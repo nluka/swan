@@ -1,0 +1,17 @@
+{
+  "configurations": [
+    {
+      "name": "main",
+      "includePath": [
+        "C:/code/boost_1_80_0",
+        "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.29.30133/include",
+        "C:/code/glfw"
+      ],
+      "intelliSenseMode": "windows-msvc-x64",
+      "compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.29.30133/bin/Hostx64/x64/cl.exe",
+      "cStandard": "c17",
+      "cppStandard": "c++20"
+    }
+  ],
+  "version": 4
+}
