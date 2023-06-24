@@ -3,7 +3,7 @@
 @REM @echo Compiling nexplorer debug...
 
 @call cl.exe /std:c++20 /nologo /W4 /WX /EHsc /Fo:obj_debug\ /Fe:nexplorer_debug.exe /I"C:/code/glfw" /I"C:/code/boost_1_80_0" /MT ^
-src/main.cpp src/util.cpp ^
+src/swan.cpp ^
 obj_debug/imgui_demo.obj ^
 obj_debug/imgui_draw.obj ^
 obj_debug/imgui_impl_glfw.obj ^
