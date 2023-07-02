@@ -100,7 +100,6 @@ GLFWwindow *init_glfw_and_imgui()
     return window;
 }
 
-
 static
 void render(GLFWwindow *window)
 {
@@ -141,21 +140,19 @@ i32 main(i32, char**)
         icon.width = 0;
         icon.height = 0;
 
-        // Load the icon image from file
-        int icon_width, iconHeight, iconChannels;
-        u8 *iconPixels = stbi_load("swan.png", &icon_width, &iconHeight, &iconChannels, STBI_rgb_alpha);
-        if (iconPixels)
-        {
-            icon.pixels = iconPixels;
-            icon.width = icon_width;
-            icon.height = iconHeight;
+        int icon_width, icon_height, icon_channels;
+        u8 *icon_pixels = stbi_load("swan.png", &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
 
-            // Set the window icon
+        if (icon_pixels)
+        {
+            icon.pixels = icon_pixels;
+            icon.width = icon_width;
+            icon.height = icon_height;
+
             glfwSetWindowIcon(window, 1, &icon);
         }
 
-        // Free the icon image data
-        stbi_image_free(iconPixels);
+        stbi_image_free(icon_pixels);
     }
 
     std::vector<explorer_window> explorers = {};
@@ -169,6 +166,7 @@ i32 main(i32, char**)
         explorer.show = true;
         explorer.dir_entries.reserve(1024);
         explorer.name = "Explorer 1";
+        explorer.last_selected_dirent_idx = explorer_window::NO_SELECTION;
         if (0 == GetCurrentDirectoryA((i32)explorer.working_dir.size(), explorer.working_dir.data())) {
             debug_log("%s: GetCurrentDirectoryA failed", explorer.name);
         } else {
@@ -180,6 +178,7 @@ i32 main(i32, char**)
         explorer.show = true;
         explorer.dir_entries.reserve(1024);
         explorer.name = "Explorer 2";
+        explorer.last_selected_dirent_idx = explorer_window::NO_SELECTION;
         if (0 == GetCurrentDirectoryA((i32)explorer.working_dir.size(), explorer.working_dir.data())) {
             debug_log("%s: GetCurrentDirectoryA failed", explorer.name);
         } else {
@@ -203,7 +202,7 @@ i32 main(i32, char**)
         ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
         if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("Windows")) {
+            if (ImGui::BeginMenu("[Windows]")) {
                 for (auto &expl : explorers) {
                     ImGui::MenuItem(expl.name, nullptr, &expl.show);
                 }
@@ -211,8 +210,9 @@ i32 main(i32, char**)
                 ImGui::MenuItem("ImGui Demo", NULL, &show_demo);
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu("Explorer Options")) {
+            if (ImGui::BeginMenu("[Explorer Options]")) {
                 ImGui::MenuItem("Show cwd length", NULL, &expl_opts.show_cwd_len);
+                ImGui::MenuItem("Show debug info", NULL, &expl_opts.show_debug_info);
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -225,11 +225,6 @@ i32 main(i32, char**)
         if (show_analytics) {
             if (ImGui::Begin("Analytics")) {
                 ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-                // ImGui::Text("s_working_dir = [%s]", s_working_dir.data());
-                // ImGui::Text("cwd_exists = [%d]", directory_exists(s_working_dir.data()));
-                // ImGui::Text("s_num_file_searches = [%zu]", s_num_file_searches);
-                // ImGui::Text("s_dir_entries.size() = [%zu]", s_dir_entries.size());
-                // ImGui::Text("s_last_selected_dirent_idx = [%lld]", s_last_selected_dirent_idx);
             }
             ImGui::End();
         }
