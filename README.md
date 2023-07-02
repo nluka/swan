@@ -36,12 +36,12 @@ entry = file | directory
 - [x] Multiple panes
 - [x] Manual refresh
 - [x] Regex filtering
+- [x] Clickable directories in cwd
 - [ ] Back/forward buttons
-- [ ] Glob filtering
 - [ ] Handle shortcuts
-- [ ] Clickable directories in cwd
 - [ ] Sort directory entries
 - [ ] Move directory entries
+- [ ] Glob filtering
 - [ ] Cut/Copy Paste directory entries
 - [ ] Pins
 - [ ] Show directory preview (num child files/dirs)
