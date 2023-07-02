@@ -18,6 +18,7 @@ entry = file | directory
 - \[Shift] + \[Left Click] to add all entries inclusively between prev-click and current-click to selection
 - double \[Left Click] to open entry
 - \[Enter] to open selected entry
+- \[Ctrl] + \[r] to refresh entries
 
 ### What annoys me about Windows Explorer
 
@@ -38,6 +39,7 @@ entry = file | directory
 - [x] Regex filtering
 - [x] Clickable directories in cwd
 - [x] Back/forward history buttons
+- [x] Ctrl-r to refresh
 - [ ] "Contains" filtering
 - [ ] History browser
 - [ ] Handle shortcuts (IShellLink)

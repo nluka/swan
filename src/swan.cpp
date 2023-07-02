@@ -218,6 +218,7 @@ i32 main(i32, char**)
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu("[Explorer Options]")) {
+                    ImGui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
                     if (ImGui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir)) {
                         for (auto &expl : explorers) {
                             update_cwd_entries(&expl, expl.cwd.data(), expl_opts);
