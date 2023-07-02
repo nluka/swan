@@ -9,6 +9,16 @@ The <u>sw</u>iss <u>a</u>rmy k<u>n</u>ife program for Windows. One program to re
 
 ## Explorer
 
+### Controls
+
+entry = file | directory
+
+- \[Left Click] to set selection to entry
+- \[Ctrl] + \[Left Click] to toggle entry selection
+- \[Shift] + \[Left Click] to add all entries inclusively between prev-click and current-click to selection
+- double \[Left Click] to open entry
+- \[Enter] to open selected entry
+
 ### What annoys me about Windows Explorer
 
 - Only a single pane
@@ -23,7 +33,7 @@ The <u>sw</u>iss <u>a</u>rmy k<u>n</u>ife program for Windows. One program to re
 - [x] Remove "." directory
 - [x] Double click directory
 - [x] Double click file
-- [ ] Multiple panes
+- [x] Multiple panes
 - [ ] Handle shortcuts
 - [ ] Clickable directories in cwd
 - [ ] Sort directory entries
