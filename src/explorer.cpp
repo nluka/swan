@@ -245,13 +245,79 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
     //     }
     // }
 
+    // ImGui::SameLine();
+
+    // if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
+    //     debug_log("%s: back triggered", expl.name);
+    // }
+
+    // ImGui::SameLine();
+
+    // if (ImGui::ArrowButton("Forward", ImGuiDir_Right)) {
+    //     debug_log("%s: forward triggered", expl.name);
+    // }
+
     ImGui::Spacing();
     ImGui::Spacing();
 
     {
+        static char const *clicknav_label     = "clicknav:";
         static char const *cwd_label_with_len = "cwd(%3d):";
         static char const *cwd_label_no_len   = "     cwd:";
         static char const *filter_label       = "  filter:";
+
+        if (!expl.dir_entries.empty()) {
+            ImGui::Text(clicknav_label);
+            ImGui::SameLine();
+
+            static std::vector<char const *> slices(50);
+            slices.clear();
+
+            path_t sliced_path = expl.working_dir;
+            char const *slice = strtok(sliced_path.data(), "\\/");
+            while (slice != nullptr) {
+                slices.push_back(slice);
+                slice = strtok(nullptr, "\\/");
+            }
+
+            auto cd_to_slice = [&expl, &sliced_path](char const *slice) {
+                char const *slice_end = slice;
+                while (*slice_end != '\0') {
+                    ++slice_end;
+                }
+
+                u64 len = slice_end - sliced_path.data();
+                expl.working_dir[len] = '\0';
+            };
+
+            f32 original_spacing = ImGui::GetStyle().ItemSpacing.x;
+            if (slices.size() > 1) {
+                ImGui::GetStyle().ItemSpacing.x = 2;
+            }
+
+            for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
+                if (ImGui::Button(*slice_it)) {
+                    debug_log("%s: clicked slice [%s]", expl.name, *slice_it);
+                    cd_to_slice(*slice_it);
+                    update_dir_entries(&expl, expl.working_dir.data());
+                }
+                ImGui::SameLine();
+                ImGui::Text("\\");
+                ImGui::SameLine();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(slices.back())) {
+                debug_log("%s: clicked slice [%s]", expl.name, slices.back());
+                cd_to_slice(slices.back());
+                update_dir_entries(&expl, expl.working_dir.data());
+            }
+
+            // TODO: ImGui::Combo() for all directories in expl.working_dir
+
+            if (slices.size() > 1) {
+                ImGui::GetStyle().ItemSpacing.x = original_spacing;
+            }
+        }
 
         if (expl_opts.show_cwd_len) {
             ImGui::Text(cwd_label_with_len, strlen(expl.working_dir.data()));
