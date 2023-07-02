@@ -34,6 +34,9 @@ entry = file | directory
 - [x] Double click directory
 - [x] Double click file
 - [x] Multiple panes
+- [x] Manual refresh
+- [ ] Automatic refresh
+- [ ] Filtering
 - [ ] Handle shortcuts
 - [ ] Clickable directories in cwd
 - [ ] Sort directory entries
