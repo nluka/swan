@@ -1,8 +1,4 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include <cstdio>
-#include <string>
-#include <cstring>
-#include <memory>
 
 #if 0
     // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
@@ -156,6 +152,8 @@ i32 main(i32, char**)
         stbi_image_free(icon_pixels);
     }
 
+    static explorer_options expl_opts = {};
+
     std::vector<explorer_window> explorers = {};
     explorers.reserve(2);
 
@@ -165,25 +163,29 @@ i32 main(i32, char**)
     {
         explorer_window &explorer = explorers[0];
         explorer.show = true;
-        explorer.dir_entries.reserve(1024);
+        explorer.cwd_entries.reserve(1024);
         explorer.name = "Explorer 1";
         explorer.last_selected_dirent_idx = explorer_window::NO_SELECTION;
-        if (0 == GetCurrentDirectoryA((i32)explorer.working_dir.size(), explorer.working_dir.data())) {
+        if (0 == GetCurrentDirectoryA((i32)explorer.cwd.size(), explorer.cwd.data())) {
             debug_log("%s: GetCurrentDirectoryA failed", explorer.name);
-        } else {
-            update_dir_entries(&explorer, explorer.working_dir.data());
+        }
+        else {
+            update_cwd_entries(&explorer, explorer.cwd.data(), expl_opts);
+            explorer.wd_history.push_back(explorer.cwd);
         }
     }
     {
         explorer_window &explorer = explorers[1];
         explorer.show = true;
-        explorer.dir_entries.reserve(1024);
+        explorer.cwd_entries.reserve(1024);
         explorer.name = "Explorer 2";
         explorer.last_selected_dirent_idx = explorer_window::NO_SELECTION;
-        if (0 == GetCurrentDirectoryA((i32)explorer.working_dir.size(), explorer.working_dir.data())) {
+        if (0 == GetCurrentDirectoryA((i32)explorer.cwd.size(), explorer.cwd.data())) {
             debug_log("%s: GetCurrentDirectoryA failed", explorer.name);
-        } else {
-            update_dir_entries(&explorer, explorer.working_dir.data());
+        }
+        else {
+            update_cwd_entries(&explorer, explorer.cwd.data(), expl_opts);
+            explorer.wd_history.push_back(explorer.cwd);
         }
     }
 
@@ -199,7 +201,6 @@ i32 main(i32, char**)
 
         static bool show_analytics = false;
         static bool show_demo = false;
-        static explorer_options expl_opts = {};
 
         {
             ImGuiStyle &style = ImGui::GetStyle();
@@ -217,6 +218,11 @@ i32 main(i32, char**)
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu("[Explorer Options]")) {
+                    if (ImGui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir)) {
+                        for (auto &expl : explorers) {
+                            update_cwd_entries(&expl, expl.cwd.data(), expl_opts);
+                        }
+                    }
                     ImGui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
                     ImGui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
                     ImGui::EndMenu();
