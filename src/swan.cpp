@@ -19,6 +19,7 @@
 #include "stbi_image.h"
 #pragma warning(pop)
 
+#define IMGUI_DEFINE_MATH_OPERATORS 1
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
@@ -60,14 +61,14 @@ GLFWwindow *init_glfw_and_imgui()
     {
         int screenWidth = GetSystemMetrics(SM_CXSCREEN);
         int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-        window = glfwCreateWindow(screenWidth, screenHeight, "nexplorer", nullptr, nullptr);
+        window = glfwCreateWindow(screenWidth, screenHeight, "swan", nullptr, nullptr);
         if (window == nullptr) {
             return nullptr;
         }
     }
 
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    glfwSwapInterval(1); // vsync
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -81,7 +82,7 @@ GLFWwindow *init_glfw_and_imgui()
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
     ImGui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
-    ImGui::StyleColorsDark();
+    ImGui::StyleColorsClassic();
 
     // Setup Platform/Renderer backends
     {
@@ -186,11 +187,6 @@ i32 main(i32, char**)
         }
     }
 
-    static bool show_analytics = false;
-    static bool show_demo = false;
-
-    explorer_options expl_opts = {};
-
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -201,21 +197,34 @@ i32 main(i32, char**)
 
         ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
-        if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("[Windows]")) {
-                for (auto &expl : explorers) {
-                    ImGui::MenuItem(expl.name, nullptr, &expl.show);
+        static bool show_analytics = false;
+        static bool show_demo = false;
+        static explorer_options expl_opts = {};
+
+        {
+            ImGuiStyle &style = ImGui::GetStyle();
+            f32 original_padding = style.FramePadding.y;
+
+            style.FramePadding.y = 7.5f;
+
+            if (ImGui::BeginMainMenuBar()) {
+                if (ImGui::BeginMenu("[Windows]")) {
+                    for (auto &expl : explorers) {
+                        ImGui::MenuItem(expl.name, nullptr, &expl.show);
+                    }
+                    ImGui::MenuItem("Analytics", nullptr, &show_analytics);
+                    ImGui::MenuItem("ImGui Demo", nullptr, &show_demo);
+                    ImGui::EndMenu();
                 }
-                ImGui::MenuItem("Analytics", NULL, &show_analytics);
-                ImGui::MenuItem("ImGui Demo", NULL, &show_demo);
-                ImGui::EndMenu();
+                if (ImGui::BeginMenu("[Explorer Options]")) {
+                    ImGui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
+                    ImGui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMainMenuBar();
             }
-            if (ImGui::BeginMenu("[Explorer Options]")) {
-                ImGui::MenuItem("Show cwd length", NULL, &expl_opts.show_cwd_len);
-                ImGui::MenuItem("Show debug info", NULL, &expl_opts.show_debug_info);
-                ImGui::EndMenu();
-            }
-            ImGui::EndMainMenuBar();
+
+            style.FramePadding.y = original_padding;
         }
 
         for (auto &expl : explorers) {
@@ -224,7 +233,12 @@ i32 main(i32, char**)
 
         if (show_analytics) {
             if (ImGui::Begin("Analytics")) {
-                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+                // static ImVec4 green(100, 255, 0, 255);
+                // static ImVec4 yellow(255, 255, 0, 255);
+                // static ImVec4 red(255, 50, 0, 255);
+
+                ImGui::Text("%.1f FPS", io.Framerate);
+                ImGui::Text("%.3f ms/frame ", 1000.0f / io.Framerate);
             }
             ImGui::End();
         }
