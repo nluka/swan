@@ -23,6 +23,7 @@ typedef std::array<char, MAX_PATH> path_t;
 struct directory_entry
 {
     bool is_directory;
+    bool is_symbolic_link;
     bool is_selected;
     path_t path;
     u64 size;
@@ -109,12 +110,13 @@ void update_dir_entries(explorer_window *expl_ptr, std::string_view parent_dir)
 
         directory_entry entry = {};
 
+        std::memcpy(entry.path.data(), find_data.cFileName, entry.path.size());
+
         entry.is_directory = find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+        entry.is_symbolic_link = path_ends_with(entry.path, ".lnk");
 
         entry.size = static_cast<u64>(find_data.nFileSizeHigh) << 32;
         entry.size |= static_cast<u64>(find_data.nFileSizeLow);
-
-        std::memcpy(entry.path.data(), find_data.cFileName, entry.path.size());
 
         if (strcmp(entry.path.data(), ".") == 0) {
             continue;
@@ -196,6 +198,14 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
         return;
     }
 
+    if (ImGui::Button("Refresh")) {
+        debug_log("%s: refresh triggered", expl.name);
+        update_dir_entries(&expl, expl.working_dir.data());
+    }
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
     {
         static char const *cwd_label_with_len = "cwd(%3d):";
         static char const *cwd_label_no_len   = "cwd:     ";
@@ -218,6 +228,7 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
         ImGui::InputText("##filter", expl.filter.data(), expl.filter.size());
     }
 
+    ImGui::Spacing();
     ImGui::Spacing();
 
     bool window_focused = ImGui::IsWindowFocused();
@@ -302,6 +313,10 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
                             if (dir_ent.is_directory) {
                                 debug_log("%s: double clicked directory [%s]", expl.name, dir_ent.path.data());
                                 try_descend_to_directory(expl, dir_ent.path.data());
+                            }
+                            else if (dir_ent.is_symbolic_link) {
+                                debug_log("%s: double clicked link [%s]", expl.name, dir_ent.path.data());
+                                // TODO: implement
                             }
                             else {
                                 debug_log("%s: double clicked file [%s]", expl.name, dir_ent.path.data());

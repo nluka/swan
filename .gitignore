@@ -6,3 +6,5 @@ imgui.ini
 *.res
 *.png
 *.ico
+*.pdf
+*.lnk
