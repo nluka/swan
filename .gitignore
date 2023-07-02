@@ -3,3 +3,6 @@ obj/
 *.obj
 imgui.ini
 *.exe
+*.res
+*.png
+*.ico
