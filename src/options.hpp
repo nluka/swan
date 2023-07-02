@@ -9,6 +9,7 @@
 
 struct explorer_options
 {
+    bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
     bool show_cwd_len;
     bool show_debug_info;
     bool automatic_refresh;

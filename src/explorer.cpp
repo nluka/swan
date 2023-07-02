@@ -421,53 +421,139 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
 
     bool window_focused = ImGui::IsWindowFocused();
 
+    if (window_focused && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) {
+        debug_log("%s: ctrl-r, refresh", expl.name);
+        update_cwd_entries(&expl, expl.cwd.data(), opts);
+    }
+
     if (expl.cwd_entries.empty()) {
         static ImVec4 const orange(1, 0.5, 0, 1);
-
         ImGui::TextColored(orange, "Not a directory.");
     }
     else {
         static ImVec4 const white(1, 1, 1, 1);
         static ImVec4 const yellow(1, 1, 0, 1);
 
-        u64 num_filtered_dirents = 0;
-        u64 num_selected_dirents = 0;
-        u64 num_directory_dirents = 0;
-        u64 num_symlink_dirents = 0;
+        u64 num_selected_directories = 0;
+        u64 num_selected_symlinks = 0;
+        u64 num_selected_files = 0;
+
+        u64 num_filtered_directories = 0;
+        u64 num_filtered_symlinks = 0;
+        u64 num_filtered_files = 0;
+
+        u64 num_child_directories = 0;
+        u64 num_child_symlinks = 0;
 
         for (auto const &dir_ent : expl.cwd_entries) {
             static_assert(false == 0);
             static_assert(true == 1);
-            num_filtered_dirents += u64(dir_ent.is_filtered_out);
-            num_selected_dirents += u64(dir_ent.is_selected);
-            num_directory_dirents += u64(dir_ent.is_directory);
-            num_symlink_dirents += u64(dir_ent.is_symbolic_link);
+
+            num_selected_directories += u64(dir_ent.is_selected && dir_ent.is_directory);
+            num_selected_symlinks += u64(dir_ent.is_selected && dir_ent.is_symbolic_link);
+            num_selected_files += u64(dir_ent.is_selected && !dir_ent.is_directory && !dir_ent.is_symbolic_link);
+
+            num_filtered_directories += u64(dir_ent.is_filtered_out && dir_ent.is_directory);
+            num_filtered_symlinks += u64(dir_ent.is_filtered_out && dir_ent.is_symbolic_link);
+            num_filtered_files += u64(dir_ent.is_filtered_out && !dir_ent.is_directory && !dir_ent.is_symbolic_link);
+
+            num_child_directories += u64(dir_ent.is_directory);
+            num_child_symlinks += u64(dir_ent.is_symbolic_link);
         }
 
-        u64 num_file_dirents = expl.cwd_entries.size() - num_directory_dirents - num_symlink_dirents;
+        u64 num_filtered_dirents = num_filtered_directories + num_filtered_symlinks + num_filtered_files;
+        u64 num_selected_dirents = num_selected_directories + num_selected_symlinks + num_selected_files;
+        u64 num_child_dirents = expl.cwd_entries.size();
+        u64 num_child_files = num_child_dirents - num_child_directories - num_child_symlinks;
+
+        ImGui::Text("%zu children", num_child_dirents);
+        if (num_child_dirents > 0) {
+            ImGui::SameLine();
+            ImGui::Text(":");
+        }
+        if (num_child_files > 0) {
+            ImGui::SameLine();
+            ImGui::Text("%zu file%s", num_child_files, num_child_files == 1 ? "" : "s");
+        }
+        if (num_child_directories > 0) {
+            ImGui::SameLine();
+            ImGui::Text("%zu director%s", num_child_directories, num_child_directories == 1 ? "y" : "ies");
+        }
+        if (num_child_symlinks > 0) {
+            ImGui::SameLine();
+            ImGui::Text("%zu shortcut%s", num_child_symlinks, num_child_symlinks == 1 ? "" : "s");
+        }
+        // ImGui::Text("%zu total children: %zu director%s, %zu file%s, %zu shortcut%s.",
+        //     expl.cwd_entries.size(),
+        //     num_child_directories, num_child_directories == 1 ? "y" : "ies",
+        //     num_child_files, num_child_files == 1 ? "" : "s",
+        //     num_child_symlinks, num_child_symlinks == 1 ? "" : "s");
 
         if (expl.filter_error != "") {
-            static ImVec4 red(1, .2f, 0, 1);
+            static ImVec4 const red(1, .2f, 0, 1);
 
             ImGui::PushTextWrapPos(ImGui::GetColumnWidth());
-            ImGui::TextColored(red, "Filter failed - %s", expl.filter_error.c_str());
+            ImGui::TextColored(red, "Filter failed: %s", expl.filter_error.c_str());
             ImGui::PopTextWrapPos();
         }
         else {
-            ImGui::Text("%zu entries filtered.", num_filtered_dirents);
+            ImGui::Text("%zu filtered", num_filtered_dirents);
+            if (num_filtered_dirents > 0) {
+                ImGui::SameLine();
+                ImGui::Text(":");
+            }
+            if (num_filtered_files > 0) {
+                ImGui::SameLine();
+                ImGui::Text("%zu file%s", num_filtered_files, num_filtered_files == 1 ? "" : "s");
+            }
+            if (num_filtered_directories > 0) {
+                ImGui::SameLine();
+                ImGui::Text("%zu director%s", num_filtered_directories, num_filtered_directories == 1 ? "y" : "ies");
+            }
+            if (num_filtered_symlinks > 0) {
+                ImGui::SameLine();
+                ImGui::Text("%zu shortcut%s", num_filtered_symlinks, num_filtered_symlinks == 1 ? "" : "s");
+            }
+            // ImGui::Text("%zu filtered: %zu director%s, %zu file%s, %zu shortcut%s.",
+            //     num_filtered_dirents,
+            //     num_filtered_directories, num_filtered_directories == 1 ? "y" : "ies",
+            //     num_filtered_files, num_filtered_files == 1 ? "" : "s",
+            //     num_filtered_symlinks, num_filtered_symlinks == 1 ? "" : "s");
         }
-        ImGui::Text("%zu entries selected.", num_selected_dirents);
-        ImGui::Text("%zu directories, %zu files, %zu shortcuts.", num_directory_dirents, num_file_dirents, num_symlink_dirents);
+
+        ImGui::Text("%zu selected", num_selected_dirents);
+        if (num_selected_dirents > 0) {
+            ImGui::SameLine();
+            ImGui::Text(":");
+        }
+        if (num_selected_files > 0) {
+            ImGui::SameLine();
+            ImGui::Text("%zu file%s", num_selected_files, num_selected_files == 1 ? "" : "s");
+        }
+        if (num_selected_directories > 0) {
+            ImGui::SameLine();
+            ImGui::Text("%zu director%s", num_selected_directories, num_selected_directories == 1 ? "y" : "ies");
+        }
+        if (num_selected_symlinks > 0) {
+            ImGui::SameLine();
+            ImGui::Text("%zu shortcut%s", num_selected_symlinks, num_selected_symlinks == 1 ? "" : "s");
+        }
+        // ImGui::Text("%zu selected: %zu director%s, %zu file%s, %zu shortcut%s.",
+        //     num_selected_dirents,
+        //     num_selected_directories, num_selected_directories == 1 ? "y" : "ies",
+        //     num_selected_files, num_selected_files == 1 ? "" : "s",
+        //     num_selected_symlinks, num_selected_symlinks == 1 ? "" : "s");
 
         ImGui::Spacing();
         ImGui::Spacing();
 
-        if (ImGui::BeginTable("Entries", 3, ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable)) {
-            enum class column_id : u32 { number, path, size, };
+        enum class column_id : i32 { number, path, size_pretty, size_bytes, count };
 
-            ImGui::TableSetupColumn("Number", 0, 0.0f, (u32)column_id::number);
-            ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_DefaultSort, 0.0f, (u32)column_id::path);
-            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_DefaultSort, 0.0f, (u32)column_id::size);
+        if (ImGui::BeginTable("Entries", (i32)column_id::count, ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable)) {
+            ImGui::TableSetupColumn("Number", ImGuiTableColumnFlags_DefaultSort, 0.0f, (u32)column_id::number);
+            ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_NoSort, 0.0f, (u32)column_id::path);
+            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_NoSort, 0.0f, (u32)column_id::size_pretty);
+            ImGui::TableSetupColumn("Bytes", ImGuiTableColumnFlags_NoSort, 0.0f, (u32)column_id::size_bytes);
             ImGui::TableHeadersRow();
 
             if (window_focused && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -489,13 +575,15 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
 
                 ImGui::TableNextRow();
 
+                // Number (column_id::number)
                 {
-                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TableSetColumnIndex((i32)column_id::number);
                     ImGui::Text("%zu", i + 1);
                 }
 
+                // Path (column_id::path)
                 {
-                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TableSetColumnIndex((i32)column_id::path);
                     ImGui::PushStyleColor(ImGuiCol_Text, dir_ent.is_directory ? yellow : white);
 
                     if (ImGui::Selectable(dir_ent.path.data(), dir_ent.is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
@@ -572,8 +660,22 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                     ImGui::PopStyleColor();
                 }
 
+                // Size (column_id::size_pretty)
                 {
-                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TableSetColumnIndex((i32)column_id::size_pretty);
+                    if (dir_ent.is_directory) {
+                        ImGui::Text("");
+                    }
+                    else {
+                        std::array<char, 21> pretty_size = {};
+                        format_file_size(dir_ent.size, pretty_size.data(), pretty_size.size(), opts.binary_size_system ? 1024 : 1000);
+                        ImGui::Text("%s", pretty_size.data());
+                    }
+                }
+
+                // Bytes (column_id::size_bytes)
+                {
+                    ImGui::TableSetColumnIndex((i32)column_id::size_bytes);
                     if (dir_ent.is_directory) {
                         ImGui::Text("");
                     }
