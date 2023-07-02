@@ -35,8 +35,9 @@ entry = file | directory
 - [x] Double click file
 - [x] Multiple panes
 - [x] Manual refresh
-- [ ] Automatic refresh
-- [ ] Filtering
+- [x] Regex filtering
+- [ ] Back/forward buttons
+- [ ] Glob filtering
 - [ ] Handle shortcuts
 - [ ] Clickable directories in cwd
 - [ ] Sort directory entries
@@ -45,3 +46,4 @@ entry = file | directory
 - [ ] Pins
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview
+- [ ] Automatic refresh

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <vector>
 #include <cstdint>
+#include <regex>
 
 #include <Windows.h>
 #include "Shlwapi.h"
@@ -22,6 +23,7 @@ typedef std::array<char, MAX_PATH> path_t;
 
 struct directory_entry
 {
+    bool is_filtered_out;
     bool is_directory;
     bool is_symbolic_link;
     bool is_selected;
@@ -32,12 +34,14 @@ struct directory_entry
 struct explorer_window
 {
     bool show;
-    std::array<char, 1024> filter;
+    std::array<char, 512> filter;
     path_t working_dir;
     std::vector<directory_entry> dir_entries;
+    std::string filter_error;
     char const *name;
     u64 num_file_searches;
     u64 last_selected_dirent_idx;
+    LARGE_INTEGER last_refresh_timestamp;
 
     static u64 const NO_SELECTION = UINT64_MAX;
 };
@@ -78,6 +82,7 @@ void update_dir_entries(explorer_window *expl_ptr, std::string_view parent_dir)
     explorer_window &expl = *expl_ptr;
 
     expl.dir_entries.clear();
+    expl.filter_error.clear();
 
     WIN32_FIND_DATAA find_data;
 
@@ -138,6 +143,24 @@ void update_dir_entries(explorer_window *expl_ptr, std::string_view parent_dir)
             return lhs.is_directory;
         }
     });
+
+    {
+        static std::regex filter(expl.filter[0] == '\0' ? ".*" : expl.filter.data());
+
+        try {
+            filter = std::regex(expl.filter[0] == '\0' ? ".*" : expl.filter.data());
+        }
+        catch (std::exception const &except) {
+            debug_log("%s: error constructing std::regex, %s", expl.name, except.what());
+            expl.filter_error = except.what();
+        }
+
+        for (auto &dir_ent : expl.dir_entries) {
+            dir_ent.is_filtered_out = !std::regex_match(dir_ent.path.data(), filter);
+        }
+    }
+
+    (void) QueryPerformanceCounter(&expl.last_refresh_timestamp);
 }
 
 void try_descend_to_directory(explorer_window &expl, char const *child_dir)
@@ -184,6 +207,16 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
     return 0;
 }
 
+f64 compute_diff_ms(LARGE_INTEGER start, LARGE_INTEGER end)
+{
+    LARGE_INTEGER frequency;
+    (void) QueryPerformanceFrequency(&frequency);
+
+    LONGLONG ticks = end.QuadPart - start.QuadPart;
+    f64 milliseconds = f64(ticks) * f64(1000) / f64(frequency.QuadPart);
+    return milliseconds;
+}
+
 static
 void render_file_explorer(explorer_window &expl, explorer_options const &expl_opts)
 {
@@ -202,14 +235,23 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
         debug_log("%s: refresh triggered", expl.name);
         update_dir_entries(&expl, expl.working_dir.data());
     }
+    // else {
+    //     LARGE_INTEGER current_timestamp = {};
+    //     (void) QueryPerformanceCounter(&current_timestamp);
+    //     f64 diff_ms = compute_diff_ms(expl.last_refresh_timestamp, current_timestamp);
+    //     if (diff_ms >= f64(1500)) {
+    //         debug_log("%s: automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
+    //         update_dir_entries(&expl, expl.working_dir.data());
+    //     }
+    // }
 
     ImGui::Spacing();
     ImGui::Spacing();
 
     {
         static char const *cwd_label_with_len = "cwd(%3d):";
-        static char const *cwd_label_no_len   = "cwd:     ";
-        static char const *filter_label       = "filter:  ";
+        static char const *cwd_label_no_len   = "     cwd:";
+        static char const *filter_label       = "  filter:";
 
         if (expl_opts.show_cwd_len) {
             ImGui::Text(cwd_label_with_len, strlen(expl.working_dir.data()));
@@ -234,11 +276,33 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
     bool window_focused = ImGui::IsWindowFocused();
 
     if (expl.dir_entries.empty()) {
-        ImGui::Text("Not a directory.");
+        static ImVec4 const orange(1, 0.5, 0, 1);
+
+        ImGui::TextColored(orange, "Not a directory.");
     }
     else {
-        static ImVec4 const white(255, 255, 255, 255);
-        static ImVec4 const yellow(255, 255, 0, 255);
+        static ImVec4 const white(1, 1, 1, 1);
+        static ImVec4 const yellow(1, 1, 0, 1);
+
+        u64 num_filtered_dirents = std::count_if(
+            expl.dir_entries.begin(),
+            expl.dir_entries.end(),
+            [](directory_entry const &e) { return e.is_filtered_out; }
+        );
+
+        if (expl.filter_error != "") {
+            static ImVec4 red(1, .2f, 0, 1);
+
+            ImGui::PushTextWrapPos(ImGui::GetColumnWidth());
+            ImGui::TextColored(red, "Filter failed... %s", expl.filter_error.c_str());
+            ImGui::PopTextWrapPos();
+        }
+        else {
+            ImGui::Text("%zu entries filtered.", num_filtered_dirents);
+        }
+
+        ImGui::Spacing();
+        ImGui::Spacing();
 
         if (ImGui::BeginTable("Entries", 3, ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable)) {
             enum class column_id : u32 { number, path, size, };
@@ -259,6 +323,11 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
 
             for (u64 i = 0; i < expl.dir_entries.size(); ++i) {
                 auto &dir_ent = expl.dir_entries[i];
+
+                if (dir_ent.is_filtered_out) {
+                    ++num_filtered_dirents;
+                    continue;
+                }
 
                 ImGui::TableNextRow();
 
@@ -302,8 +371,9 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
 
                             debug_log("%s: shift click, [%zu, %zu]", expl.name, first_idx, last_idx);
 
-                            for (u64 j = first_idx; j <= last_idx; ++j)
+                            for (u64 j = first_idx; j <= last_idx; ++j) {
                                 expl.dir_entries[j].is_selected = true;
+                            }
                         }
 
                         static f64 last_click_time = 0;
@@ -376,6 +446,7 @@ void render_file_explorer(explorer_window &expl, explorer_options const &expl_op
             ImGui::Spacing();
         }
 
+        ImGui::Text("[DEBUG]");
         ImGui::Text("working_dir = [%s]", expl.working_dir.data());
         ImGui::Text("cwd_exists = %d", directory_exists(expl.working_dir.data()));
         ImGui::Text("num_file_searches = %zu", expl.num_file_searches);
