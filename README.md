@@ -37,8 +37,10 @@ entry = file | directory
 - [x] Manual refresh
 - [x] Regex filtering
 - [x] Clickable directories in cwd
-- [ ] Back/forward buttons
-- [ ] Handle shortcuts
+- [x] Back/forward history buttons
+- [ ] "Contains" filtering
+- [ ] History browser
+- [ ] Handle shortcuts (IShellLink)
 - [ ] Sort directory entries
 - [ ] Move directory entries
 - [ ] Glob filtering
