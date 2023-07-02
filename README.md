@@ -2,12 +2,14 @@
 
 The <u>sw</u>iss <u>a</u>rmy k<u>n</u>ife program for Windows. One program to replace many, featuring:
 
-- [ ] Powerful file explorer (wayyy better than Windows Explorer)
+- [ ] Powerful [file explorer](#explorer) (wayyy better than Windows Explorer)
 - [ ] Super fast file finder (Windows Explorer? pfff)
 - [ ] yt-dlp frontend
 - [ ] Fast, useful terminal (unlike Command Prompt)
 
-## What annoys me about Windows Explorer
+## Explorer
+
+### What annoys me about Windows Explorer
 
 - Only a single pane
 - Bad Shift-click behavior
@@ -16,11 +18,12 @@ The <u>sw</u>iss <u>a</u>rmy k<u>n</u>ife program for Windows. One program to re
 - Lacks ability to see/kill processes which are locking a file
 - Can't tell if a folder has stuff inside (files? folders? nested folders?)
 
-## Todo
+### Todo
 
 - [x] Remove "." directory
 - [x] Double click directory
 - [x] Double click file
+- [ ] Multiple panes
 - [ ] Handle shortcuts
 - [ ] Clickable directories in cwd
 - [ ] Sort directory entries
