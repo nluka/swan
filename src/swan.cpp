@@ -1,4 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
+#include <filesystem>
 
 #if 0
     // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
@@ -152,42 +153,23 @@ i32 main(i32, char**)
         stbi_image_free(icon_pixels);
     }
 
+    path_t starting_path = {};
+    if (!GetCurrentDirectoryA((i32)starting_path.size(), starting_path.data())) {
+        debug_log("GetCurrentDirectoryA failed");
+    }
+
     static explorer_options expl_opts = {};
+#if !defined(NDEBUG)
+    expl_opts.show_debug_info = true;
+    expl_opts.show_cwd_len = true;
+#endif
 
     std::vector<explorer_window> explorers = {};
-    explorers.reserve(2);
-
-    explorers.push_back({});
-    explorers.push_back({});
-
-    {
-        explorer_window &explorer = explorers[0];
-        explorer.show = true;
-        explorer.cwd_entries.reserve(1024);
-        explorer.name = "Explorer 1";
-        explorer.last_selected_dirent_idx = explorer_window::NO_SELECTION;
-        if (0 == GetCurrentDirectoryA((i32)explorer.cwd.size(), explorer.cwd.data())) {
-            debug_log("%s: GetCurrentDirectoryA failed", explorer.name);
-        }
-        else {
-            update_cwd_entries(&explorer, explorer.cwd.data(), expl_opts);
-            explorer.wd_history.push_back(explorer.cwd);
-        }
-    }
-    {
-        explorer_window &explorer = explorers[1];
-        explorer.show = true;
-        explorer.cwd_entries.reserve(1024);
-        explorer.name = "Explorer 2";
-        explorer.last_selected_dirent_idx = explorer_window::NO_SELECTION;
-        if (0 == GetCurrentDirectoryA((i32)explorer.cwd.size(), explorer.cwd.data())) {
-            debug_log("%s: GetCurrentDirectoryA failed", explorer.name);
-        }
-        else {
-            update_cwd_entries(&explorer, explorer.cwd.data(), expl_opts);
-            explorer.wd_history.push_back(explorer.cwd);
-        }
-    }
+    explorers.reserve(4);
+    explorers.emplace_back(create_default_explorer_windows("Explorer 1", true, starting_path, expl_opts));
+    explorers.emplace_back(create_default_explorer_windows("Explorer 2", true, starting_path, expl_opts));
+    explorers.emplace_back(create_default_explorer_windows("Explorer 3", false, starting_path, expl_opts));
+    explorers.emplace_back(create_default_explorer_windows("Explorer 4", false, starting_path, expl_opts));
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();

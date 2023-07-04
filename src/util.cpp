@@ -3,10 +3,35 @@
 
 #include <iostream>
 
+// Returns the size of a static C-style array at compile time.
+template <typename ElemTy, u64 Length>
+consteval
+u64 lengthof(ElemTy (&)[Length]) { return Length; }
+
 static
 void flip_bool(bool &b)
 {
     b ^= true;
+}
+
+// TODO: fix
+char const *strstr_icase(char const *haystack, char const *needle)
+{
+    u64 needle_len = strlen(needle);
+    u64 haystack_len = strlen(haystack);
+
+    for (u64 i = 0; i <= haystack_len - needle_len; ++i) {
+        if (
+            std::equal(
+                needle, needle + needle_len, haystack + i,
+                [](char a, char b) { return toupper(a) == toupper(b); }
+            )
+        ) {
+            return haystack + i;
+        }
+    }
+
+    return nullptr;
 }
 
 static
