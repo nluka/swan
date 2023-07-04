@@ -18,6 +18,7 @@
 #include "primitives.hpp"
 #include "on_scope_exit.hpp"
 #include "options.hpp"
+#include "scoped_timer.hpp"
 
 #include "util.cpp"
 
@@ -33,34 +34,49 @@ struct directory_entry
     u64 size;
 };
 
-struct explorer_window
+enum filter_mode : i32
 {
-    bool show;
-    std::array<char, 512> filter;
-    path_t cwd; // current working directory
-    std::vector<directory_entry> cwd_entries; // all direct children of the cwd
-    std::string filter_error;
-    std::deque<path_t> wd_history; // history for cwd (back/forward arrows)
-    u64 wd_history_pos; // where in the cwd history we are (back/forward arrows)
-    char const *name;
-    u64 num_file_searches;
-    u64 last_selected_dirent_idx;
-    LARGE_INTEGER last_refresh_timestamp;
-
-    static u64 const NO_SELECTION = UINT64_MAX;
+    contains,
+    regex,
+    // glob,
+    count,
 };
 
-enum class path_append_result : i32
+struct explorer_window
 {
-    success = 0,
-    nil,
-    exceeds_max_path,
+    char const *name;
+    bool show;
+
+    path_t cwd; // current working directory
+    std::vector<directory_entry> cwd_entries; // all direct children of the cwd
+    u64 cwd_prev_selected_dirent_idx; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
+    static u64 const NO_SELECTION = UINT64_MAX;
+
+    std::deque<path_t> wd_history; // history for cwd (back/forward arrows)
+    u64 wd_history_pos; // where in the cwd history we are (back/forward arrows)
+
+    std::string filter;
+    std::string filter_error;
+    filter_mode filter_mode;
+    bool filter_case_sensitive;
+
+    // [DEBUG]
+    u64 num_file_searches;
+    LARGE_INTEGER last_refresh_timestamp;
+    f64 filter_time_us;
 };
 
 u64 path_length(path_t const &path) noexcept
 {
     return strlen(path.data());
 }
+
+enum class path_append_result : i32
+{
+    nil = -1,
+    success = 0,
+    exceeds_max_path,
+};
 
 path_append_result path_append(path_t &path, char const *str)
 {
@@ -83,10 +99,20 @@ bool path_ends_with(path_t const &path, char const *chars)
     return strchr(chars, last_ch);
 }
 
+void path_clear(path_t &path)
+{
+    path[0] = '\0';
+}
+
+// TODO: consider adding an options struct argument to control whether the filesystem is queried
+//       or filtration is performed, etc. as it may be relevant for efficiency
 static
 void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, explorer_options const &opts)
 {
     IM_ASSERT(expl_ptr != nullptr);
+
+    scoped_timer<scoped_timer_unit::MICROSECONDS> timer("update_cwd_entries", nullptr, &std::cout);
+
     explorer_window &expl = *expl_ptr;
 
     expl.cwd_entries.clear();
@@ -155,23 +181,92 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
         }
     });
 
-    {
-        static std::regex filter(expl.filter[0] == '\0' ? ".*" : expl.filter.data());
+    if (!expl.filter.empty()) {
+        switch (expl.filter_mode) {
+            default:
+            case filter_mode::contains: {
+                {
+                    char const *(*strstr_scase)(char const *, char const *) = strstr;
+                    auto matcher = expl.filter_case_sensitive ? strstr_scase : strstr_icase;
 
-        try {
-            filter = std::regex(expl.filter[0] == '\0' ? ".*" : expl.filter.data());
-        }
-        catch (std::exception const &except) {
-            debug_log("%s: update_cwd_entries(): error constructing std::regex, %s", expl.name, except.what());
-            expl.filter_error = except.what();
-        }
+                    scoped_timer<scoped_timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
 
-        for (auto &dir_ent : expl.cwd_entries) {
-            dir_ent.is_filtered_out = !std::regex_match(dir_ent.path.data(), filter);
+                    for (auto &dir_ent : expl.cwd_entries) {
+                        dir_ent.is_filtered_out = !matcher(dir_ent.path.data(), expl.filter.c_str());
+                    }
+                }
+                break;
+            }
+
+            case filter_mode::regex: {
+                static std::regex filter_regex;
+                try {
+                    scoped_timer<scoped_timer_unit::MICROSECONDS> regex_ctor_timer("filter_regex ctor", nullptr, &std::cout);
+                    filter_regex = expl.filter;
+                }
+                catch (std::exception const &except) {
+                    debug_log("%s: update_cwd_entries(): error constructing std::regex, %s", expl.name, except.what());
+                    expl.filter_error = except.what();
+                    break;
+                }
+                {
+                    auto match_flags = std::regex_constants::match_default | (std::regex_constants::icase * (expl.filter_case_sensitive == 0));
+
+                    scoped_timer<scoped_timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
+
+                    for (auto &dir_ent : expl.cwd_entries) {
+                        dir_ent.is_filtered_out = !std::regex_match(
+                            dir_ent.path.data(),
+                            filter_regex,
+                            (std::regex_constants::match_flag_type)match_flags
+                        );
+                    }
+                }
+                break;
+            }
+
+            // case filter_mode::glob: {
+            //     throw std::runtime_error("not implemented");
+            //     break;
+            // }
         }
     }
 
     (void) QueryPerformanceCounter(&expl.last_refresh_timestamp);
+}
+
+explorer_window create_default_explorer_windows(
+    char const *name,
+    bool show,
+    path_t starting_dir,
+    explorer_options const &opts
+) {
+    explorer_window w;
+
+    w.show = show;
+    w.name = name;
+
+    w.cwd = starting_dir;
+    w.cwd_entries = {};
+    w.cwd_entries.reserve(1024);
+    w.cwd_prev_selected_dirent_idx = explorer_window::NO_SELECTION;
+
+    w.wd_history = {};
+    w.wd_history.push_back(starting_dir);
+    w.wd_history_pos = 0;
+
+    w.filter = std::string(1024, '\0');
+    w.filter_error = "";
+    w.filter_mode = filter_mode::contains;
+    w.filter_case_sensitive = false;
+
+    w.num_file_searches = 0;
+    w.last_refresh_timestamp = {};
+    w.filter_time_us = 0.f;
+
+    update_cwd_entries(&w, starting_dir.data(), opts);
+
+    return w;
 }
 
 void new_history_from(explorer_window &expl, path_t const &new_latest_entry)
@@ -229,13 +324,19 @@ void try_descend_to_directory(explorer_window &expl, char const *child_dir, expl
 
             new_history_from(expl, new_working_dir);
             expl.cwd = new_working_dir;
-            expl.last_selected_dirent_idx = UINT64_MAX;
+            expl.cwd_prev_selected_dirent_idx = UINT64_MAX;
         }
         else {
             debug_log("%s: PathCanonicalizeA failed", expl.name);
         }
     }
 }
+
+struct cwd_text_input_callback_user_data
+{
+    explorer_window *expl_ptr;
+    explorer_options *opts_ptr;
+};
 
 static
 i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
@@ -248,24 +349,28 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
         }
     }
     else if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
-        auto expl = reinterpret_cast<explorer_window *>(data->UserData);
-        explorer_options const *opts = reinterpret_cast<explorer_options *>((explorer_window *)data->UserData + 1);
-        debug_log("%s: ImGuiInputTextFlags_CallbackEdit, data->Buf = [%s]", expl->name, data->Buf);
-        update_cwd_entries(expl, data->Buf, *opts);
+        auto user_data = (cwd_text_input_callback_user_data *)(data->UserData);
+        auto expl_ptr = user_data->expl_ptr;
+        auto opts_pts = user_data->opts_ptr;
+
+        debug_log("UserData: %p expl: %p opts: %p", data->UserData, expl_ptr, opts_pts);
+        debug_log("%s: ImGuiInputTextFlags_CallbackEdit, data->Buf = [%s]", expl_ptr->name, data->Buf);
+        update_cwd_entries(user_data->expl_ptr, data->Buf, *user_data->opts_ptr);
     }
 
     return 0;
 }
 
-f64 compute_diff_ms(LARGE_INTEGER start, LARGE_INTEGER end)
-{
-    LARGE_INTEGER frequency;
-    (void) QueryPerformanceFrequency(&frequency);
+// static
+// f64 compute_diff_ms(LARGE_INTEGER start, LARGE_INTEGER end)
+// {
+//     LARGE_INTEGER frequency;
+//     (void) QueryPerformanceFrequency(&frequency);
 
-    LONGLONG ticks = end.QuadPart - start.QuadPart;
-    f64 milliseconds = f64(ticks) * f64(1000) / f64(frequency.QuadPart);
-    return milliseconds;
-}
+//     LONGLONG ticks = end.QuadPart - start.QuadPart;
+//     f64 milliseconds = f64(ticks) * f64(1000) / f64(frequency.QuadPart);
+//     return milliseconds;
+// }
 
 static
 void render_file_explorer(explorer_window &expl, explorer_options &opts)
@@ -274,74 +379,181 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
         return;
     }
 
-    auto &io = ImGui::GetIO();
-
     if (!ImGui::Begin(expl.name)) {
         ImGui::End();
         return;
     }
 
-    if (ImGui::Button("Refresh")) {
-        debug_log("%s: refresh triggered", expl.name);
-        update_cwd_entries(&expl, expl.cwd.data(), opts);
-    }
-    // else {
-    //     LARGE_INTEGER current_timestamp = {};
-    //     (void) QueryPerformanceCounter(&current_timestamp);
-    //     f64 diff_ms = compute_diff_ms(expl.last_refresh_timestamp, current_timestamp);
-    //     if (diff_ms >= f64(1500)) {
-    //         debug_log("%s: automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
-    //         update_cwd_entries(&expl, expl.cwd.data());
-    //     }
-    // }
+    static ImVec4 const white(1, 1, 1, 1);
+    static ImVec4 const yellow(1, 1, 0, 1);
+    static ImVec4 const orange(1, 0.5f, 0, 1);
+    static ImVec4 const red(1, 0.2f, 0, 1);
 
-    ImGui::SameLine();
+    auto &io = ImGui::GetIO();
+    bool window_focused = ImGui::IsWindowFocused();
 
-    ImGui::BeginDisabled(expl.wd_history_pos == 0);
-    if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
-        debug_log("%s: back arrow button triggered", expl.name);
-
-        if (expl.wd_history_pos == 0) {
-            debug_log("%s: already at front of history deque", expl.name);
+    // handle enter key pressed on cwd entry
+    if (window_focused && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        if (UINT64_MAX == expl.cwd_prev_selected_dirent_idx) {
+            debug_log("%s: pressed enter but cwd_prev_selected_dirent_idx was NO_SELECTION", expl.name);
         } else {
-            --expl.wd_history_pos;
-            expl.cwd = expl.wd_history[expl.wd_history_pos];
-            debug_log("%s: new wd_history_pos (--) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
-            update_cwd_entries(&expl, expl.cwd.data(), opts);
+            auto dirent_which_enter_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
+            debug_log("%s: pressed enter on [%s]", expl.name, dirent_which_enter_pressed_on.path.data());
+            if (dirent_which_enter_pressed_on.is_directory) {
+                try_descend_to_directory(expl, dirent_which_enter_pressed_on.path.data(), opts);
+            }
         }
     }
-    ImGui::EndDisabled();
 
-    ImGui::SameLine();
-
-    ImGui::BeginDisabled(expl.wd_history_pos == expl.wd_history.size() - 1);
-    if (ImGui::ArrowButton("Forward", ImGuiDir_Right)) {
-        debug_log("%s: forward arrow button triggered", expl.name);
-
-        if (expl.wd_history_pos == expl.wd_history.size() - 1) {
-            debug_log("%s: already at back of history deque", expl.name);
-        } else {
-            ++expl.wd_history_pos;
-            expl.cwd = expl.wd_history[expl.wd_history_pos];
-            debug_log("%s: new wd_history_pos (++) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
-            update_cwd_entries(&expl, expl.cwd.data(), opts);
-        }
-    }
-    ImGui::EndDisabled();
-
-    ImGui::Spacing();
-    ImGui::Spacing();
-
+    // refresh button, ctrl-r refresh logic, automatic refreshing
     {
-        static char const *clicknav_label     = "clicknav:";
-        static char const *cwd_label_with_len = "cwd(%3d):";
-        static char const *cwd_label_no_len   = "     cwd:";
-        static char const *filter_label       = "  filter:";
+        bool refreshed = false; // to avoid refreshing twice in one frame
 
+        auto refresh = [&]() {
+            if (!refreshed) {
+                update_cwd_entries(&expl, expl.cwd.data(), opts);
+                refreshed = true;
+            }
+        };
+
+        if (window_focused && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) {
+            debug_log("%s: ctrl-r, refresh", expl.name);
+            refresh();
+        }
+
+        if (ImGui::Button("Refresh") && !refreshed) {
+            debug_log("%s: refresh triggered", expl.name);
+            refresh();
+        }
+
+        // if (!refreshed) {
+        //     // see if it's time for an automatic refresh
+        //     LARGE_INTEGER current_timestamp = {};
+        //     (void) QueryPerformanceCounter(&current_timestamp);
+        //     f64 diff_ms = compute_diff_ms(expl.last_refresh_timestamp, current_timestamp);
+        //     if (diff_ms >= f64(1500)) {
+        //         debug_log("%s: automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
+        //         update_cwd_entries(&expl, expl.cwd.data());
+        //     }
+        // }
+    }
+
+    ImGui::SameLine();
+
+    // history back arrow start
+    {
+        ImGui::BeginDisabled(expl.wd_history_pos == 0);
+
+        if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
+            debug_log("%s: back arrow button triggered", expl.name);
+
+            if (expl.wd_history_pos == 0) {
+                debug_log("%s: already at front of history deque", expl.name);
+            } else {
+                --expl.wd_history_pos;
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                debug_log("%s: new wd_history_pos (--) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
+                update_cwd_entries(&expl, expl.cwd.data(), opts);
+            }
+        }
+
+        ImGui::EndDisabled();
+    }
+    // history back arrow end
+
+    ImGui::SameLine();
+
+    // history forward arrow
+    {
+        ImGui::BeginDisabled(expl.wd_history_pos == expl.wd_history.size() - 1);
+
+        if (ImGui::ArrowButton("Forward", ImGuiDir_Right)) {
+            debug_log("%s: forward arrow button triggered", expl.name);
+
+            if (expl.wd_history_pos == expl.wd_history.size() - 1) {
+                debug_log("%s: already at back of history deque", expl.name);
+            } else {
+                ++expl.wd_history_pos;
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                debug_log("%s: new wd_history_pos (++) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
+                update_cwd_entries(&expl, expl.cwd.data(), opts);
+            }
+        }
+
+        ImGui::EndDisabled();
+    }
+    // history forward end
+
+    ImGui::SameLine();
+    ImGui::Spacing();
+    ImGui::SameLine();
+
+    // cwd filter start
+    {
+        ImGui::Text("filter:");
+        ImGui::SameLine();
+
+    #if 0
+        ImGui::Text("Filter Mode:");
+        ImGui::SameLine();
+        ImGui::RadioButton("Contains", (i32 *)(&expl.filter_mode), filter_mode::contains);
+        ImGui::SameLine();
+        ImGui::RadioButton("RegExp", (i32 *)(&expl.filter_mode), filter_mode::regex);
+        ImGui::SameLine();
+        ImGui::RadioButton("Glob", (i32 *)(&expl.filter_mode), filter_mode::glob);
+    #else
+        // important that they are all the same length,
+        // this assumption is leveraged for calculation of combo box width
+        static char const *filter_modes[] = {
+            "Contains",
+            "RegExp  ",
+        };
+        ImVec2 max_dropdown_elem_size = ImGui::CalcTextSize(filter_modes[0]);
+
+        ImGui::PushItemWidth(max_dropdown_elem_size.x + 30.f); // some extra for the dropdown button
+        ImGui::Combo("##filter_mode", (i32 *)(&expl.filter_mode), filter_modes, lengthof(filter_modes));
+        ImGui::PopItemWidth();
+    #endif
+    }
+    // cwd filter end
+
+    ImGui::SameLine();
+
+    // case sensitivity button start
+    {
+        if (ImGui::Button(expl.filter_case_sensitive ? "aa" : "aA")) {
+            flip_bool(expl.filter_case_sensitive);
+            update_cwd_entries(&expl, expl.cwd.data(), opts);
+        }
+    }
+    // case sensitivity button start
+
+    ImGui::SameLine();
+
+    // filter text input start
+    {
+        ImGui::PushItemWidth(max(
+            ImGui::CalcTextSize(expl.filter.c_str()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f,
+            ImGui::CalcTextSize("12345678").x
+        ));
+        if (ImGui::InputText("##filter", expl.filter.data(), expl.filter.size())) {
+            debug_log("%s: filter InputText active", expl.name);
+            update_cwd_entries(&expl, expl.cwd.data(), opts);
+        }
+        ImGui::PopItemWidth();
+    }
+    // filter text input start
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    static char const *clicknav_label     = "clicknav:";
+    static char const *cwd_label_with_len = "cwd(%3d):";
+    static char const *cwd_label_no_len   = "     cwd:";
+
+    // clicknav start
+    {
         if (!expl.cwd_entries.empty()) {
-            ImGui::Text(clicknav_label);
-            ImGui::SameLine();
-
             static std::vector<char const *> slices(50);
             slices.clear();
 
@@ -374,6 +586,8 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                 ImGui::GetStyle().ItemSpacing.x = 2;
             }
 
+            ImGui::Text(clicknav_label);
+            ImGui::SameLine();
             for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
                 if (ImGui::Button(*slice_it)) {
                     debug_log("%s: clicked slice [%s]", expl.name, *slice_it);
@@ -397,43 +611,48 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                 ImGui::GetStyle().ItemSpacing.x = original_spacing;
             }
         }
+    }
+    // clicknav end
 
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // cwd text input start
+    {
+        cwd_text_input_callback_user_data user_data;
+        user_data.expl_ptr = &expl;
+        user_data.opts_ptr = &opts;
+
+        // label
         if (opts.show_cwd_len) {
             ImGui::Text(cwd_label_with_len, path_length(expl.cwd));
-        }
-        else {
+        } else {
             ImGui::Text(cwd_label_no_len);
         }
+
         ImGui::SameLine();
-        ImGui::PushItemWidth(ImGui::GetColumnWidth());
-        void *user_data[] = { &expl, &opts };
+
+        // input
+        ImGui::PushItemWidth(ImGui::CalcTextSize(expl.cwd.data()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f);
         ImGui::InputText("##cwd", expl.cwd.data(), expl.cwd.size(),
-            ImGuiInputTextFlags_CallbackCharFilter|ImGuiInputTextFlags_CallbackEdit, cwd_text_input_callback, user_data);
-
-        ImGui::Text(filter_label);
-        ImGui::SameLine();
-        ImGui::PushItemWidth(ImGui::GetColumnWidth());
-        ImGui::InputText("##filter", expl.filter.data(), expl.filter.size());
+            ImGuiInputTextFlags_CallbackCharFilter|ImGuiInputTextFlags_CallbackEdit, cwd_text_input_callback, (void *)&user_data);
+        ImGui::PopItemWidth();
     }
+    // cwd text input
 
     ImGui::Spacing();
     ImGui::Spacing();
 
-    bool window_focused = ImGui::IsWindowFocused();
+    // cwd entries stats & table start
 
-    if (window_focused && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) {
-        debug_log("%s: ctrl-r, refresh", expl.name);
-        update_cwd_entries(&expl, expl.cwd.data(), opts);
+    if (!directory_exists(expl.cwd.data())) {
+        ImGui::TextColored(orange, "Invalid directory.");
     }
-
-    if (expl.cwd_entries.empty()) {
-        static ImVec4 const orange(1, 0.5, 0, 1);
-        ImGui::TextColored(orange, "Not a directory.");
+    else if (expl.cwd_entries.empty()) {
+        // cwd exists but is empty
+        ImGui::TextColored(orange, "Empty directory.");
     }
     else {
-        static ImVec4 const white(1, 1, 1, 1);
-        static ImVec4 const yellow(1, 1, 0, 1);
-
         u64 num_selected_directories = 0;
         u64 num_selected_symlinks = 0;
         u64 num_selected_files = 0;
@@ -466,6 +685,10 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
         u64 num_child_dirents = expl.cwd_entries.size();
         u64 num_child_files = num_child_dirents - num_child_directories - num_child_symlinks;
 
+    #if 1
+        (void) num_selected_dirents;
+        (void) num_child_files;
+    #else
         ImGui::Text("%zu children", num_child_dirents);
         if (num_child_dirents > 0) {
             ImGui::SameLine();
@@ -483,17 +706,10 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
             ImGui::SameLine();
             ImGui::Text("%zu shortcut%s", num_child_symlinks, num_child_symlinks == 1 ? "" : "s");
         }
-        // ImGui::Text("%zu total children: %zu director%s, %zu file%s, %zu shortcut%s.",
-        //     expl.cwd_entries.size(),
-        //     num_child_directories, num_child_directories == 1 ? "y" : "ies",
-        //     num_child_files, num_child_files == 1 ? "" : "s",
-        //     num_child_symlinks, num_child_symlinks == 1 ? "" : "s");
 
         if (expl.filter_error != "") {
-            static ImVec4 const red(1, .2f, 0, 1);
-
             ImGui::PushTextWrapPos(ImGui::GetColumnWidth());
-            ImGui::TextColored(red, "Filter failed: %s", expl.filter_error.c_str());
+            ImGui::TextColored(red, "%s", expl.filter_error.c_str());
             ImGui::PopTextWrapPos();
         }
         else {
@@ -514,11 +730,6 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                 ImGui::SameLine();
                 ImGui::Text("%zu shortcut%s", num_filtered_symlinks, num_filtered_symlinks == 1 ? "" : "s");
             }
-            // ImGui::Text("%zu filtered: %zu director%s, %zu file%s, %zu shortcut%s.",
-            //     num_filtered_dirents,
-            //     num_filtered_directories, num_filtered_directories == 1 ? "y" : "ies",
-            //     num_filtered_files, num_filtered_files == 1 ? "" : "s",
-            //     num_filtered_symlinks, num_filtered_symlinks == 1 ? "" : "s");
         }
 
         ImGui::Text("%zu selected", num_selected_dirents);
@@ -538,18 +749,17 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
             ImGui::SameLine();
             ImGui::Text("%zu shortcut%s", num_selected_symlinks, num_selected_symlinks == 1 ? "" : "s");
         }
-        // ImGui::Text("%zu selected: %zu director%s, %zu file%s, %zu shortcut%s.",
-        //     num_selected_dirents,
-        //     num_selected_directories, num_selected_directories == 1 ? "y" : "ies",
-        //     num_selected_files, num_selected_files == 1 ? "" : "s",
-        //     num_selected_symlinks, num_selected_symlinks == 1 ? "" : "s");
 
         ImGui::Spacing();
         ImGui::Spacing();
+    #endif
 
         enum class column_id : i32 { number, path, size_pretty, size_bytes, count };
 
-        if (ImGui::BeginTable("Entries", (i32)column_id::count, ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable)) {
+        if (num_filtered_dirents == expl.cwd_entries.size()) {
+            ImGui::TextColored(orange, "No entries passed filter.");
+        }
+        else if (ImGui::BeginTable("Entries", (i32)column_id::count, ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable)) {
             ImGui::TableSetupColumn("Number", ImGuiTableColumnFlags_DefaultSort, 0.0f, (u32)column_id::number);
             ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_NoSort, 0.0f, (u32)column_id::path);
             ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_NoSort, 0.0f, (u32)column_id::size_pretty);
@@ -600,18 +810,18 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
 
                             u64 first_idx, last_idx;
 
-                            if (UINT64_MAX == expl.last_selected_dirent_idx) {
+                            if (UINT64_MAX == expl.cwd_prev_selected_dirent_idx) {
                                 // nothing in cwd has been selected, so start selection from very first entry
-                                expl.last_selected_dirent_idx = 0;
+                                expl.cwd_prev_selected_dirent_idx = 0;
                             }
 
-                            if (i <= expl.last_selected_dirent_idx) {
+                            if (i <= expl.cwd_prev_selected_dirent_idx) {
                                 // prev selected item below current one
                                 first_idx = i;
-                                last_idx = expl.last_selected_dirent_idx;
+                                last_idx = expl.cwd_prev_selected_dirent_idx;
                             }
                             else {
-                                first_idx = expl.last_selected_dirent_idx;
+                                first_idx = expl.cwd_prev_selected_dirent_idx;
                                 last_idx = i;
                             }
 
@@ -654,7 +864,7 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                         }
 
                         last_click_time = current_time;
-                        expl.last_selected_dirent_idx = i;
+                        expl.cwd_prev_selected_dirent_idx = i;
                     }
 
                     ImGui::PopStyleColor();
@@ -685,24 +895,14 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                 }
             }
 
-            if (window_focused && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                if (UINT64_MAX == expl.last_selected_dirent_idx) {
-                    debug_log("%s: pressed enter but last_selected_dirent_idx was NO_SELECTION", expl.name);
-                } else {
-                    auto dirent_which_enter_pressed_on = expl.cwd_entries[expl.last_selected_dirent_idx];
-                    debug_log("%s: pressed enter on [%s]", expl.name, dirent_which_enter_pressed_on.path.data());
-                    if (dirent_which_enter_pressed_on.is_directory) {
-                        try_descend_to_directory(expl, dirent_which_enter_pressed_on.path.data(), opts);
-                    }
-                }
-            }
-
             ImGui::EndTable();
         }
     }
+    // cwd entries stats & table end
 
+    // debug info start
     if (opts.show_debug_info) {
-        for (u64 i = 0; i < 5; ++i) {
+        for (u64 i = 0; i < 10; ++i) {
             ImGui::Spacing();
         }
 
@@ -711,8 +911,10 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
         ImGui::Text("cwd_exists = %d", directory_exists(expl.cwd.data()));
         ImGui::Text("num_file_searches = %zu", expl.num_file_searches);
         ImGui::Text("dir_entries.size() = %zu", expl.cwd_entries.size());
-        ImGui::Text("last_selected_dirent_idx = %lld", expl.last_selected_dirent_idx);
+        ImGui::Text("cwd_prev_selected_dirent_idx = %lld", expl.cwd_prev_selected_dirent_idx);
+        ImGui::Text("filter_time_us = %.1lf", expl.filter_time_us);
     }
+    // debug info end
 
     ImGui::End();
 }
