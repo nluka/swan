@@ -2,7 +2,7 @@
 
 @REM @echo Compiling swan_debug...
 
-@call cl.exe /std:c++20 /nologo /W4 /WX /EHsc /Fo:obj_debug\ /Fe:swan_debug.exe /I"C:/code/glfw" /I"C:/code/boost_1_80_0" /MT ^
+@call ptime.exe cl.exe /std:c++20 /nologo /W4 /WX /EHsc /Fo:obj_debug\ /Fe:swan_debug.exe /I"C:/code/glfw" /I"C:/code/boost_1_80_0" /MT ^
 src/swan.cpp .res ^
 obj_debug/imgui_demo.obj ^
 obj_debug/imgui_draw.obj ^

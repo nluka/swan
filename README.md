@@ -40,9 +40,9 @@ entry = file | directory
 - [x] Clickable directories in cwd
 - [x] Back/forward history buttons
 - [x] Ctrl-r to refresh
-- [ ] "Contains" filtering
-- [ ] History browser
+- [x] "Contains" filtering
 - [ ] Handle shortcuts (IShellLink)
+- [ ] History browser
 - [ ] Sort directory entries
 - [ ] Move directory entries
 - [ ] Glob filtering

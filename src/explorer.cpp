@@ -186,8 +186,7 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
             default:
             case filter_mode::contains: {
                 {
-                    char const *(*strstr_scase)(char const *, char const *) = strstr;
-                    auto matcher = expl.filter_case_sensitive ? strstr_scase : strstr_icase;
+                    auto matcher = expl.filter_case_sensitive ? StrStrA : StrStrIA;
 
                     scoped_timer<scoped_timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
 
@@ -255,7 +254,8 @@ explorer_window create_default_explorer_windows(
     w.wd_history.push_back(starting_dir);
     w.wd_history_pos = 0;
 
-    w.filter = std::string(1024, '\0');
+    w.filter = "";
+    w.filter.reserve(1024);
     w.filter_error = "";
     w.filter_mode = filter_mode::contains;
     w.filter_case_sensitive = false;
