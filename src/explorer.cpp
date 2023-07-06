@@ -525,6 +525,9 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
             flip_bool(expl.filter_case_sensitive);
             update_cwd_entries(&expl, expl.cwd.data(), opts);
         }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::SetTooltip("Toggle filter case sensitivity: aA = case insensitive, aa = case sensitive");
+        }
     }
     // case sensitivity button start
 
@@ -534,7 +537,7 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
     {
         ImGui::PushItemWidth(max(
             ImGui::CalcTextSize(expl.filter.c_str()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f,
-            ImGui::CalcTextSize("12345678").x
+            ImGui::CalcTextSize("123456789012345").x
         ));
         if (ImGui::InputText("##filter", expl.filter.data(), expl.filter.size())) {
             debug_log("%s: filter InputText active", expl.name);
@@ -582,23 +585,22 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
             };
 
             f32 original_spacing = ImGui::GetStyle().ItemSpacing.x;
-            if (slices.size() > 1) {
-                ImGui::GetStyle().ItemSpacing.x = 2;
-            }
 
             ImGui::Text(clicknav_label);
             ImGui::SameLine();
+
             for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
                 if (ImGui::Button(*slice_it)) {
                     debug_log("%s: clicked slice [%s]", expl.name, *slice_it);
                     cd_to_slice(*slice_it);
                     update_cwd_entries(&expl, expl.cwd.data(), opts);
                 }
+                ImGui::GetStyle().ItemSpacing.x = 2;
                 ImGui::SameLine();
                 ImGui::Text("\\");
                 ImGui::SameLine();
             }
-            ImGui::SameLine();
+
             if (ImGui::Button(slices.back())) {
                 debug_log("%s: clicked slice [%s]", expl.name, slices.back());
                 cd_to_slice(slices.back());
