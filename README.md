@@ -41,7 +41,7 @@ entry = file | directory
 - [x] Back/forward history buttons
 - [x] Ctrl-r to refresh
 - [x] "Contains" filtering
-- [ ] Handle shortcuts (IShellLink)
+- [x] Handle shortcuts (IShellLink)
 - [ ] History browser
 - [ ] Sort directory entries
 - [ ] Move directory entries
@@ -49,5 +49,6 @@ entry = file | directory
 - [ ] Cut/Copy Paste directory entries
 - [ ] Pins
 - [ ] Show directory preview (num child files/dirs)
+- [ ] Customizable context menu
 - [ ] File preview
 - [ ] Automatic refresh
