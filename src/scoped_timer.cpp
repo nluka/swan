@@ -6,7 +6,7 @@
 #include <ostream>
 #include <string_view>
 
-namespace scoped_timer_unit
+namespace timer_unit
 {
   typedef uint32_t value_type;
 
@@ -17,7 +17,7 @@ namespace scoped_timer_unit
     NANOSECONDS  = 1;
 };
 
-template <scoped_timer_unit::value_type TimerUnit>
+template <timer_unit::value_type TimerUnit>
 class scoped_timer
 {
   public:
@@ -45,10 +45,10 @@ class scoped_timer
       if (m_os) {
         char const *unit_cstr;
         switch (TimerUnit) {
-          case scoped_timer_unit::SECONDS:      unit_cstr = "s"; break;
-          case scoped_timer_unit::MILLISECONDS: unit_cstr = "ms"; break;
-          case scoped_timer_unit::MICROSECONDS: unit_cstr = "us"; break;
-          case scoped_timer_unit::NANOSECONDS:  unit_cstr = "ns"; break;
+          case timer_unit::SECONDS:      unit_cstr = "s"; break;
+          case timer_unit::MILLISECONDS: unit_cstr = "ms"; break;
+          case timer_unit::MICROSECONDS: unit_cstr = "us"; break;
+          case timer_unit::NANOSECONDS:  unit_cstr = "ns"; break;
           default:                              unit_cstr = nullptr; break;
         }
 

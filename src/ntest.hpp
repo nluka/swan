@@ -10,6 +10,12 @@
 #include <string>
 #include <type_traits>
 #include <filesystem>
+#include <algorithm>
+
+#ifdef _WIN32
+# undef min
+# undef max
+#endif
 
 namespace ntest {
 

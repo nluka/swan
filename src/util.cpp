@@ -16,6 +16,14 @@ void flip_bool(bool &b)
     b ^= true;
 }
 
+u64 two_u32_to_one_u64(u32 low, u32 high)
+{
+    u64 result = {};
+    result = static_cast<u64>(high) << 32;
+    result |= static_cast<u64>(low);
+    return result;
+}
+
 void debug_log([[maybe_unused]] char const *fmt, ...)
 {
 #if !defined(NDEBUG)
@@ -58,7 +66,7 @@ void format_file_size(
         // no digits after decimal point for bytes
         // because showing a fraction of a byte doesn't make sense
         ? "%.0lf %s"
-        // 2 digits after decimal points for denominations
+        // 2 digits after decimal points for units above Bytes
         // greater than bytes
         : "%.2lf %s";
 

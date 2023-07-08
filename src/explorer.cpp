@@ -10,19 +10,21 @@
 #include <deque>
 #include <sstream>
 
-#include <Windows.h>
-#include "Shlwapi.h"
+#include <windows.h>
+#include "shlwapi.h"
+#include <shlwapi.h>
+#include <shlguid.h>
+#include <shobjidl.h>
+#include "shlobj_core.h"
 
 #include "imgui/imgui.h"
 
-#include "primitives.hpp"
-#include "on_scope_exit.hpp"
-#include "options.hpp"
-#include "scoped_timer.hpp"
-
+#include "primitives.cpp"
+#include "on_scope_exit.cpp"
+#include "options.cpp"
+#include "scoped_timer.cpp"
 #include "util.cpp"
-
-typedef std::array<char, MAX_PATH> path_t;
+#include "path.cpp"
 
 struct directory_entry
 {
@@ -55,7 +57,7 @@ struct explorer_window
     std::deque<path_t> wd_history; // history for cwd (back/forward arrows)
     u64 wd_history_pos; // where in the cwd history we are (back/forward arrows)
 
-    std::string filter;
+    std::array<char, 512> filter;
     std::string filter_error;
     filter_mode filter_mode;
     bool filter_case_sensitive;
@@ -66,42 +68,47 @@ struct explorer_window
     f64 filter_time_us;
 };
 
-u64 path_length(path_t const &path) noexcept
-{
-    return strlen(path.data());
-}
+static HRESULT com_handle = {};
+static IShellLinkA *shell_link = nullptr;
+static IPersistFile *persist_file_interface = nullptr;
 
-enum class path_append_result : i32
+bool init_windows_shell_com_garbage()
 {
-    nil = -1,
-    success = 0,
-    exceeds_max_path,
-};
+    // COM has to be one of the dumbest things I've ever seen...
+    // what's wrong with just having some functions? Why on earth does this stuff need to be OO?
 
-path_append_result path_append(path_t &path, char const *str)
-{
-    u64 str_len = strlen(str);
-    u64 final_len_without_nul = path_length(path) + str_len;
-
-    if (final_len_without_nul > MAX_PATH) {
-        return path_append_result::exceeds_max_path;
+    // Initialize COM library
+    com_handle = CoInitialize(nullptr);
+    if (FAILED(com_handle)) {
+        debug_log("CoInitialize failed");
+        return false;
     }
 
-    (void) strncat(path.data(), str, str_len);
+    // Create an instance of IShellLinkA
+    com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkA, (LPVOID *)&shell_link);
+    if (FAILED(com_handle)) {
+        debug_log("CoCreateInstance failed");
+        CoUninitialize();
+        return false;
+    }
 
-    return path_append_result::success;
+    // Query IPersistFile interface from IShellLinkA
+    com_handle = shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&persist_file_interface);
+    if (FAILED(com_handle)) {
+        debug_log("failed to query IPersistFile interface");
+        persist_file_interface->Release();
+        CoUninitialize();
+        return false;
+    }
+
+    return true;
 }
 
-bool path_ends_with(path_t const &path, char const *chars)
+void cleanup_windows_shell_com_garbage()
 {
-    u64 len = path_length(path);
-    char last_ch = path[len - 1];
-    return strchr(chars, last_ch);
-}
-
-void path_clear(path_t &path)
-{
-    path[0] = '\0';
+    persist_file_interface->Release();
+    shell_link->Release();
+    CoUninitialize();
 }
 
 // TODO: consider adding an options struct argument to control whether the filesystem is queried
@@ -111,7 +118,7 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
 {
     IM_ASSERT(expl_ptr != nullptr);
 
-    scoped_timer<scoped_timer_unit::MICROSECONDS> timer("update_cwd_entries", nullptr, &std::cout);
+    scoped_timer<timer_unit::MICROSECONDS> timer("update_cwd_entries", nullptr, &std::cout);
 
     explorer_window &expl = *expl_ptr;
 
@@ -120,7 +127,8 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
 
     WIN32_FIND_DATAA find_data;
 
-    // TODO: make more efficient
+    // this seems inefficient but was measured to be faster than the "efficient" way,
+    // or maybe both are so fast that it doesn't matter...
     while (parent_dir.ends_with(' ')) {
         parent_dir = std::string_view(parent_dir.data(), parent_dir.size() - 1);
     }
@@ -154,8 +162,7 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
         entry.is_directory = find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
         entry.is_symbolic_link = path_ends_with(entry.path, ".lnk");
 
-        entry.size = static_cast<u64>(find_data.nFileSizeHigh) << 32;
-        entry.size |= static_cast<u64>(find_data.nFileSizeLow);
+        entry.size = two_u32_to_one_u64(find_data.nFileSizeLow, find_data.nFileSizeHigh);
 
         if (strcmp(entry.path.data(), ".") == 0) {
             continue;
@@ -181,17 +188,17 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
         }
     });
 
-    if (!expl.filter.empty()) {
+    if (expl.filter.data()[0] != '\0') {
         switch (expl.filter_mode) {
             default:
             case filter_mode::contains: {
                 {
                     auto matcher = expl.filter_case_sensitive ? StrStrA : StrStrIA;
 
-                    scoped_timer<scoped_timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
+                    scoped_timer<timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
 
                     for (auto &dir_ent : expl.cwd_entries) {
-                        dir_ent.is_filtered_out = !matcher(dir_ent.path.data(), expl.filter.c_str());
+                        dir_ent.is_filtered_out = !matcher(dir_ent.path.data(), expl.filter.data());
                     }
                 }
                 break;
@@ -200,8 +207,8 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
             case filter_mode::regex: {
                 static std::regex filter_regex;
                 try {
-                    scoped_timer<scoped_timer_unit::MICROSECONDS> regex_ctor_timer("filter_regex ctor", nullptr, &std::cout);
-                    filter_regex = expl.filter;
+                    scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer("filter_regex ctor", nullptr, &std::cout);
+                    filter_regex = expl.filter.data();
                 }
                 catch (std::exception const &except) {
                     debug_log("%s: update_cwd_entries(): error constructing std::regex, %s", expl.name, except.what());
@@ -211,7 +218,7 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
                 {
                     auto match_flags = std::regex_constants::match_default | (std::regex_constants::icase * (expl.filter_case_sensitive == 0));
 
-                    scoped_timer<scoped_timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
+                    scoped_timer<timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
 
                     for (auto &dir_ent : expl.cwd_entries) {
                         dir_ent.is_filtered_out = !std::regex_match(
@@ -254,9 +261,9 @@ explorer_window create_default_explorer_windows(
     w.wd_history.push_back(starting_dir);
     w.wd_history_pos = 0;
 
-    w.filter = "";
-    w.filter.reserve(1024);
+    w.filter = {};
     w.filter_error = "";
+    w.filter_error.reserve(1024);
     w.filter_mode = filter_mode::contains;
     w.filter_case_sensitive = false;
 
@@ -306,11 +313,7 @@ void try_descend_to_directory(explorer_window &expl, char const *child_dir, expl
 {
     path_t new_working_dir = expl.cwd;
 
-    auto app_res = path_append_result::nil;
-    if (!path_ends_with(expl.cwd, "\\/")) {
-        app_res = path_append(expl.cwd, "\\");
-    }
-    app_res = path_append(expl.cwd, child_dir);
+    auto app_res = path_append(expl.cwd, child_dir, true);
 
     if (app_res != path_append_result::success) {
         debug_log("%s: path_append failed, cwd = [%s], append data = [\\%s]", expl.name, expl.cwd.data(), child_dir);
@@ -350,11 +353,8 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
     }
     else if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
         auto user_data = (cwd_text_input_callback_user_data *)(data->UserData);
-        auto expl_ptr = user_data->expl_ptr;
-        auto opts_pts = user_data->opts_ptr;
 
-        debug_log("UserData: %p expl: %p opts: %p", data->UserData, expl_ptr, opts_pts);
-        debug_log("%s: ImGuiInputTextFlags_CallbackEdit, data->Buf = [%s]", expl_ptr->name, data->Buf);
+        debug_log("%s: ImGuiInputTextFlags_CallbackEdit, data->Buf = [%s]", user_data->expl_ptr->name, data->Buf);
         update_cwd_entries(user_data->expl_ptr, data->Buf, *user_data->opts_ptr);
     }
 
@@ -405,243 +405,234 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
         }
     }
 
-    // refresh button, ctrl-r refresh logic, automatic refreshing
-    {
-        bool refreshed = false; // to avoid refreshing twice in one frame
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 15.f));
+    if (ImGui::BeginTable("first_3_control_rows", 1, ImGuiTableFlags_SizingFixedFit|ImGuiTableFlags_BordersH)) {
 
-        auto refresh = [&]() {
-            if (!refreshed) {
-                update_cwd_entries(&expl, expl.cwd.data(), opts);
-                refreshed = true;
-            }
-        };
+        ImGui::TableNextColumn();
 
-        if (window_focused && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) {
-            debug_log("%s: ctrl-r, refresh", expl.name);
-            refresh();
-        }
+        // refresh button, ctrl-r refresh logic, automatic refreshing
+        {
+            bool refreshed = false; // to avoid refreshing twice in one frame
 
-        if (ImGui::Button("Refresh") && !refreshed) {
-            debug_log("%s: refresh triggered", expl.name);
-            refresh();
-        }
-
-        // if (!refreshed) {
-        //     // see if it's time for an automatic refresh
-        //     LARGE_INTEGER current_timestamp = {};
-        //     (void) QueryPerformanceCounter(&current_timestamp);
-        //     f64 diff_ms = compute_diff_ms(expl.last_refresh_timestamp, current_timestamp);
-        //     if (diff_ms >= f64(1500)) {
-        //         debug_log("%s: automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
-        //         update_cwd_entries(&expl, expl.cwd.data());
-        //     }
-        // }
-    }
-
-    ImGui::SameLine();
-
-    // history back arrow start
-    {
-        ImGui::BeginDisabled(expl.wd_history_pos == 0);
-
-        if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
-            debug_log("%s: back arrow button triggered", expl.name);
-
-            if (expl.wd_history_pos == 0) {
-                debug_log("%s: already at front of history deque", expl.name);
-            } else {
-                --expl.wd_history_pos;
-                expl.cwd = expl.wd_history[expl.wd_history_pos];
-                debug_log("%s: new wd_history_pos (--) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
-                update_cwd_entries(&expl, expl.cwd.data(), opts);
-            }
-        }
-
-        ImGui::EndDisabled();
-    }
-    // history back arrow end
-
-    ImGui::SameLine();
-
-    // history forward arrow
-    {
-        ImGui::BeginDisabled(expl.wd_history_pos == expl.wd_history.size() - 1);
-
-        if (ImGui::ArrowButton("Forward", ImGuiDir_Right)) {
-            debug_log("%s: forward arrow button triggered", expl.name);
-
-            if (expl.wd_history_pos == expl.wd_history.size() - 1) {
-                debug_log("%s: already at back of history deque", expl.name);
-            } else {
-                ++expl.wd_history_pos;
-                expl.cwd = expl.wd_history[expl.wd_history_pos];
-                debug_log("%s: new wd_history_pos (++) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
-                update_cwd_entries(&expl, expl.cwd.data(), opts);
-            }
-        }
-
-        ImGui::EndDisabled();
-    }
-    // history forward end
-
-    ImGui::SameLine();
-    ImGui::Spacing();
-    ImGui::SameLine();
-
-    // cwd filter start
-    {
-        ImGui::Text("filter:");
-        ImGui::SameLine();
-
-    #if 0
-        ImGui::Text("Filter Mode:");
-        ImGui::SameLine();
-        ImGui::RadioButton("Contains", (i32 *)(&expl.filter_mode), filter_mode::contains);
-        ImGui::SameLine();
-        ImGui::RadioButton("RegExp", (i32 *)(&expl.filter_mode), filter_mode::regex);
-        ImGui::SameLine();
-        ImGui::RadioButton("Glob", (i32 *)(&expl.filter_mode), filter_mode::glob);
-    #else
-        // important that they are all the same length,
-        // this assumption is leveraged for calculation of combo box width
-        static char const *filter_modes[] = {
-            "Contains",
-            "RegExp  ",
-        };
-        ImVec2 max_dropdown_elem_size = ImGui::CalcTextSize(filter_modes[0]);
-
-        ImGui::PushItemWidth(max_dropdown_elem_size.x + 30.f); // some extra for the dropdown button
-        ImGui::Combo("##filter_mode", (i32 *)(&expl.filter_mode), filter_modes, lengthof(filter_modes));
-        ImGui::PopItemWidth();
-    #endif
-    }
-    // cwd filter end
-
-    ImGui::SameLine();
-
-    // case sensitivity button start
-    {
-        if (ImGui::Button(expl.filter_case_sensitive ? "aa" : "aA")) {
-            flip_bool(expl.filter_case_sensitive);
-            update_cwd_entries(&expl, expl.cwd.data(), opts);
-        }
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-            ImGui::SetTooltip("Toggle filter case sensitivity: aA = case insensitive, aa = case sensitive");
-        }
-    }
-    // case sensitivity button start
-
-    ImGui::SameLine();
-
-    // filter text input start
-    {
-        ImGui::PushItemWidth(max(
-            ImGui::CalcTextSize(expl.filter.c_str()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f,
-            ImGui::CalcTextSize("123456789012345").x
-        ));
-        if (ImGui::InputText("##filter", expl.filter.data(), expl.filter.size())) {
-            debug_log("%s: filter InputText active", expl.name);
-            update_cwd_entries(&expl, expl.cwd.data(), opts);
-        }
-        ImGui::PopItemWidth();
-    }
-    // filter text input start
-
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    static char const *clicknav_label     = "clicknav:";
-    static char const *cwd_label_with_len = "cwd(%3d):";
-    static char const *cwd_label_no_len   = "     cwd:";
-
-    // clicknav start
-    {
-        if (!expl.cwd_entries.empty()) {
-            static std::vector<char const *> slices(50);
-            slices.clear();
-
-            path_t sliced_path = expl.cwd;
-            char const *slice = strtok(sliced_path.data(), "\\/");
-            while (slice != nullptr) {
-                slices.push_back(slice);
-                slice = strtok(nullptr, "\\/");
-            }
-
-            auto cd_to_slice = [&expl, &sliced_path](char const *slice) {
-                char const *slice_end = slice;
-                while (*slice_end != '\0') {
-                    ++slice_end;
-                }
-
-                u64 len = slice_end - sliced_path.data();
-
-                if (len == path_length(expl.cwd)) {
-                    debug_log("%s: cd_to_slice: slice == cwd, not updating cwd|history", expl.name);
-                }
-                else {
-                    expl.cwd[len] = '\0';
-                    new_history_from(expl, expl.cwd);
+            auto refresh = [&]() {
+                if (!refreshed) {
+                    update_cwd_entries(&expl, expl.cwd.data(), opts);
+                    refreshed = true;
                 }
             };
 
-            f32 original_spacing = ImGui::GetStyle().ItemSpacing.x;
-
-            ImGui::Text(clicknav_label);
-            ImGui::SameLine();
-
-            for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
-                if (ImGui::Button(*slice_it)) {
-                    debug_log("%s: clicked slice [%s]", expl.name, *slice_it);
-                    cd_to_slice(*slice_it);
-                    update_cwd_entries(&expl, expl.cwd.data(), opts);
-                }
-                ImGui::GetStyle().ItemSpacing.x = 2;
-                ImGui::SameLine();
-                ImGui::Text("\\");
-                ImGui::SameLine();
+            if (window_focused && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) {
+                debug_log("%s: ctrl-r, refresh triggered", expl.name);
+                refresh();
             }
 
-            if (ImGui::Button(slices.back())) {
-                debug_log("%s: clicked slice [%s]", expl.name, slices.back());
-                cd_to_slice(slices.back());
-                update_cwd_entries(&expl, expl.cwd.data(), opts);
+            if (ImGui::Button("Refresh") && !refreshed) {
+                debug_log("%s: refresh button pressed", expl.name);
+                refresh();
             }
 
-            // TODO: ImGui::Combo() for all directories in expl.cwd
-
-            if (slices.size() > 1) {
-                ImGui::GetStyle().ItemSpacing.x = original_spacing;
-            }
+            // if (!refreshed) {
+            //     // see if it's time for an automatic refresh
+            //     LARGE_INTEGER current_timestamp = {};
+            //     (void) QueryPerformanceCounter(&current_timestamp);
+            //     f64 diff_ms = compute_diff_ms(expl.last_refresh_timestamp, current_timestamp);
+            //     if (diff_ms >= f64(1500)) {
+            //         debug_log("%s: automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
+            //         update_cwd_entries(&expl, expl.cwd.data());
+            //     }
+            // }
         }
-    }
-    // clicknav end
-
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    // cwd text input start
-    {
-        cwd_text_input_callback_user_data user_data;
-        user_data.expl_ptr = &expl;
-        user_data.opts_ptr = &opts;
-
-        // label
-        if (opts.show_cwd_len) {
-            ImGui::Text(cwd_label_with_len, path_length(expl.cwd));
-        } else {
-            ImGui::Text(cwd_label_no_len);
-        }
+        // end of refresh button, ctrl-r refresh logic, automatic refreshing
 
         ImGui::SameLine();
 
-        // input
-        ImGui::PushItemWidth(ImGui::CalcTextSize(expl.cwd.data()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f);
-        ImGui::InputText("##cwd", expl.cwd.data(), expl.cwd.size(),
-            ImGuiInputTextFlags_CallbackCharFilter|ImGuiInputTextFlags_CallbackEdit, cwd_text_input_callback, (void *)&user_data);
-        ImGui::PopItemWidth();
-    }
-    // cwd text input
+        // history back arrow start
+        {
+            ImGui::BeginDisabled(expl.wd_history_pos == 0);
 
+            if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
+                debug_log("%s: back arrow button triggered", expl.name);
+
+                if (expl.wd_history_pos == 0) {
+                    debug_log("%s: already at front of history deque", expl.name);
+                } else {
+                    --expl.wd_history_pos;
+                    expl.cwd = expl.wd_history[expl.wd_history_pos];
+                    debug_log("%s: new wd_history_pos (--) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
+                    update_cwd_entries(&expl, expl.cwd.data(), opts);
+                }
+            }
+
+            ImGui::EndDisabled();
+        }
+        // history back arrow end
+
+        ImGui::SameLine();
+
+        // history forward arrow
+        {
+            ImGui::BeginDisabled(expl.wd_history_pos == expl.wd_history.size() - 1);
+
+            if (ImGui::ArrowButton("Forward", ImGuiDir_Right)) {
+                debug_log("%s: forward arrow button triggered", expl.name);
+
+                if (expl.wd_history_pos == expl.wd_history.size() - 1) {
+                    debug_log("%s: already at back of history deque", expl.name);
+                } else {
+                    ++expl.wd_history_pos;
+                    expl.cwd = expl.wd_history[expl.wd_history_pos];
+                    debug_log("%s: new wd_history_pos (++) = %zu, new cwd = [%s]", expl.name, expl.wd_history_pos, expl.cwd.data());
+                    update_cwd_entries(&expl, expl.cwd.data(), opts);
+                }
+            }
+
+            ImGui::EndDisabled();
+        }
+        // history forward end
+
+        ImGui::SameLine();
+        ImGui::Spacing();
+        ImGui::SameLine();
+
+        // filter type start
+        {
+            ImGui::Text("filter:");
+            ImGui::SameLine();
+
+            // important that they are all the same length,
+            // this assumption is leveraged for calculation of combo box width
+            static char const *filter_modes[] = {
+                "Contains",
+                "RegExp  ",
+            };
+            ImVec2 max_dropdown_elem_size = ImGui::CalcTextSize(filter_modes[0]);
+
+            ImGui::PushItemWidth(max_dropdown_elem_size.x + 30.f); // some extra for the dropdown button
+            ImGui::Combo("##filter_mode", (i32 *)(&expl.filter_mode), filter_modes, lengthof(filter_modes));
+            ImGui::PopItemWidth();
+        }
+        // filter type end
+
+        ImGui::SameLine();
+
+        // filter case sensitivity button start
+        {
+            if (ImGui::Button(expl.filter_case_sensitive ? "aa" : "aA")) {
+                flip_bool(expl.filter_case_sensitive);
+                update_cwd_entries(&expl, expl.cwd.data(), opts);
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                ImGui::SetTooltip("Toggle filter case sensitivity: aA = case insensitive, aa = case sensitive");
+            }
+        }
+        // filter case sensitivity button start
+
+        ImGui::SameLine();
+
+        // filter text input start
+        {
+            ImGui::PushItemWidth(max(
+                ImGui::CalcTextSize(expl.filter.data()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f,
+                ImGui::CalcTextSize("123456789012345").x
+            ));
+            if (ImGui::InputText("##filter", expl.filter.data(), expl.filter.size())) {
+                debug_log("%s: filter InputText active", expl.name);
+                update_cwd_entries(&expl, expl.cwd.data(), opts);
+            }
+            ImGui::PopItemWidth();
+        }
+        // filter text input end
+
+        // clicknav start
+        if (directory_exists(expl.cwd.data())) {
+            ImGui::TableNextColumn();
+
+            if (!expl.cwd_entries.empty()) {
+                static std::vector<char const *> slices = {};
+                slices.reserve(50);
+                slices.clear();
+
+                path_t sliced_path = expl.cwd;
+                char const *slice = strtok(sliced_path.data(), "\\/");
+                while (slice != nullptr) {
+                    slices.push_back(slice);
+                    slice = strtok(nullptr, "\\/");
+                }
+
+                auto cd_to_slice = [&expl, &sliced_path](char const *slice) {
+                    char const *slice_end = slice;
+                    while (*slice_end != '\0') {
+                        ++slice_end;
+                    }
+
+                    u64 len = slice_end - sliced_path.data();
+
+                    if (len == path_length(expl.cwd)) {
+                        debug_log("%s: cd_to_slice: slice == cwd, not updating cwd|history", expl.name);
+                    }
+                    else {
+                        expl.cwd[len] = '\0';
+                        new_history_from(expl, expl.cwd);
+                    }
+                };
+
+                f32 original_spacing = ImGui::GetStyle().ItemSpacing.x;
+
+                for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
+                    if (ImGui::Button(*slice_it)) {
+                        debug_log("%s: clicked slice [%s]", expl.name, *slice_it);
+                        cd_to_slice(*slice_it);
+                        update_cwd_entries(&expl, expl.cwd.data(), opts);
+                    }
+                    ImGui::GetStyle().ItemSpacing.x = 2;
+                    ImGui::SameLine();
+                    ImGui::Text("\\");
+                    ImGui::SameLine();
+                }
+
+                if (ImGui::Button(slices.back())) {
+                    debug_log("%s: clicked slice [%s]", expl.name, slices.back());
+                    cd_to_slice(slices.back());
+                    update_cwd_entries(&expl, expl.cwd.data(), opts);
+                }
+
+                if (slices.size() > 1) {
+                    ImGui::GetStyle().ItemSpacing.x = original_spacing;
+                }
+            }
+        }
+        // clicknav end
+
+        ImGui::TableNextColumn();
+
+        // cwd text input start
+        {
+            cwd_text_input_callback_user_data user_data;
+            user_data.expl_ptr = &expl;
+            user_data.opts_ptr = &opts;
+
+            // input
+            ImGui::PushItemWidth(max(
+                ImGui::CalcTextSize(expl.cwd.data()).x + (ImGui::GetStyle().FramePadding.x * 2) + 30.f,
+                ImGui::CalcTextSize("123456789_123456789_").x
+            ));
+            ImGui::InputText("##cwd", expl.cwd.data(), expl.cwd.size(),
+                ImGuiInputTextFlags_CallbackCharFilter|ImGuiInputTextFlags_CallbackEdit, cwd_text_input_callback, (void *)&user_data);
+            ImGui::PopItemWidth();
+
+            ImGui::SameLine();
+
+            // label
+            if (opts.show_cwd_len) {
+                ImGui::Text("cwd(%3d)", path_length(expl.cwd));
+            }
+        }
+        // cwd text input end
+    }
+    ImGui::EndTable();
+    ImGui::PopStyleVar();
+
+    ImGui::Spacing();
     ImGui::Spacing();
     ImGui::Spacing();
 
@@ -690,6 +681,16 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
     #if 1
         (void) num_selected_dirents;
         (void) num_child_files;
+
+        if (expl.filter_error != "") {
+            ImGui::PushTextWrapPos(ImGui::GetColumnWidth());
+            ImGui::TextColored(red, "%s", expl.filter_error.c_str());
+            ImGui::PopTextWrapPos();
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::Spacing();
+        }
     #else
         ImGui::Text("%zu children", num_child_dirents);
         if (num_child_dirents > 0) {
@@ -760,6 +761,14 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
 
         if (num_filtered_dirents == expl.cwd_entries.size()) {
             ImGui::TextColored(orange, "No entries passed filter.");
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Clear filter")) {
+                debug_log("%s: clear filter button pressed", expl.name);
+                expl.filter[0] = '\0';
+                update_cwd_entries(&expl, expl.cwd.data(), opts);
+            }
         }
         else if (ImGui::BeginTable("Entries", (i32)column_id::count, ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable)) {
             ImGui::TableSetupColumn("Number", ImGuiTableColumnFlags_DefaultSort, 0.0f, (u32)column_id::number);
@@ -843,16 +852,47 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                                 try_descend_to_directory(expl, dir_ent.path.data(), opts);
                             }
                             else if (dir_ent.is_symbolic_link) {
-                                debug_log("%s: double clicked link [%s]", expl.name, dir_ent.path.data());
                                 // TODO: implement
+                                char const *lnk_file_path = dir_ent.path.data();
+                                debug_log("%s: double clicked link [%s]", expl.name, lnk_file_path);
+
+                                path_t shortcut_path = {};
+
+                                // Load the .lnk file
+                                MultiByteToWideChar(CP_ACP, 0, lnk_file_path, -1, reinterpret_cast<LPWSTR>(shortcut_path.data()), (i32)shortcut_path.size());
+                                com_handle = persist_file_interface->Load(reinterpret_cast<LPCOLESTR>(shortcut_path.data()), STGM_READ);
+
+                                if (FAILED(com_handle)) {
+                                    debug_log("%s: failed to load file [%s]", expl.name, lnk_file_path);
+                                } else {
+                                    LPITEMIDLIST pidl;
+                                    com_handle = shell_link->GetIDList(&pidl);
+                                    if (FAILED(com_handle)) {
+                                        debug_log("%s: failed to GetPath from [%s]", expl.name, lnk_file_path);
+                                        goto symlink_end;
+                                    }
+
+                                    path_t link_wd = {};
+                                    if (!SHGetPathFromIDListA(pidl, link_wd.data())) {
+                                        debug_log("%s: failed to SHGetPathFromIDList from [%s]", expl.name, lnk_file_path);
+                                        goto symlink_end;
+                                    }
+
+                                    debug_log("%s: link dest = [%s]", expl.name, link_wd.data());
+
+                                    path_clear(expl.cwd);
+                                    path_append(expl.cwd, link_wd.data());
+                                    update_cwd_entries(&expl, expl.cwd.data(), opts);
+                                }
+
+                                symlink_end:;
                             }
                             else {
                                 debug_log("%s: double clicked file [%s]", expl.name, dir_ent.path.data());
+
                                 path_t target_full_path = expl.cwd;
-                                if (!path_ends_with(target_full_path, "\\/")) {
-                                    (void) path_append(target_full_path, "\\");
-                                }
-                                if (path_append_result::success == path_append(target_full_path, dir_ent.path.data())) {
+
+                                if (path_append_result::success == path_append(target_full_path, dir_ent.path.data(), true)) {
                                     debug_log("%s: target_full_path = [%s]", expl.name, target_full_path.data());
                                     [[maybe_unused]] HINSTANCE result = ShellExecuteA(nullptr, "open", target_full_path.data(), nullptr, nullptr, SW_SHOWNORMAL);
                                 }
