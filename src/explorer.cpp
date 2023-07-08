@@ -65,7 +65,12 @@ struct explorer_window
     // [DEBUG]
     u64 num_file_searches;
     LARGE_INTEGER last_refresh_timestamp;
-    f64 filter_time_us;
+    f64 update_cwd_entries_total_us;
+    f64 update_cwd_entries_searchpath_setup_us;
+    f64 update_cwd_entries_filesystem_us;
+    f64 update_cwd_entries_regex_ctor_us;
+    f64 update_cwd_entries_sort_us;
+    f64 update_cwd_entries_filter_us;
 };
 
 static HRESULT com_handle = {};
@@ -118,7 +123,7 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
 {
     IM_ASSERT(expl_ptr != nullptr);
 
-    scoped_timer<timer_unit::MICROSECONDS> timer("update_cwd_entries", nullptr, &std::cout);
+    scoped_timer<timer_unit::MICROSECONDS> function_timer(nullptr, &expl_ptr->update_cwd_entries_total_us);
 
     explorer_window &expl = *expl_ptr;
 
@@ -134,59 +139,73 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
     }
 
     if (!directory_exists(parent_dir.data())) {
-        debug_log("%s: update_cwd_entries(): directory [%s] doesn't exist", expl.name, parent_dir.data());
+        debug_log("%s: directory [%s] doesn't exist", expl.name, parent_dir.data());
         return;
     }
 
     static std::string search_path{};
-    search_path.reserve(parent_dir.size() + strlen("\\*"));
-    search_path = parent_dir;
-    search_path += "\\*";
-
-    debug_log("%s: update_cwd_entries(): querying filesystem, search_path = [%s]", expl.name, search_path.c_str());
-
-    HANDLE find_handle = FindFirstFileA(search_path.data(), &find_data);
-    auto find_handle_cleanup_routine = make_on_scope_exit([&find_handle] { FindClose(find_handle); });
-
-    if (find_handle == INVALID_HANDLE_VALUE) {
-        debug_log("%s: update_cwd_entries(): find_handle == INVALID_HANDLE_VALUE", expl.name);
+    {
+        scoped_timer<timer_unit::MICROSECONDS> search_path_timer(nullptr, &expl_ptr->update_cwd_entries_searchpath_setup_us);
+        search_path.reserve(parent_dir.size() + strlen("\\*"));
+        search_path = parent_dir;
+        search_path += "\\*";
     }
 
-    do {
-        ++expl.num_file_searches;
+    {
+        // debug_log("%s: querying filesystem, search_path = [%s]", expl.name, search_path.c_str());
 
-        directory_entry entry = {};
+        scoped_timer<timer_unit::MICROSECONDS> filesystem_timer(nullptr, &expl_ptr->update_cwd_entries_filesystem_us);
 
-        std::memcpy(entry.path.data(), find_data.cFileName, entry.path.size());
+        HANDLE find_handle = FindFirstFileA(search_path.data(), &find_data);
 
-        entry.is_directory = find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
-        entry.is_symbolic_link = path_ends_with(entry.path, ".lnk");
+        // TODO: check if safe to FindClose on INVALID_HANDLE_VALUE
+        auto find_handle_cleanup_routine = make_on_scope_exit([&find_handle] { FindClose(find_handle); });
 
-        entry.size = two_u32_to_one_u64(find_data.nFileSizeLow, find_data.nFileSizeHigh);
-
-        if (strcmp(entry.path.data(), ".") == 0) {
-            continue;
+        if (find_handle == INVALID_HANDLE_VALUE) {
+            debug_log("%s: update_cwd_entries(): find_handle == INVALID_HANDLE_VALUE", expl.name);
+            return;
         }
 
-        if (strcmp(entry.path.data(), "..") == 0) {
-            if (opts.show_dotdot_dir) {
-                expl.cwd_entries.emplace_back(entry);
-                std::swap(expl.cwd_entries.back(), expl.cwd_entries.front());
+        do {
+            ++expl.num_file_searches;
+
+            directory_entry entry = {};
+
+            std::memcpy(entry.path.data(), find_data.cFileName, entry.path.size());
+
+            entry.is_directory = find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+            entry.is_symbolic_link = path_ends_with(entry.path, ".lnk");
+
+            entry.size = two_u32_to_one_u64(find_data.nFileSizeLow, find_data.nFileSizeHigh);
+
+            if (strcmp(entry.path.data(), ".") == 0) {
+                continue;
             }
-        } else {
-            expl.cwd_entries.emplace_back(entry);
-        }
-    }
-    while (FindNextFileA(find_handle, &find_data));
 
-    std::sort(expl.cwd_entries.begin(), expl.cwd_entries.end(), [](directory_entry const &lhs, directory_entry const &rhs) {
-        if (lhs.is_directory && rhs.is_directory) {
-            return strcmp(lhs.path.data(), "..") == 0;
+            if (strcmp(entry.path.data(), "..") == 0) {
+                if (opts.show_dotdot_dir) {
+                    expl.cwd_entries.emplace_back(entry);
+                    std::swap(expl.cwd_entries.back(), expl.cwd_entries.front());
+                }
+            } else {
+                expl.cwd_entries.emplace_back(entry);
+            }
         }
-        else {
-            return lhs.is_directory;
-        }
-    });
+        while (FindNextFileA(find_handle, &find_data));
+    }
+
+    {
+        scoped_timer<timer_unit::MICROSECONDS> sort_timer(nullptr, &expl_ptr->update_cwd_entries_sort_us);
+
+        std::sort(expl.cwd_entries.begin(), expl.cwd_entries.end(), [](directory_entry const &lhs, directory_entry const &rhs) {
+            if (lhs.is_directory && rhs.is_directory) {
+                return strcmp(lhs.path.data(), "..") == 0;
+            }
+            else {
+                return lhs.is_directory;
+            }
+        });
+    }
 
     if (expl.filter.data()[0] != '\0') {
         switch (expl.filter_mode) {
@@ -195,7 +214,7 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
                 {
                     auto matcher = expl.filter_case_sensitive ? StrStrA : StrStrIA;
 
-                    scoped_timer<timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
+                    scoped_timer<timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.update_cwd_entries_filter_us);
 
                     for (auto &dir_ent : expl.cwd_entries) {
                         dir_ent.is_filtered_out = !matcher(dir_ent.path.data(), expl.filter.data());
@@ -207,18 +226,18 @@ void update_cwd_entries(explorer_window *expl_ptr, std::string_view parent_dir, 
             case filter_mode::regex: {
                 static std::regex filter_regex;
                 try {
-                    scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer("filter_regex ctor", nullptr, &std::cout);
+                    scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(nullptr, &expl.update_cwd_entries_regex_ctor_us);
                     filter_regex = expl.filter.data();
                 }
                 catch (std::exception const &except) {
-                    debug_log("%s: update_cwd_entries(): error constructing std::regex, %s", expl.name, except.what());
+                    debug_log("%s: error constructing std::regex, %s", expl.name, except.what());
                     expl.filter_error = except.what();
                     break;
                 }
                 {
                     auto match_flags = std::regex_constants::match_default | (std::regex_constants::icase * (expl.filter_case_sensitive == 0));
 
-                    scoped_timer<timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.filter_time_us);
+                    scoped_timer<timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.update_cwd_entries_filter_us);
 
                     for (auto &dir_ent : expl.cwd_entries) {
                         dir_ent.is_filtered_out = !std::regex_match(
@@ -269,7 +288,11 @@ explorer_window create_default_explorer_windows(
 
     w.num_file_searches = 0;
     w.last_refresh_timestamp = {};
-    w.filter_time_us = 0.f;
+    w.update_cwd_entries_total_us = 0.f;
+    w.update_cwd_entries_filesystem_us = 0.f;
+    w.update_cwd_entries_regex_ctor_us = 0.f;
+    w.update_cwd_entries_sort_us = 0.f;
+    w.update_cwd_entries_filter_us = 0.f;
 
     update_cwd_entries(&w, starting_dir.data(), opts);
 
@@ -501,7 +524,7 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
 
             // important that they are all the same length,
             // this assumption is leveraged for calculation of combo box width
-            static char const *filter_modes[] = {
+            static char const *filter_modes[filter_mode::count] = {
                 "Contains",
                 "RegExp  ",
             };
@@ -760,15 +783,17 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
         enum class column_id : i32 { number, path, size_pretty, size_bytes, count };
 
         if (num_filtered_dirents == expl.cwd_entries.size()) {
-            ImGui::TextColored(orange, "No entries passed filter.");
-
-            ImGui::SameLine();
-
             if (ImGui::Button("Clear filter")) {
                 debug_log("%s: clear filter button pressed", expl.name);
                 expl.filter[0] = '\0';
                 update_cwd_entries(&expl, expl.cwd.data(), opts);
             }
+
+            ImGui::SameLine();
+            ImGui::Spacing();
+            ImGui::SameLine();
+
+            ImGui::TextColored(orange, "No entries passed filter.");
         }
         else if (ImGui::BeginTable("Entries", (i32)column_id::count, ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable)) {
             ImGui::TableSetupColumn("Number", ImGuiTableColumnFlags_DefaultSort, 0.0f, (u32)column_id::number);
@@ -948,15 +973,30 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
             ImGui::Spacing();
         }
 
+        auto calc_perc_total_time = [&expl](f64 time) {
+            return time == 0.f
+                ? 0.f
+                : ( (time / expl.update_cwd_entries_total_us) * 100.f );
+        };
+
         ImGui::Text("[DEBUG]");
         ImGui::Text("cwd = [%s]", expl.cwd.data());
-        ImGui::Text("cwd_exists = %d", directory_exists(expl.cwd.data()));
+        ImGui::Text("directory_exists(cwd) = %d", directory_exists(expl.cwd.data()));
         ImGui::Text("num_file_searches = %zu", expl.num_file_searches);
-        ImGui::Text("dir_entries.size() = %zu", expl.cwd_entries.size());
+        ImGui::Text("cwd_entries.size() = %zu", expl.cwd_entries.size());
         ImGui::Text("cwd_prev_selected_dirent_idx = %lld", expl.cwd_prev_selected_dirent_idx);
-        ImGui::Text("filter_time_us = %.1lf", expl.filter_time_us);
+        ImGui::Text("update_cwd_entries_total_us = %.1lf", expl.update_cwd_entries_total_us);
+        ImGui::Text("update_cwd_entries_searchpath_setup_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_searchpath_setup_us, calc_perc_total_time(expl.update_cwd_entries_searchpath_setup_us));
+        ImGui::Text("update_cwd_entries_filesystem_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_filesystem_us, calc_perc_total_time(expl.update_cwd_entries_filesystem_us));
+        ImGui::Text("update_cwd_entries_regex_ctor_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_regex_ctor_us, calc_perc_total_time(expl.update_cwd_entries_regex_ctor_us));
+        ImGui::Text("update_cwd_entries_sort_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_sort_us, calc_perc_total_time(expl.update_cwd_entries_sort_us));
+        ImGui::Text("update_cwd_entries_filter_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_filter_us, calc_perc_total_time(expl.update_cwd_entries_filter_us));
     }
     // debug info end
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
 
     ImGui::End();
 }
