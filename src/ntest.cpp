@@ -13,6 +13,11 @@
 # include <cxxabi.h>
 #endif
 
+#ifdef _WIN32
+# undef min
+# undef max
+#endif
+
 #include "ntest.hpp"
 
 namespace fs = std::filesystem;

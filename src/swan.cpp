@@ -1,14 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include <filesystem>
-
-#if 0
-    // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
-    // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
-    // Your own project should not be affected, as you are likely to link with a newer binary of GLFW that is adequate for your version of Visual Studio.
-    #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
-    #pragma comment(lib, "legacy_stdio_definitions")
-    #endif
-#endif
 
 #pragma warning(push)
 #pragma warning(disable: 4244)
@@ -21,10 +11,9 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 
-#include "on_scope_exit.hpp"
-#include "primitives.hpp"
-#include "options.hpp"
-
+#include "on_scope_exit.cpp"
+#include "primitives.cpp"
+#include "options.cpp"
 #include "explorer.cpp"
 #include "util.cpp"
 
@@ -117,17 +106,24 @@ void render(GLFWwindow *window)
 
 i32 main(i32, char**)
 {
+    debug_log("--------------------");
+
     GLFWwindow *window = init_glfw_and_imgui();
     if (window == nullptr) {
         return 1;
     }
 
-    auto window_cleanup_routine = make_on_scope_exit([window]() {
+    if (!init_windows_shell_com_garbage()) {
+        return 1;
+    }
+
+    auto cleanup_routine = make_on_scope_exit([window]() {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
         glfwDestroyWindow(window);
         glfwTerminate();
+        cleanup_windows_shell_com_garbage();
     });
 
     [[maybe_unused]] auto &io = ImGui::GetIO();
@@ -222,10 +218,6 @@ i32 main(i32, char**)
 
         if (show_analytics) {
             if (ImGui::Begin("Analytics")) {
-                // static ImVec4 green(100, 255, 0, 255);
-                // static ImVec4 yellow(255, 255, 0, 255);
-                // static ImVec4 red(255, 50, 0, 255);
-
                 ImGui::Text("%.1f FPS", io.Framerate);
                 ImGui::Text("%.3f ms/frame ", 1000.0f / io.Framerate);
             }
