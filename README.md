@@ -44,11 +44,11 @@ entry = file | directory
 - [x] Handle shortcuts (IShellLink)
 - [ ] History browser
 - [ ] Sort directory entries
-- [ ] Move directory entries
-- [ ] Glob filtering
-- [ ] Cut/Copy Paste directory entries
 - [ ] Pins
-- [ ] Show directory preview (num child files/dirs)
+- [ ] Move directory entries
+- [ ] Copy directory entries
+- [ ] Glob filtering
 - [ ] Customizable context menu
+- [ ] Show directory preview (num child files/dirs)
 - [ ] File preview
 - [ ] Automatic refresh
