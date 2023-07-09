@@ -155,6 +155,7 @@ i32 main(i32, char**)
     }
 
     static explorer_options expl_opts = {};
+    expl_opts.show_dotdot_dir = true;
 #if !defined(NDEBUG)
     expl_opts.show_debug_info = true;
     expl_opts.show_cwd_len = true;
