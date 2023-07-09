@@ -42,7 +42,7 @@ entry = file | directory
 - [x] Ctrl-r to refresh
 - [x] "Contains" filtering
 - [x] Handle shortcuts (IShellLink)
-- [ ] History browser
+- [x] History browser
 - [ ] Sort directory entries
 - [ ] Pins
 - [ ] Move directory entries
