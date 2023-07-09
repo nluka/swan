@@ -67,6 +67,7 @@ struct explorer_window
     LARGE_INTEGER last_refresh_timestamp;
     f64 update_cwd_entries_total_us;
     f64 update_cwd_entries_searchpath_setup_us;
+    f64 update_cwd_entries_check_cwd_exists_us;
     f64 update_cwd_entries_filesystem_us;
     f64 update_cwd_entries_regex_ctor_us;
     f64 update_cwd_entries_sort_us;
@@ -126,13 +127,14 @@ void update_cwd_entries(u8 actions, explorer_window *expl_ptr, std::string_view 
     IM_ASSERT(expl_ptr != nullptr);
 
     explorer_window &expl = *expl_ptr;
-    expl_ptr->update_cwd_entries_total_us = 0;
+    expl.update_cwd_entries_total_us = 0;
+    expl.update_cwd_entries_check_cwd_exists_us = 0;
     expl.update_cwd_entries_searchpath_setup_us = 0;
     expl.update_cwd_entries_filesystem_us = 0;
     expl.update_cwd_entries_sort_us = 0;
     expl.update_cwd_entries_filter_us = 0;
 
-    scoped_timer<timer_unit::MICROSECONDS> function_timer(nullptr, &expl_ptr->update_cwd_entries_total_us);
+    scoped_timer<timer_unit::MICROSECONDS> function_timer(&expl_ptr->update_cwd_entries_total_us);
 
     if (actions & query_filesystem) {
         expl.cwd_entries.clear();
@@ -143,14 +145,18 @@ void update_cwd_entries(u8 actions, explorer_window *expl_ptr, std::string_view 
             parent_dir = std::string_view(parent_dir.data(), parent_dir.size() - 1);
         }
 
-        if (!directory_exists(parent_dir.data())) {
-            debug_log("%s: directory [%s] doesn't exist", expl.name, parent_dir.data());
-            return;
+        // TODO: see if this can be eliminated and done for cheaper when querying the filesystem
+        {
+            scoped_timer<timer_unit::MICROSECONDS> check_cwd_exists_timer(&expl.update_cwd_entries_check_cwd_exists_us);
+            if (!directory_exists(parent_dir.data())) {
+                debug_log("%s: directory [%s] doesn't exist", expl.name, parent_dir.data());
+                return;
+            }
         }
 
         static std::string search_path{};
         {
-            scoped_timer<timer_unit::MICROSECONDS> search_path_timer(nullptr, &expl.update_cwd_entries_searchpath_setup_us);
+            scoped_timer<timer_unit::MICROSECONDS> search_path_timer(&expl.update_cwd_entries_searchpath_setup_us);
             search_path.reserve(parent_dir.size() + strlen("\\*"));
             search_path = parent_dir;
             search_path += "\\*";
@@ -158,7 +164,7 @@ void update_cwd_entries(u8 actions, explorer_window *expl_ptr, std::string_view 
 
         debug_log("%s: querying filesystem, search_path = [%s]", expl.name, search_path.c_str());
 
-        scoped_timer<timer_unit::MICROSECONDS> filesystem_timer(nullptr, &expl.update_cwd_entries_filesystem_us);
+        scoped_timer<timer_unit::MICROSECONDS> filesystem_timer(&expl.update_cwd_entries_filesystem_us);
 
         WIN32_FIND_DATAA find_data;
         HANDLE find_handle = FindFirstFileA(search_path.data(), &find_data);
@@ -200,7 +206,7 @@ void update_cwd_entries(u8 actions, explorer_window *expl_ptr, std::string_view 
     }
 
     if (actions & sort) {
-        scoped_timer<timer_unit::MICROSECONDS> sort_timer(nullptr, &expl.update_cwd_entries_sort_us);
+        scoped_timer<timer_unit::MICROSECONDS> sort_timer(&expl.update_cwd_entries_sort_us);
 
         std::sort(expl.cwd_entries.begin(), expl.cwd_entries.end(), [](directory_entry const &lhs, directory_entry const &rhs) {
             if (lhs.is_directory && rhs.is_directory) {
@@ -213,7 +219,7 @@ void update_cwd_entries(u8 actions, explorer_window *expl_ptr, std::string_view 
     }
 
     if (actions & filter) {
-        scoped_timer<timer_unit::MICROSECONDS> filter_timer(nullptr, &expl.update_cwd_entries_filter_us);
+        scoped_timer<timer_unit::MICROSECONDS> filter_timer(&expl.update_cwd_entries_filter_us);
 
         expl.filter_error.clear();
 
@@ -238,7 +244,7 @@ void update_cwd_entries(u8 actions, explorer_window *expl_ptr, std::string_view 
                 case filter_mode::regex: {
                     static std::regex filter_regex;
                     try {
-                        scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(nullptr, &expl.update_cwd_entries_regex_ctor_us);
+                        scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(&expl.update_cwd_entries_regex_ctor_us);
                         filter_regex = expl.filter.data();
                     }
                     catch (std::exception const &except) {
@@ -441,6 +447,22 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
 
         ImGui::TableNextColumn();
 
+        // up a directory arrow start
+        {
+            bool cwd_exists = directory_exists(expl.cwd.data());
+            ImGui::BeginDisabled(!cwd_exists);
+
+            if (ImGui::ArrowButton("Up", ImGuiDir_Up)) {
+                debug_log("%s: up arrow button triggered", expl.name);
+                try_descend_to_directory(expl, "..", opts);
+            }
+
+            ImGui::EndDisabled();
+        }
+        // up a directory arrow end
+
+        ImGui::SameLine();
+
         // refresh button, ctrl-r refresh logic, automatic refreshing
         {
             bool refreshed = false; // to avoid refreshing twice in one frame
@@ -553,7 +575,12 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                 update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-                ImGui::SetTooltip("Toggle filter case sensitivity: aA = case insensitive, aa = case sensitive");
+                ImGui::SetTooltip(
+                    " \n Toggle filter case sensitivity \n\n"
+                    " aA: %sinsensitive%s \n"
+                    " aa: %ssensitive  %s \n ",
+                    !expl.filter_case_sensitive ? "[" : " ", !expl.filter_case_sensitive ? "]" : " ",
+                    expl.filter_case_sensitive ? "[" : " ", expl.filter_case_sensitive ? "]" : " ");
             }
         }
         // filter case sensitivity button start
@@ -994,11 +1021,18 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
         ImGui::Text("cwd_entries.size() = %zu", expl.cwd_entries.size());
         ImGui::Text("cwd_prev_selected_dirent_idx = %lld", expl.cwd_prev_selected_dirent_idx);
         ImGui::Text("update_cwd_entries_total_us = %.1lf", expl.update_cwd_entries_total_us);
-        ImGui::Text("update_cwd_entries_searchpath_setup_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_searchpath_setup_us, calc_perc_total_time(expl.update_cwd_entries_searchpath_setup_us));
-        ImGui::Text("update_cwd_entries_filesystem_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_filesystem_us, calc_perc_total_time(expl.update_cwd_entries_filesystem_us));
-        ImGui::Text("update_cwd_entries_sort_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_sort_us, calc_perc_total_time(expl.update_cwd_entries_sort_us));
-        ImGui::Text("update_cwd_entries_filter_us = %.1lf (%.1lf %%)", expl.update_cwd_entries_filter_us, calc_perc_total_time(expl.update_cwd_entries_filter_us));
-        ImGui::Text("update_cwd_entries_regex_ctor_us = %.1lf", expl.update_cwd_entries_regex_ctor_us);
+        ImGui::Text("update_cwd_entries_check_cwd_exists_us = %.1lf (%.1lf %%)",
+            expl.update_cwd_entries_check_cwd_exists_us, calc_perc_total_time(expl.update_cwd_entries_check_cwd_exists_us));
+        ImGui::Text("update_cwd_entries_searchpath_setup_us = %.1lf (%.1lf %%)",
+            expl.update_cwd_entries_searchpath_setup_us, calc_perc_total_time(expl.update_cwd_entries_searchpath_setup_us));
+        ImGui::Text("update_cwd_entries_filesystem_us = %.1lf (%.1lf %%)",
+            expl.update_cwd_entries_filesystem_us, calc_perc_total_time(expl.update_cwd_entries_filesystem_us));
+        ImGui::Text("update_cwd_entries_sort_us = %.1lf (%.1lf %%)",
+            expl.update_cwd_entries_sort_us, calc_perc_total_time(expl.update_cwd_entries_sort_us));
+        ImGui::Text("update_cwd_entries_filter_us = %.1lf (%.1lf %%)",
+            expl.update_cwd_entries_filter_us, calc_perc_total_time(expl.update_cwd_entries_filter_us));
+        ImGui::Text("update_cwd_entries_regex_ctor_us = %.1lf",
+            expl.update_cwd_entries_regex_ctor_us);
     }
     // debug info end
 
