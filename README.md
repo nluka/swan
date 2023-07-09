@@ -43,10 +43,11 @@ entry = file | directory
 - [x] "Contains" filtering
 - [x] Handle shortcuts (IShellLink)
 - [x] History browser
-- [ ] Sort directory entries
+- [x] Sort directory entries
 - [ ] Pins
 - [ ] Move directory entries
 - [ ] Copy directory entries
+- [ ] Handle executable .lnk
 - [ ] Glob filtering
 - [ ] Customizable context menu
 - [ ] Show directory preview (num child files/dirs)
