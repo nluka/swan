@@ -11,11 +11,13 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 
-#include "on_scope_exit.cpp"
-#include "primitives.cpp"
-#include "options.cpp"
-#include "explorer.cpp"
+#include "on_scope_exit.hpp"
+#include "primitives.hpp"
+#include "common.hpp"
+
 #include "util.cpp"
+#include "pinned.cpp"
+#include "explorer.cpp"
 
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers
@@ -88,6 +90,31 @@ GLFWwindow *init_glfw_and_imgui()
 }
 
 static
+void set_window_icon(GLFWwindow *window)
+{
+    GLFWimage icon;
+    icon.pixels = nullptr;
+    icon.width = 0;
+    icon.height = 0;
+
+    int icon_width, icon_height, icon_channels;
+    u8 *icon_pixels = stbi_load("swan.png", &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
+
+    auto cleanup_icon_pixels_routine = make_on_scope_exit([icon_pixels] {
+        stbi_image_free(icon_pixels);
+    });
+
+    if (icon_pixels)
+    {
+        icon.pixels = icon_pixels;
+        icon.width = icon_width;
+        icon.height = icon_height;
+
+        glfwSetWindowIcon(window, 1, &icon);
+    }
+}
+
+static
 void render(GLFWwindow *window)
 {
     ImGui::Render();
@@ -106,7 +133,7 @@ void render(GLFWwindow *window)
 
 i32 main(i32, char**)
 {
-    debug_log("--------------------");
+    debug_log("\n%%%%%% init %%%%%%\n");
 
     GLFWwindow *window = init_glfw_and_imgui();
     if (window == nullptr) {
@@ -126,47 +153,71 @@ i32 main(i32, char**)
         cleanup_windows_shell_com_garbage();
     });
 
+    set_window_icon(window);
+
     [[maybe_unused]] auto &io = ImGui::GetIO();
 
+    explorer_options expl_opts = {};
+    if (!expl_opts.load_from_disk()) {
+        debug_log("explorer_options::load_from_disk failed, setting defaults");
+        expl_opts.show_dotdot_dir = true;
+    #if !defined(NDEBUG)
+        expl_opts.show_debug_info = true;
+        expl_opts.show_cwd_len = true;
+    #endif
+    }
+
+    windows_options win_opts = {};
+    if (!win_opts.load_from_disk()) {
+        debug_log("windows_options::load_from_disk failed, setting defaults");
+        win_opts.show_explorer_1 = true;
+        win_opts.show_pinned = true;
+    #if !defined(NDEBUG)
+        win_opts.show_demo = true;
+    #endif
+    }
+
     {
-        GLFWimage icon;
-        icon.pixels = nullptr;
-        icon.width = 0;
-        icon.height = 0;
-
-        int icon_width, icon_height, icon_channels;
-        u8 *icon_pixels = stbi_load("swan.png", &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
-
-        if (icon_pixels)
-        {
-            icon.pixels = icon_pixels;
-            icon.width = icon_width;
-            icon.height = icon_height;
-
-            glfwSetWindowIcon(window, 1, &icon);
+        auto [success, num_pins_loaded] = load_pins_from_disk(expl_opts.dir_separator());
+        if (!success) {
+            debug_log("load_pins_from_disk failed");
+        } else {
+            debug_log("load_pins_from_disk success, loaded %zu pins", num_pins_loaded);
         }
-
-        stbi_image_free(icon_pixels);
     }
 
-    path_t starting_path = {};
-    if (!GetCurrentDirectoryA((i32)starting_path.size(), starting_path.data())) {
-        debug_log("GetCurrentDirectoryA failed");
+    std::vector<explorer_window> explorers(4);
+    {
+        char const *names[] = { "Explorer 1", "Explorer 2", "Explorer 3", "Explorer 4" };
+
+        for (u64 i = 0; i < explorers.size(); ++i) {
+            auto &expl = explorers[i];
+
+            expl.name = names[i];
+            expl.filter_error.reserve(1024);
+
+            bool load_result = explorers[i].load_from_disk(expl_opts.dir_separator());
+            debug_log("Explorer %zu load_from_disk result: %d", i+1, load_result);
+
+            if (!load_result) {
+                std::string startup_path_stdstr = std::filesystem::current_path().string();
+
+                path_t startup_path = {};
+                path_append(startup_path, startup_path_stdstr.c_str());
+                path_force_separator(startup_path, expl_opts.dir_separator());
+
+                expl.cwd = startup_path;
+                expl.wd_history.push_back(startup_path);
+
+                bool save_result = explorers[i].save_to_disk();
+                debug_log("Explorer %zu save_to_disk result: %d", i+1, save_result);
+            }
+
+            update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
+        }
     }
 
-    static explorer_options expl_opts = {};
-    expl_opts.show_dotdot_dir = true;
-#if !defined(NDEBUG)
-    expl_opts.show_debug_info = true;
-    expl_opts.show_cwd_len = true;
-#endif
-
-    std::vector<explorer_window> explorers = {};
-    explorers.reserve(4);
-    explorers.emplace_back(create_default_explorer_windows("Explorer 1", true, starting_path, expl_opts));
-    explorers.emplace_back(create_default_explorer_windows("Explorer 2", true, starting_path, expl_opts));
-    explorers.emplace_back(create_default_explorer_windows("Explorer 3", false, starting_path, expl_opts));
-    explorers.emplace_back(create_default_explorer_windows("Explorer 4", false, starting_path, expl_opts));
+    debug_log("\n%%%%%% render loop %%%%%%\n");
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -178,9 +229,6 @@ i32 main(i32, char**)
 
         ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
-        static bool show_analytics = false;
-        static bool show_demo = false;
-
         {
             ImGuiStyle &style = ImGui::GetStyle();
             f32 original_padding = style.FramePadding.y;
@@ -189,23 +237,66 @@ i32 main(i32, char**)
 
             if (ImGui::BeginMainMenuBar()) {
                 if (ImGui::BeginMenu("[Windows]")) {
-                    for (auto &expl : explorers) {
-                        ImGui::MenuItem(expl.name, nullptr, &expl.show);
-                    }
-                    ImGui::MenuItem("Analytics", nullptr, &show_analytics);
-                    ImGui::MenuItem("ImGui Demo", nullptr, &show_demo);
+                    bool change_made = false;
+                    static_assert((false | false) == false);
+                    static_assert((false | true) == true);
+                    static_assert((true | true) == true);
+
+                    change_made |= ImGui::MenuItem("Pinned", nullptr, &win_opts.show_pinned);
+
+                    change_made |= ImGui::MenuItem(explorers[0].name, nullptr, &win_opts.show_explorer_0);
+                    change_made |= ImGui::MenuItem(explorers[1].name, nullptr, &win_opts.show_explorer_1);
+                    change_made |= ImGui::MenuItem(explorers[2].name, nullptr, &win_opts.show_explorer_2);
+                    change_made |= ImGui::MenuItem(explorers[3].name, nullptr, &win_opts.show_explorer_3);
+
+                    change_made |= ImGui::MenuItem("Analytics", nullptr, &win_opts.show_analytics);
+                    change_made |= ImGui::MenuItem("ImGui Demo", nullptr, &win_opts.show_demo);
+
                     ImGui::EndMenu();
+
+                    if (change_made) {
+                        bool result = win_opts.save_to_disk();
+                        debug_log("windows_options::save_to_disk result: %d", result);
+                    }
                 }
                 if (ImGui::BeginMenu("[Explorer Options]")) {
-                    ImGui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
-                    if (ImGui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir)) {
-                        for (auto &expl : explorers) {
-                            update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
+                    bool change_made = false;
+                    static_assert((false | false) == false);
+                    static_assert((false | true) == true);
+                    static_assert((true | true) == true);
+
+                    {
+                        bool changed_dotdot_dir = ImGui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir);
+                        if (changed_dotdot_dir) {
+                            for (auto &expl : explorers) {
+                                update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
+                            }
                         }
+                        change_made |= changed_dotdot_dir;
                     }
-                    ImGui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
-                    ImGui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
+
+                    change_made |= ImGui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
+                    change_made |= ImGui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
+
+                    {
+                        bool changed_dir_separator = ImGui::MenuItem("Unix directory separators", nullptr, &expl_opts.unix_directory_separator);
+                        if (changed_dir_separator) {
+                            for (auto &expl : explorers) {
+                                update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
+                            }
+                            update_pin_dir_separators(expl_opts.dir_separator());
+                        }
+                        change_made |= changed_dir_separator;
+                    }
+
+                    change_made |= ImGui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
+
                     ImGui::EndMenu();
+
+                    if (change_made) {
+                        bool result = expl_opts.save_to_disk();
+                        debug_log("explorer_options::save_to_disk result: %d", result);
+                    }
                 }
                 ImGui::EndMainMenuBar();
             }
@@ -213,11 +304,24 @@ i32 main(i32, char**)
             style.FramePadding.y = original_padding;
         }
 
-        for (auto &expl : explorers) {
-            render_file_explorer(expl, expl_opts);
+        if (win_opts.show_pinned) {
+            render_pinned(explorers, win_opts, expl_opts);
         }
 
-        if (show_analytics) {
+        if (win_opts.show_explorer_0) {
+            render_file_explorer(explorers[0], expl_opts);
+        }
+        if (win_opts.show_explorer_1) {
+            render_file_explorer(explorers[1], expl_opts);
+        }
+        if (win_opts.show_explorer_2) {
+            render_file_explorer(explorers[2], expl_opts);
+        }
+        if (win_opts.show_explorer_3) {
+            render_file_explorer(explorers[3], expl_opts);
+        }
+
+        if (win_opts.show_analytics) {
             if (ImGui::Begin("Analytics")) {
                 ImGui::Text("%.1f FPS", io.Framerate);
                 ImGui::Text("%.3f ms/frame ", 1000.0f / io.Framerate);
@@ -225,7 +329,7 @@ i32 main(i32, char**)
             ImGui::End();
         }
 
-        if (show_demo) {
+        if (win_opts.show_demo) {
             ImGui::ShowDemoWindow();
         }
 

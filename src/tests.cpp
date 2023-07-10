@@ -5,13 +5,17 @@
 
 #include "term.hpp"
 #include "term.cpp"
-
 #include "ntest.hpp"
 #include "ntest.cpp"
 
-#include "primitives.cpp"
+#include "primitives.hpp"
+
+#include "path.hpp"
 #include "path.cpp"
+
 #include "util.cpp"
+
+using swan::path_t;
 
 i32 main()
 {
@@ -123,7 +127,7 @@ i32 main()
   }
   #endif
 
-  // path_clear
+  using swan::path_clear;
   #if 1
   {
     path_t p = {};
@@ -134,7 +138,7 @@ i32 main()
   }
   #endif
 
-  // path_length
+  using swan::path_length;
   #if 1
   {
     path_t p = {};
@@ -146,7 +150,7 @@ i32 main()
   }
   #endif
 
-  // path_ends_with
+  using swan::path_ends_with;
   #if 1
   {
     path_t p = {};
@@ -163,7 +167,7 @@ i32 main()
   }
   #endif
 
-  // path_ends_with_one_of
+  using swan::path_ends_with_one_of;
   #if 1
   {
     path_t p = {};
@@ -180,7 +184,7 @@ i32 main()
   }
   #endif
 
-  // path_append
+  using swan::path_append, swan::path_append_result;
   #if 1
   {
     {
@@ -240,7 +244,7 @@ i32 main()
   }
   #endif
 
-  // path_is_empty
+  using swan::path_is_empty;
   #if 1
   {
     path_t p = {};

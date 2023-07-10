@@ -30,7 +30,7 @@ void debug_log([[maybe_unused]] char const *fmt, ...)
     va_list args;
     va_start(args, fmt);
 
-    assert(vprintf(fmt, args) > 0);
+    assert(vprintf(fmt, args) >= 0);
 
     va_end(args);
 
