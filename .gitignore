@@ -9,3 +9,9 @@ imgui.ini
 *.pdf
 *.lnk
 swan_tests.md
+*.bin
+pins.txt
+Explorer_1.txt
+Explorer_2.txt
+Explorer_3.txt
+Explorer_4.txt

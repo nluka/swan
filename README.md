@@ -44,10 +44,18 @@ entry = file | directory
 - [x] Handle shortcuts (IShellLink)
 - [x] History browser
 - [x] Sort directory entries
-- [ ] Pins
+- [x] Unix path separator (/) support
+- [x] Persist state
+- [x] Pins
+- [x] Show when last refreshed
+- [ ] Column: "last modified"
 - [ ] Move directory entries
 - [ ] Copy directory entries
+- [ ] Delete directory entries
+- [ ] Undo move/copy/delete
 - [ ] Handle executable .lnk
+- [ ] Renaming
+- [ ] Bulk renaming
 - [ ] Glob filtering
 - [ ] Customizable context menu
 - [ ] Show directory preview (num child files/dirs)

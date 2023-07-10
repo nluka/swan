@@ -1,5 +1,7 @@
 @call cl.exe ^
 src/swan.cpp ^
+src/common.cpp ^
+src/path.cpp ^
 obj_debug/imgui_demo.obj ^
 obj_debug/imgui_draw.obj ^
 obj_debug/imgui_impl_glfw.obj ^
