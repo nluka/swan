@@ -8,7 +8,9 @@
 #include <shlwapi.h>
 #include <shlguid.h>
 #include <shobjidl.h>
-#include "shlobj_core.h"
+#include <shlobj_core.h>
+#include <timezoneapi.h>
+#include <datetimeapi.h>
 
 #include "imgui/imgui.h"
 
@@ -69,6 +71,19 @@ void cleanup_windows_shell_com_garbage()
     CoUninitialize();
 }
 
+std::pair<i32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept(true)
+{
+    std::array<char, 64> buffer = {};
+    DWORD flags = FDTF_LONGDATE | FDTF_LONGTIME | FDTF_RELATIVE | FDTF_LTRDATE;
+    i32 length = SHFormatDateTimeA(time, &flags, buffer.data(), (u32)buffer.size());
+
+    // for some reason, SHFormatDateTimeA will pad parts of the string with ASCII 63 (?)
+    // when using LONGDATE or LONGTIME, so we will simply convert them to spaces
+    std::replace(buffer.begin(), buffer.end(), '?', ' ');
+
+    return { length, buffer };
+}
+
 enum cwd_entries_table_col_id : ImGuiID
 {
     cwd_entries_table_col_number,
@@ -76,6 +91,8 @@ enum cwd_entries_table_col_id : ImGuiID
     cwd_entries_table_col_type,
     cwd_entries_table_col_size_pretty,
     cwd_entries_table_col_size_bytes,
+    // cwd_entries_table_col_creation_time,
+    cwd_entries_table_col_last_write_time,
     cwd_entries_table_col_count
 };
 
@@ -134,6 +151,16 @@ void sort_cwd_entries(explorer_window &expl, ImGuiTableSortSpecs *sort_specs)
                     } else {
                         left_lt_right = (left.size < right.size) == direction_flipper;
                     }
+                    break;
+                }
+                // case cwd_entries_table_col_creation_time: {
+                //     i32 cmp = CompareFileTime(&left.creation_time_raw, &right.creation_time_raw);
+                //     left_lt_right = (cmp <= 0) == direction_flipper;
+                //     break;
+                // }
+                case cwd_entries_table_col_last_write_time: {
+                    i32 cmp = CompareFileTime(&left.last_write_time_raw, &right.last_write_time_raw);
+                    left_lt_right = (cmp <= 0) == direction_flipper;
                     break;
                 }
             }
@@ -206,9 +233,11 @@ void update_cwd_entries(u8 actions, explorer_window *expl_ptr, std::string_view 
 
         do {
             explorer_window::directory_entry entry = {};
-            std::strncpy(entry.path.data(), find_data.cFileName, entry.path.size());
             entry.number = number;
+            std::strncpy(entry.path.data(), find_data.cFileName, entry.path.size());
             entry.size = two_u32_to_one_u64(find_data.nFileSizeLow, find_data.nFileSizeHigh);
+            entry.creation_time_raw = find_data.ftCreationTime;
+            entry.last_write_time_raw = find_data.ftLastWriteTime;
 
             if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                 entry.type = explorer_window::directory_entry::type::directory;
@@ -1117,13 +1146,15 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                 ImGui::TextColored(orange, "All items filtered.");
             }
             else if (ImGui::BeginTable("cwd_entries", cwd_entries_table_col_count,
-                ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable|ImGuiTableFlags_SortTristate
+                ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable
             )) {
                 ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_number);
                 ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_path);
                 ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_type);
                 ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_size_pretty);
                 ImGui::TableSetupColumn("Bytes", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_size_bytes);
+                // ImGui::TableSetupColumn("Created", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_creation_time);
+                ImGui::TableSetupColumn("Last Edited", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_last_write_time);
                 ImGui::TableHeadersRow();
 
                 ImGuiTableSortSpecs *sort_specs = ImGui::TableGetSortSpecs();
@@ -1291,6 +1322,16 @@ void render_file_explorer(explorer_window &expl, explorer_options &opts)
                         else {
                             ImGui::Text("%zu", dir_ent.size);
                         }
+                    }
+
+                    // if (ImGui::TableSetColumnIndex(cwd_entries_table_col_creation_time)) {
+                    //     auto [result, buffer] = filetime_to_string(&dir_ent.last_write_time_raw);
+                    //     ImGui::TextUnformatted(buffer.data());
+                    // }
+
+                    if (ImGui::TableSetColumnIndex(cwd_entries_table_col_last_write_time)) {
+                        auto [result, buffer] = filetime_to_string(&dir_ent.last_write_time_raw);
+                        ImGui::TextUnformatted(buffer.data());
                     }
                 }
 
