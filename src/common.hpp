@@ -56,12 +56,14 @@ struct explorer_window
             count
         };
 
-        type type;
         bool is_filtered_out;
         bool is_selected;
+        type type;
         u32 number;
         path_t path;
         u64 size;
+        FILETIME creation_time_raw;
+        FILETIME last_write_time_raw;
 
         bool is_directory() const noexcept(true)
         {

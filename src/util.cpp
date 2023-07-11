@@ -9,7 +9,10 @@
 // Returns the size of a static C-style array at compile time.
 template <typename ElemTy, u64 Length>
 consteval
-u64 lengthof(ElemTy (&)[Length]) { return Length; }
+u64 lengthof(ElemTy (&)[Length])
+{
+    return Length;
+}
 
 void flip_bool(bool &b)
 {

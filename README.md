@@ -48,7 +48,7 @@ entry = file | directory
 - [x] Persist state
 - [x] Pins
 - [x] Show when last refreshed
-- [ ] Column: "last modified"
+- [x] Column: "last modified"
 - [ ] Move directory entries
 - [ ] Copy directory entries
 - [ ] Delete directory entries

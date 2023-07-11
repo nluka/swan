@@ -29,6 +29,7 @@ glfw3.lib ^
 opengl32.lib ^
 gdi32.lib ^
 shell32.lib ^
+kernel32.lib ^
 msvcrt.lib ^
 ole32.lib ^
 shlwapi.lib
