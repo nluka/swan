@@ -23,6 +23,12 @@ namespace swan {
 
   void path_force_separator(path_t &path, char dir_separator) noexcept(true);
 
+  char path_pop_back(path_t &path) noexcept(true);
+
+  bool path_pop_back_if(path_t &path, char if_ch) noexcept(true);
+
+  bool path_pop_back_if_not(path_t &path, char if_not_ch) noexcept(true);
+
   enum class path_append_result : i32
   {
       nil = -1,
@@ -30,7 +36,12 @@ namespace swan {
       exceeds_max_path,
   };
 
-  path_append_result path_append(swan::path_t &path, char const *str, bool prepend_slash = false) noexcept(true);
+  path_append_result path_append(
+    swan::path_t &path,
+    char const *str,
+    char dir_separator = 0,
+    bool prepend_slash = false,
+    bool postpend_slash = false) noexcept(true);
 
 } // namespace swan
 

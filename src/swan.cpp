@@ -70,7 +70,7 @@ GLFWwindow *init_glfw_and_imgui()
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
     ImGui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
-    ImGui::StyleColorsClassic();
+    ImGui::StyleColorsDark();
 
     // Setup Platform/Renderer backends
     {
