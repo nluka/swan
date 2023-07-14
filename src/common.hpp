@@ -7,6 +7,7 @@
 
 #include "path.hpp"
 #include "primitives.hpp"
+#include "imgui/imgui.h"
 
 struct windows_options
 {
@@ -48,7 +49,7 @@ struct explorer_window
 
     struct directory_entry
     {
-        enum class type : u8
+        enum class ent_type : u8
         {
             directory,
             symlink,
@@ -58,8 +59,8 @@ struct explorer_window
 
         bool is_filtered_out;
         bool is_selected;
-        type type;
-        u32 number;
+        ent_type type;
+        u32 id;
         path_t path;
         u64 size;
         FILETIME creation_time_raw;
@@ -67,22 +68,38 @@ struct explorer_window
 
         bool is_directory() const noexcept(true)
         {
-            return type == directory_entry::type::directory;
+            return type == directory_entry::ent_type::directory;
         }
 
         bool is_symlink() const noexcept(true)
         {
-            return type == directory_entry::type::symlink;
+            return type == directory_entry::ent_type::symlink;
         }
 
         bool is_file() const noexcept(true)
         {
-            return type != directory_entry::type::directory;
+            return type != directory_entry::ent_type::directory;
         }
 
         bool is_non_symlink_file() const noexcept(true)
         {
             return is_file() && !is_symlink();
+        }
+
+        ImVec4 get_color() const noexcept(true)
+        {
+            return get_color(this->type);
+        }
+
+        static ImVec4 get_color(ent_type type) noexcept(true)
+        {
+            static ImVec4 const pale_green(0.85f, 1, 0.85f, 1);
+            static ImVec4 const yellow(1, 1, 0, 1);
+            static ImVec4 const cyan(0.1f, 1, 1, 1);
+
+            if (type == ent_type::directory) return yellow;
+            if (type == ent_type::symlink) return cyan;
+            else return pale_green;
         }
     };
 

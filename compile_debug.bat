@@ -20,6 +20,7 @@ obj_debug/imgui.obj ^
 /EHsc ^
 /MT ^
 /D_CRT_SECURE_NO_WARNINGS ^
+/Zi ^
 /link ^
 /NODEFAULTLIB:MSVCRTD ^
 /NODEFAULTLIB:LIBCMT ^

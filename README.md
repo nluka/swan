@@ -49,10 +49,10 @@ entry = file | directory
 - [x] Pins
 - [x] Show when last refreshed
 - [x] Column: "last modified"
-- [ ] Move directory entries
+- [ ] Cut directory entries
 - [ ] Copy directory entries
 - [ ] Delete directory entries
-- [ ] Undo move/copy/delete
+- [ ] Undo cut/copy/delete
 - [ ] Handle executable .lnk
 - [ ] Renaming
 - [ ] Bulk renaming
