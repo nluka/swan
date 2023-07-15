@@ -5,7 +5,7 @@
 #include "common.hpp"
 #include "path.hpp"
 
-using swan::path_t;
+using namespace swan;
 
 static std::vector<path_t> s_pins = {};
 
@@ -16,7 +16,7 @@ std::vector<path_t> const &get_pins() noexcept(true)
 
 bool pin(path_t &path, char dir_separator) noexcept(true)
 {
-  swan::path_force_separator(path, dir_separator);
+  path_force_separator(path, dir_separator);
 
   try {
     s_pins.push_back(path);
@@ -48,10 +48,10 @@ void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept(true)
   std::swap(*(s_pins.begin() + pin1_idx), *(s_pins.begin() + pin2_idx));
 }
 
-u64 get_pin_idx(path_t const &path) noexcept(true)
+u64 find_pin_idx(path_t const &path) noexcept(true)
 {
   for (u64 i = 0; i < s_pins.size(); ++i) {
-    if (strcmp(s_pins[i].data(), path.data()) == 0) {
+    if (path_loosely_same(s_pins[i], path)) {
       return i;
     }
   }
@@ -81,7 +81,7 @@ bool save_pins_to_disk() noexcept(true)
 void update_pin_dir_separators(char new_dir_separator) noexcept(true)
 {
   for (auto &pin : s_pins) {
-    swan::path_force_separator(pin, new_dir_separator);
+    path_force_separator(pin, new_dir_separator);
   }
 }
 

@@ -3,7 +3,7 @@
 
 #include "common.hpp"
 
-using swan::path_t;
+using namespace swan;
 
 void render_pinned(
     std::vector<explorer_window> &explorers,
@@ -16,7 +16,7 @@ void render_pinned(
         u64 num_buttons_rendered = 0;
 
         auto render_pin_button = [&](u64 expl_win_num, explorer_window &expl) {
-            ImGui::BeginDisabled(strcmp(expl.cwd.data(), pin.data()) == 0);
+            ImGui::BeginDisabled(path_loosely_same(expl.cwd, pin));
 
             char buffer[32];
             snprintf(buffer, lengthof(buffer), "%zu##%zu", expl_win_num, pin_idx);

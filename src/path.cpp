@@ -1,15 +1,40 @@
 #ifndef SWAN_PATH_CPP
 #define SWAN_PATH_CPP
 
+#include <array>
 #include <cassert>
+#include <cstring>
+
+#include <windows.h>
+#include <shlwapi.h>
+#undef min
 
 #include "path.hpp"
 
 using swan::path_t;
 
-u64 swan::path_length(path_t const &path) noexcept(true)
+path_t swan::path_create(char const *data) noexcept(true)
 {
-    return strlen(path.data());
+    path_t p = {};
+
+    if (data == nullptr) {
+        return p;
+    }
+
+    u16 data_len = (u16)strnlen(data, UINT16_MAX);
+
+    if (data_len >= p.max_size()) {
+        return p;
+    }
+
+    strcpy(p.data(), data);
+
+    return p;
+}
+
+u16 swan::path_length(path_t const &path) noexcept(true)
+{
+    return (u16)strnlen(path.data(), UINT16_MAX);
 }
 
 char swan::path_pop_back(path_t &path) noexcept(true)
@@ -106,42 +131,102 @@ void swan::path_force_separator(path_t &path, char dir_separator) noexcept(true)
     }
 }
 
-swan::path_append_result swan::path_append(
-    swan::path_t &path,
+u64 swan::path_append(
+    path_t &path,
     char const *str,
     char dir_separator,
-    bool prepend_slash,
-    bool postpend_slash) noexcept(true)
+    bool prepend_sep,
+    bool postpend_sep) noexcept(true)
 {
-    static_assert(false == 0);
-    static_assert(true == 1);
-
-    assert(str != nullptr);
+    if (str == nullptr) {
+        return 0;
+    }
 
     u64 str_len = strlen(str);
 
-    assert(str_len > 0);
+    if (str_len == 0) {
+        return 0;
+    }
 
-    u64 space_left = path.size() - path_length(path) - 1;
-    bool can_fit = space_left >= str_len + u64(prepend_slash) + u64(postpend_slash);
+    u64 path_len = path_length(path);
+
+    u64 space_left = path.size() - 1 - path_len;
+
+    static_assert(u8(false) == 0);
+    static_assert(u8(true) == 1);
+    u64 desired_append_len = str_len + u8(prepend_sep) + u8(postpend_sep);
+
+    bool can_fit = space_left >= desired_append_len;
 
     if (!can_fit) {
-        return path_append_result::exceeds_max_path;
+        return 0;
     }
 
     char const separator_buf[] = { dir_separator, '\0' };
 
-    if (prepend_slash && !path_ends_with_one_of(path, "\\/")) {
+    if (prepend_sep && path[path_len - 1] != dir_separator) {
         (void) strncat(path.data(), separator_buf, 1);
     }
 
     (void) strncat(path.data(), str, str_len);
 
-    if (postpend_slash) {
+    if (postpend_sep) {
         (void) strncat(path.data(), separator_buf, 1);
     }
 
-    return path_append_result::success;
+    return 1;
+}
+
+bool swan::path_loosely_same(path_t const &p1, path_t const &p2) noexcept(true)
+{
+    u16 p1_len = path_length(p1);
+    u16 p2_len = path_length(p2);
+    i32 len_diff = +((i32)p1_len - (i32)p2_len);
+
+    if (len_diff <= 1) {
+        return StrCmpNIA(p1.data(), p2.data(), std::min(p1_len, p2_len)) == 0;
+    }
+    else {
+        return false;
+    }
+}
+
+path_t swan::path_squish_adjacent_separators(path_t const &path) noexcept(true)
+{
+    // shoutout to ChatGPT for writing this for me
+
+    // Variable to store the cleaned-up path
+    path_t cleaned_path;
+    u64 cleaned_index = 0;
+    u64 path_len = path_length(path);
+
+    char previous_char = '\0';
+
+    for (u64 i = 0; i < path_len; ++i)
+    {
+        char current_char = path[i];
+
+        if (strchr("\\/", current_char) && strchr("\\/", previous_char))
+        {
+            // Skip the additional consecutive slashes
+            continue;
+        }
+
+        // Add the current character to the cleaned-up path
+        cleaned_path[cleaned_index] = current_char;
+        ++cleaned_index;
+
+        // Update the previous character
+        previous_char = current_char;
+    }
+
+    // Fill the remaining characters in the cleaned-up path with null characters
+    for (; cleaned_index < cleaned_path.size(); ++cleaned_index)
+    {
+        cleaned_path[cleaned_index] = '\0';
+    }
+
+    return cleaned_path;
 }
 
 #endif // SWAN_PATH_CPP

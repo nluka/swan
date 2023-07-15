@@ -30,6 +30,8 @@ i32 main()
   ntest::config::set_max_arr_preview_len(3);
   ntest::config::set_max_str_preview_len(10);
 
+  using swan::path_create;
+
   // ntest init
   {
     auto const res = ntest::init();
@@ -130,8 +132,7 @@ i32 main()
   using swan::path_clear;
   #if 1
   {
-    path_t p = {};
-    std::strcpy(p.data(), "Text.");
+    path_t p = path_create("Text.");
     ntest::assert_cstr("Text.", p.data());
     path_clear(p);
     ntest::assert_cstr("", p.data());
@@ -141,104 +142,100 @@ i32 main()
   using swan::path_length;
   #if 1
   {
-    path_t p = {};
-    ntest::assert_uint64(0, path_length(p));
-
-    std::strcpy(p.data(), "Text.");
-    ntest::assert_cstr("Text.", p.data());
-    ntest::assert_uint64(5, path_length(p));
+    {
+      path_t p = {};
+      ntest::assert_uint64(0, path_length(p));
+    }
+    {
+      path_t p = path_create("Text.");
+      ntest::assert_cstr("Text.", p.data());
+      ntest::assert_uint64(5, path_length(p));
+    }
   }
   #endif
 
   using swan::path_ends_with;
   #if 1
   {
-    path_t p = {};
-
-    ntest::assert_bool(false, path_ends_with(p, ""));
-    ntest::assert_bool(false, path_ends_with(p, "text"));
-
-    std::strcpy(p.data(), "Text.");
-    ntest::assert_bool(false, path_ends_with(p, "text."));
-    ntest::assert_bool(true, path_ends_with(p, "."));
-    ntest::assert_bool(true, path_ends_with(p, "xt."));
-    ntest::assert_bool(true, path_ends_with(p, "Text."));
-    ntest::assert_bool(false, path_ends_with(p, "Text.Text."));
+    {
+      path_t p = {};
+      ntest::assert_bool(false, path_ends_with(p, ""));
+      ntest::assert_bool(false, path_ends_with(p, "text"));
+    }
+    {
+      path_t p = path_create("Text.");
+      ntest::assert_bool(false, path_ends_with(p, "text."));
+      ntest::assert_bool(true, path_ends_with(p, "."));
+      ntest::assert_bool(true, path_ends_with(p, "xt."));
+      ntest::assert_bool(true, path_ends_with(p, "Text."));
+      ntest::assert_bool(false, path_ends_with(p, "Text.Text."));
+    }
   }
   #endif
 
   using swan::path_ends_with_one_of;
   #if 1
   {
-    path_t p = {};
-
-    ntest::assert_bool(false, path_ends_with_one_of(p, "abc"));
-
-    std::strcpy(p.data(), "Text");
-    ntest::assert_bool(false, path_ends_with_one_of(p, "abc"));
-    ntest::assert_bool(false, path_ends_with_one_of(p, "T"));
-    ntest::assert_bool(true, path_ends_with_one_of(p, "t"));
-    ntest::assert_bool(true, path_ends_with_one_of(p, "tt"));
-    ntest::assert_bool(true, path_ends_with_one_of(p, "abct"));
-    ntest::assert_bool(true, path_ends_with_one_of(p, "tabc"));
+    {
+      path_t p = {};
+      ntest::assert_bool(false, path_ends_with_one_of(p, "abc"));
+    }
+    {
+      path_t p = path_create("Text");
+      ntest::assert_bool(false, path_ends_with_one_of(p, "abc"));
+      ntest::assert_bool(false, path_ends_with_one_of(p, "T"));
+      ntest::assert_bool(true, path_ends_with_one_of(p, "t"));
+      ntest::assert_bool(true, path_ends_with_one_of(p, "tt"));
+      ntest::assert_bool(true, path_ends_with_one_of(p, "abct"));
+      ntest::assert_bool(true, path_ends_with_one_of(p, "tabc"));
+    }
   }
   #endif
 
-  using swan::path_append, swan::path_append_result;
+  using swan::path_append;
   #if 1
   {
     {
       path_t p = {};
-      auto result = path_append_result::nil;
 
-      result = path_append(p, "C:");
-      ntest::assert_int32((i32)path_append_result::success, (i32)result);
+      ntest::assert_uint64(1, path_append(p, "C:"));
       ntest::assert_cstr("C:", p.data());
 
-      result = path_append(p, "code\\", true);
-      ntest::assert_int32((i32)path_append_result::success, (i32)result);
+      ntest::assert_uint64(1, path_append(p, "code\\", '\\', true));
       ntest::assert_cstr("C:\\code\\", p.data());
 
-      result = path_append(p, "swan", true);
-      ntest::assert_int32((i32)path_append_result::success, (i32)result);
+      ntest::assert_uint64(1, path_append(p, "swan", '\\', true));
       ntest::assert_cstr("C:\\code\\swan", p.data());
 
-      result = path_append(p, ".md");
-      ntest::assert_int32((i32)path_append_result::success, (i32)result);
+      ntest::assert_uint64(1, path_append(p, ".md"));
       ntest::assert_cstr("C:\\code\\swan.md", p.data());
     }
     {
       path_t p = {};
-      auto result = path_append_result::nil;
 
       std::string temp(p.size() - 1, 'x');
 
-      result = path_append(p, temp.c_str());
-      ntest::assert_int32((i32)path_append_result::success, (i32)result);
+      ntest::assert_uint64(1, path_append(p, temp.c_str()));
       ntest::assert_cstr(temp.c_str(), p.data());
 
       p = {};
 
-      result = path_append(p, temp.c_str(), true);
-      ntest::assert_int32((i32)path_append_result::exceeds_max_path, (i32)result);
+      ntest::assert_uint64(0, path_append(p, temp.c_str(), '\\', true));
       ntest::assert_cstr("", p.data());
 
       p = {};
 
       temp.pop_back();
-      result = path_append(p, temp.c_str());
-      ntest::assert_int32((i32)path_append_result::success, (i32)result);
+      ntest::assert_uint64(1, path_append(p, temp.c_str()));
       ntest::assert_cstr(temp.c_str(), p.data());
       // p is now one away from max capacity
 
-      result = path_append(p, "x");
-      ntest::assert_int32((i32)path_append_result::success, (i32)result);
+      ntest::assert_uint64(1, path_append(p, "x"));
       temp.push_back('x');
       ntest::assert_cstr(temp.c_str(), p.data());
       // p is now at max capacity, next append should fail
 
-      result = path_append(p, "x");
-      ntest::assert_int32((i32)path_append_result::exceeds_max_path, (i32)result);
+      ntest::assert_uint64(0, path_append(p, "x"));
       ntest::assert_cstr(temp.c_str(), p.data()); // ensure state has not changed on failure
     }
   }
@@ -247,10 +244,14 @@ i32 main()
   using swan::path_is_empty;
   #if 1
   {
-    path_t p = {};
-    ntest::assert_bool(true, path_is_empty(p));
-    std::strcpy(p.data(), "text");
-    ntest::assert_bool(false, path_is_empty(p));
+    {
+      path_t p = {};
+      ntest::assert_bool(true, path_is_empty(p));
+    }
+    {
+      path_t p = path_create("text");
+      ntest::assert_bool(false, path_is_empty(p));
+    }
   }
   #endif
 
@@ -269,6 +270,42 @@ i32 main()
     u32 lo = 0xFF'F1'1F'FF;
     u64 combined = two_u32_to_one_u64(lo, hi);
     ntest::assert_uint64(0xff'f0'0f'ff'ff'f1'1f'ff, combined);
+  }
+  #endif
+
+  using swan::path_loosely_same;
+  #if 1
+  {
+    {
+      path_t p1 = path_create("1/2/3");
+      path_t p2 = path_create("1/2/3");
+      ntest::assert_bool(true, path_loosely_same(p1, p2));
+      ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+    {
+      path_t p1 = path_create("1/2/3");
+      path_t p2 = path_create("1/2/3/");
+      ntest::assert_bool(true, path_loosely_same(p1, p2));
+      ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+    {
+      path_t p1 = path_create("C:\\code\\");
+      path_t p2 = path_create("C:\\code");
+      ntest::assert_bool(true, path_loosely_same(p1, p2));
+      ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+  }
+  #endif
+
+  using swan::path_squish_adjacent_separators;
+  #if 1
+  {
+    ntest::assert_cstr("1/2/3", path_squish_adjacent_separators(path_create("1/2/3")).data());
+    ntest::assert_cstr("1/2/3", path_squish_adjacent_separators(path_create("1//2//3")).data());
+    ntest::assert_cstr("1/2/3/", path_squish_adjacent_separators(path_create("1//2//3//")).data());
+
+    ntest::assert_cstr("1\\2\\3\\", path_squish_adjacent_separators(path_create("1\\2\\3\\")).data());
+    ntest::assert_cstr("1\\2\\3\\", path_squish_adjacent_separators(path_create("1\\\\\\2\\3\\\\\\")).data());
   }
   #endif
 
