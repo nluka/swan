@@ -11,7 +11,9 @@ namespace swan {
 
   typedef std::array<char, MAX_PATH> path_t;
 
-  u64 path_length(path_t const &path) noexcept(true);
+  path_t path_create(char const *data) noexcept(true);
+
+  u16 path_length(path_t const &path) noexcept(true);
 
   bool path_ends_with(path_t const &path, char const *end) noexcept(true);
 
@@ -29,19 +31,16 @@ namespace swan {
 
   bool path_pop_back_if_not(path_t &path, char if_not_ch) noexcept(true);
 
-  enum class path_append_result : i32
-  {
-      nil = -1,
-      success = 0,
-      exceeds_max_path,
-  };
-
-  path_append_result path_append(
+  u64 path_append(
     swan::path_t &path,
     char const *str,
     char dir_separator = 0,
     bool prepend_slash = false,
     bool postpend_slash = false) noexcept(true);
+
+  bool path_loosely_same(path_t const &p1, path_t const &p2) noexcept(true);
+
+  swan::path_t path_squish_adjacent_separators(path_t const &path) noexcept(true);
 
 } // namespace swan
 

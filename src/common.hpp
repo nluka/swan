@@ -45,8 +45,6 @@ struct explorer_options
 
 struct explorer_window
 {
-    using path_t = swan::path_t;
-
     struct directory_entry
     {
         enum class ent_type : u8
@@ -57,14 +55,14 @@ struct explorer_window
             count
         };
 
-        bool is_filtered_out;
-        bool is_selected;
-        ent_type type;
-        u32 id;
-        path_t path;
         u64 size;
         FILETIME creation_time_raw;
         FILETIME last_write_time_raw;
+        u32 id;
+        ent_type type;
+        bool is_filtered_out;
+        bool is_selected;
+        swan::path_t path;
 
         bool is_directory() const noexcept(true)
         {
@@ -103,7 +101,7 @@ struct explorer_window
         }
     };
 
-    enum filter_mode : i32
+    enum filter_mode : u64
     {
         contains,
         regex,
@@ -112,39 +110,46 @@ struct explorer_window
     };
 
     static u64 const NO_SELECTION = UINT64_MAX;
+    bool save_to_disk() const noexcept(true);
+    bool load_from_disk(char dir_separator) noexcept(true);
+
+    // 40 byte members
+
+    std::deque<swan::path_t> wd_history = {}; // history for working directories, persisted in file
+
+    // 32 byte members
+
+    std::string filter_error = "";
+
+    // 24 byte members
+
+    std::vector<directory_entry> cwd_entries = {}; // 24 bytes, all direct children of the cwd
+
+    // 8 byte members
 
     char const *name = nullptr;
-
-    path_t cwd = {}; // current working directory, persisted in file
-    std::vector<directory_entry> cwd_entries = {}; // all direct children of the cwd
-    u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
-
-    std::array<char, 256> filter = {}; // persisted in file
-    std::string filter_error = "";
     filter_mode filter_mode = filter_mode::contains; // persisted in file
-    bool filter_case_sensitive = false; // persisted in file
-
-    u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
-    std::deque<path_t> wd_history = {}; // history for working directories, persisted in file
-
-    // [DEBUG]
-
     LARGE_INTEGER last_refresh_timestamp = {};
+    u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
+    u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
     u64 num_file_finds = 0;
     f64 sort_us = 0;
     f64 check_if_pinned_us = 0;
     f64 unpin_us = 0;
     f64 update_cwd_entries_total_us = 0;
     f64 update_cwd_entries_searchpath_setup_us = 0;
-    f64 update_cwd_entries_check_cwd_exists_us = 0;
     f64 update_cwd_entries_filesystem_us = 0;
     f64 update_cwd_entries_filter_us = 0;
     f64 update_cwd_entries_regex_ctor_us = 0;
     f64 update_cwd_entries_save_to_disk_us = 0;
-    i8 latest_save_to_disk_result = -1;
 
-    bool save_to_disk() const noexcept(true);
-    bool load_from_disk(char dir_separator) noexcept(true);
+    // 1 byte alignment members
+
+    i8 latest_save_to_disk_result = -1;
+    swan::path_t cwd = {}; // current working directory, persisted in file
+    std::array<char, 256> filter = {}; // persisted in file
+    bool filter_case_sensitive = false; // persisted in file
+    bool needs_initial_sort = true;
 };
 
 constexpr u8 const query_filesystem = 1 << 0;
@@ -171,6 +176,6 @@ bool save_pins_to_disk() noexcept(true);
 
 std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true);
 
-u64 get_pin_idx(swan::path_t const &) noexcept(true);
+u64 find_pin_idx(swan::path_t const &) noexcept(true);
 
 #endif // SWAN_COMMON_HPP
