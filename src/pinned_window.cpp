@@ -1,17 +1,16 @@
-#ifndef SWAN_PINNED_CPP
-#define SWAN_PINNED_CPP
+#ifndef SWAN_PINNED_WINDOW_CPP
+#define SWAN_PINNED_WINDOW_CPP
 
 #include "common.hpp"
+#include "util.hpp"
 
 using namespace swan;
 
-void render_pinned(
-    std::vector<explorer_window> &explorers,
+void render_pinned_window(
+    std::array<explorer_window, 4> &explorers,
     windows_options const &win_opts,
-    explorer_options const &expl_opts
-) {
-    assert(explorers.size() == 4);
-
+    explorer_options const &expl_opts) noexcept(true)
+{
     auto render_pin_item = [&](path_t const &pin, u64 pin_idx) {
         u64 num_buttons_rendered = 0;
 
@@ -72,4 +71,4 @@ void render_pinned(
     ImGui::End();
 }
 
-#endif // SWAN_PINNED_CPP
+#endif // SWAN_PINNED_WINDOW_CPP

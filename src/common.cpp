@@ -1,13 +1,81 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <thread>
 
+#include "BS_thread_pool.hpp"
 #include "common.hpp"
 #include "path.hpp"
 
 using namespace swan;
 
+static std::deque<file_operation> s_file_ops_queue = {};
 static std::vector<path_t> s_pins = {};
+static BS::thread_pool s_thread_pool(1);
+ImGuiTextBuffer debug_log_package::s_debug_buffer = {};
+
+bool enqueue_file_op(
+  file_operation::type op_type,
+  path_t const &src_path,
+  path_t const &dest_path,
+  char dir_separator) noexcept(true)
+{
+  (void)dir_separator;
+
+  // if (op_type == file_operation::type::copy) {
+  //   s_thread_pool.push_task([file = file_path, dest = dest_path, dir_sep = dir_separator]() -> bool {
+  //     path_t new_file_path = dest;
+  //     if (!path_append(new_file_path, file.data(), dir_sep, true)) {
+  //       // error
+  //       return false;
+  //     }
+  //     return CopyFileExA(file.data(), new_file_path.data(), )
+  //   });
+  // }
+
+  try {
+    s_file_ops_queue.emplace_front(0, 0, 0, 0, time_point_t(), op_type, src_path, dest_path);
+    return true;
+  }
+  catch (...) {
+    return false;
+  }
+}
+
+DWORD file_op_progress_callback(
+    LARGE_INTEGER total_file_size,
+    LARGE_INTEGER total_bytes_transferred,
+    LARGE_INTEGER stream_size,
+    LARGE_INTEGER stream_bytes_transferred,
+    [[maybe_unused]] DWORD stream_num,
+    DWORD callback_reason,
+    [[maybe_unused]] HANDLE src_handle,
+    [[maybe_unused]] HANDLE dest_handle,
+    void *user_data) noexcept(true)
+{
+    auto &file_op = *((file_op_progress_callback_user_data *)user_data)->file_op;
+    file_op.total_file_size = (u64)total_file_size.QuadPart;
+    file_op.total_bytes_transferred = (u64)total_bytes_transferred.QuadPart;
+    file_op.stream_size = (u64)stream_size.QuadPart;
+    file_op.stream_bytes_transferred = (u64)stream_bytes_transferred.QuadPart;
+
+    if (callback_reason == CALLBACK_CHUNK_FINISHED) {
+
+    }
+    else if (callback_reason == CALLBACK_STREAM_SWITCH) {
+
+    }
+    else {
+
+    }
+
+    return PROGRESS_CONTINUE;
+}
+
+std::deque<file_operation> const &get_file_ops_queue() noexcept(true)
+{
+    return s_file_ops_queue;
+}
 
 std::vector<path_t> const &get_pins() noexcept(true)
 {
@@ -28,7 +96,7 @@ bool pin(path_t &path, char dir_separator) noexcept(true)
 
 void unpin(u64 pin_idx) noexcept(true)
 {
-  u64 last_idx = s_pins.size() - 1;
+  [[maybe_unused]] u64 last_idx = s_pins.size() - 1;
 
   assert(pin_idx <= last_idx);
 
@@ -61,7 +129,7 @@ u64 find_pin_idx(path_t const &path) noexcept(true)
 bool save_pins_to_disk() noexcept(true)
 {
   try {
-    std::ofstream out("pins.txt");
+    std::ofstream out("data/pins.txt");
     if (!out) {
       return false;
     }
@@ -88,7 +156,7 @@ void update_pin_dir_separators(char new_dir_separator) noexcept(true)
 std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true)
 {
   try {
-    std::ifstream in("pins.txt");
+    std::ifstream in("data/pins.txt");
     if (!in) {
       return { false, 0 };
     }
@@ -122,7 +190,7 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true)
 bool explorer_options::save_to_disk() const noexcept(true)
 {
   try {
-    std::ofstream out("explorer_options.bin", std::ios::binary);
+    std::ofstream out("data/explorer_options.bin", std::ios::binary);
     if (!out) {
       return false;
     }
@@ -147,7 +215,7 @@ bool explorer_options::save_to_disk() const noexcept(true)
 bool explorer_options::load_from_disk() noexcept(true)
 {
   try {
-    std::ifstream in("explorer_options.bin", std::ios::binary);
+    std::ifstream in("data/explorer_options.bin", std::ios::binary);
     if (!in) {
       return false;
     }
@@ -172,7 +240,7 @@ bool explorer_options::load_from_disk() noexcept(true)
 bool windows_options::save_to_disk() const noexcept(true)
 {
   try {
-    std::ofstream out("windows_options.bin", std::ios::binary);
+    std::ofstream out("data/windows_options.bin", std::ios::binary);
     if (!out) {
       return false;
     }
@@ -181,6 +249,7 @@ bool windows_options::save_to_disk() const noexcept(true)
     static_assert(i8(0) == i8(false));
 
     out << i8(this->show_pinned)
+        << i8(this->show_file_operations)
         << i8(this->show_explorer_0)
         << i8(this->show_explorer_1)
         << i8(this->show_explorer_2)
@@ -188,6 +257,7 @@ bool windows_options::save_to_disk() const noexcept(true)
         << i8(this->show_analytics)
   #if !defined (NDEBUG)
         << i8(this->show_demo)
+        << i8(this->show_debug_log)
   #endif
     ;
 
@@ -201,7 +271,7 @@ bool windows_options::save_to_disk() const noexcept(true)
 bool windows_options::load_from_disk() noexcept(true)
 {
   try {
-    std::ifstream in("windows_options.bin", std::ios::binary);
+    std::ifstream in("data/windows_options.bin", std::ios::binary);
     if (!in) {
       return false;
     }
@@ -210,6 +280,7 @@ bool windows_options::load_from_disk() noexcept(true)
     static_assert(i8(0) == i8(false));
 
     in >> (i8 &)this->show_pinned
+       >> (i8 &)this->show_file_operations
        >> (i8 &)this->show_explorer_0
        >> (i8 &)this->show_explorer_1
        >> (i8 &)this->show_explorer_2
@@ -217,6 +288,7 @@ bool windows_options::load_from_disk() noexcept(true)
        >> (i8 &)this->show_analytics
   #if !defined (NDEBUG)
       >> (i8 &)this->show_demo
+      >> (i8 &)this->show_debug_log
   #endif
     ;
 
@@ -225,4 +297,28 @@ bool windows_options::load_from_disk() noexcept(true)
   catch (...) {
     return false;
   }
+}
+
+char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true)
+{
+    // MSVC does some cursed shit with std::source_location::file_name,
+    // sometimes it returns the realpath, sometimes it returns a relative path.
+    // hence we process it to extract just the "actual" file name.
+
+    // C:\code\swan\src\explorer_window.cpp
+    //                  ^^^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    //     ^^^^^^^^ what we are after
+
+    char const *just_the_file_name = std__source_location__file_path;
+
+    std::string_view view(just_the_file_name);
+
+    u64 last_sep_pos = view.find_last_of("\\/");
+
+    if (last_sep_pos != std::string::npos) {
+        just_the_file_name += last_sep_pos + 1;
+    }
+
+    return just_the_file_name;
 }

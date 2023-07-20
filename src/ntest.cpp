@@ -99,15 +99,16 @@ special_chars_table_t const &ntest::internal::special_chars_serial_file()
 special_chars_table_t const &ntest::internal::special_chars_markdown_preview()
 {
   static special_chars_table_t const s_special_markdown_chars {
-    { '\a', 'a' },
-    { '\b', 'b' },
-    { '\f', 'f' },
-    { '\n', 'n' },
-    { '\r', 'r' },
-    { '\t', 't' },
-    { '\v', 'v' },
-    { '\0', '0' },
-    { '`', '`' },
+    { '\a', 'a'  },
+    { '\b', 'b'  },
+    { '\f', 'f'  },
+    { '\n', 'n'  },
+    { '\r', 'r'  },
+    { '\t', 't'  },
+    { '\v', 'v'  },
+    { '\0', '0'  },
+    { '`' , '`'  },
+    { '\\', '\\' }, // to prevent html tags from being escaped by user data
   };
   return s_special_markdown_chars;
 }
@@ -457,10 +458,6 @@ bool ntest::assert_cstr(
   {
     passed = false;
   }
-  // bool const passed =
-  //   (expected_len == actual_len) &&
-  //   (strcmp(expected, actual) == 0)
-  // ;
 
   stringstream serialized_vals{};
   serialized_vals << "char*" << '\0';

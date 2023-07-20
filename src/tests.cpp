@@ -5,6 +5,7 @@
 
 #include "term.hpp"
 #include "term.cpp"
+
 #include "ntest.hpp"
 #include "ntest.cpp"
 
@@ -13,6 +14,7 @@
 #include "path.hpp"
 #include "path.cpp"
 
+#include "util.hpp"
 #include "util.cpp"
 
 using swan::path_t;
@@ -293,6 +295,12 @@ i32 main()
       path_t p2 = path_create("C:\\code");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+    {
+      path_t p1 = path_create("C:\\code");
+      path_t p2 = path_create("C:\\");
+      ntest::assert_bool(false, path_loosely_same(p1, p2));
+      ntest::assert_bool(false, path_loosely_same(p2, p1));
     }
   }
   #endif
