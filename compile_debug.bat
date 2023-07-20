@@ -2,6 +2,7 @@
 src/swan.cpp ^
 src/common.cpp ^
 src/path.cpp ^
+src/util.cpp ^
 obj_debug/imgui_demo.obj ^
 obj_debug/imgui_draw.obj ^
 obj_debug/imgui_impl_glfw.obj ^
@@ -9,19 +10,22 @@ obj_debug/imgui_impl_opengl3.obj ^
 obj_debug/imgui_tables.obj ^
 obj_debug/imgui_widgets.obj ^
 obj_debug/imgui.obj ^
-.res ^
+resource/.res ^
 /Fo:obj_debug\ ^
-/Fe:swan_debug.exe ^
+/Fe:bin\swan_debug.exe ^
+/Fd:bin\vc140_debug.pdb ^
 /I"C:/code/glfw" ^
 /I"C:/code/boost_1_80_0" ^
 /std:c++20 ^
 /nologo ^
-/W4 /WX ^
+/W4 ^
 /EHsc ^
+/MP ^
 /MT ^
 /D_CRT_SECURE_NO_WARNINGS ^
 /Zi ^
 /link ^
+/DEBUG:FULL ^
 /NODEFAULTLIB:MSVCRTD ^
 /NODEFAULTLIB:LIBCMT ^
 /LIBPATH:"C:/code/glfw" ^

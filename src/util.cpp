@@ -3,23 +3,18 @@
 
 #include <iostream>
 #include <cassert>
+#include <cstring>
 
 #include <windows.h>
 
-// Returns the size of a static C-style array at compile time.
-template <typename ElemTy, u64 Length>
-consteval
-u64 lengthof(ElemTy (&)[Length])
-{
-    return Length;
-}
+#include "util.hpp"
 
-void flip_bool(bool &b)
+void flip_bool(bool &b) noexcept(true)
 {
     b ^= true;
 }
 
-u64 two_u32_to_one_u64(u32 low, u32 high)
+u64 two_u32_to_one_u64(u32 low, u32 high) noexcept(true)
 {
     u64 result = {};
     result = static_cast<u64>(high) << 32;
@@ -27,32 +22,18 @@ u64 two_u32_to_one_u64(u32 low, u32 high)
     return result;
 }
 
-void debug_log([[maybe_unused]] char const *fmt, ...)
-{
-#if !defined(NDEBUG)
-    va_list args;
-    va_start(args, fmt);
-
-    assert(vprintf(fmt, args) >= 0);
-
-    va_end(args);
-
-    (void) putc('\n', stdout);
-#endif
-}
-
-i32 directory_exists(char const *path)
+i32 directory_exists(char const *path) noexcept(true)
 {
     DWORD attributes = GetFileAttributesA(path);
     return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
 void format_file_size(
-    u64 const file_size,
-    char *const out,
-    u64 const out_size,
-    u64 unit_multiplier
-) {
+    u64 file_size,
+    char *out,
+    u64 out_size,
+    u64 unit_multiplier) noexcept(true)
+{
     char const *units[] = { "B", "KB", "MB", "GB", "TB" };
     u64 constexpr largest_unit_idx = (sizeof(units) / sizeof(*units)) - 1;
     u64 unit_idx = 0;
@@ -74,6 +55,55 @@ void format_file_size(
         : "%.2lf %s";
 
     snprintf(out, out_size, fmt, size, units[unit_idx]);
+}
+
+i64 compute_diff_ms(time_point_t start, time_point_t end) noexcept(true)
+{
+    auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
+    auto end_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(end);
+    auto diff_ms = end_ms - start_ms;
+    return diff_ms.count();
+}
+
+time_point_t current_time() noexcept(true)
+{
+    return std::chrono::high_resolution_clock::now();
+}
+
+std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noexcept(true)
+{
+    std::array<char, 64> out = {};
+
+    i64 ms_diff = compute_diff_ms(start, end);
+    i64 ten_seconds = 10'000;
+    i64 thirty_seconds = 30'000;
+    i64 one_minute = 60'000;
+    i64 one_hour = one_minute * 60;
+    i64 one_day = one_hour * 24;
+
+    if (ms_diff < ten_seconds) {
+        strncpy(out.data(), "just now", out.size());
+    }
+    else if (ms_diff < thirty_seconds) {
+         strncpy(out.data(), "< 30 sec ago", out.size());
+    }
+    else if (ms_diff < one_minute) {
+        strncpy(out.data(), "< 1 minute ago", out.size());
+    }
+    else if (ms_diff < one_hour) {
+        u64 minutes = u64(ms_diff / one_minute);
+        snprintf(out.data(), out.size(), "%zu min%s ago", minutes, minutes == 1 ? "" : "s");
+    }
+    else if (ms_diff < one_day) {
+        u64 hours = u64(ms_diff / one_hour);
+        snprintf(out.data(), out.size(), "%zu hour%s ago", hours, hours == 1 ? "" : "s");
+    }
+    else {
+        u64 days = u64(ms_diff / one_day);
+        snprintf(out.data(), out.size(), "%zu day%s ago", days, days == 1 ? "" : "s");
+    }
+
+    return out;
 }
 
 #endif // SWAN_UTIL_CPP

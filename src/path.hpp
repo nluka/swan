@@ -40,6 +40,10 @@ namespace swan {
 
   bool path_loosely_same(path_t const &p1, path_t const &p2) noexcept(true);
 
+  bool path_strictly_same(path_t const &p1, path_t const &p2) noexcept(true);
+
+  bool path_equals_exactly(path_t const &p1, char const *p2) noexcept(true);
+
   swan::path_t path_squish_adjacent_separators(path_t const &path) noexcept(true);
 
 } // namespace swan

@@ -4,10 +4,12 @@
 #include <array>
 #include <cassert>
 #include <cstring>
+#include <algorithm>
 
 #include <windows.h>
 #include <shlwapi.h>
 #undef min
+#undef max
 
 #include "path.hpp"
 
@@ -35,6 +37,16 @@ path_t swan::path_create(char const *data) noexcept(true)
 u16 swan::path_length(path_t const &path) noexcept(true)
 {
     return (u16)strnlen(path.data(), UINT16_MAX);
+}
+
+bool swan::path_equals_exactly(path_t const &p1, char const *p2) noexcept(true)
+{
+    return strcmp(p1.data(), p2) == 0;
+}
+
+bool swan::path_strictly_same(path_t const &p1, path_t const &p2) noexcept(true)
+{
+    return strcmp(p1.data(), p2.data()) == 0;
 }
 
 char swan::path_pop_back(path_t &path) noexcept(true)
@@ -181,7 +193,7 @@ bool swan::path_loosely_same(path_t const &p1, path_t const &p2) noexcept(true)
 {
     u16 p1_len = path_length(p1);
     u16 p2_len = path_length(p2);
-    i32 len_diff = +((i32)p1_len - (i32)p2_len);
+    i32 len_diff = (i32)std::max(p1_len, p2_len) - (i32)std::min(p1_len, p2_len);
 
     if (len_diff <= 1) {
         return StrCmpNIA(p1.data(), p2.data(), std::min(p1_len, p2_len)) == 0;
