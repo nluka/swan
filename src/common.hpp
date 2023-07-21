@@ -6,6 +6,8 @@
 #include <string>
 #include <source_location>
 
+#include <boost/circular_buffer.hpp>
+
 #include "path.hpp"
 #include "util.hpp"
 #include "primitives.hpp"
@@ -171,12 +173,22 @@ struct file_operation
         count
     };
 
+    file_operation(type op_type, swan::path_t const &src, swan::path_t const &dst) noexcept(true)
+        : op_type(op_type)
+        , src_path(src)
+        , dest_path(dst)
+    {
+    }
+
     u64 total_file_size = 0;
     u64 total_bytes_transferred = 0;
     u64 stream_size = 0;
     u64 stream_bytes_transferred = 0;
-    time_point_t completed_time = {};
+    time_point_t start_time = {};
+    time_point_t end_time = {};
     type op_type = type::nil;
+    bool started = false;
+    bool result = false;
     swan::path_t src_path = {};
     swan::path_t dest_path = {};
 };
@@ -203,7 +215,7 @@ bool enqueue_file_op(
     swan::path_t const &dest_path,
     char dir_separator) noexcept(true);
 
-std::deque<file_operation> const &get_file_ops_queue() noexcept(true);
+boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept(true);
 
 constexpr u8 const query_filesystem = 1 << 0;
 constexpr u8 const filter = 1 << 1;

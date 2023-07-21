@@ -12,7 +12,7 @@ void render_file_ops_window() noexcept(true)
 
     [[maybe_unused]] auto &io = ImGui::GetIO();
 
-    auto const &file_ops_queue = get_file_ops_queue();
+    auto const &file_ops_buffer = get_file_ops_buffer();
 
     enum file_ops_table_col : i32
     {
@@ -34,7 +34,7 @@ void render_file_ops_window() noexcept(true)
         ImGui::TableSetupColumn("Dst", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dest_path);
         ImGui::TableHeadersRow();
 
-        for (auto const &file_op : file_ops_queue) {
+        for (auto const &file_op : file_ops_buffer) {
             ImGui::TableNextRow();
 
             if (ImGui::TableSetColumnIndex(file_ops_table_col_undo)) {
@@ -43,9 +43,9 @@ void render_file_ops_window() noexcept(true)
 
             if (ImGui::TableSetColumnIndex(file_ops_table_col_when)) {
                 time_point_t blank_time = {};
-                if (file_op.completed_time != blank_time) {
+                if (file_op.end_time != blank_time) {
                     time_point_t now = current_time();
-                    ImGui::TextUnformatted(compute_when_str(file_op.completed_time, now).data());
+                    ImGui::TextUnformatted(compute_when_str(file_op.end_time, now).data());
                 }
                 else {
                     ImGui::TextUnformatted("Queued");

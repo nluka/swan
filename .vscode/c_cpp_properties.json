@@ -3,7 +3,7 @@
     {
       "name": "main",
       "includePath": [
-        // "C:/code/boost_1_80_0",
+        "C:/code/boost_1_80_0",
         "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.29.30133/include",
         "C:/code/glfw"
       ],
