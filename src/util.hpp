@@ -35,4 +35,8 @@ std::array<char, 64> compute_when_str(
     time_point_t start,
     time_point_t end) noexcept(true);
 
+void seed_fast_rand(u64) noexcept(true);
+
+u64 fast_rand(u64 min, u64 max) noexcept(true);
+
 #endif // SWAN_UTIL_HPP

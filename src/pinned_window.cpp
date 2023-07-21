@@ -54,10 +54,7 @@ void render_pinned_window(
         if (num_buttons_rendered > 0) {
             ImGui::SameLine();
         }
-        {
-            using dir_entry = explorer_window::directory_entry;
-            ImGui::TextColored(dir_entry::get_color(dir_entry::ent_type::directory), pin.data());
-        }
+        ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::directory), pin.data());
     };
 
     if (ImGui::Begin("Pinned")) {

@@ -27,7 +27,7 @@
 // https://github.com/ocornut/imgui/issues/707#issuecomment-917151020
 void setup_imgui_styles()
 {
-    ImVec4* colors = ImGui::GetStyle().Colors;
+    ImVec4 *colors = ImGui::GetStyle().Colors;
     colors[ImGuiCol_Text]                   = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
     colors[ImGuiCol_TextDisabled]           = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
     colors[ImGuiCol_WindowBg]               = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
@@ -351,6 +351,8 @@ i32 main(i32, char**) try
             update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
         }
     }
+
+    seed_fast_rand((u64)current_time().time_since_epoch().count());
 
     debug_log("entering render loop...");
 

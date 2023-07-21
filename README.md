@@ -49,13 +49,15 @@ entry = file | directory
 - [x] Pins
 - [x] Show when last refreshed
 - [x] Column: "last modified"
-- [ ] Cut directory entries
 - [ ] Copy directory entries
 - [ ] Delete directory entries
-- [ ] Undo cut/copy/delete
-- [ ] Handle executable .lnk
+- [ ] Undo copy
+- [ ] Undo delete
+- [ ] Cut directory entries
+- [ ] Undo cut
 - [ ] Renaming
 - [ ] Bulk renaming
+- [ ] Handle executable .lnk
 - [ ] Glob filtering
 - [ ] Customizable context menu
 - [ ] Show directory preview (num child files/dirs)
