@@ -49,63 +49,68 @@ struct explorer_options
     }
 };
 
+struct basic_dir_ent
+{
+    enum class kind : u8
+    {
+        nil = 0,
+        directory,
+        symlink,
+        file,
+        count
+    };
+
+    u64 size = 0;
+    FILETIME creation_time_raw = {};
+    FILETIME last_write_time_raw = {};
+    u32 id = {};
+    kind type = kind::nil;
+    swan::path_t path = {};
+
+    bool is_directory() const noexcept(true)
+    {
+        return type == basic_dir_ent::kind::directory;
+    }
+
+    bool is_symlink() const noexcept(true)
+    {
+        return type == basic_dir_ent::kind::symlink;
+    }
+
+    bool is_file() const noexcept(true)
+    {
+        return type != basic_dir_ent::kind::directory;
+    }
+
+    bool is_non_symlink_file() const noexcept(true)
+    {
+        return is_file() && !is_symlink();
+    }
+
+    ImVec4 get_color() const noexcept(true)
+    {
+        return get_color(this->type);
+    }
+
+    static ImVec4 get_color(basic_dir_ent::kind t) noexcept(true)
+    {
+        static ImVec4 const pale_green(0.85f, 1, 0.85f, 1);
+        static ImVec4 const yellow(1, 1, 0, 1);
+        static ImVec4 const cyan(0.1f, 1, 1, 1);
+
+        if (t == kind::directory) return yellow;
+        if (t == kind::symlink) return cyan;
+        else return pale_green;
+    }
+};
+
 struct explorer_window
 {
-    struct directory_entry
+    struct dir_ent
     {
-        enum class ent_type : u8
-        {
-            nil = 0,
-            directory,
-            symlink,
-            file,
-            count
-        };
-
-        u64 size = 0;
-        FILETIME creation_time_raw = {};
-        FILETIME last_write_time_raw = {};
-        u32 id = {};
-        ent_type type = ent_type::nil;
+        basic_dir_ent basic;
         bool is_filtered_out = false;
         bool is_selected = false;
-        swan::path_t path = {};
-
-        bool is_directory() const noexcept(true)
-        {
-            return type == directory_entry::ent_type::directory;
-        }
-
-        bool is_symlink() const noexcept(true)
-        {
-            return type == directory_entry::ent_type::symlink;
-        }
-
-        bool is_file() const noexcept(true)
-        {
-            return type != directory_entry::ent_type::directory;
-        }
-
-        bool is_non_symlink_file() const noexcept(true)
-        {
-            return is_file() && !is_symlink();
-        }
-
-        ImVec4 get_color() const noexcept(true)
-        {
-            return get_color(this->type);
-        }
-
-        static ImVec4 get_color(ent_type type) noexcept(true)
-        {
-            static ImVec4 const pale_green(0.85f, 1, 0.85f, 1);
-            static ImVec4 const yellow(1, 1, 0, 1);
-            static ImVec4 const cyan(0.1f, 1, 1, 1);
-
-            if (type == ent_type::directory) return yellow;
-            if (type == ent_type::symlink) return cyan;
-            else return pale_green;
-        }
     };
 
     enum filter_mode : u64
@@ -130,7 +135,7 @@ struct explorer_window
 
     // 24 byte members
 
-    std::vector<directory_entry> cwd_entries = {}; // 24 bytes, all direct children of the cwd
+    std::vector<dir_ent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
 
     // 8 byte members
 
@@ -245,6 +250,8 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true);
 u64 find_pin_idx(swan::path_t const &) noexcept(true);
 
 char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true);
+
+bool query_directory_entries(std::vector<basic_dir_ent> &entries, swan::path_t dir_path) noexcept(true);
 
 struct debug_log_package {
     char const *fmt;

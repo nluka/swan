@@ -9,6 +9,24 @@
 
 #include "util.hpp"
 
+static u64 s_fast_rand_seed = {};
+void seed_fast_rand(u64 v) noexcept(true)
+{
+    s_fast_rand_seed = v;
+}
+
+u64 fast_rand(u64 min, u64 max) noexcept(true)
+{
+    s_fast_rand_seed ^= (s_fast_rand_seed << 21);
+    s_fast_rand_seed ^= (s_fast_rand_seed >> 35);
+    s_fast_rand_seed ^= (s_fast_rand_seed << 4);
+
+    u64 range = static_cast<uint64_t>(max - min) + 1;
+    u64 rand_num = s_fast_rand_seed % range;
+
+    return rand_num;
+}
+
 void flip_bool(bool &b) noexcept(true)
 {
     b ^= true;

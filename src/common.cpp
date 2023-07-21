@@ -6,6 +6,7 @@
 #include "BS_thread_pool.hpp"
 #include "common.hpp"
 #include "path.hpp"
+#include "on_scope_exit.hpp"
 
 using namespace swan;
 
@@ -70,10 +71,28 @@ bool enqueue_file_op(
         return false;
     }
 
-    // TODO: check if new_file_path already exists, if yes give it a unique name
-    if (!path_append(new_file_path, " (1)")) {
-        debug_log("failed to create new_file_path");
-        return false;
+    {
+        FILE *f = fopen(new_file_path.data(), "rb");
+        if (f != nullptr) {
+            fclose(f);
+
+            static char const rand_chars[] = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            constexpr u64 num_rand_chars_to_pick = 5;
+            std::array<char, 1 + num_rand_chars_to_pick + 1> rand_str = {};
+
+            rand_str[0] = '_';
+
+            for (auto iter = rand_str.begin() + 1; iter != rand_str.end(); ++iter) {
+                u64 rand_idx = fast_rand(0, lengthof(rand_chars) - 2);
+                char rand_ch = rand_chars[rand_idx];
+                *iter = rand_ch;
+            }
+
+            if (!path_append(new_file_path, rand_str.data())) {
+                debug_log("failed to append rand_str.data() to new_file_path");
+                return false;
+            }
+        }
     }
 
     {
@@ -413,4 +432,61 @@ char const *get_just_file_name(char const *std__source_location__file_path) noex
     }
 
     return just_the_file_name;
+}
+
+bool query_directory_entries(std::vector<basic_dir_ent> &entries, path_t dir_path) noexcept(true)
+{
+    static std::string search_path{};
+    {
+        search_path.reserve(path_length(dir_path) + 2);
+        search_path = dir_path.data();
+
+        if (search_path.back() != '/' && search_path.back() != '\\') {
+            search_path += '/';
+        }
+        search_path += '*';
+    }
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE find_handle = FindFirstFileA(search_path.data(), &find_data);
+
+    auto find_handle_cleanup_routine = make_on_scope_exit([&find_handle] { FindClose(find_handle); });
+
+    if (find_handle == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    u32 id = 0;
+
+    do {
+        basic_dir_ent entry = {};
+        entry.id = id;
+        std::strncpy(entry.path.data(), find_data.cFileName, entry.path.size());
+        entry.size = two_u32_to_one_u64(find_data.nFileSizeLow, find_data.nFileSizeHigh);
+        entry.creation_time_raw = find_data.ftCreationTime;
+        entry.last_write_time_raw = find_data.ftLastWriteTime;
+
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            entry.type = basic_dir_ent::kind::directory;
+        }
+        else if (path_ends_with(entry.path, ".lnk")) {
+            entry.type = basic_dir_ent::kind::symlink;
+        }
+        else {
+            entry.type = basic_dir_ent::kind::file;
+        }
+
+        if (path_equals_exactly(entry.path, ".")) {
+            continue;
+        }
+
+        if (!path_equals_exactly(entry.path, ".") && !path_equals_exactly(entry.path, "..")) {
+            entries.emplace_back(entry);
+        }
+
+        ++id;
+    }
+    while (FindNextFileA(find_handle, &find_data));
+
+    return true;
 }
