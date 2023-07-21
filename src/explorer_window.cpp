@@ -556,7 +556,11 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
     }
     else if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
         debug_log("[%s] ImGuiInputTextFlags_CallbackEdit, data->Buf = [%s], cwd = [%s]", expl.name, data->Buf, cwd);
-        bool cwd_exists_after_edit = update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+
+        auto const &new_cwd = data->Buf;
+
+        bool cwd_exists_after_edit = update_cwd_entries(full_refresh, &expl, new_cwd, opts);
+
         if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
             if (path_is_empty(expl.prev_valid_cwd) || !path_loosely_same(expl.cwd, expl.prev_valid_cwd)) {
                 new_history_from(expl, expl.cwd);
@@ -566,6 +570,8 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
             }
             expl.latest_save_to_disk_result = (i8)expl.save_to_disk();
         }
+
+        expl.cwd = path_create(data->Buf);
     }
 
     return 0;

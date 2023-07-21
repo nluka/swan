@@ -31,6 +31,7 @@ void render_file_ops_window() noexcept(true)
         ImGui::TableSetupColumn("When", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_when);
         ImGui::TableSetupColumn("Op", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
         ImGui::TableSetupColumn("Src", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
+        ImGui::TableSetupColumn("Dst", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dest_path);
         ImGui::TableHeadersRow();
 
         for (auto const &file_op : file_ops_queue) {
