@@ -9,37 +9,129 @@
 
 using namespace swan;
 
-static std::deque<file_operation> s_file_ops_queue = {};
+#if defined(NDEBUG)
+#   define MAX_FILE_OPS 1000
+#else
+#   define MAX_FILE_OPS 10
+#endif
+
+static boost::circular_buffer<file_operation> s_file_ops_buffer(MAX_FILE_OPS);
 static std::vector<path_t> s_pins = {};
 static BS::thread_pool s_thread_pool(1);
 ImGuiTextBuffer debug_log_package::s_debug_buffer = {};
 
-bool enqueue_file_op(
-  file_operation::type op_type,
-  path_t const &src_path,
-  path_t const &dest_path,
-  char dir_separator) noexcept(true)
+std::string get_last_error_string()
 {
-  (void)dir_separator;
+    DWORD error_code = GetLastError();
+    if (error_code == 0)
+        return "No error.";
 
-  // if (op_type == file_operation::type::copy) {
-  //   s_thread_pool.push_task([file = file_path, dest = dest_path, dir_sep = dir_separator]() -> bool {
-  //     path_t new_file_path = dest;
-  //     if (!path_append(new_file_path, file.data(), dir_sep, true)) {
-  //       // error
-  //       return false;
-  //     }
-  //     return CopyFileExA(file.data(), new_file_path.data(), )
-  //   });
-  // }
+    LPSTR buffer = nullptr;
+    DWORD buffer_size = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr,
+        error_code,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPSTR>(&buffer),
+        0,
+        nullptr
+    );
 
-  try {
-    s_file_ops_queue.emplace_front(0, 0, 0, 0, time_point_t(), op_type, src_path, dest_path);
-    return true;
-  }
-  catch (...) {
-    return false;
-  }
+    if (buffer_size == 0)
+        return "Error formatting message.";
+
+    std::string error_message(buffer, buffer + buffer_size);
+    LocalFree(buffer); // Free the allocated buffer
+
+    // Remove trailing newline characters
+    while (!error_message.empty() && (error_message.back() == '\r' || error_message.back() == '\n'))
+        error_message.pop_back();
+
+    return error_message;
+}
+
+bool enqueue_file_op(
+    file_operation::type op_type,
+    path_t const &src_path,
+    path_t const &dest_path,
+    char dir_separator) noexcept(true)
+{
+    // this check ensures we don't circle around and overwrite a file_operation which is in progress.
+    {
+        auto blank_time = time_point_t();
+        if (s_file_ops_buffer.full() && s_file_ops_buffer.front().end_time == blank_time) {
+            return false;
+        }
+    }
+
+    path_t new_file_path = dest_path;
+    if (!path_append(new_file_path, get_just_file_name(src_path.data()), dir_separator, true)) {
+        debug_log("failed to create new_file_path");
+        return false;
+    }
+
+    // TODO: check if new_file_path already exists, if yes give it a unique name
+    if (!path_append(new_file_path, " (1)")) {
+        debug_log("failed to create new_file_path");
+        return false;
+    }
+
+    {
+        file_operation file_op(op_type, src_path, new_file_path);
+        try {
+            s_file_ops_buffer.push_back(file_op);
+        }
+        catch (...) {
+            debug_log("s_file_ops_buffer.push_back(file_op) threw");
+            return false;
+        }
+    }
+
+    u64 file_op_idx = s_file_ops_buffer.size() - 1;
+
+    try {
+        switch (op_type) {
+            case file_operation::type::copy: {
+                s_thread_pool.push_task([file_op_idx] {
+                    file_operation *file_op = &s_file_ops_buffer[file_op_idx];
+
+                    file_op_progress_callback_user_data user_data = {};
+                    user_data.file_op = file_op;
+
+                    BOOL cancel = false;
+
+                    file_op->start_time = current_time();
+                    file_op->started = true;
+
+                    BOOL result = CopyFileExA(
+                        file_op->src_path.data(), file_op->dest_path.data(),
+                        file_op_progress_callback, (void *)&user_data,
+                        &cancel, COPY_FILE_FAIL_IF_EXISTS);
+
+                    file_op->result = result;
+                    file_op->end_time = current_time();
+
+                    debug_log("CopyFileExA(src = [%s], dst = [%s]) result: %d",
+                        file_op->src_path.data(), file_op->dest_path.data(), result);
+
+                    if (!result) {
+                        debug_log(get_last_error_string().c_str());
+                    }
+                });
+
+                return true;
+            }
+            case file_operation::type::remove: {
+
+                return false;
+            }
+            default:
+                return false;
+        }
+    }
+    catch (...) {
+        return false;
+    }
 }
 
 DWORD file_op_progress_callback(
@@ -60,21 +152,21 @@ DWORD file_op_progress_callback(
     file_op.stream_bytes_transferred = (u64)stream_bytes_transferred.QuadPart;
 
     if (callback_reason == CALLBACK_CHUNK_FINISHED) {
-
+        debug_log("CALLBACK_CHUNK_FINISHED");
     }
     else if (callback_reason == CALLBACK_STREAM_SWITCH) {
-
+        debug_log("CALLBACK_STREAM_SWITCH");
     }
     else {
-
+        debug_log("unknown callback_reason");
     }
 
     return PROGRESS_CONTINUE;
 }
 
-std::deque<file_operation> const &get_file_ops_queue() noexcept(true)
+boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept(true)
 {
-    return s_file_ops_queue;
+    return s_file_ops_buffer;
 }
 
 std::vector<path_t> const &get_pins() noexcept(true)

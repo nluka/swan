@@ -153,7 +153,7 @@ bool update_cwd_entries(
     explorer_options const &opts,
     std::source_location sloc)
 {
-    debug_log("[%s] update_cwd_entries() called from [%s:%d]",
+    debug_log("[%s] update_cwd_entries() called from [[%s]%d]",
         expl_ptr->name, get_just_file_name(sloc.file_name()), sloc.line());
 
     scoped_timer<timer_unit::MICROSECONDS> function_timer(&expl_ptr->update_cwd_entries_total_us);
@@ -507,7 +507,7 @@ void try_descend_to_directory(explorer_window &expl, char const *child_dir, expl
 
     if (path_append(expl.cwd, child_dir, dir_separator, true)) {
         if (PathCanonicalizeA(new_cwd.data(), expl.cwd.data())) {
-            debug_log("%s: PathCanonicalizeA success: new_cwd = [%s]", expl.name, new_cwd.data());
+            debug_log("[%s] PathCanonicalizeA success: new_cwd = [%s]", expl.name, new_cwd.data());
 
             update_cwd_entries(full_refresh, &expl, new_cwd.data(), opts);
 
@@ -517,11 +517,11 @@ void try_descend_to_directory(explorer_window &expl, char const *child_dir, expl
             expl.filter_error.clear();
         }
         else {
-            debug_log("%s: PathCanonicalizeA failed", expl.name);
+            debug_log("[%s] PathCanonicalizeA failed", expl.name);
         }
     }
     else {
-        debug_log("%s: path_append failed, new_cwd = [%s], append data = [%c%s]", expl.name, new_cwd.data(), dir_separator, child_dir);
+        debug_log("[%s] path_append failed, new_cwd = [%s], append data = [%c%s]", expl.name, new_cwd.data(), dir_separator, child_dir);
         expl.cwd = new_cwd;
     }
 }
@@ -599,10 +599,10 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
     // handle enter key pressed on cwd entry
     if (window_focused && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
         if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
-            debug_log("%s: pressed enter but cwd_prev_selected_dirent_idx was NO_SELECTION", expl.name);
+            debug_log("[%s] pressed enter but cwd_prev_selected_dirent_idx was NO_SELECTION", expl.name);
         } else {
             auto dirent_which_enter_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
-            debug_log("%s: pressed enter on [%s]", expl.name, dirent_which_enter_pressed_on.path.data());
+            debug_log("[%s] pressed enter on [%s]", expl.name, dirent_which_enter_pressed_on.path.data());
             if (dirent_which_enter_pressed_on.is_directory()) {
                 try_descend_to_directory(expl, dirent_which_enter_pressed_on.path.data(), opts);
             }
@@ -674,12 +674,12 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             };
 
             if (window_focused && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) {
-                debug_log("%s: ctrl-r, refresh triggered", expl.name);
+                debug_log("[%s] ctrl-r, refresh triggered", expl.name);
                 refresh();
             }
 
             if (ImGui::Button("Refresh") && !refreshed) {
-                debug_log("%s: refresh button pressed", expl.name);
+                debug_log("[%s] refresh button pressed", expl.name);
                 refresh();
             }
 
@@ -689,7 +689,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             //     (void) QueryPerformanceCounter(&current_timestamp);
             //     f64 diff_ms = compute_diff_ms(expl.last_refresh_timestamp, current_timestamp);
             //     if (diff_ms >= f64(1500)) {
-            //         debug_log("%s: automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
+            //         debug_log("[%s] automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
             //         update_cwd_entries(&expl, expl.cwd.data());
             //     }
             // }
@@ -718,7 +718,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             if (ImGui::Button(buffer)) {
                 if (already_pinned) {
-                    debug_log("%s: pin_idx = %zu", expl.name, pin_idx);
+                    debug_log("[%s] pin_idx = %zu", expl.name, pin_idx);
                     scoped_timer<timer_unit::MICROSECONDS> unpin_timer(&expl.unpin_us);
                     unpin(pin_idx);
                 }
@@ -748,7 +748,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             ImGui::BeginDisabled(!cwd_exists_before_edit);
 
             if (ImGui::ArrowButton("Up", ImGuiDir_Up)) {
-                debug_log("%s: up arrow button triggered", expl.name);
+                debug_log("[%s] up arrow button triggered", expl.name);
                 try_ascend_directory(expl, opts);
             }
 
@@ -763,7 +763,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             ImGui::BeginDisabled(expl.wd_history_pos == 0);
 
             if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
-                debug_log("%s: back arrow button triggered", expl.name);
+                debug_log("[%s] back arrow button triggered", expl.name);
 
                 if (io.KeyShift || io.KeyCtrl) {
                     expl.wd_history_pos = 0;
@@ -790,7 +790,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             ImGui::BeginDisabled(expl.wd_history_pos == wd_history_last_idx);
 
             if (ImGui::ArrowButton("Forward", ImGuiDir_Right)) {
-                debug_log("%s: forward arrow button triggered", expl.name);
+                debug_log("[%s] forward arrow button triggered", expl.name);
 
                 if (io.KeyShift || io.KeyCtrl) {
                     expl.wd_history_pos = wd_history_last_idx;
@@ -1039,8 +1039,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
         ImGui::TableNextColumn();
 
-        bool cwd_exists_after_edit = cwd_exists_before_edit;
-
         // cwd text input start
         {
             cwd_text_input_callback_user_data user_data;
@@ -1096,7 +1094,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 u64 len = slice_end - sliced_path.data();
 
                 if (len == path_length(expl.cwd)) {
-                    debug_log("%s: cd_to_slice: slice == cwd, not updating cwd|history", expl.name);
+                    debug_log("[%s] cd_to_slice: slice == cwd, not updating cwd|history", expl.name);
                 }
                 else {
                     expl.cwd[len] = '\0';
@@ -1108,7 +1106,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
                 if (ImGui::Button(*slice_it)) {
-                    debug_log("%s: clicked slice [%s]", expl.name, *slice_it);
+                    debug_log("[%s] clicked slice [%s]", expl.name, *slice_it);
                     cd_to_slice(*slice_it);
                     update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
                 }
@@ -1119,7 +1117,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             }
 
             if (ImGui::Button(slices.back())) {
-                debug_log("%s: clicked slice [%s]", expl.name, slices.back());
+                debug_log("[%s] clicked slice [%s]", expl.name, slices.back());
                 cd_to_slice(slices.back());
                 update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
             }
@@ -1282,7 +1280,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         if (ImGui::BeginChild("cwd_entries_child", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
             if (num_filtered_dirents == expl.cwd_entries.size()) {
                 if (ImGui::Button("Clear filter")) {
-                    debug_log("%s: clear filter button pressed", expl.name);
+                    debug_log("[%s] clear filter button pressed", expl.name);
                     expl.filter[0] = '\0';
                     update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
                 }
@@ -1365,7 +1363,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                     last_idx = i;
                                 }
 
-                                debug_log("%s: shift click, [%zu, %zu]", expl.name, first_idx, last_idx);
+                                debug_log("[%s] shift click, [%zu, %zu]", expl.name, first_idx, last_idx);
 
                                 for (u64 j = first_idx; j <= last_idx; ++j) {
                                     expl.cwd_entries[j].is_selected = true;
@@ -1377,7 +1375,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
                             if (current_time - last_click_time <= 0.2) {
                                 if (dir_ent.is_directory()) {
-                                    debug_log("%s: double clicked directory [%s]", expl.name, dir_ent.path.data());
+                                    debug_log("[%s] double clicked directory [%s]", expl.name, dir_ent.path.data());
 
                                     auto const &descend_target = dir_ent.path;
 
@@ -1389,7 +1387,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                 }
                                 else if (dir_ent.is_symlink()) {
                                     char const *lnk_file_path = dir_ent.path.data();
-                                    debug_log("%s: double clicked link [%s]", expl.name, lnk_file_path);
+                                    debug_log("[%s] double clicked link [%s]", expl.name, lnk_file_path);
 
                                     path_t shortcut_path = {};
 
@@ -1398,22 +1396,22 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                     HRESULT com_handle = s_persist_file_interface->Load(reinterpret_cast<LPCOLESTR>(shortcut_path.data()), 0);
 
                                     if (FAILED(com_handle)) {
-                                        debug_log("%s: failed to load file [%s]", expl.name, lnk_file_path);
+                                        debug_log("[%s] failed to load file [%s]", expl.name, lnk_file_path);
                                     } else {
                                         LPITEMIDLIST pidl;
                                         com_handle = s_shell_link->GetIDList(&pidl);
                                         if (FAILED(com_handle)) {
-                                            debug_log("%s: failed to GetPath from [%s]", expl.name, lnk_file_path);
+                                            debug_log("[%s] failed to GetPath from [%s]", expl.name, lnk_file_path);
                                             goto symlink_end;
                                         }
 
                                         path_t link_wd = {};
                                         if (!SHGetPathFromIDListA(pidl, link_wd.data())) {
-                                            debug_log("%s: failed to SHGetPathFromIDList from [%s]", expl.name, lnk_file_path);
+                                            debug_log("[%s] failed to SHGetPathFromIDList from [%s]", expl.name, lnk_file_path);
                                             goto symlink_end;
                                         }
 
-                                        debug_log("%s: link dest = [%s]", expl.name, link_wd.data());
+                                        debug_log("[%s] link dest = [%s]", expl.name, link_wd.data());
 
                                         expl.cwd = link_wd;
                                         update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
@@ -1422,21 +1420,21 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                     symlink_end:;
                                 }
                                 else {
-                                    debug_log("%s: double clicked file [%s]", expl.name, dir_ent.path.data());
+                                    debug_log("[%s] double clicked file [%s]", expl.name, dir_ent.path.data());
 
                                     path_t target_full_path = expl.cwd;
 
                                     if (path_append(target_full_path, dir_ent.path.data(), opts.dir_separator(), true)) {
-                                        debug_log("%s: target_full_path = [%s]", expl.name, target_full_path.data());
+                                        debug_log("[%s] target_full_path = [%s]", expl.name, target_full_path.data());
                                         [[maybe_unused]] HINSTANCE result = ShellExecuteA(nullptr, "open", target_full_path.data(), nullptr, nullptr, SW_SHOWNORMAL);
                                     }
                                     else {
-                                        debug_log("%s: path_append failed, cwd = [%s], append data = [\\%s]", expl.name, expl.cwd.data(), dir_ent.path.data());
+                                        debug_log("[%s] path_append failed, cwd = [%s], append data = [\\%s]", expl.name, expl.cwd.data(), dir_ent.path.data());
                                     }
                                 }
                             }
                             else {
-                                debug_log("%s: selected [%s]", expl.name, dir_ent.path.data());
+                                debug_log("[%s] selected [%s]", expl.name, dir_ent.path.data());
                             }
 
                             last_click_time = current_time;
