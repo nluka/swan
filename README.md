@@ -49,11 +49,15 @@ entry = file | directory
 - [x] Pins
 - [x] Show when last refreshed
 - [x] Column: "last modified"
-- [ ] Copy directory entries
-- [ ] Delete directory entries
+- [x] Automatic refresh
+- [ ] Copy files
+- [ ] Copy directory
+- [ ] Delete file
+- [ ] Delete directory
 - [ ] Undo copy
 - [ ] Undo delete
-- [ ] Cut directory entries
+- [ ] Cut file
+- [ ] Cut directory
 - [ ] Undo cut
 - [ ] Renaming
 - [ ] Create directory
@@ -63,4 +67,3 @@ entry = file | directory
 - [ ] Customizable context menu
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview
-- [ ] Automatic refresh

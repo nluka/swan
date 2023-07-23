@@ -17,9 +17,9 @@ void render_file_ops_window() noexcept(true)
     enum file_ops_table_col : i32
     {
         file_ops_table_col_undo,
-        file_ops_table_col_when,
+        file_ops_table_col_completed,
         file_ops_table_col_op_type,
-        file_ops_table_col_rate,
+        file_ops_table_col_speed,
         file_ops_table_col_src_path,
         file_ops_table_col_dest_path,
         file_ops_table_col_count
@@ -29,9 +29,9 @@ void render_file_ops_window() noexcept(true)
         ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp)
     ) {
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_undo);
-        ImGui::TableSetupColumn("When", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_when);
+        ImGui::TableSetupColumn("Completed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_completed);
         ImGui::TableSetupColumn("Op", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
-        ImGui::TableSetupColumn("Rate", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_rate);
+        ImGui::TableSetupColumn("Speed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_speed);
         ImGui::TableSetupColumn("Src", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
         ImGui::TableSetupColumn("Dst", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dest_path);
         ImGui::TableHeadersRow();
@@ -39,21 +39,28 @@ void render_file_ops_window() noexcept(true)
         for (auto const &file_op : file_ops_buffer) {
             ImGui::TableNextRow();
 
+            time_point_t blank_time = {};
+            time_point_t now = current_time();
+
+            auto start_time = file_op.start_time.load();
+            auto end_time = file_op.end_time.load();
+            auto total_size = file_op.total_file_size.load();
+            auto bytes_transferred = file_op.total_bytes_transferred.load();
+
             if (ImGui::TableSetColumnIndex(file_ops_table_col_undo)) {
                 ImGui::SmallButton("Undo");
             }
 
-            if (ImGui::TableSetColumnIndex(file_ops_table_col_when)) {
-                time_point_t blank_time = {};
-                if (file_op.start_time.load() == blank_time) {
+            if (ImGui::TableSetColumnIndex(file_ops_table_col_completed)) {
+                if (start_time == blank_time) {
                     ImGui::TextUnformatted("Queued");
                 }
-                else if (file_op.end_time.load() == blank_time) {
-                    // in progress
+                else if (end_time == blank_time) {
+                    f64 percent_completed = ((f64)bytes_transferred / (f64)total_size) * 100.0;
+                    ImGui::Text("%.1lf %%", percent_completed);
                 }
                 else {
-                    time_point_t now = current_time();
-                    ImGui::TextUnformatted(compute_when_str(file_op.end_time, now).data());
+                    ImGui::TextUnformatted(compute_when_str(end_time, now).data());
                 }
             }
 
@@ -63,12 +70,8 @@ void render_file_ops_window() noexcept(true)
                 else if (file_op.op_type == file_operation::type::remove) ImGui::TextUnformatted("rm");
             }
 
-            if (ImGui::TableSetColumnIndex(file_ops_table_col_rate)) {
-                auto start_time = file_op.start_time.load();
-                auto end_time = file_op.end_time.load();
-                auto bytes_transferred = file_op.total_bytes_transferred.load();
-
-                u64 ms = compute_diff_ms(start_time, end_time == time_point_t() ? current_time() : end_time);
+            if (ImGui::TableSetColumnIndex(file_ops_table_col_speed)) {
+                u64 ms = compute_diff_ms(start_time, end_time == time_point_t() ? now : end_time);
                 f64 bytes_per_ms = (f64)bytes_transferred / (f64)ms;
                 f64 bytes_per_sec = bytes_per_ms * 1'000.0;
 

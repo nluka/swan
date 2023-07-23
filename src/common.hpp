@@ -138,7 +138,6 @@ struct explorer_window
     // 24 byte members
 
     std::vector<dir_ent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
-    std::vector<dir_ent> cwd_entries_selected = {}; // 24 bytes
 
     // 8 byte members
 
