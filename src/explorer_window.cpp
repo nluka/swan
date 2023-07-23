@@ -173,6 +173,15 @@ bool update_cwd_entries(
     expl.update_cwd_entries_regex_ctor_us = 0;
 
     if (actions & query_filesystem) {
+        static std::vector<path_t> selected_entries = {};
+        selected_entries.clear();
+
+        for (auto const &dir_ent : expl.cwd_entries) {
+            if (dir_ent.is_selected) {
+                selected_entries.push_back(dir_ent.basic.path);
+            }
+        }
+
         expl.cwd_entries.clear();
 
         // this seems inefficient but was measured to be faster than the "efficient" way,
@@ -242,6 +251,13 @@ bool update_cwd_entries(
                         std::swap(expl.cwd_entries.back(), expl.cwd_entries.front());
                     }
                 } else {
+                    for (auto const &prev_selected_entry : selected_entries) {
+                        bool was_selected_before_refresh = path_strictly_same(entry.basic.path, prev_selected_entry);
+                        if (was_selected_before_refresh) {
+                            entry.is_selected = true;
+                        }
+                    }
+
                     expl.cwd_entries.emplace_back(entry);
                 }
 
@@ -685,16 +701,17 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 refresh();
             }
 
-            // if (!refreshed) {
-            //     // see if it's time for an automatic refresh
-            //     LARGE_INTEGER current_timestamp = {};
-            //     (void) QueryPerformanceCounter(&current_timestamp);
-            //     f64 diff_ms = compute_diff_ms(expl.last_refresh_timestamp, current_timestamp);
-            //     if (diff_ms >= f64(1500)) {
-            //         debug_log("[%s] automatic refresh triggered (%lld)", expl.name, current_timestamp.QuadPart);
-            //         update_cwd_entries(&expl, expl.cwd.data());
-            //     }
-            // }
+            if (!refreshed) {
+                // see if it's time for an automatic refresh
+                time_point_t now = current_time();
+
+                u64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
+
+                if (diff_ms >= 1000) {
+                    debug_log("[%s] automatic refresh triggered (%lld)", expl.name, now.time_since_epoch().count());
+                    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                }
+            }
         }
         // end of refresh button, ctrl-r refresh logic, automatic refreshing
 
