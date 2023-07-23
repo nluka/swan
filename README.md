@@ -56,6 +56,7 @@ entry = file | directory
 - [ ] Cut directory entries
 - [ ] Undo cut
 - [ ] Renaming
+- [ ] Create directory
 - [ ] Bulk renaming
 - [ ] Handle executable .lnk
 - [ ] Glob filtering

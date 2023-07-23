@@ -5,6 +5,7 @@
 #include <deque>
 #include <string>
 #include <source_location>
+#include <atomic>
 
 #include <boost/circular_buffer.hpp>
 
@@ -127,6 +128,7 @@ struct explorer_window
 
     // 40 byte members
 
+    // TODO: switch to boost::circular_buffer
     std::deque<swan::path_t> wd_history = {}; // history for working directories, persisted in file
 
     // 32 byte members
@@ -136,6 +138,7 @@ struct explorer_window
     // 24 byte members
 
     std::vector<dir_ent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
+    std::vector<dir_ent> cwd_entries_selected = {}; // 24 bytes
 
     // 8 byte members
 
@@ -178,6 +181,18 @@ struct file_operation
         count
     };
 
+    std::atomic<u64> total_file_size          = { 0 };
+    std::atomic<u64> total_bytes_transferred  = { 0 };
+    std::atomic<u64> stream_size              = { 0 };
+    std::atomic<u64> stream_bytes_transferred = { 0 };
+    std::atomic<time_point_t> start_time      = {   };
+    std::atomic<time_point_t> end_time        = {   };
+    type op_type = type::nil;
+    bool started = false;
+    bool result = false;
+    swan::path_t src_path = {};
+    swan::path_t dest_path = {};
+
     file_operation(type op_type, swan::path_t const &src, swan::path_t const &dst) noexcept(true)
         : op_type(op_type)
         , src_path(src)
@@ -185,17 +200,40 @@ struct file_operation
     {
     }
 
-    u64 total_file_size = 0;
-    u64 total_bytes_transferred = 0;
-    u64 stream_size = 0;
-    u64 stream_bytes_transferred = 0;
-    time_point_t start_time = {};
-    time_point_t end_time = {};
-    type op_type = type::nil;
-    bool started = false;
-    bool result = false;
-    swan::path_t src_path = {};
-    swan::path_t dest_path = {};
+    // for boost::circular_buffer
+    file_operation(file_operation const &other) noexcept(true)
+        : op_type(other.op_type)
+        , started(other.started)
+        , result(other.result)
+        , src_path(other.src_path)
+        , dest_path(other.dest_path)
+    {
+        this->total_file_size.store(other.total_file_size.load());
+        this->total_bytes_transferred.store(other.total_bytes_transferred.load());
+        this->stream_size.store(other.stream_size.load());
+        this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
+        this->start_time.store(other.start_time.load());
+        this->end_time.store(other.end_time.load());
+    }
+
+    // for boost::circular_buffer
+    file_operation &operator=(file_operation const &other) noexcept(true)
+    {
+        this->total_file_size.store(other.total_file_size.load());
+        this->total_bytes_transferred.store(other.total_bytes_transferred.load());
+        this->stream_size.store(other.stream_size.load());
+        this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
+
+        this->start_time.store(other.start_time.load());
+        this->end_time.store(other.end_time.load());
+
+        this->op_type = other.op_type;
+        this->result = other.result;
+        this->src_path = other.src_path;
+        this->dest_path = other.dest_path;
+
+        return *this;
+    }
 };
 
 struct file_op_progress_callback_user_data

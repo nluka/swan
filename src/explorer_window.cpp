@@ -153,7 +153,7 @@ bool update_cwd_entries(
     explorer_options const &opts,
     std::source_location sloc)
 {
-    debug_log("[%s] update_cwd_entries() called from [[%s]%d]",
+    debug_log("[%s] update_cwd_entries() called from [%s:%d]",
         expl_ptr->name, get_just_file_name(sloc.file_name()), sloc.line());
 
     scoped_timer<timer_unit::MICROSECONDS> function_timer(&expl_ptr->update_cwd_entries_total_us);
@@ -562,16 +562,18 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
         bool cwd_exists_after_edit = update_cwd_entries(full_refresh, &expl, new_cwd, opts);
 
         if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
+            expl.cwd = path_create(data->Buf);
+
             if (path_is_empty(expl.prev_valid_cwd) || !path_loosely_same(expl.cwd, expl.prev_valid_cwd)) {
                 new_history_from(expl, expl.cwd);
             }
+
             if (!path_loosely_same(expl.cwd, expl.prev_valid_cwd)) {
                 expl.prev_valid_cwd = expl.cwd;
             }
+
             expl.latest_save_to_disk_result = (i8)expl.save_to_disk();
         }
-
-        expl.cwd = path_create(data->Buf);
     }
 
     return 0;

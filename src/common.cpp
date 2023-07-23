@@ -60,7 +60,7 @@ bool enqueue_file_op(
     // this check ensures we don't circle around and overwrite a file_operation which is in progress.
     {
         auto blank_time = time_point_t();
-        if (s_file_ops_buffer.full() && s_file_ops_buffer.front().end_time == blank_time) {
+        if (s_file_ops_buffer.full() && s_file_ops_buffer.front().end_time.load() == blank_time) {
             return false;
         }
     }
@@ -76,7 +76,10 @@ bool enqueue_file_op(
         if (f != nullptr) {
             fclose(f);
 
-            static char const rand_chars[] = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            static char const rand_chars[] = "1234567890"
+                                             "abcdefghijklmnopqrstuvwxyz"
+                                             "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
             constexpr u64 num_rand_chars_to_pick = 5;
             std::array<char, 1 + num_rand_chars_to_pick + 1> rand_str = {};
 
@@ -119,7 +122,7 @@ bool enqueue_file_op(
 
                     BOOL cancel = false;
 
-                    file_op->start_time = current_time();
+                    file_op->start_time.store(current_time());
                     file_op->started = true;
 
                     BOOL result = CopyFileExA(
@@ -128,7 +131,7 @@ bool enqueue_file_op(
                         &cancel, COPY_FILE_FAIL_IF_EXISTS);
 
                     file_op->result = result;
-                    file_op->end_time = current_time();
+                    file_op->end_time.store(current_time());
 
                     debug_log("CopyFileExA(src = [%s], dst = [%s]) result: %d",
                         file_op->src_path.data(), file_op->dest_path.data(), result);
@@ -165,19 +168,19 @@ DWORD file_op_progress_callback(
     void *user_data) noexcept(true)
 {
     auto &file_op = *((file_op_progress_callback_user_data *)user_data)->file_op;
-    file_op.total_file_size = (u64)total_file_size.QuadPart;
-    file_op.total_bytes_transferred = (u64)total_bytes_transferred.QuadPart;
-    file_op.stream_size = (u64)stream_size.QuadPart;
-    file_op.stream_bytes_transferred = (u64)stream_bytes_transferred.QuadPart;
+    file_op.total_file_size.store((u64)total_file_size.QuadPart);
+    file_op.total_bytes_transferred.store((u64)total_bytes_transferred.QuadPart);
+    file_op.stream_size.store((u64)stream_size.QuadPart);
+    file_op.stream_bytes_transferred.store((u64)stream_bytes_transferred.QuadPart);
 
     if (callback_reason == CALLBACK_CHUNK_FINISHED) {
-        debug_log("CALLBACK_CHUNK_FINISHED");
+
     }
     else if (callback_reason == CALLBACK_STREAM_SWITCH) {
-        debug_log("CALLBACK_STREAM_SWITCH");
+
     }
     else {
-        debug_log("unknown callback_reason");
+
     }
 
     return PROGRESS_CONTINUE;
@@ -398,8 +401,8 @@ bool windows_options::load_from_disk() noexcept(true)
        >> (i8 &)this->show_explorer_3
        >> (i8 &)this->show_analytics
   #if !defined (NDEBUG)
-      >> (i8 &)this->show_demo
-      >> (i8 &)this->show_debug_log
+       >> (i8 &)this->show_demo
+       >> (i8 &)this->show_debug_log
   #endif
     ;
 

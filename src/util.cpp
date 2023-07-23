@@ -93,20 +93,23 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     std::array<char, 64> out = {};
 
     i64 ms_diff = compute_diff_ms(start, end);
-    i64 ten_seconds = 10'000;
-    i64 thirty_seconds = 30'000;
+    // i64 ten_seconds = 10'000;
+    // i64 thirty_seconds = 30'000;
     i64 one_minute = 60'000;
     i64 one_hour = one_minute * 60;
     i64 one_day = one_hour * 24;
 
-    if (ms_diff < ten_seconds) {
+    // if (ms_diff < ten_seconds) {
+    //     strncpy(out.data(), "just now", out.size());
+    // }
+    // else if (ms_diff < thirty_seconds) {
+    //      strncpy(out.data(), "< 30 sec ago", out.size());
+    // }
+    // else if (ms_diff < one_minute) {
+    //     strncpy(out.data(), "< 1 minute ago", out.size());
+    // }
+    if (ms_diff < one_minute) {
         strncpy(out.data(), "just now", out.size());
-    }
-    else if (ms_diff < thirty_seconds) {
-         strncpy(out.data(), "< 30 sec ago", out.size());
-    }
-    else if (ms_diff < one_minute) {
-        strncpy(out.data(), "< 1 minute ago", out.size());
     }
     else if (ms_diff < one_hour) {
         u64 minutes = u64(ms_diff / one_minute);
