@@ -53,6 +53,7 @@ std::string get_last_error_string()
 
 bool enqueue_file_op(
     file_operation::type op_type,
+    u64 file_size,
     path_t const &src_path,
     path_t const &dest_path,
     char dir_separator) noexcept(true)
@@ -65,41 +66,67 @@ bool enqueue_file_op(
         }
     }
 
-    path_t new_file_path = dest_path;
-    if (!path_append(new_file_path, get_just_file_name(src_path.data()), dir_separator, true)) {
-        debug_log("failed to create new_file_path");
-        return false;
+    switch (op_type) {
+        case file_operation::type::copy: {
+            path_t new_file_path = dest_path;
+        if (!path_append(new_file_path, get_just_file_name(src_path.data()), dir_separator, true)) {
+            debug_log("failed to create new_file_path");
+            return false;
+        }
+        }
     }
 
-    {
-        FILE *f = fopen(new_file_path.data(), "rb");
-        if (f != nullptr) {
-            fclose(f);
+    path_t new_file_path;
 
-            static char const rand_chars[] = "1234567890"
-                                             "abcdefghijklmnopqrstuvwxyz"
-                                             "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    if (op_type == file_operation::type::copy || op_type == file_operation::type::move) {
+        new_file_path = dest_path;
 
-            constexpr u64 num_rand_chars_to_pick = 5;
-            std::array<char, 1 + num_rand_chars_to_pick + 1> rand_str = {};
+        if (!path_append(new_file_path, get_just_file_name(src_path.data()), dir_separator, true)) {
+            debug_log("failed to create new_file_path");
+            return false;
+        }
 
-            rand_str[0] = '_';
-
-            for (auto iter = rand_str.begin() + 1; iter != rand_str.end(); ++iter) {
-                u64 rand_idx = fast_rand(0, lengthof(rand_chars) - 2);
-                char rand_ch = rand_chars[rand_idx];
-                *iter = rand_ch;
+        {
+            bool file_exists = false;
+            {
+                FILE *f = fopen(new_file_path.data(), "rb");
+                if (f) {
+                    (void) fclose(f);
+                    file_exists = true;
+                }
+                else if (GetFileAttributesA(new_file_path.data()) != INVALID_FILE_ATTRIBUTES) {
+                    file_exists = true;
+                }
             }
 
-            if (!path_append(new_file_path, rand_str.data())) {
-                debug_log("failed to append rand_str.data() to new_file_path");
-                return false;
+            if (file_exists) {
+                // we need to create a new name to prevent overwriting
+
+                static char const rand_chars[] = "1234567890"
+                                                 "abcdefghijklmnopqrstuvwxyz"
+                                                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+                constexpr u64 num_rand_chars_to_pick = 5;
+                std::array<char, 1 + num_rand_chars_to_pick + 1> rand_str = {};
+
+                rand_str[0] = '_';
+
+                for (auto iter = rand_str.begin() + 1; iter != rand_str.end(); ++iter) {
+                    u64 rand_idx = fast_rand(0, lengthof(rand_chars) - 2);
+                    char rand_ch = rand_chars[rand_idx];
+                    *iter = rand_ch;
+                }
+
+                if (!path_append(new_file_path, rand_str.data())) {
+                    debug_log("failed to append rand_str.data() to new_file_path");
+                    return false;
+                }
             }
         }
     }
 
     {
-        file_operation file_op(op_type, src_path, new_file_path);
+        file_operation file_op(op_type, file_size, src_path, new_file_path);
         try {
             s_file_ops_buffer.push_back(file_op);
         }
@@ -123,20 +150,19 @@ bool enqueue_file_op(
                     BOOL cancel = false;
 
                     file_op->start_time.store(current_time());
-                    file_op->started = true;
 
-                    BOOL result = CopyFileExA(
+                    BOOL success = CopyFileExA(
                         file_op->src_path.data(), file_op->dest_path.data(),
                         file_op_progress_callback, (void *)&user_data,
                         &cancel, COPY_FILE_FAIL_IF_EXISTS);
 
-                    file_op->result = result;
                     file_op->end_time.store(current_time());
+                    file_op->success = success;
 
                     debug_log("CopyFileExA(src = [%s], dst = [%s]) result: %d",
-                        file_op->src_path.data(), file_op->dest_path.data(), result);
+                        file_op->src_path.data(), file_op->dest_path.data(), success);
 
-                    if (!result) {
+                    if (!success) {
                         debug_log(get_last_error_string().c_str());
                     }
                 });
@@ -144,8 +170,24 @@ bool enqueue_file_op(
                 return true;
             }
             case file_operation::type::remove: {
+                s_thread_pool.push_task([file_op_idx] {
+                    file_operation *file_op = &s_file_ops_buffer[file_op_idx];
 
-                return false;
+                    file_op->start_time.store(current_time());
+
+                    BOOL success = DeleteFileA(file_op->src_path.data());
+
+
+                    file_op->end_time.store(current_time());
+                    file_op->total_bytes_transferred.store(file_op->total_file_size.load());
+                    file_op->success = success;
+
+                    debug_log("DeleteFileA(%s) result: %d", file_op->src_path.data(), success);
+
+                    if (!success) {
+                        debug_log(get_last_error_string().c_str());
+                    }
+                });
             }
             default:
                 return false;
