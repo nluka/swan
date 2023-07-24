@@ -33,6 +33,7 @@ struct paste_payload
 {
     struct item
     {
+        u64 size;
         basic_dir_ent::kind type;
         path_t path;
     };
@@ -708,8 +709,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 u64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
 
                 if (diff_ms >= 1000) {
-                    debug_log("[%s] automatic refresh triggered (%lld)", expl.name, now.time_since_epoch().count());
-                    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                    refresh();
                 }
             }
         }
@@ -968,7 +968,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 if (dir_ent.is_selected) {
                     path_t src = expl.cwd;
                     if (path_append(src, dir_ent.basic.path.data(), dir_separator, true)) {
-                        s_paste_payload.items.push_back({ dir_ent.basic.type, src });
+                        s_paste_payload.items.push_back({ dir_ent.basic.size, dir_ent.basic.type, src });
                     } else {
                         // error
                     }
@@ -989,7 +989,28 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 if (dir_ent.is_selected) {
                     path_t src = expl.cwd;
                     if (path_append(src, dir_ent.basic.path.data(), dir_separator, true)) {
-                        s_paste_payload.items.push_back({ dir_ent.basic.type, src });
+                        s_paste_payload.items.push_back({ dir_ent.basic.size, dir_ent.basic.type, src });
+                    } else {
+                        // error
+                    }
+                }
+            }
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+
+        ImGui::BeginDisabled(expl.num_selected_cwd_entries == 0);
+        if (ImGui::Button("Delete")) {
+            s_paste_payload.window_name = expl.name;
+            s_paste_payload.items.clear();
+            s_paste_payload.keep_src = false;
+
+            for (auto const &dir_ent : expl.cwd_entries) {
+                if (dir_ent.is_selected) {
+                    path_t src = expl.cwd;
+                    if (path_append(src, dir_ent.basic.path.data(), dir_separator, true)) {
+                        enqueue_file_op(file_operation::type::remove, dir_ent.basic.size, src, {}, dir_separator);
                     } else {
                         // error
                     }
@@ -1013,7 +1034,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
                     }
                     else {
-                        enqueue_file_op(op_type, paste_item.path, expl.cwd, dir_separator);
+                        enqueue_file_op(op_type, paste_item.size, paste_item.path, expl.cwd, dir_separator);
                     }
                 }
             }
@@ -1026,7 +1047,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             ImGui::SameLine();
             ImGui::Spacing();
             ImGui::SameLine();
-
 
             u64 num_dirs = 0, num_symlinks = 0, num_files = 0;
             for (auto const &item : s_paste_payload.items) {
@@ -1233,6 +1253,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             }
         }
 
+    #if 0
         ImGui::SameLine();
         ImGui::Text(" ");
         ImGui::SameLine();
@@ -1241,6 +1262,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             time_point_t now = current_time();
             ImGui::Text("refreshed %s", compute_when_str(expl.last_refresh_time, now).data());
         }
+    #endif
 
         ImGui::Spacing();
         ImGui::Spacing();

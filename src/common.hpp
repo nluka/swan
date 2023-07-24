@@ -187,23 +187,22 @@ struct file_operation
     std::atomic<time_point_t> start_time      = {   };
     std::atomic<time_point_t> end_time        = {   };
     type op_type = type::nil;
-    bool started = false;
-    bool result = false;
+    bool success = false;
     swan::path_t src_path = {};
     swan::path_t dest_path = {};
 
-    file_operation(type op_type, swan::path_t const &src, swan::path_t const &dst) noexcept(true)
+    file_operation(type op_type, u64 file_size, swan::path_t const &src, swan::path_t const &dst) noexcept(true)
         : op_type(op_type)
         , src_path(src)
         , dest_path(dst)
     {
+        total_file_size.store(file_size);
     }
 
     // for boost::circular_buffer
     file_operation(file_operation const &other) noexcept(true)
         : op_type(other.op_type)
-        , started(other.started)
-        , result(other.result)
+        , success(other.success)
         , src_path(other.src_path)
         , dest_path(other.dest_path)
     {
@@ -227,7 +226,7 @@ struct file_operation
         this->end_time.store(other.end_time.load());
 
         this->op_type = other.op_type;
-        this->result = other.result;
+        this->success = other.success;
         this->src_path = other.src_path;
         this->dest_path = other.dest_path;
 
@@ -253,6 +252,7 @@ DWORD file_op_progress_callback(
 
 bool enqueue_file_op(
     file_operation::type op_type,
+    u64 file_size,
     swan::path_t const &file_path,
     swan::path_t const &dest_path,
     char dir_separator) noexcept(true);
@@ -315,6 +315,8 @@ void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&.
 // #if !defined(NDEBUG)
     auto &debug_buffer = debug_log_package::s_debug_buffer;
     u64 const max_size = 1024 * 1024 * 10;
+
+    debug_buffer.reserve(max_size);
 
     if (debug_buffer.size() > max_size) {
         debug_buffer.clear();

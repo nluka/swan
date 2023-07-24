@@ -50,20 +50,38 @@ entry = file | directory
 - [x] Show when last refreshed
 - [x] Column: "last modified"
 - [x] Automatic refresh
-- [ ] Copy files
+
+- [x] Copy file
 - [ ] Copy directory
 - [ ] Delete file
 - [ ] Delete directory
-- [ ] Undo copy
-- [ ] Undo delete
+
+- [ ] Undo copy file
+- [ ] Undo copy directory
+- [ ] Undo delete file
+- [ ] Undo delete directory
+
 - [ ] Cut file
 - [ ] Cut directory
-- [ ] Undo cut
-- [ ] Renaming
+- [ ] Undo cut file
+- [ ] Undo cut directory
+
+- [ ] Persist file operations history
+
+- [ ] Context menu: copy file name
+- [ ] Context menu: copy file name no ext
+- [ ] Context menu: copy file path
+- [ ] Context menu: copy file path no ext
+- [ ] Context menu: rename file
+- [ ] Context menu: copy directory name
+- [ ] Context menu: copy directory path
+- [ ] Context menu: rename directory
+
 - [ ] Create directory
+- [ ] Renaming
 - [ ] Bulk renaming
 - [ ] Handle executable .lnk
 - [ ] Glob filtering
-- [ ] Customizable context menu
+
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview

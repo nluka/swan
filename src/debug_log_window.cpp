@@ -6,25 +6,37 @@
 void render_debug_log_window() noexcept(true)
 {
     if (ImGui::Begin("Debug Log")) {
+        auto same_line_with_spacing = [] {
+            ImGui::SameLine();
+            ImGui::Spacing();
+            ImGui::SameLine();
+        };
+
         static bool auto_scroll = true;
+
+        // first line
+
+        bool jump_to_top = ImGui::ArrowButton("Top", ImGuiDir_Up);
+
+        same_line_with_spacing();
 
         if (ImGui::Button("Clear")) {
             debug_log_package::clear_buffer();
         }
 
         ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
 
-        bool jump_to_top = ImGui::Button("Jump Top");
-        ImGui::SameLine();
-        bool jump_to_bottom = ImGui::Button("Jump Bottom");
+        if (ImGui::Button("Save to file")) {
+            debug_log_package::clear_buffer();
+        }
 
-        ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
+        // second line
 
-        ImGui::Checkbox("Auto Scroll", &auto_scroll);
+        bool jump_to_bottom = ImGui::ArrowButton("Bottom", ImGuiDir_Down);
+
+        same_line_with_spacing();
+
+        ImGui::Checkbox("Auto-scroll at bottom", &auto_scroll);
 
         ImGui::Spacing();
         ImGui::Separator();
