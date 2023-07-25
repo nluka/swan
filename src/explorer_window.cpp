@@ -692,34 +692,43 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 }
             };
 
+            if (
+                opts.ref_mode == explorer_options::refresh_mode::manual ||
+                (opts.ref_mode == explorer_options::refresh_mode::adaptive && expl.cwd_entries.size() > opts.adaptive_refresh_threshold)
+            ) {
+                if (ImGui::Button("Refresh") && !refreshed) {
+                    debug_log("[%s] refresh button pressed", expl.name);
+                    refresh();
+                }
+
+                ImGui::SameLine();
+                ImGui::Spacing();
+                ImGui::SameLine();
+                ImGui::Spacing();
+                ImGui::SameLine();
+            }
+            else {
+                if (!refreshed) {
+                    // see if it's time for an automatic refresh
+
+                    time_point_t now = current_time();
+
+                    i64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
+
+                    if (diff_ms >= max(explorer_options::min_tolerable_refresh_interval_ms, opts.auto_refresh_interval_ms)) {
+                        refresh();
+                    }
+                }
+            }
+
             if (window_focused && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) {
                 debug_log("[%s] ctrl-r, refresh triggered", expl.name);
                 refresh();
             }
-
-            if (ImGui::Button("Refresh") && !refreshed) {
-                debug_log("[%s] refresh button pressed", expl.name);
-                refresh();
-            }
-
-            if (!refreshed) {
-                // see if it's time for an automatic refresh
-                time_point_t now = current_time();
-
-                u64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
-
-                if (diff_ms >= 1000) {
-                    refresh();
-                }
-            }
         }
         // end of refresh button, ctrl-r refresh logic, automatic refreshing
 
-        ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
+
 
         // pin cwd button start
         {

@@ -34,6 +34,19 @@ struct windows_options
 
 struct explorer_options
 {
+    enum class refresh_mode : i32
+    {
+        adaptive,
+        manual,
+        automatic,
+        count
+    };
+
+    static i32 const min_tolerable_refresh_interval_ms = 500;
+
+    i32 auto_refresh_interval_ms;
+    i32 adaptive_refresh_threshold;
+    refresh_mode ref_mode;
     bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
     bool show_cwd_len;
     bool show_debug_info;

@@ -27,7 +27,7 @@ void render_debug_log_window() noexcept(true)
         ImGui::SameLine();
 
         if (ImGui::Button("Save to file")) {
-            debug_log_package::clear_buffer();
+            // debug_log_package::clear_buffer();
         }
 
         // second line

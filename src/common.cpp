@@ -345,114 +345,205 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true)
 
 bool explorer_options::save_to_disk() const noexcept(true)
 {
-  try {
-    std::ofstream out("data/explorer_options.bin", std::ios::binary);
-    if (!out) {
-      return false;
+    try {
+        std::ofstream out("data/explorer_options.txt", std::ios::binary);
+
+        if (!out) {
+            return false;
+        }
+
+        static_assert(i8(1) == i8(true));
+        static_assert(i8(0) == i8(false));
+
+        out << "auto_refresh_interval_ms " << this->auto_refresh_interval_ms << '\n';
+        out << "adaptive_refresh_threshold " << this->adaptive_refresh_threshold << '\n';
+        out << "ref_mode " << (i32)this->ref_mode << '\n';
+        out << "binary_size_system " << (i32)this->binary_size_system << '\n';
+        out << "show_cwd_len " << (i32)this->show_cwd_len << '\n';
+        out << "show_debug_info " << (i32)this->show_debug_info << '\n';
+        out << "show_dotdot_dir " << (i32)this->show_dotdot_dir << '\n';
+        out << "unix_directory_separator " << (i32)this->unix_directory_separator << '\n';
+
+        return true;
     }
-
-    static_assert(i8(1) == i8(true));
-    static_assert(i8(0) == i8(false));
-
-    out << i8(this->binary_size_system)
-        << i8(this->show_cwd_len)
-        << i8(this->show_debug_info)
-        << i8(this->automatic_refresh)
-        << i8(this->show_dotdot_dir)
-        << i8(this->unix_directory_separator);
-
-    return true;
-  }
-  catch (...) {
-    return false;
-  }
+    catch (...) {
+        return false;
+    }
 }
 
 bool explorer_options::load_from_disk() noexcept(true)
 {
-  try {
-    std::ifstream in("data/explorer_options.bin", std::ios::binary);
-    if (!in) {
-      return false;
+    try {
+        std::ifstream in("data/explorer_options.txt", std::ios::binary);
+        if (!in) {
+            return false;
+        }
+
+        static_assert(i8(1) == i8(true));
+        static_assert(i8(0) == i8(false));
+
+        std::string what = {};
+        what.reserve(100);
+        char bit_ch = 0;
+
+        {
+            in >> what;
+            assert(what == "auto_refresh_interval_ms");
+            in >> (i32 &)this->auto_refresh_interval_ms;
+        }
+        {
+            in >> what;
+            assert(what == "adaptive_refresh_threshold");
+            in >> (i32 &)this->adaptive_refresh_threshold;
+        }
+        {
+            in >> what;
+            assert(what == "ref_mode");
+            in >> (i32 &)this->ref_mode;
+        }
+        {
+            in >> what;
+            assert(what == "binary_size_system");
+            in >> bit_ch;
+            this->binary_size_system = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_cwd_len");
+            in >> bit_ch;
+            this->show_cwd_len = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_debug_info");
+            in >> bit_ch;
+            this->show_debug_info = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_dotdot_dir");
+            in >> bit_ch;
+            this->show_dotdot_dir = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "unix_directory_separator");
+            in >> bit_ch;
+            this->unix_directory_separator = bit_ch == '1' ? 1 : 0;
+        }
+
+        return true;
     }
-
-  static_assert(i8(1) == i8(true));
-  static_assert(i8(0) == i8(false));
-
-    in >> (i8 &)this->binary_size_system
-       >> (i8 &)this->show_cwd_len
-       >> (i8 &)this->show_debug_info
-       >> (i8 &)this->automatic_refresh
-       >> (i8 &)this->show_dotdot_dir
-       >> (i8 &)this->unix_directory_separator;
-
-    return true;
-  }
-  catch (...) {
-    return false;
-  }
+    catch (...) {
+        return false;
+    }
 }
 
 bool windows_options::save_to_disk() const noexcept(true)
 {
-  try {
-    std::ofstream out("data/windows_options.bin", std::ios::binary);
-    if (!out) {
-      return false;
+    try {
+        std::ofstream out("data/windows_options.txt", std::ios::binary);
+        if (!out) {
+        return false;
+        }
+
+        out << "show_pinned " << this->show_pinned << '\n';
+        out << "show_file_operations " << this->show_file_operations << '\n';
+        out << "show_explorer_0 " << this->show_explorer_0 << '\n';
+        out << "show_explorer_1 " << this->show_explorer_1 << '\n';
+        out << "show_explorer_2 " << this->show_explorer_2 << '\n';
+        out << "show_explorer_3 " << this->show_explorer_3 << '\n';
+        out << "show_analytics " << this->show_analytics << '\n';
+    #if !defined (NDEBUG)
+        out << "show_demo " << this->show_demo << '\n';
+        out << "show_debug_log " << this->show_debug_log << '\n';
+    #endif
+
+        return true;
     }
-
-    static_assert(i8(1) == i8(true));
-    static_assert(i8(0) == i8(false));
-
-    out << i8(this->show_pinned)
-        << i8(this->show_file_operations)
-        << i8(this->show_explorer_0)
-        << i8(this->show_explorer_1)
-        << i8(this->show_explorer_2)
-        << i8(this->show_explorer_3)
-        << i8(this->show_analytics)
-  #if !defined (NDEBUG)
-        << i8(this->show_demo)
-        << i8(this->show_debug_log)
-  #endif
-    ;
-
-    return true;
-  }
-  catch (...) {
-    return false;
-  }
+    catch (...) {
+        return false;
+    }
 }
 
 bool windows_options::load_from_disk() noexcept(true)
 {
-  try {
-    std::ifstream in("data/windows_options.bin", std::ios::binary);
-    if (!in) {
-      return false;
+    try {
+        std::ifstream in("data/windows_options.txt", std::ios::binary);
+        if (!in) {
+            return false;
+        }
+
+        static_assert(i8(1) == i8(true));
+        static_assert(i8(0) == i8(false));
+
+        std::string what = {};
+        what.reserve(100);
+        char bit_ch = 0;
+
+        {
+            in >> what;
+            assert(what == "show_pinned");
+            in >> bit_ch;
+            this->show_pinned = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_file_operations");
+            in >> bit_ch;
+            this->show_file_operations = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_explorer_0");
+            in >> bit_ch;
+            this->show_explorer_0 = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_explorer_1");
+            in >> bit_ch;
+            this->show_explorer_1 = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_explorer_2");
+            in >> bit_ch;
+            this->show_explorer_2 = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_explorer_3");
+            in >> bit_ch;
+            this->show_explorer_3 = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_analytics");
+            in >> bit_ch;
+            this->show_analytics = bit_ch == '1' ? 1 : 0;
+        }
+
+    #if !defined(NDEBUG)
+        {
+            in >> what;
+            assert(what == "show_demo");
+            in >> bit_ch;
+            this->show_demo = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_debug_log");
+            in >> bit_ch;
+            this->show_debug_log = bit_ch == '1' ? 1 : 0;
+        }
+    #endif
+
+        return true;
     }
-
-    static_assert(i8(1) == i8(true));
-    static_assert(i8(0) == i8(false));
-
-    in >> (i8 &)this->show_pinned
-       >> (i8 &)this->show_file_operations
-       >> (i8 &)this->show_explorer_0
-       >> (i8 &)this->show_explorer_1
-       >> (i8 &)this->show_explorer_2
-       >> (i8 &)this->show_explorer_3
-       >> (i8 &)this->show_analytics
-  #if !defined (NDEBUG)
-       >> (i8 &)this->show_demo
-       >> (i8 &)this->show_debug_log
-  #endif
-    ;
-
-    return true;
-  }
-  catch (...) {
-    return false;
-  }
+    catch (...) {
+        return false;
+    }
 }
 
 char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true)
