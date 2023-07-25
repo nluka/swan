@@ -52,13 +52,13 @@ entry = file | directory
 - [x] Automatic refresh
 
 - [x] Copy file
+- [x] Delete file
 - [ ] Copy directory
-- [ ] Delete file
 - [ ] Delete directory
 
 - [ ] Undo copy file
-- [ ] Undo copy directory
 - [ ] Undo delete file
+- [ ] Undo copy directory
 - [ ] Undo delete directory
 
 - [ ] Cut file
@@ -77,11 +77,12 @@ entry = file | directory
 - [ ] Context menu: copy directory path
 - [ ] Context menu: rename directory
 
+- [x] Toggleable auto refresh
+- [x] Adaptive auto refresh (on for small directories, off for large ones)
 - [ ] Create directory
-- [ ] Renaming
-- [ ] Bulk renaming
 - [ ] Handle executable .lnk
 - [ ] Glob filtering
+- [ ] Bulk renaming
 
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview

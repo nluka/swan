@@ -294,6 +294,9 @@ i32 main(i32, char**) try
     explorer_options expl_opts = {};
     if (!expl_opts.load_from_disk()) {
         debug_log("explorer_options::load_from_disk failed, setting defaults");
+        expl_opts.auto_refresh_interval_ms = 1000;
+        expl_opts.adaptive_refresh_threshold = 1000;
+        expl_opts.ref_mode = explorer_options::refresh_mode::adaptive;
         expl_opts.show_dotdot_dir = true;
     #if !defined(NDEBUG)
         expl_opts.show_debug_info = true;
@@ -433,6 +436,31 @@ i32 main(i32, char**) try
 
                     change_made |= ImGui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
 
+                    if (ImGui::BeginMenu("Refreshing")) {
+                        char const *refresh_modes[] = {
+                            "Adaptive",
+                            "Manual",
+                            "Automatic",
+                        };
+
+                        static_assert(lengthof(refresh_modes) == (u64)explorer_options::refresh_mode::count);
+
+                        ImGui::SeparatorText("Mode");
+                        change_made |= ImGui::Combo("##refresh_mode", (i32 *)&expl_opts.ref_mode, refresh_modes, lengthof(refresh_modes));
+
+                        if (expl_opts.ref_mode == explorer_options::refresh_mode::adaptive) {
+                            ImGui::SeparatorText("Threshold (# items)");
+                            change_made |= ImGui::InputInt("##adaptive_refresh_threshold", &expl_opts.adaptive_refresh_threshold, 100, 1000);
+                        }
+
+                        if (expl_opts.ref_mode != explorer_options::refresh_mode::manual) {
+                            ImGui::SeparatorText("Interval (ms)");
+                            change_made |= ImGui::InputInt("##auto_refresh_interval_ms", &expl_opts.auto_refresh_interval_ms, 100, 500);
+                        }
+
+                        ImGui::EndMenu();
+                    }
+
                     ImGui::EndMenu();
 
                     if (change_made) {
@@ -467,9 +495,11 @@ i32 main(i32, char**) try
             render_explorer_window(explorers[3], expl_opts);
         }
 
+    #if !defined(NDEBUG)
         if (win_opts.show_debug_log) {
             render_debug_log_window();
         }
+    #endif
 
         if (win_opts.show_analytics) {
             if (ImGui::Begin("Analytics")) {
