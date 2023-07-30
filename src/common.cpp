@@ -11,8 +11,10 @@
 using namespace swan;
 
 #if defined(NDEBUG)
+bool debug_log_package::s_logging_enabled = false;
 #   define MAX_FILE_OPS 1000
 #else
+bool debug_log_package::s_logging_enabled = true;
 #   define MAX_FILE_OPS 10
 #endif
 

@@ -82,8 +82,17 @@ void sort_cwd_entries(explorer_window &expl, ImGuiTableSortSpecs *sort_specs)
 
     scoped_timer<timer_unit::MICROSECONDS> sort_timer(&expl.sort_us);
 
+    using dir_ent_t = explorer_window::dir_ent;
+
+    // start with a preliminary sort by path.
+    // this ensures no matter the initial state, the final state is always same (deterministic).
+    // necessary for avoiding unexpected movement from a refresh (especially unsightly with auto refresh).
+    std::sort(expl.cwd_entries.begin(), expl.cwd_entries.end(), [](dir_ent_t const &left, dir_ent_t const &right) {
+        return lstrcmpiA(left.basic.path.data(), right.basic.path.data()) < 0;
+    });
+
     // needs to return true when left < right
-    auto compare = [&](explorer_window::dir_ent const &left, explorer_window::dir_ent const &right) {
+    auto compare = [&](dir_ent_t const &left, dir_ent_t const &right) {
         bool left_lt_right = false;
 
         for (i32 i = 0; i < sort_specs->SpecsCount; ++i) {
@@ -166,7 +175,7 @@ bool update_cwd_entries(
     char dir_sep = opts.dir_separator();
 
     explorer_window &expl = *expl_ptr;
-    expl.needs_initial_sort = true;
+    expl.needs_sort = true;
     expl.update_cwd_entries_total_us = 0;
     expl.update_cwd_entries_searchpath_setup_us = 0;
     expl.update_cwd_entries_filesystem_us = 0;
@@ -217,7 +226,7 @@ bool update_cwd_entries(
             if (find_handle == INVALID_HANDLE_VALUE) {
                 debug_log("[%s] find_handle == INVALID_HANDLE_VALUE", expl.name);
                 parent_dir_exists = false;
-                return parent_dir_exists;
+                goto exit;
             } else {
                 parent_dir_exists = true;
             }
@@ -281,6 +290,8 @@ bool update_cwd_entries(
         bool filter_is_blank = expl.filter.data()[0] == '\0';
 
         if (!filter_is_blank) {
+            static std::regex filter_regex;
+
             switch (expl.filter_mode) {
                 default:
                 case explorer_window::filter_mode::contains: {
@@ -293,7 +304,6 @@ bool update_cwd_entries(
                 }
 
                 case explorer_window::filter_mode::regex: {
-                    static std::regex filter_regex;
                     try {
                         scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(&expl.update_cwd_entries_regex_ctor_us);
                         filter_regex = expl.filter.data();
@@ -319,16 +329,40 @@ bool update_cwd_entries(
                     break;
                 }
 
-                // case filter_mode::glob: {
-                //     throw std::runtime_error("not implemented");
+                // case explorer_window::filter_mode::glob: {
+                //     char const *glob_pattern = expl.filter.data();
+                //     std::string translated_regex_str = glob_to_regex_str(glob_pattern);
+
+                //     try {
+                //         scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(&expl.update_cwd_entries_regex_ctor_us);
+                //         filter_regex = expl.filter.data();
+                //     }
+                //     catch (std::exception const &except) {
+                //         debug_log("[%s] error constructing std::regex, %s", expl.name, except.what());
+                //         expl.filter_error = except.what();
+                //         break;
+                //     }
+
+                //     auto match_flags = std::regex_constants::match_default | (
+                //         std::regex_constants::icase * (expl.filter_case_sensitive == 0)
+                //     );
+
+                //     for (auto &dir_ent : expl.cwd_entries) {
+                //         dir_ent.is_filtered_out = !std::regex_match(
+                //             dir_ent.basic.path.data(),
+                //             filter_regex,
+                //             (std::regex_constants::match_flag_type)match_flags
+                //         );
+                //     }
+
                 //     break;
                 // }
             }
         }
     }
 
+exit:
     expl.last_refresh_time = current_time();
-
     return parent_dir_exists;
 }
 
@@ -685,9 +719,9 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         {
             bool refreshed = false; // to avoid refreshing twice in one frame
 
-            auto refresh = [&]() {
+            auto refresh = [&](std::source_location sloc = std::source_location::current()) {
                 if (!refreshed) {
-                    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts, sloc);
                     refreshed = true;
                 }
             };
@@ -708,14 +742,18 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 ImGui::SameLine();
             }
             else {
-                if (!refreshed) {
+                if (!refreshed && cwd_exists_before_edit) {
                     // see if it's time for an automatic refresh
 
                     time_point_t now = current_time();
 
                     i64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
 
-                    if (diff_ms >= max(explorer_options::min_tolerable_refresh_interval_ms, opts.auto_refresh_interval_ms)) {
+                    auto min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
+
+                    if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms)) {
+                        debug_log("[%s] AUTO_REFRESH: diff_ms = %lld, min_refresh_itv_ms = %d, auto_refresh_interval_ms = %d",
+                            expl.name, diff_ms, min_refresh_itv_ms, opts.auto_refresh_interval_ms);
                         refresh();
                     }
                 }
@@ -727,8 +765,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             }
         }
         // end of refresh button, ctrl-r refresh logic, automatic refreshing
-
-
 
         // pin cwd button start
         {
@@ -909,10 +945,14 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             // important that they are all the same length,
             // this assumption is leveraged for calculation of combo box width
-            static char const *filter_modes[explorer_window::filter_mode::count] = {
+            static char const *filter_modes[] = {
                 "Contains",
+                // "Glob    ",
                 "RegExp  ",
             };
+
+            static_assert(lengthof(filter_modes) == (u64)explorer_window::filter_mode::count);
+
             ImVec2 max_dropdown_elem_size = ImGui::CalcTextSize(filter_modes[0]);
 
             ImGui::PushItemWidth(max_dropdown_elem_size.x + 30.f); // some extra for the dropdown button
@@ -956,16 +996,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         // filter text input end
 
         ImGui::TableNextColumn();
-
-        ImGui::BeginDisabled(s_paste_payload.items.empty());
-        if (ImGui::Button("Clear")) {
-            s_paste_payload.items.clear();
-        }
-        ImGui::EndDisabled();
-
-        ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
 
         ImGui::BeginDisabled(expl.num_selected_cwd_entries == 0);
         if (ImGui::Button("Cut")) {
@@ -1029,27 +1059,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         ImGui::EndDisabled();
 
         ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
-
-        {
-            ImGui::BeginDisabled(s_paste_payload.items.empty());
-
-            if (ImGui::Button("Paste into cwd")) {
-                auto op_type = s_paste_payload.keep_src ? file_operation::type::copy : file_operation::type::move;
-
-                for (auto const &paste_item : s_paste_payload.items) {
-                    if (paste_item.type == basic_dir_ent::kind::directory) {
-
-                    }
-                    else {
-                        enqueue_file_op(op_type, paste_item.size, paste_item.path, expl.cwd, dir_separator);
-                    }
-                }
-            }
-
-            ImGui::EndDisabled();
-        }
 
         // paste payload description start
         if (!s_paste_payload.items.empty()) {
@@ -1066,19 +1075,42 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             if (num_dirs > 0) {
                 ImGui::SameLine();
-                ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::directory), "%zuD", num_dirs);
+                ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::directory), "%zud", num_dirs);
             }
             if (num_symlinks > 0) {
                 ImGui::SameLine();
-                ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::symlink), "%zuS", num_symlinks);
+                ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::symlink), "%zus", num_symlinks);
             }
             if (num_files > 0) {
                 ImGui::SameLine();
-                ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::file), "%zuF", num_files);
+                ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::file), "%zuf", num_files);
             }
 
             ImGui::SameLine();
             ImGui::Text("ready to be %s from %s", (s_paste_payload.keep_src ? "copied" : "cut"), s_paste_payload.window_name);
+
+            ImGui::SameLine();
+            ImGui::Spacing();
+            ImGui::SameLine();
+
+            if (ImGui::Button("Paste")) {
+                auto op_type = s_paste_payload.keep_src ? file_operation::type::copy : file_operation::type::move;
+
+                for (auto const &paste_item : s_paste_payload.items) {
+                    if (paste_item.type == basic_dir_ent::kind::directory) {
+
+                    }
+                    else {
+                        enqueue_file_op(op_type, paste_item.size, paste_item.path, expl.cwd, dir_separator);
+                    }
+                }
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("X##Cancel")) {
+                s_paste_payload.items.clear();
+            }
         }
         // paste payload description end
 
@@ -1115,8 +1147,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         // cwd text input end
 
         // clicknav start
-        #if 0
-        if (cwd_exists_after_edit) {
+        if (cwd_exists_before_edit) {
             ImGui::TableNextColumn();
 
             static std::vector<char const *> slices = {};
@@ -1171,7 +1202,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 ImGui::GetStyle().ItemSpacing.x = original_spacing;
             }
         }
-        #endif
         // clicknav end
     }
     ImGui::EndTable();
@@ -1350,10 +1380,10 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 ImGui::TableHeadersRow();
 
                 ImGuiTableSortSpecs *sort_specs = ImGui::TableGetSortSpecs();
-                if (sort_specs != nullptr && (expl.needs_initial_sort || sort_specs->SpecsDirty)) {
+                if (sort_specs != nullptr && (expl.needs_sort || sort_specs->SpecsDirty)) {
                     sort_cwd_entries(expl, sort_specs);
                     sort_specs->SpecsDirty = false;
-                    expl.needs_initial_sort = false;
+                    expl.needs_sort = false;
                 }
 
                 for (u64 i = 0; i < expl.cwd_entries.size(); ++i) {

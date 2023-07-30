@@ -16,8 +16,8 @@ void render_file_ops_window() noexcept(true)
 
     enum file_ops_table_col : i32
     {
-        file_ops_table_col_undo,
-        file_ops_table_col_completed,
+        file_ops_table_col_action,
+        file_ops_table_col_status,
         file_ops_table_col_op_type,
         file_ops_table_col_speed,
         file_ops_table_col_src_path,
@@ -28,8 +28,8 @@ void render_file_ops_window() noexcept(true)
     if (ImGui::BeginTable("Activities", file_ops_table_col_count,
         ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp)
     ) {
-        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_undo);
-        ImGui::TableSetupColumn("Completed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_completed);
+        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_action);
+        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_status);
         ImGui::TableSetupColumn("Op", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
         ImGui::TableSetupColumn("Speed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_speed);
         ImGui::TableSetupColumn("Src", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
@@ -48,11 +48,11 @@ void render_file_ops_window() noexcept(true)
             auto bytes_transferred = file_op.total_bytes_transferred.load();
             auto success = file_op.success;
 
-            if (ImGui::TableSetColumnIndex(file_ops_table_col_undo)) {
+            if (ImGui::TableSetColumnIndex(file_ops_table_col_action)) {
                 ImGui::SmallButton("Undo");
             }
 
-            if (ImGui::TableSetColumnIndex(file_ops_table_col_completed)) {
+            if (ImGui::TableSetColumnIndex(file_ops_table_col_status)) {
                 if (start_time == blank_time) {
                     ImGui::TextUnformatted("Queued");
                 }
@@ -61,10 +61,12 @@ void render_file_ops_window() noexcept(true)
                     ImGui::Text("%.1lf %%", percent_completed);
                 }
                 else if (!success) {
-                    ImGui::TextUnformatted("failed");
+                    auto when_str = compute_when_str(end_time, now);
+                    ImGui::Text("Fail (%s)", when_str.data());
                 }
                 else {
-                    ImGui::TextUnformatted(compute_when_str(end_time, now).data());
+                    auto when_str = compute_when_str(end_time, now);
+                    ImGui::Text("Done (%s)", when_str.data());
                 }
             }
 
@@ -80,7 +82,7 @@ void render_file_ops_window() noexcept(true)
                     || file_op.op_type == file_operation::type::remove // delete operation
                     || (end_time != blank_time && !success) // operation failed
                 ) {
-                    // no speed displayed
+                    ImGui::TextUnformatted("--");
                 }
                 else {
                     u64 ms = compute_diff_ms(start_time, end_time == time_point_t() ? now : end_time);

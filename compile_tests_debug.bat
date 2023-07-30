@@ -4,7 +4,6 @@ src/tests.cpp ^
 /std:c++20 ^
 /nologo ^
 /W4 ^
-/WX ^
 /EHsc ^
 /Fo:obj_debug\ ^
 /Fe:bin\swan_tests_debug.exe ^
