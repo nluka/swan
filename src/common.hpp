@@ -6,6 +6,7 @@
 #include <string>
 #include <source_location>
 #include <atomic>
+#include <string_view>
 
 #include <boost/circular_buffer.hpp>
 
@@ -118,6 +119,8 @@ struct basic_dir_ent
     }
 };
 
+typedef std::array<char, 256> static_cstr_256_t;
+
 struct explorer_window
 {
     struct dir_ent
@@ -177,9 +180,9 @@ struct explorer_window
     swan::path_t prev_valid_cwd = {};
     swan::path_t cwd = {}; // current working directory, persisted in file
     swan::path_t cwd_last_frame = {};
-    std::array<char, 256> filter = {}; // persisted in file
+    static_cstr_256_t filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
-    bool needs_initial_sort = true;
+    bool needs_sort = true;
 };
 
 struct file_operation
@@ -308,6 +311,7 @@ struct debug_log_package {
     std::source_location loc;
     time_point_t time;
     static ImGuiTextBuffer s_debug_buffer;
+    static bool s_logging_enabled;
 
     debug_log_package(char const *f, std::source_location l = std::source_location::current()) noexcept(true)
         : fmt(f)
@@ -325,7 +329,10 @@ struct debug_log_package {
 template <typename... Args>
 void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args)
 {
-// #if !defined(NDEBUG)
+    if (!debug_log_package::s_logging_enabled) {
+        return;
+    }
+
     auto &debug_buffer = debug_log_package::s_debug_buffer;
     u64 const max_size = 1024 * 1024 * 10;
 
@@ -340,7 +347,6 @@ void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&.
     debug_buffer.appendf("%21s:%5d ", just_the_file_name, pack.loc.line());
     debug_buffer.appendf(pack.fmt, args...);
     debug_buffer.append("\n");
-// #endif
 }
 
 #endif // SWAN_COMMON_HPP

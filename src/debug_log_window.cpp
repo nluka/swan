@@ -26,20 +26,27 @@ void render_debug_log_window() noexcept(true)
 
         ImGui::SameLine();
 
+        ImGui::BeginDisabled(true);
         if (ImGui::Button("Save to file")) {
             // debug_log_package::clear_buffer();
         }
+        ImGui::EndDisabled();
 
-        // second line
+        same_line_with_spacing();
 
-        bool jump_to_bottom = ImGui::ArrowButton("Bottom", ImGuiDir_Down);
+        ImGui::Checkbox("Logging Enabled", &debug_log_package::s_logging_enabled);
 
         same_line_with_spacing();
 
         ImGui::Checkbox("Auto-scroll at bottom", &auto_scroll);
 
+        // second line
+        bool jump_to_bottom = ImGui::ArrowButton("Bottom", ImGuiDir_Down);
+
         ImGui::Spacing();
         ImGui::Separator();
+
+        // third line
 
         if (ImGui::BeginChild("debug_log_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar)) {
             auto const &debug_buffer = debug_log_package::s_debug_buffer;

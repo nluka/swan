@@ -93,21 +93,10 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     std::array<char, 64> out = {};
 
     i64 ms_diff = compute_diff_ms(start, end);
-    // i64 ten_seconds = 10'000;
-    // i64 thirty_seconds = 30'000;
     i64 one_minute = 60'000;
     i64 one_hour = one_minute * 60;
     i64 one_day = one_hour * 24;
 
-    // if (ms_diff < ten_seconds) {
-    //     strncpy(out.data(), "just now", out.size());
-    // }
-    // else if (ms_diff < thirty_seconds) {
-    //      strncpy(out.data(), "< 30 sec ago", out.size());
-    // }
-    // else if (ms_diff < one_minute) {
-    //     strncpy(out.data(), "< 1 minute ago", out.size());
-    // }
     if (ms_diff < one_minute) {
         strncpy(out.data(), "just now", out.size());
     }
@@ -122,6 +111,30 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     else {
         u64 days = u64(ms_diff / one_day);
         snprintf(out.data(), out.size(), "%zu day%s ago", days, days == 1 ? "" : "s");
+    }
+
+    return out;
+}
+
+std::string glob_to_regex_str(std::string_view pattern) noexcept(true)
+{
+    std::string out = {};
+    {
+        f64 twenty_percent_f = f64(pattern.length()) * 0.2;
+        u64 twenty_percent = u64(twenty_percent_f);
+        out.reserve(pattern.length() + twenty_percent);
+    }
+
+    for (char ch : pattern) {
+        if (ch == '*') {
+            out += ".*";
+        }
+        else if (ch == '.') {
+            out += "\\.";
+        }
+        else {
+            out += ch;
+        }
     }
 
     return out;
