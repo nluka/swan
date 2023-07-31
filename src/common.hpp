@@ -250,29 +250,6 @@ struct file_operation
     }
 };
 
-struct file_op_progress_callback_user_data
-{
-    file_operation *file_op = nullptr;
-};
-
-DWORD file_op_progress_callback(
-    LARGE_INTEGER total_file_size,
-    LARGE_INTEGER total_bytes_transferred,
-    LARGE_INTEGER steam_size,
-    LARGE_INTEGER steam_bytes_transferred,
-    DWORD stream_num,
-    DWORD callback_reason,
-    HANDLE src_handle,
-    HANDLE dest_handle,
-    void *user_data) noexcept(true);
-
-bool enqueue_file_op(
-    file_operation::type op_type,
-    u64 file_size,
-    swan::path_t const &file_path,
-    swan::path_t const &dest_path,
-    char dir_separator) noexcept(true);
-
 boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept(true);
 
 constexpr u8 const query_filesystem = 1 << 0;
@@ -303,8 +280,6 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true);
 u64 find_pin_idx(swan::path_t const &) noexcept(true);
 
 char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true);
-
-bool query_directory_entries(std::vector<basic_dir_ent> &entries, swan::path_t dir_path) noexcept(true);
 
 struct debug_log_package {
     char const *fmt;

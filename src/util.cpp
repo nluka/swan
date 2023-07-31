@@ -116,28 +116,4 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     return out;
 }
 
-std::string glob_to_regex_str(std::string_view pattern) noexcept(true)
-{
-    std::string out = {};
-    {
-        f64 twenty_percent_f = f64(pattern.length()) * 0.2;
-        u64 twenty_percent = u64(twenty_percent_f);
-        out.reserve(pattern.length() + twenty_percent);
-    }
-
-    for (char ch : pattern) {
-        if (ch == '*') {
-            out += ".*";
-        }
-        else if (ch == '.') {
-            out += "\\.";
-        }
-        else {
-            out += ch;
-        }
-    }
-
-    return out;
-}
-
 #endif // SWAN_UTIL_CPP

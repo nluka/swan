@@ -140,47 +140,6 @@ void set_window_icon(GLFWwindow *window)
 }
 
 static
-bool init_windows_shell_com_garbage()
-{
-    // COM has to be one of the dumbest things I've ever seen...
-    // what's wrong with just having some functions? Why on earth does this stuff need to be OO?
-
-    // Initialize COM library
-    HRESULT com_handle = CoInitialize(nullptr);
-    if (FAILED(com_handle)) {
-        debug_log("CoInitialize failed");
-        return false;
-    }
-
-    // Create an instance of IShellLinkA
-    com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkA, (LPVOID *)&s_shell_link);
-    if (FAILED(com_handle)) {
-        debug_log("CoCreateInstance failed");
-        CoUninitialize();
-        return false;
-    }
-
-    // Query IPersistFile interface from IShellLinkA
-    com_handle = s_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&s_persist_file_interface);
-    if (FAILED(com_handle)) {
-        debug_log("failed to query IPersistFile interface");
-        s_persist_file_interface->Release();
-        CoUninitialize();
-        return false;
-    }
-
-    return true;
-}
-
-static
-void cleanup_windows_shell_com_garbage()
-{
-    s_persist_file_interface->Release();
-    s_shell_link->Release();
-    CoUninitialize();
-}
-
-static
 void render(GLFWwindow *window)
 {
     ImGui::Render();

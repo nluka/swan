@@ -29,6 +29,50 @@
 
 using namespace swan;
 
+static IShellLinkA *s_shell_link = nullptr;
+static IPersistFile *s_persist_file_interface = nullptr;
+
+static
+bool init_windows_shell_com_garbage()
+{
+    // COM has to be one of the dumbest things I've ever seen...
+    // what's wrong with just having some functions? Why on earth does this stuff need to be OO?
+
+    // Initialize COM library
+    HRESULT com_handle = CoInitialize(nullptr);
+    if (FAILED(com_handle)) {
+        debug_log("CoInitialize failed");
+        return false;
+    }
+
+    // Create an instance of IShellLinkA
+    com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkA, (LPVOID *)&s_shell_link);
+    if (FAILED(com_handle)) {
+        debug_log("CoCreateInstance failed");
+        CoUninitialize();
+        return false;
+    }
+
+    // Query IPersistFile interface from IShellLinkA
+    com_handle = s_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&s_persist_file_interface);
+    if (FAILED(com_handle)) {
+        debug_log("failed to query IPersistFile interface");
+        s_persist_file_interface->Release();
+        CoUninitialize();
+        return false;
+    }
+
+    return true;
+}
+
+static
+void cleanup_windows_shell_com_garbage()
+{
+    s_persist_file_interface->Release();
+    s_shell_link->Release();
+    CoUninitialize();
+}
+
 struct paste_payload
 {
     struct item
@@ -44,8 +88,6 @@ struct paste_payload
     bool keep_src = {};
 };
 
-static IShellLinkA *s_shell_link = nullptr;
-static IPersistFile *s_persist_file_interface = nullptr;
 static paste_payload s_paste_payload = {};
 
 static
@@ -62,7 +104,7 @@ std::pair<i32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
     return { length, buffer };
 }
 
-enum cwd_entries_table_col_id : ImGuiID
+enum cwd_entries_table_col : ImGuiID
 {
     cwd_entries_table_col_number,
     cwd_entries_table_col_id,
@@ -328,35 +370,6 @@ bool update_cwd_entries(
 
                     break;
                 }
-
-                // case explorer_window::filter_mode::glob: {
-                //     char const *glob_pattern = expl.filter.data();
-                //     std::string translated_regex_str = glob_to_regex_str(glob_pattern);
-
-                //     try {
-                //         scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(&expl.update_cwd_entries_regex_ctor_us);
-                //         filter_regex = expl.filter.data();
-                //     }
-                //     catch (std::exception const &except) {
-                //         debug_log("[%s] error constructing std::regex, %s", expl.name, except.what());
-                //         expl.filter_error = except.what();
-                //         break;
-                //     }
-
-                //     auto match_flags = std::regex_constants::match_default | (
-                //         std::regex_constants::icase * (expl.filter_case_sensitive == 0)
-                //     );
-
-                //     for (auto &dir_ent : expl.cwd_entries) {
-                //         dir_ent.is_filtered_out = !std::regex_match(
-                //             dir_ent.basic.path.data(),
-                //             filter_regex,
-                //             (std::regex_constants::match_flag_type)match_flags
-                //         );
-                //     }
-
-                //     break;
-                // }
             }
         }
     }
@@ -947,7 +960,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             // this assumption is leveraged for calculation of combo box width
             static char const *filter_modes[] = {
                 "Contains",
-                // "Glob    ",
                 "RegExp  ",
             };
 
@@ -1041,20 +1053,22 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
         ImGui::BeginDisabled(expl.num_selected_cwd_entries == 0);
         if (ImGui::Button("Delete")) {
-            s_paste_payload.window_name = expl.name;
-            s_paste_payload.items.clear();
-            s_paste_payload.keep_src = false;
+            // TODO: setup IFileOperation
 
             for (auto const &dir_ent : expl.cwd_entries) {
-                if (dir_ent.is_selected) {
-                    path_t src = expl.cwd;
-                    if (path_append(src, dir_ent.basic.path.data(), dir_separator, true)) {
-                        enqueue_file_op(file_operation::type::remove, dir_ent.basic.size, src, {}, dir_separator);
-                    } else {
-                        // error
-                    }
+                if (!dir_ent.is_selected) {
+                    continue;
+                }
+
+                if (dir_ent.basic.is_directory()) {
+                    // delete directory
+                }
+                else {
+                    // delete file
                 }
             }
+
+            // TODO: cleanup IFIleOperation
         }
         ImGui::EndDisabled();
 
@@ -1094,16 +1108,30 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             ImGui::SameLine();
 
             if (ImGui::Button("Paste")) {
-                auto op_type = s_paste_payload.keep_src ? file_operation::type::copy : file_operation::type::move;
+                bool keep_src = s_paste_payload.keep_src;
+
+                // TODO: setup IFileOperation
 
                 for (auto const &paste_item : s_paste_payload.items) {
                     if (paste_item.type == basic_dir_ent::kind::directory) {
-
+                        if (keep_src) {
+                            // copy directory
+                        }
+                        else {
+                            // move directory
+                        }
                     }
                     else {
-                        enqueue_file_op(op_type, paste_item.size, paste_item.path, expl.cwd, dir_separator);
+                        if (keep_src) {
+                            // copy file
+                        }
+                        else {
+                            // move file
+                        }
                     }
                 }
+
+                // TODO: cleanup IFIleOperation
             }
 
             ImGui::SameLine();
@@ -1593,3 +1621,60 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 }
 
 #endif // SWAN_EXPLORER_WINDOW_CPP
+
+// HRESULT handle = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+// if (FAILED(handle)) {
+//     goto end_paste;
+// }
+
+// IFileOperation *file_op = NULL;
+// handle = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
+// if (FAILED(handle)) {
+//     CoUninitialize();
+//     goto end_paste;
+// }
+
+// // Set the operation flags
+// handle = file_op->SetOperationFlags(FOF_NOCONFIRMATION | FOFX_NOCOPYHOOKS);
+// if (FAILED(handle)) {
+//     file_op->Release();
+//     CoUninitialize();
+//     goto end_paste;
+// }
+
+// // Set the destination directory
+// IShellItem* psiTo = NULL;
+// hr = SHCreateItemFromParsingName(destinationDir.c_str(), NULL, IID_PPV_ARGS(&psiTo));
+// if (FAILED(hr)) {
+//     psiFrom->Release();
+//     pfo->Release();
+//     CoUninitialize();
+//     return false;
+// }
+
+// // Add the move operation
+// hr = pfo->MoveItem(psiFrom, psiTo, NULL, NULL);
+// if (FAILED(hr)) {
+//     psiTo->Release();
+//     psiFrom->Release();
+//     pfo->Release();
+//     CoUninitialize();
+//     return false;
+// }
+
+// // Perform the operation
+// hr = pfo->PerformOperations();
+// if (FAILED(hr)) {
+//     psiTo->Release();
+//     psiFrom->Release();
+//     pfo->Release();
+//     CoUninitialize();
+//     return false;
+// }
+
+// psiTo->Release();
+// psiFrom->Release();
+// pfo->Release();
+// CoUninitialize();
+// return true;

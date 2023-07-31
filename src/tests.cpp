@@ -317,28 +317,6 @@ i32 main()
   }
   #endif
 
-  // glob_to_regex_str
-  #if 1
-  {
-    ntest::assert_stdstr("source\\.cpp", glob_to_regex_str("source.cpp"));
-    ntest::assert_stdstr("source\\.\\.\\.cpp", glob_to_regex_str("source...cpp"));
-    ntest::assert_stdstr(".*\\.cpp", glob_to_regex_str("*.cpp"));
-
-    // ntest::assert_stdstr("", glob_to_regex_str(""));
-    // ntest::assert_stdstr("a", glob_to_regex_str("a"));
-    // ntest::assert_stdstr("^exact_match$", glob_to_regex_str("exact_match"));
-    // ntest::assert_stdstr("ab", glob_to_regex_str("a?b"));
-    // ntest::assert_stdstr("a.*b", glob_to_regex_str("a*b"));
-    // ntest::assert_stdstr("a[0-9]b", glob_to_regex_str("a[0-9]b"));
-    // ntest::assert_stdstr("a[^0-9]b", glob_to_regex_str("a[!0-9]b"));
-    // ntest::assert_stdstr("a\\[b", glob_to_regex_str("a\\[b"));
-    // ntest::assert_stdstr("a[0-9]b[ab]c", glob_to_regex_str("a[0-9]b?[ab]c"));
-    // ntest::assert_stdstr("^a[0-9]b.c$", glob_to_regex_str("^a[0-9]b?c$"));
-    // ntest::assert_stdstr("abcd.*.efgh", glob_to_regex_str("abcd.*.efgh"));
-    // ntest::assert_stdstr("a.*.*.*.b", glob_to_regex_str("a****b"));
-  }
-  #endif
-
   //
   #if 1
   {
