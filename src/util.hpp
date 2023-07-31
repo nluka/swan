@@ -39,6 +39,4 @@ void seed_fast_rand(u64) noexcept(true);
 
 u64 fast_rand(u64 min, u64 max) noexcept(true);
 
-std::string glob_to_regex_str(std::string_view pattern) noexcept(true);
-
 #endif // SWAN_UTIL_HPP

@@ -26,11 +26,12 @@ void render_debug_log_window() noexcept(true)
 
         ImGui::SameLine();
 
+    #if 0
         ImGui::BeginDisabled(true);
         if (ImGui::Button("Save to file")) {
-            // debug_log_package::clear_buffer();
         }
         ImGui::EndDisabled();
+    #endif
 
         same_line_with_spacing();
 
