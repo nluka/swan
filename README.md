@@ -76,6 +76,7 @@ entry = file | directory
 - [ ] Context menu: copy directory name
 - [ ] Context menu: copy directory path
 - [ ] Context menu: rename directory
+- [ ] Context menu: custom commands
 
 - [x] Toggleable auto refresh
 - [x] Adaptive auto refresh (on for small directories, off for large ones)

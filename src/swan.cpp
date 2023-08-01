@@ -22,6 +22,7 @@
 #include "explorer_window.cpp"
 #include "file_ops_window.cpp"
 #include "debug_log_window.cpp"
+#include "unicode_test_window.cpp"
 
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers
@@ -85,10 +86,22 @@ GLFWwindow *init_glfw_and_imgui()
     }
 
     {
-        f32 base_font_size = 15.0f;
-        // f32 icon_font_size = base_font_size * 1;
+        ImFontConfig config;
+        config.MergeMode = true;
 
-        [[maybe_unused]] auto font = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/consola.ttf", base_font_size);
+        ImFont *font = nullptr;
+
+        font = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/arialuni.ttf", 20.0f);
+        assert(font != nullptr);
+
+        font = io.Fonts->AddFontFromFileTTF("data/CascadiaMono.ttf", 17.0f, &config, io.Fonts->GetGlyphRangesCyrillic());
+        assert(font != nullptr);
+
+        // font = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/consola.ttf", base_font_size);
+        // assert(font != nullptr);
+
+        // [[maybe_unused]] f32 base_font_size = 15.0f;
+        // f32 icon_font_size = base_font_size * 1;
 
         // {
         //     static ImWchar const icons_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
@@ -107,8 +120,6 @@ GLFWwindow *init_glfw_and_imgui()
         //     icons_config.GlyphMinAdvanceX = icon_font_size;
         //     io.Fonts->AddFontFromFileTTF("data/" FONT_ICON_FILE_NAME_MD, icon_font_size, &icons_config, icons_ranges);
         // }
-
-        io.Fonts->AddFontDefault();
     }
 
     return window;
@@ -414,6 +425,8 @@ i32 main(i32, char**) try
             ImGui::ShowDemoWindow();
         }
     #endif
+
+        render_unicode_test_window();
 
         render(window);
     }
