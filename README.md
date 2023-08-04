@@ -68,14 +68,9 @@ entry = file | directory
 
 - [ ] Persist file operations history
 
-- [ ] Context menu: copy file name
-- [ ] Context menu: copy file name no ext
-- [ ] Context menu: copy file path
-- [ ] Context menu: copy file path no ext
-- [ ] Context menu: rename file
-- [ ] Context menu: copy directory name
-- [ ] Context menu: copy directory path
-- [ ] Context menu: rename directory
+- [x] Context menu: copy name
+- [x] Context menu: copy path
+- [ ] Context menu: rename
 - [ ] Context menu: custom commands
 
 - [x] Toggleable auto refresh
@@ -85,5 +80,6 @@ entry = file | directory
 - [ ] Glob filtering
 - [ ] Bulk renaming
 
+- [ ] Unicode
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview

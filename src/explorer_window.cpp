@@ -1396,6 +1396,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             }
             else if (ImGui::BeginTable("cwd_entries", cwd_entries_table_col_count,
                 ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable
+                // ImVec2(-1, ImGui::GetContentRegionAvail().y)
             )) {
                 ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, cwd_entries_table_col_number);
                 ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_id);
@@ -1413,6 +1414,8 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     sort_specs->SpecsDirty = false;
                     expl.needs_sort = false;
                 }
+
+                static explorer_window::dir_ent const *right_clicked_ent = nullptr;
 
                 for (u64 i = 0; i < expl.cwd_entries.size(); ++i) {
                     auto &dir_ent = expl.cwd_entries[i];
@@ -1542,10 +1545,18 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
                             last_click_time = current_time;
                             expl.cwd_prev_selected_dirent_idx = i;
+
+                        } // ImGui::Selectable
+
+                        if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && strcmp("..", dir_ent.basic.path.data()) != 0) {
+                            debug_log("[%s] right clicked [%s]", expl.name, dir_ent.basic.path.data());
+                            ImGui::OpenPopup("Context");
+                            right_clicked_ent = &dir_ent;
                         }
 
                         ImGui::PopStyleColor();
-                    }
+
+                    } // path col
 
                     if (ImGui::TableSetColumnIndex(cwd_entries_table_col_type)) {
                         if (dir_ent.basic.is_directory()) {
@@ -1590,10 +1601,36 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     }
 
                     expl.num_selected_cwd_entries += u64(dir_ent.is_selected);
+
+                } // cwd_entries loop
+
+                if (ImGui::IsPopupOpen("Context")) {
+                    ImGui::BeginPopup("Context");
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, right_clicked_ent->basic.get_color());
+                    ImGui::SeparatorText(right_clicked_ent->basic.path.data());
+                    ImGui::PopStyleColor();
+
+                    bool is_directory = right_clicked_ent->basic.is_directory();
+
+                    if (ImGui::Selectable("Copy name")) {
+                        ImGui::SetClipboardText(right_clicked_ent->basic.path.data());
+                    }
+                    if (ImGui::Selectable("Copy path")) {
+                        path_t full_path = path_create(expl.cwd.data());
+                        if (!path_append(full_path, right_clicked_ent->basic.path.data(), dir_separator, true)) {
+                            // error
+                        } else {
+                            ImGui::SetClipboardText(full_path.data());
+                        }
+                    }
+
+                    ImGui::EndPopup();
                 }
 
                 ImGui::EndTable();
             }
+
             if (ImGui::IsItemHovered() && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A)) {
                 // select all cwd entries when hovering over the table and pressing Ctrl-a
                 for (auto &dir_ent2 : expl.cwd_entries)
