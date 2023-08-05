@@ -21,11 +21,7 @@
 #include "util.hpp"
 #include "path.hpp"
 
-#if defined(NDEBUG)
-#   define MAX_EXPLORER_WD_HISTORY 100
-#else
-#   define MAX_EXPLORER_WD_HISTORY 5 // something small for easier debugging
-#endif
+#define MAX_EXPLORER_WD_HISTORY 15
 
 using namespace swan;
 
@@ -677,9 +673,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
     // debug info start
     if (opts.show_debug_info) {
-        ImGui::SeparatorText("DEBUG");
-        ImGui::Spacing();
-
         auto calc_perc_total_time = [&expl](f64 time) {
             return time == 0.f
                 ? 0.f
@@ -687,43 +680,72 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         };
 
         ImGui::Text("prev_valid_cwd = [%s]", expl.prev_valid_cwd.data());
-        ImGui::Text("num_file_finds = %zu", expl.num_file_finds);
-        ImGui::Text("cwd_prev_selected_dirent_idx = %lld", expl.cwd_prev_selected_dirent_idx);
-        ImGui::Text("num_selected_cwd_entries = %zu", expl.num_selected_cwd_entries);
-        ImGui::Text("latest_save_to_disk_result = %d", expl.latest_save_to_disk_result);
-        ImGui::Text("sort_us = %.1lf", expl.sort_us);
-        ImGui::Text("unpin_us = %.1lf", expl.unpin_us);
-        ImGui::Text("save_to_disk_us = %.1lf", expl.save_to_disk_us);
 
-        ImGui::Spacing();
-        ImGui::SeparatorText("update_cwd_entries timings");
-        ImGui::Spacing();
+        if (ImGui::BeginTable("timers", 3, ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_Resizable)) {
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("misc. state");
+            ImGui::Text("num_file_finds");
+            ImGui::Text("cwd_prev_selected_dirent_idx");
+            ImGui::Text("num_selected_cwd_entries");
+            ImGui::Text("latest_save_to_disk_result");
 
-        ImGui::Text("total_us            : %9.1lf (%.1lf ms)",
-             expl.update_cwd_entries_total_us,
-             expl.update_cwd_entries_total_us / 1000.f);
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("");
+            ImGui::Text("%zu", expl.num_file_finds);
+            ImGui::Text("%lld", expl.cwd_prev_selected_dirent_idx);
+            ImGui::Text("%zu", expl.num_selected_cwd_entries);
+            ImGui::Text("%d", expl.latest_save_to_disk_result);
 
-        ImGui::Text("searchpath_setup_us : %9.1lf (%4.1lf %%)",
-            expl.update_cwd_entries_searchpath_setup_us,
-            calc_perc_total_time(expl.update_cwd_entries_searchpath_setup_us));
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("");
 
-        ImGui::Text("filesystem_us       : %9.1lf (%4.1lf %%)",
-            expl.update_cwd_entries_filesystem_us,
-            calc_perc_total_time(expl.update_cwd_entries_filesystem_us));
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("update_cwd_entries timers");
+            ImGui::TextUnformatted("total_us");
+            ImGui::TextUnformatted("searchpath_setup_us");
+            ImGui::TextUnformatted("filesystem_us");
+            ImGui::TextUnformatted("filter_us");
+            ImGui::TextUnformatted("regex_ctor_us");
 
-        ImGui::Text("filter_us           : %9.1lf (%4.1lf %%)",
-            expl.update_cwd_entries_filter_us,
-            calc_perc_total_time(expl.update_cwd_entries_filter_us));
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("");
+            ImGui::Text("%.1lf", expl.update_cwd_entries_total_us);
+            ImGui::Text("%.1lf", expl.update_cwd_entries_searchpath_setup_us);
+            ImGui::Text("%.1lf", expl.update_cwd_entries_filesystem_us);
+            ImGui::Text("%.1lf", expl.update_cwd_entries_filter_us);
+            ImGui::Text("%.1lf", expl.update_cwd_entries_regex_ctor_us);
 
-        ImGui::Text("regex_ctor_us       : %9.1lf",
-            expl.update_cwd_entries_regex_ctor_us);
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("");
+            ImGui::Text("%.1lf ms", expl.update_cwd_entries_total_us / 1000.f);
+            ImGui::Text("%.1lf %%", calc_perc_total_time(expl.update_cwd_entries_searchpath_setup_us));
+            ImGui::Text("%.1lf %%", calc_perc_total_time(expl.update_cwd_entries_filesystem_us));
+            ImGui::Text("%.1lf %%", calc_perc_total_time(expl.update_cwd_entries_filter_us));
+            ImGui::Text("%.1lf %%", calc_perc_total_time(expl.update_cwd_entries_regex_ctor_us));
 
-        ImGui::Spacing();
-        ImGui::SeparatorText("DEBUG end");
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("other timers");
+            ImGui::TextUnformatted("sort_us");
+            ImGui::TextUnformatted("unpin_us");
+            ImGui::TextUnformatted("save_to_disk_us");
+
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("");
+            ImGui::Text("%.1lf", expl.sort_us);
+            ImGui::Text("%.1lf", expl.unpin_us);
+            ImGui::Text("%.1lf", expl.save_to_disk_us);
+
+            ImGui::TableNextColumn();
+            ImGui::SeparatorText("");
+
+            ImGui::EndTable();
+        }
     }
     // debug info end
 
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 15.f));
+    ImGui::Spacing();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 10.f));
     if (ImGui::BeginTable("first_3_control_rows", 1, ImGuiTableFlags_SizingFixedFit)) {
 
         ImGui::TableNextColumn();
@@ -806,7 +828,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 debug_log("save_pins_to_disk result = %d", result);
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(" \n Click here to %s the current working directory. \n ",
+                ImGui::SetTooltip(" Click here to %s the current working directory. ",
                     already_pinned ? "unpin" : "pin");
             }
 
@@ -967,7 +989,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             ImVec2 max_dropdown_elem_size = ImGui::CalcTextSize(filter_modes[0]);
 
-            ImGui::PushItemWidth(max_dropdown_elem_size.x + 30.f); // some extra for the dropdown button
+            ImGui::PushItemWidth(max_dropdown_elem_size.x + 35.f); // some extra for the dropdown button
             ImGui::Combo("##filter_mode", (i32 *)(&expl.filter_mode), filter_modes, lengthof(filter_modes));
             ImGui::PopItemWidth();
         }
@@ -983,9 +1005,9 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             }
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip(
-                    " \n Toggle filter case sensitivity \n\n"
-                    " i: %sinsensitive%s \n"
-                    " s: %ssensitive  %s \n ",
+                    " Toggle filter case sensitivity \n"
+                    " %sinsensitive%s \n"
+                    " %ssensitive%s ",
                     !expl.filter_case_sensitive ? "[" : " ", !expl.filter_case_sensitive ? "]" : " ",
                     expl.filter_case_sensitive ? "[" : " ", expl.filter_case_sensitive ? "]" : " ");
             }
@@ -1443,8 +1465,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                 // entry was selected but Ctrl was not held, so deselect everything
                                 for (auto &dir_ent2 : expl.cwd_entries)
                                     dir_ent2.is_selected = false;
-
-                                // expl.num_selected_cwd_entries = 0;
                             }
 
                             flip_bool(dir_ent.is_selected);
@@ -1611,7 +1631,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     ImGui::SeparatorText(right_clicked_ent->basic.path.data());
                     ImGui::PopStyleColor();
 
-                    bool is_directory = right_clicked_ent->basic.is_directory();
+                    // bool is_directory = right_clicked_ent->basic.is_directory();
 
                     if (ImGui::Selectable("Copy name")) {
                         ImGui::SetClipboardText(right_clicked_ent->basic.path.data());
