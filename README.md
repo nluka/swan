@@ -70,18 +70,20 @@ entry = file | directory
 
 - [x] Context menu: copy name
 - [x] Context menu: copy path
+- [x] Context menu: reveal in File Explorer
 - [ ] Context menu: rename
 - [ ] Context menu: custom commands
 
 - [x] Toggleable auto refresh
 - [x] Adaptive auto refresh (on for small directories, off for large ones)
+- [x] Unicode
+- [x] Handle executable .lnk
 - [ ] Create directory
 - [ ] Create file
-- [x] Handle executable .lnk
-- [x] Reveal in File Explorer
-- [ ] Glob filtering
 - [ ] Bulk renaming
+- [ ] Basic drive info
 
-- [x] Unicode
+- [ ] Create shortcut
+- [ ] Glob filtering
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview
