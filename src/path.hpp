@@ -9,7 +9,7 @@
 
 namespace swan {
 
-  typedef std::array<char, MAX_PATH> path_t;
+  typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> path_t;
 
   path_t path_create(char const *data) noexcept(true);
 

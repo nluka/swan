@@ -281,6 +281,8 @@ u64 find_pin_idx(swan::path_t const &) noexcept(true);
 
 char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true);
 
+std::string get_last_error_string() noexcept(true);
+
 struct debug_log_package {
     char const *fmt;
     std::source_location loc;
