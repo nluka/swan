@@ -428,6 +428,8 @@ bool explorer_window::save_to_disk() const noexcept(true)
     }
 
     debug_log("[%s] save attempted, result: %d", file_name, result);
+    this->latest_save_to_disk_result = (i8)result;
+
     return result;
 }
 
@@ -570,11 +572,13 @@ void try_ascend_directory(explorer_window &expl, explorer_options const &opts)
     // remove anything between end and final separator
     while (path_pop_back_if_not(cwd, dir_separator));
 
-    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+    (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
 
     new_history_from(expl, expl.cwd);
     expl.cwd_prev_selected_dirent_idx = explorer_window::NO_SELECTION;
     expl.filter_error.clear();
+
+    (void) expl.save_to_disk();
 }
 
 void try_descend_to_directory(explorer_window &expl, char const *child_dir, explorer_options const &opts)
@@ -586,12 +590,14 @@ void try_descend_to_directory(explorer_window &expl, char const *child_dir, expl
         if (PathCanonicalizeA(new_cwd.data(), expl.cwd.data())) {
             debug_log("[%s] PathCanonicalizeA success: new_cwd = [%s]", expl.name, new_cwd.data());
 
-            update_cwd_entries(full_refresh, &expl, new_cwd.data(), opts);
+            (void) update_cwd_entries(full_refresh, &expl, new_cwd.data(), opts);
 
             new_history_from(expl, new_cwd);
             expl.cwd = new_cwd;
             expl.cwd_prev_selected_dirent_idx = explorer_window::NO_SELECTION;
             expl.filter_error.clear();
+
+            (void) expl.save_to_disk();
         }
         else {
             debug_log("[%s] PathCanonicalizeA failed", expl.name);
@@ -649,7 +655,7 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
                 expl.prev_valid_cwd = expl.cwd;
             }
 
-            expl.latest_save_to_disk_result = (i8)expl.save_to_disk();
+            (void) expl.save_to_disk();
         }
     }
 
@@ -761,6 +767,8 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
     // debug info end
 
     ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
 
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 10.f));
     if (ImGui::BeginTable("first_3_control_rows", 1, ImGuiTableFlags_SizingFixedFit)) {
@@ -773,7 +781,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             auto refresh = [&](std::source_location sloc = std::source_location::current()) {
                 if (!refreshed) {
-                    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts, sloc);
+                    (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts, sloc);
                     refreshed = true;
                 }
             };
@@ -887,7 +895,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 }
 
                 expl.cwd = expl.wd_history[expl.wd_history_pos];
-                update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
             }
 
             ImGui::EndDisabled();
@@ -914,7 +922,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 }
 
                 expl.cwd = expl.wd_history[expl.wd_history_pos];
-                update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
             }
 
             ImGui::EndDisabled();
@@ -974,7 +982,8 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     if (ImGui::Selectable(buffer, false)) {
                         expl.wd_history_pos = i;
                         expl.cwd = expl.wd_history[i];
-                        update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                        (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                        (void) expl.save_to_disk();
                     }
                 }
 
@@ -1014,7 +1023,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         {
             if (ImGui::Button(expl.filter_case_sensitive ? "s" : "i")) {
                 flip_bool(expl.filter_case_sensitive);
-                update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
+                (void) update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
             }
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip(
@@ -1036,7 +1045,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 ImGui::CalcTextSize("123456789012345").x
             ));
             if (ImGui::InputTextWithHint("##filter", "Filter", expl.filter.data(), expl.filter.size())) {
-                update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
+                (void) update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
             }
             ImGui::PopItemWidth();
         }
@@ -1210,7 +1219,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         // cwd text input end
 
         // clicknav start
-        if (cwd_exists_before_edit) {
+        if (cwd_exists_before_edit && !path_is_empty(expl.cwd)) {
             ImGui::TableNextColumn();
 
             static std::vector<char const *> slices = {};
@@ -1247,7 +1256,8 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 if (ImGui::Button(*slice_it)) {
                     debug_log("[%s] clicked slice [%s]", expl.name, *slice_it);
                     cd_to_slice(*slice_it);
-                    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                    (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                    (void) expl.save_to_disk();
                 }
                 ImGui::GetStyle().ItemSpacing.x = 2;
                 ImGui::SameLine();
@@ -1258,7 +1268,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             if (ImGui::Button(slices.back())) {
                 debug_log("[%s] clicked slice [%s]", expl.name, slices.back());
                 cd_to_slice(slices.back());
-                update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
             }
 
             if (slices.size() > 1) {
@@ -1411,8 +1421,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         ImGui::Spacing();
         ImGui::Spacing();
     #endif
-        // ImGui::SeparatorText("Directory contents");
-
         expl.num_selected_cwd_entries = 0; // will get computed as we render cwd_entries table
 
         if (ImGui::BeginChild("cwd_entries_child", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
@@ -1420,7 +1428,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 if (ImGui::Button("Clear filter")) {
                     debug_log("[%s] clear filter button pressed", expl.name);
                     expl.filter[0] = '\0';
-                    update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
+                    (void) update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
                 }
 
                 ImGui::SameLine();
@@ -1607,7 +1615,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                         // shortcut to a directory, let's navigate there
 
                                         expl.cwd = symlink_target_path_utf8;
-                                        update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                                        (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
                                     }
                                     else {
                                         // shortcut to a file, let's open it
@@ -1746,7 +1754,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                             ImGui::TextUnformatted("dir");
                         }
                         else if (dir_ent.basic.is_symlink()) {
-                            ImGui::TextUnformatted("symlink");
+                            ImGui::TextUnformatted("link");
                         }
                         else {
                             ImGui::TextUnformatted("file");
