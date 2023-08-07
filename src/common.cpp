@@ -360,3 +360,36 @@ char const *get_just_file_name(char const *std__source_location__file_path) noex
 
     return just_the_file_name;
 }
+
+std::string get_last_error_string() noexcept(true)
+{
+    DWORD error_code = GetLastError();
+    if (error_code == 0) {
+        return "No error.";
+    }
+
+    LPSTR buffer = nullptr;
+    DWORD buffer_size = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr,
+        error_code,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPSTR>(&buffer),
+        0,
+        nullptr
+    );
+
+    if (buffer_size == 0) {
+        return "Error formatting message.";
+    }
+
+    std::string error_message(buffer, buffer + buffer_size);
+    LocalFree(buffer);
+
+    // Remove trailing newline characters
+    while (!error_message.empty() && (error_message.back() == '\r' || error_message.back() == '\n')) {
+        error_message.pop_back();
+    }
+
+    return error_message;
+}

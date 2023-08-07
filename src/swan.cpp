@@ -424,9 +424,9 @@ i32 main(i32, char**) try
         if (win_opts.show_demo) {
             ImGui::ShowDemoWindow();
         }
-    #endif
 
         render_unicode_test_window();
+    #endif
 
         render(window);
     }

@@ -3,6 +3,7 @@
 
 #include <regex>
 #include <fstream>
+#include <iostream>
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -25,7 +26,7 @@
 
 using namespace swan;
 
-static IShellLinkA *s_shell_link = nullptr;
+static IShellLinkW *s_shell_link = nullptr;
 static IPersistFile *s_persist_file_interface = nullptr;
 
 static
@@ -204,9 +205,9 @@ bool update_cwd_entries(
     debug_log("[%s] update_cwd_entries() called from [%s:%d]",
         expl_ptr->name, get_just_file_name(sloc.file_name()), sloc.line());
 
-    scoped_timer<timer_unit::MICROSECONDS> function_timer(&expl_ptr->update_cwd_entries_total_us);
-
     IM_ASSERT(expl_ptr != nullptr);
+
+    scoped_timer<timer_unit::MICROSECONDS> function_timer(&expl_ptr->update_cwd_entries_total_us);
 
     bool parent_dir_exists = false;
 
@@ -239,25 +240,37 @@ bool update_cwd_entries(
         }
 
         if (parent_dir != "") {
-            static std::string search_path{};
+            wchar_t search_path[512] = {};
             {
                 scoped_timer<timer_unit::MICROSECONDS> search_path_timer(&expl.update_cwd_entries_searchpath_setup_us);
 
-                search_path.reserve(parent_dir.size() + 2);
-                search_path = parent_dir;
+                MultiByteToWideChar(CP_UTF8, 0,
+                                    parent_dir.data(), (i32)parent_dir.size(),
+                                    search_path, (i32)lengthof(search_path));
 
-                if (!search_path.ends_with(dir_sep)) {
-                    search_path += dir_sep;
+                wchar_t dir_sep_w[] = { (wchar_t)dir_sep, L'\0' };
+
+                if (!parent_dir.ends_with(dir_sep)) {
+                    (void) StrCatW(search_path, dir_sep_w);
                 }
-                search_path += '*';
+                (void) StrCatW(search_path, L"*");
             }
 
-            debug_log("[%s] querying filesystem, search_path = [%s]", expl.name, search_path.c_str());
+            {
+                char buffer[2048] = {};
+
+                WideCharToMultiByte(CP_UTF8, 0,
+                                    search_path, (i32)wcslen(search_path),
+                                    buffer, (i32)lengthof(buffer),
+                                    "!", nullptr);
+
+                debug_log("[%s] querying filesystem, search_path = [%s]", expl.name, buffer);
+            }
 
             scoped_timer<timer_unit::MICROSECONDS> filesystem_timer(&expl.update_cwd_entries_filesystem_us);
 
-            WIN32_FIND_DATAA find_data;
-            HANDLE find_handle = FindFirstFileA(search_path.data(), &find_data);
+            WIN32_FIND_DATAW find_data;
+            HANDLE find_handle = FindFirstFileW(search_path, &find_data);
 
             auto find_handle_cleanup_routine = make_on_scope_exit([&find_handle] { FindClose(find_handle); });
 
@@ -274,10 +287,14 @@ bool update_cwd_entries(
             do {
                 explorer_window::dir_ent entry = {};
                 entry.basic.id = id;
-                std::strncpy(entry.basic.path.data(), find_data.cFileName, entry.basic.path.size());
                 entry.basic.size = two_u32_to_one_u64(find_data.nFileSizeLow, find_data.nFileSizeHigh);
                 entry.basic.creation_time_raw = find_data.ftCreationTime;
                 entry.basic.last_write_time_raw = find_data.ftLastWriteTime;
+
+                WideCharToMultiByte(CP_UTF8, 0,
+                                    find_data.cFileName, (i32)wcslen(find_data.cFileName),
+                                    entry.basic.path.data(), (i32)entry.basic.path.size(),
+                                    "!", nullptr);
 
                 if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                     entry.basic.type = basic_dir_ent::kind::directory;
@@ -312,7 +329,7 @@ bool update_cwd_entries(
                 ++expl.num_file_finds;
                 ++id;
             }
-            while (FindNextFileA(find_handle, &find_data));
+            while (FindNextFileW(find_handle, &find_data));
         }
     }
 
@@ -787,8 +804,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     auto min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
 
                     if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms)) {
-                        debug_log("[%s] AUTO_REFRESH: diff_ms = %lld, min_refresh_itv_ms = %d, auto_refresh_interval_ms = %d",
-                            expl.name, diff_ms, min_refresh_itv_ms, opts.auto_refresh_interval_ms);
+                        debug_log("[%s] auto refresh, diff_ms = %lld", expl.name, diff_ms);
                         refresh();
                     }
                 }
@@ -975,9 +991,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
         // filter type start
         {
-            ImGui::Text("filter:");
-            ImGui::SameLine();
-
             // important that they are all the same length,
             // this assumption is leveraged for calculation of combo box width
             static char const *filter_modes[] = {
@@ -1022,7 +1035,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 ImGui::CalcTextSize(expl.filter.data()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f,
                 ImGui::CalcTextSize("123456789012345").x
             ));
-            if (ImGui::InputText("##filter", expl.filter.data(), expl.filter.size())) {
+            if (ImGui::InputTextWithHint("##filter", "Filter", expl.filter.data(), expl.filter.size())) {
                 update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
             }
             ImGui::PopItemWidth();
@@ -1512,35 +1525,150 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                     }
                                 }
                                 else if (dir_ent.basic.is_symlink()) {
-                                    char const *lnk_file_path = dir_ent.basic.path.data();
-                                    debug_log("[%s] double clicked link [%s]", expl.name, lnk_file_path);
+                                    path_t symlink_self_path_utf8 = expl.cwd;
+                                    path_t symlink_target_path_utf8 = {};
+                                    wchar_t symlink_self_path_utf16[512] = {};
+                                    wchar_t symlink_target_path_utf16[512] = {};
+                                    char working_dir[512] = {};
+                                    wchar_t working_dir_utf16[512] = {};
+                                    wchar_t command_line[2048] = {};
+                                    i32 show_command = SW_SHOWNORMAL;
+                                    HRESULT com_handle = {};
+                                    HINSTANCE result = {};
+                                    LPITEMIDLIST item_id_list = nullptr;
+                                    intptr_t err_code = {};
+                                    i32 utf_written = {};
 
-                                    path_t shortcut_path = {};
+                                    if (!path_append(symlink_self_path_utf8, dir_ent.basic.path.data(), dir_separator, true)) {
+                                        debug_log("[%s] path_append(symlink_self_path_utf8, dir_ent.basic.path.data() failed", expl.name);
+                                        goto symlink_end;
+                                    }
 
-                                    // Load the .lnk file
-                                    MultiByteToWideChar(CP_ACP, 0, lnk_file_path, -1, reinterpret_cast<LPWSTR>(shortcut_path.data()), (i32)shortcut_path.size());
-                                    HRESULT com_handle = s_persist_file_interface->Load(reinterpret_cast<LPCOLESTR>(shortcut_path.data()), 0);
+                                    debug_log("[%s] double clicked link [%s]", expl.name, symlink_self_path_utf8);
 
-                                    if (FAILED(com_handle)) {
-                                        debug_log("[%s] failed to load file [%s]", expl.name, lnk_file_path);
+                                    utf_written = MultiByteToWideChar(
+                                        CP_UTF8, 0,
+                                        symlink_self_path_utf8.data(), (i32)path_length(symlink_self_path_utf8),
+                                        symlink_self_path_utf16,       (i32)lengthof(symlink_self_path_utf16)
+                                    );
+
+                                    if (utf_written == 0) {
+                                        debug_log("[%s] MultiByteToWideChar failed", expl.name);
+                                        goto symlink_end;
                                     } else {
-                                        LPITEMIDLIST pidl;
-                                        com_handle = s_shell_link->GetIDList(&pidl);
-                                        if (FAILED(com_handle)) {
-                                            debug_log("[%s] failed to GetPath from [%s]", expl.name, lnk_file_path);
-                                            goto symlink_end;
-                                        }
+                                        debug_log("[%s] MultiByteToWideChar wrote %d characters", expl.name, utf_written);
+                                        std::wcout << "symlink_self_path_utf16 = [" << symlink_self_path_utf16 << "]\n";
+                                    }
 
-                                        path_t link_wd = {};
-                                        if (!SHGetPathFromIDListA(pidl, link_wd.data())) {
-                                            debug_log("[%s] failed to SHGetPathFromIDList from [%s]", expl.name, lnk_file_path);
-                                            goto symlink_end;
-                                        }
+                                    com_handle = s_persist_file_interface->Load(symlink_self_path_utf16, STGM_READ);
 
-                                        debug_log("[%s] link dest = [%s]", expl.name, link_wd.data());
+                                    if (com_handle != S_OK) {
+                                        debug_log("[%s] s_persist_file_interface->Load [%s] failed: %s", expl.name, symlink_self_path_utf8, get_last_error_string().c_str());
+                                        goto symlink_end;
+                                    } else {
+                                        std::wcout << "s_persist_file_interface->Load [" << symlink_self_path_utf16 << "]\n";
+                                    }
 
-                                        expl.cwd = link_wd;
+                                    com_handle = s_shell_link->GetIDList(&item_id_list);
+
+                                    if (com_handle != S_OK) {
+                                        debug_log("[%s] s_shell_link->GetIDList failed: %s", expl.name, get_last_error_string().c_str());
+                                        goto symlink_end;
+                                    }
+
+                                    if (!SHGetPathFromIDListW(item_id_list, symlink_target_path_utf16)) {
+                                        debug_log("[%s] SHGetPathFromIDListW failed: %s", expl.name, get_last_error_string().c_str());
+                                        goto symlink_end;
+                                    } else {
+                                        std::wcout << "symlink_target_path_utf16 = [" << symlink_target_path_utf16 << "]\n";
+                                    }
+
+                                    if (com_handle != S_OK) {
+                                        debug_log("[%s] s_shell_link->GetPath failed: %s", expl.name, get_last_error_string().c_str());
+                                        goto symlink_end;
+                                    }
+
+                                    utf_written = WideCharToMultiByte(
+                                        CP_UTF8, 0,
+                                        symlink_target_path_utf16,       (i32)wcslen(symlink_target_path_utf16),
+                                        symlink_target_path_utf8.data(), (i32)symlink_target_path_utf8.size(),
+                                        "!", nullptr
+                                    );
+
+                                    if (utf_written == 0) {
+                                        debug_log("[%s] WideCharToMultiByte failed", expl.name);
+                                        goto symlink_end;
+                                    } else {
+                                        debug_log("[%s] WideCharToMultiByte wrote %d characters", expl.name, utf_written);
+                                        debug_log("[%s] symlink_target_path_utf8 = [%s]", expl.name, symlink_target_path_utf8.data());
+                                    }
+
+                                    if (directory_exists(symlink_target_path_utf8.data())) {
+                                        // shortcut to a directory, let's navigate there
+
+                                        expl.cwd = symlink_target_path_utf8;
                                         update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                                    }
+                                    else {
+                                        // shortcut to a file, let's open it
+
+                                        // GetWorkingDirectory takes a (wchar_t *) but writes data as if it were ASCII... no idea why
+                                        com_handle = s_shell_link->GetWorkingDirectory((wchar_t *)working_dir, lengthof(working_dir));
+
+                                        if (com_handle != S_OK) {
+                                            debug_log("[%s] s_shell_link->GetWorkingDirectory failed: %s", expl.name, get_last_error_string().c_str());
+                                            goto symlink_end;
+                                        } else {
+                                            std::wcout << "s_shell_link->GetWorkingDirectory [" << working_dir << "]\n";
+                                        }
+
+                                        utf_written = MultiByteToWideChar(
+                                            CP_UTF8, 0,
+                                            working_dir,       (i32)strlen(working_dir),
+                                            working_dir_utf16, (i32)lengthof(working_dir_utf16)
+                                        );
+
+                                        if (utf_written == 0) {
+                                            debug_log("[%s] MultiByteToWideChar failed: working_dir -> working_dir_utf16", expl.name);
+                                            goto symlink_end;
+                                        } else {
+                                            debug_log("[%s] MultiByteToWideChar wrote %d characters (working_dir -> working_dir_utf16)", expl.name, utf_written);
+                                        }
+
+                                        // ! not sure if this is correct, might be the same situation as GetWorkingDirectory,
+                                        // ! but I don't have a way of testing this as of now...
+                                        com_handle = s_shell_link->GetArguments(command_line, lengthof(command_line));
+
+                                        if (com_handle != S_OK) {
+                                            debug_log("[%s] s_shell_link->GetArguments failed: %s", expl.name, get_last_error_string().c_str());
+                                            goto symlink_end;
+                                        } else {
+                                            std::wcout << "s_shell_link->GetArguments [" << command_line << "]\n";
+                                        }
+
+                                        com_handle = s_shell_link->GetShowCmd(&show_command);
+
+                                        if (com_handle != S_OK) {
+                                            debug_log("[%s] s_shell_link->GetShowCmd failed: %s", expl.name, get_last_error_string().c_str());
+                                            goto symlink_end;
+                                        } else {
+                                            std::wcout << "s_shell_link->GetShowCmd [" << show_command << "]\n";
+                                        }
+
+                                        result = ShellExecuteW(nullptr, L"open", symlink_target_path_utf16,
+                                                               command_line, working_dir_utf16, show_command);
+
+                                        err_code = (intptr_t)result;
+
+                                        if (err_code > HINSTANCE_ERROR) {
+                                            debug_log("[%s] ShellExecuteW success", expl.name);
+                                        } else if (err_code == SE_ERR_NOASSOC) {
+                                            debug_log("[%s] ShellExecuteW: SE_ERR_NOASSOC", expl.name);
+                                        } else if (err_code == SE_ERR_FNF) {
+                                            debug_log("[%s] ShellExecuteW: SE_ERR_FNF", expl.name);
+                                        } else {
+                                            debug_log("[%s] ShellExecuteW: some sort of error", expl.name);
+                                        }
                                     }
 
                                     symlink_end:;
@@ -1548,15 +1676,50 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                 else {
                                     debug_log("[%s] double clicked file [%s]", expl.name, dir_ent.basic.path.data());
 
-                                    path_t target_full_path = expl.cwd;
+                                    path_t target_full_path_utf8 = expl.cwd;
 
-                                    if (path_append(target_full_path, dir_ent.basic.path.data(), opts.dir_separator(), true)) {
-                                        debug_log("[%s] target_full_path = [%s]", expl.name, target_full_path.data());
-                                        [[maybe_unused]] HINSTANCE result = ShellExecuteA(nullptr, "open", target_full_path.data(), nullptr, nullptr, SW_SHOWNORMAL);
-                                    }
-                                    else {
+                                    bool app_success = path_append(target_full_path_utf8, dir_ent.basic.path.data(), dir_separator, true);
+
+                                    if (!app_success) {
                                         debug_log("[%s] path_append failed, cwd = [%s], append data = [\\%s]", expl.name, expl.cwd.data(), dir_ent.basic.path.data());
                                     }
+                                    else {
+                                        wchar_t target_full_path_utf16[512] = {};
+                                        i32 utf_written = {};
+                                        HINSTANCE result = {};
+                                        intptr_t ec = {};
+
+                                        utf_written = MultiByteToWideChar(
+                                            CP_UTF8, 0,
+                                            target_full_path_utf8.data(), (i32)path_length(target_full_path_utf8),
+                                            target_full_path_utf16,       (i32)lengthof(target_full_path_utf16)
+                                        );
+
+                                        if (utf_written == 0) {
+                                            debug_log("[%s] MultiByteToWideChar failed: target_full_path_utf8 -> target_full_path_utf16", expl.name);
+                                            goto dbl_click_file_end;
+                                        }
+
+                                        debug_log("[%s] MultiByteToWideChar wrote %d characters (target_full_path_utf8 -> target_full_path_utf16)", expl.name, utf_written);
+                                        debug_log("[%s] target_full_path = [%s]", expl.name, target_full_path_utf8.data());
+
+                                        result = ShellExecuteW(nullptr, L"open", target_full_path_utf16,
+                                                               nullptr, nullptr, SW_SHOWNORMAL);
+
+                                        ec = (intptr_t)result;
+
+                                        if (ec > HINSTANCE_ERROR) {
+                                            debug_log("[%s] ShellExecuteW success", expl.name);
+                                        } else if (ec == SE_ERR_NOASSOC) {
+                                            debug_log("[%s] ShellExecuteW: SE_ERR_NOASSOC", expl.name);
+                                        } else if (ec == SE_ERR_FNF) {
+                                            debug_log("[%s] ShellExecuteW: SE_ERR_FNF", expl.name);
+                                        } else {
+                                            debug_log("[%s] ShellExecuteW: some sort of error", expl.name);
+                                        }
+                                    }
+
+                                    dbl_click_file_end:;
                                 }
                             }
                             else {
