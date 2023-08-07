@@ -116,4 +116,18 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     return out;
 }
 
+i32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept(true)
+{
+    i32 chars_written = MultiByteToWideChar(CP_UTF8, 0, utf8_text, -1, utf16_text, (i32)utf16_text_capacity);
+
+    return chars_written;
+}
+
+i32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept(true)
+{
+    i32 chars_written = WideCharToMultiByte(CP_UTF8, 0, utf16_text, -1, utf8_text, (i32)utf8_text_capacity, "!", nullptr);
+
+    return chars_written;
+}
+
 #endif // SWAN_UTIL_CPP

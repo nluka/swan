@@ -111,7 +111,7 @@ GLFWwindow *init_glfw_and_imgui()
         assert(font != nullptr);
     #endif
 
-        font = io.Fonts->AddFontFromFileTTF("data/CascadiaMono.ttf", 17.0f, &config, io.Fonts->GetGlyphRangesCyrillic());
+        font = io.Fonts->AddFontFromFileTTF("data/CascadiaMonoPL.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesCyrillic());
         assert(font != nullptr);
 
     #if 0

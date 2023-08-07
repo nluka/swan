@@ -42,15 +42,13 @@ bool init_windows_shell_com_garbage()
         return false;
     }
 
-    // Create an instance of IShellLinkA
-    com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkA, (LPVOID *)&s_shell_link);
+    com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&s_shell_link);
     if (FAILED(com_handle)) {
         debug_log("CoCreateInstance failed");
         CoUninitialize();
         return false;
     }
 
-    // Query IPersistFile interface from IShellLinkA
     com_handle = s_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&s_persist_file_interface);
     if (FAILED(com_handle)) {
         debug_log("failed to query IPersistFile interface");
@@ -91,7 +89,7 @@ static
 std::pair<i32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept(true)
 {
     std::array<char, 64> buffer = {};
-    DWORD flags = FDTF_LONGDATE | FDTF_LONGTIME | FDTF_RELATIVE | FDTF_LTRDATE;
+    DWORD flags = FDTF_SHORTDATE | FDTF_SHORTTIME;
     i32 length = SHFormatDateTimeA(time, &flags, buffer.data(), (u32)buffer.size());
 
     // for some reason, SHFormatDateTimeA will pad parts of the string with ASCII 63 (?)
@@ -240,37 +238,33 @@ bool update_cwd_entries(
         }
 
         if (parent_dir != "") {
-            wchar_t search_path[512] = {};
+            wchar_t search_path_utf16[512] = {};
             {
                 scoped_timer<timer_unit::MICROSECONDS> search_path_timer(&expl.update_cwd_entries_searchpath_setup_us);
 
-                MultiByteToWideChar(CP_UTF8, 0,
-                                    parent_dir.data(), (i32)parent_dir.size(),
-                                    search_path, (i32)lengthof(search_path));
+                utf8_to_utf16(parent_dir.data(), search_path_utf16, lengthof(search_path_utf16));
 
                 wchar_t dir_sep_w[] = { (wchar_t)dir_sep, L'\0' };
 
                 if (!parent_dir.ends_with(dir_sep)) {
-                    (void) StrCatW(search_path, dir_sep_w);
+                    (void) StrCatW(search_path_utf16, dir_sep_w);
                 }
-                (void) StrCatW(search_path, L"*");
+                (void) StrCatW(search_path_utf16, L"*");
             }
 
             {
-                char buffer[2048] = {};
+                char utf8_buffer[2048] = {};
 
-                WideCharToMultiByte(CP_UTF8, 0,
-                                    search_path, (i32)wcslen(search_path),
-                                    buffer, (i32)lengthof(buffer),
-                                    "!", nullptr);
+                u64 utf_written = utf16_to_utf8(search_path_utf16,  utf8_buffer, lengthof(utf8_buffer));
+                // TODO: check utf_written
 
-                debug_log("[%s] querying filesystem, search_path = [%s]", expl.name, buffer);
+                debug_log("[%s] querying filesystem, search_path = [%s]", expl.name, utf8_buffer);
             }
 
             scoped_timer<timer_unit::MICROSECONDS> filesystem_timer(&expl.update_cwd_entries_filesystem_us);
 
             WIN32_FIND_DATAW find_data;
-            HANDLE find_handle = FindFirstFileW(search_path, &find_data);
+            HANDLE find_handle = FindFirstFileW(search_path_utf16, &find_data);
 
             auto find_handle_cleanup_routine = make_on_scope_exit([&find_handle] { FindClose(find_handle); });
 
@@ -291,10 +285,10 @@ bool update_cwd_entries(
                 entry.basic.creation_time_raw = find_data.ftCreationTime;
                 entry.basic.last_write_time_raw = find_data.ftLastWriteTime;
 
-                WideCharToMultiByte(CP_UTF8, 0,
-                                    find_data.cFileName, (i32)wcslen(find_data.cFileName),
-                                    entry.basic.path.data(), (i32)entry.basic.path.size(),
-                                    "!", nullptr);
+                {
+                    u64 utf_written = utf16_to_utf8(find_data.cFileName, entry.basic.path.data(), entry.basic.path.size());
+                    // TODO: check utf_written
+                }
 
                 if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                     entry.basic.type = basic_dir_ent::kind::directory;
@@ -613,7 +607,7 @@ struct cwd_text_input_callback_user_data
 {
     explorer_window *expl_ptr;
     explorer_options *opts_ptr;
-    wchar_t dir_separator_w;
+    wchar_t dir_sep_utf16;
 };
 
 i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
@@ -627,7 +621,7 @@ i32 cwd_text_input_callback(ImGuiInputTextCallbackData *data)
 
     if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter) {
         if (is_separator(data->EventChar)) {
-            data->EventChar = user_data->dir_separator_w;
+            data->EventChar = user_data->dir_sep_utf16;
         }
         else {
             static wchar_t const *forbidden_chars = L"<>\"|?*";
@@ -669,17 +663,17 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         return;
     }
 
-    static ImVec4 const orange(1, 0.5f, 0, 1);
-    static ImVec4 const red(1, 0.2f, 0, 1);
+    ImVec4 const orange(1, 0.5f, 0, 1);
+    ImVec4 const red(1, 0.2f, 0, 1);
 
     auto &io = ImGui::GetIO();
     bool window_focused = ImGui::IsWindowFocused();
 
     bool cwd_exists_before_edit = directory_exists(expl.cwd.data());
-    char dir_separator = opts.unix_directory_separator ? '/' : '\\';
-    wchar_t dir_separator_w = opts.unix_directory_separator ? L'/' : L'\\';
+    char dir_sep_utf8 = opts.dir_separator();
+    wchar_t dir_sep_utf16 = dir_sep_utf8;
 
-    path_force_separator(expl.cwd, dir_separator);
+    path_force_separator(expl.cwd, dir_sep_utf8);
 
     // handle enter key pressed on cwd entry
     if (window_focused && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
@@ -846,7 +840,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     unpin(pin_idx);
                 }
                 else {
-                    (void) pin(expl.cwd, dir_separator);
+                    (void) pin(expl.cwd, dir_sep_utf8);
                 }
                 bool result = save_pins_to_disk();
                 debug_log("save_pins_to_disk result = %d", result);
@@ -1011,7 +1005,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             ImVec2 max_dropdown_elem_size = ImGui::CalcTextSize(filter_modes[0]);
 
-            ImGui::PushItemWidth(max_dropdown_elem_size.x + 35.f); // some extra for the dropdown button
+            ImGui::PushItemWidth(max_dropdown_elem_size.x + 30.f); // some extra for the dropdown button
             ImGui::Combo("##filter_mode", (i32 *)(&expl.filter_mode), filter_modes, lengthof(filter_modes));
             ImGui::PopItemWidth();
         }
@@ -1046,12 +1040,61 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             ));
             if (ImGui::InputTextWithHint("##filter", "Filter", expl.filter.data(), expl.filter.size())) {
                 (void) update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
+                (void) expl.save_to_disk();
             }
             ImGui::PopItemWidth();
         }
         // filter text input end
 
         ImGui::TableNextColumn();
+
+        if (ImGui::Button("+dir")) {
+            ImGui::OpenPopup("Create directory");
+        }
+        if (ImGui::IsPopupOpen("Create directory") && ImGui::BeginPopupModal("Create directory", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Spacing();
+
+            ImGui::Spacing();
+
+            static char buffer[256] = {};
+            // set initial focus on input text below
+            if (ImGui::IsWindowAppearing() && !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)) {
+                ImGui::SetKeyboardFocusHere(0);
+            }
+            ImGui::InputTextWithHint("##dir_name_input", "Directory name...", buffer, lengthof(buffer));
+
+            ImGui::Spacing();
+
+            if (ImGui::Button("Create")) {
+
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Cancel")) {
+                ImGui::CloseCurrentPopup();
+            }
+
+            if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::SameLine();
+
+        // if (ImGui::Button("+file")) {
+
+        // }
+
+        ImGui::SameLine();
+        ImGui::Spacing();
+        ImGui::SameLine();
+
+        ImGui::Text("Bulk ops:");
+        ImGui::SameLine();
 
         ImGui::BeginDisabled(expl.num_selected_cwd_entries == 0);
         if (ImGui::Button("Cut")) {
@@ -1062,7 +1105,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             for (auto const &dir_ent : expl.cwd_entries) {
                 if (dir_ent.is_selected) {
                     path_t src = expl.cwd;
-                    if (path_append(src, dir_ent.basic.path.data(), dir_separator, true)) {
+                    if (path_append(src, dir_ent.basic.path.data(), dir_sep_utf8, true)) {
                         s_paste_payload.items.push_back({ dir_ent.basic.size, dir_ent.basic.type, src });
                     } else {
                         // error
@@ -1083,7 +1126,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             for (auto const &dir_ent : expl.cwd_entries) {
                 if (dir_ent.is_selected) {
                     path_t src = expl.cwd;
-                    if (path_append(src, dir_ent.basic.path.data(), dir_separator, true)) {
+                    if (path_append(src, dir_ent.basic.path.data(), dir_sep_utf8, true)) {
                         s_paste_payload.items.push_back({ dir_ent.basic.size, dir_ent.basic.type, src });
                     } else {
                         // error
@@ -1193,7 +1236,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             cwd_text_input_callback_user_data user_data;
             user_data.expl_ptr = &expl;
             user_data.opts_ptr = &opts;
-            user_data.dir_separator_w = dir_separator_w;
+            user_data.dir_sep_utf16 = dir_sep_utf16;
 
             ImGui::PushItemWidth(
                 max(ImGui::CalcTextSize(expl.cwd.data()).x + (ImGui::GetStyle().FramePadding.x * 2),
@@ -1261,7 +1304,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 }
                 ImGui::GetStyle().ItemSpacing.x = 2;
                 ImGui::SameLine();
-                ImGui::Text("%c", dir_separator);
+                ImGui::Text("%c", dir_sep_utf8);
                 ImGui::SameLine();
             }
 
@@ -1519,8 +1562,10 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
                             static f64 last_click_time = 0;
                             f64 current_time = ImGui::GetTime();
+                            f64 seconds_between_clicks = current_time - last_click_time;
+                            f64 const double_click_window_sec = 0.3;
 
-                            if (current_time - last_click_time <= 0.2) {
+                            if (seconds_between_clicks <= double_click_window_sec) {
                                 if (dir_ent.basic.is_directory()) {
                                     debug_log("[%s] double clicked directory [%s]", expl.name, dir_ent.basic.path.data());
 
@@ -1535,11 +1580,10 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                 else if (dir_ent.basic.is_symlink()) {
                                     path_t symlink_self_path_utf8 = expl.cwd;
                                     path_t symlink_target_path_utf8 = {};
-                                    wchar_t symlink_self_path_utf16[512] = {};
-                                    wchar_t symlink_target_path_utf16[512] = {};
-                                    char working_dir[512] = {};
-                                    wchar_t working_dir_utf16[512] = {};
-                                    wchar_t command_line[2048] = {};
+                                    wchar_t symlink_self_path_utf16[MAX_PATH] = {};
+                                    wchar_t symlink_target_path_utf16[MAX_PATH] = {};
+                                    wchar_t working_dir_utf16[MAX_PATH] = {};
+                                    wchar_t command_line_utf16[2048] = {};
                                     i32 show_command = SW_SHOWNORMAL;
                                     HRESULT com_handle = {};
                                     HINSTANCE result = {};
@@ -1547,24 +1591,20 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                     intptr_t err_code = {};
                                     i32 utf_written = {};
 
-                                    if (!path_append(symlink_self_path_utf8, dir_ent.basic.path.data(), dir_separator, true)) {
+                                    if (!path_append(symlink_self_path_utf8, dir_ent.basic.path.data(), dir_sep_utf8, true)) {
                                         debug_log("[%s] path_append(symlink_self_path_utf8, dir_ent.basic.path.data() failed", expl.name);
                                         goto symlink_end;
                                     }
 
                                     debug_log("[%s] double clicked link [%s]", expl.name, symlink_self_path_utf8);
 
-                                    utf_written = MultiByteToWideChar(
-                                        CP_UTF8, 0,
-                                        symlink_self_path_utf8.data(), (i32)path_length(symlink_self_path_utf8),
-                                        symlink_self_path_utf16,       (i32)lengthof(symlink_self_path_utf16)
-                                    );
+                                    utf_written = utf8_to_utf16(symlink_self_path_utf8.data(), symlink_self_path_utf16, lengthof(symlink_self_path_utf16));
 
                                     if (utf_written == 0) {
-                                        debug_log("[%s] MultiByteToWideChar failed", expl.name);
+                                        debug_log("[%s] utf8_to_utf16 failed: symlink_self_path_utf8 -> symlink_self_path_utf16", expl.name);
                                         goto symlink_end;
                                     } else {
-                                        debug_log("[%s] MultiByteToWideChar wrote %d characters", expl.name, utf_written);
+                                        debug_log("[%s] utf8_to_utf16 wrote %d characters", expl.name, utf_written);
                                         std::wcout << "symlink_self_path_utf16 = [" << symlink_self_path_utf16 << "]\n";
                                     }
 
@@ -1596,18 +1636,13 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                         goto symlink_end;
                                     }
 
-                                    utf_written = WideCharToMultiByte(
-                                        CP_UTF8, 0,
-                                        symlink_target_path_utf16,       (i32)wcslen(symlink_target_path_utf16),
-                                        symlink_target_path_utf8.data(), (i32)symlink_target_path_utf8.size(),
-                                        "!", nullptr
-                                    );
+                                    utf_written = utf16_to_utf8(symlink_target_path_utf16, symlink_target_path_utf8.data(), symlink_target_path_utf8.size());
 
                                     if (utf_written == 0) {
-                                        debug_log("[%s] WideCharToMultiByte failed", expl.name);
+                                        debug_log("[%s] utf16_to_utf8 failed", expl.name);
                                         goto symlink_end;
                                     } else {
-                                        debug_log("[%s] WideCharToMultiByte wrote %d characters", expl.name, utf_written);
+                                        debug_log("[%s] utf16_to_utf8 wrote %d characters", expl.name, utf_written);
                                         debug_log("[%s] symlink_target_path_utf8 = [%s]", expl.name, symlink_target_path_utf8.data());
                                     }
 
@@ -1620,38 +1655,22 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                     else {
                                         // shortcut to a file, let's open it
 
-                                        // GetWorkingDirectory takes a (wchar_t *) but writes data as if it were ASCII... no idea why
-                                        com_handle = s_shell_link->GetWorkingDirectory((wchar_t *)working_dir, lengthof(working_dir));
+                                        com_handle = s_shell_link->GetWorkingDirectory(working_dir_utf16, lengthof(working_dir_utf16));
 
                                         if (com_handle != S_OK) {
                                             debug_log("[%s] s_shell_link->GetWorkingDirectory failed: %s", expl.name, get_last_error_string().c_str());
                                             goto symlink_end;
                                         } else {
-                                            std::wcout << "s_shell_link->GetWorkingDirectory [" << working_dir << "]\n";
+                                            std::wcout << "s_shell_link->GetWorkingDirectory [" << working_dir_utf16 << "]\n";
                                         }
 
-                                        utf_written = MultiByteToWideChar(
-                                            CP_UTF8, 0,
-                                            working_dir,       (i32)strlen(working_dir),
-                                            working_dir_utf16, (i32)lengthof(working_dir_utf16)
-                                        );
-
-                                        if (utf_written == 0) {
-                                            debug_log("[%s] MultiByteToWideChar failed: working_dir -> working_dir_utf16", expl.name);
-                                            goto symlink_end;
-                                        } else {
-                                            debug_log("[%s] MultiByteToWideChar wrote %d characters (working_dir -> working_dir_utf16)", expl.name, utf_written);
-                                        }
-
-                                        // ! not sure if this is correct, might be the same situation as GetWorkingDirectory,
-                                        // ! but I don't have a way of testing this as of now...
-                                        com_handle = s_shell_link->GetArguments(command_line, lengthof(command_line));
+                                        com_handle = s_shell_link->GetArguments(command_line_utf16, lengthof(command_line_utf16));
 
                                         if (com_handle != S_OK) {
                                             debug_log("[%s] s_shell_link->GetArguments failed: %s", expl.name, get_last_error_string().c_str());
                                             goto symlink_end;
                                         } else {
-                                            std::wcout << "s_shell_link->GetArguments [" << command_line << "]\n";
+                                            std::wcout << "s_shell_link->GetArguments [" << command_line_utf16 << "]\n";
                                         }
 
                                         com_handle = s_shell_link->GetShowCmd(&show_command);
@@ -1664,18 +1683,18 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                                         }
 
                                         result = ShellExecuteW(nullptr, L"open", symlink_target_path_utf16,
-                                                               command_line, working_dir_utf16, show_command);
+                                                               command_line_utf16, working_dir_utf16, show_command);
 
                                         err_code = (intptr_t)result;
 
                                         if (err_code > HINSTANCE_ERROR) {
                                             debug_log("[%s] ShellExecuteW success", expl.name);
                                         } else if (err_code == SE_ERR_NOASSOC) {
-                                            debug_log("[%s] ShellExecuteW: SE_ERR_NOASSOC", expl.name);
+                                            debug_log("[%s] ShellExecuteW error: SE_ERR_NOASSOC", expl.name);
                                         } else if (err_code == SE_ERR_FNF) {
-                                            debug_log("[%s] ShellExecuteW: SE_ERR_FNF", expl.name);
+                                            debug_log("[%s] ShellExecuteW error: SE_ERR_FNF", expl.name);
                                         } else {
-                                            debug_log("[%s] ShellExecuteW: some sort of error", expl.name);
+                                            debug_log("[%s] ShellExecuteW error: unexpected error", expl.name);
                                         }
                                     }
 
@@ -1686,29 +1705,25 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
                                     path_t target_full_path_utf8 = expl.cwd;
 
-                                    bool app_success = path_append(target_full_path_utf8, dir_ent.basic.path.data(), dir_separator, true);
+                                    bool app_success = path_append(target_full_path_utf8, dir_ent.basic.path.data(), dir_sep_utf8, true);
 
                                     if (!app_success) {
                                         debug_log("[%s] path_append failed, cwd = [%s], append data = [\\%s]", expl.name, expl.cwd.data(), dir_ent.basic.path.data());
                                     }
                                     else {
-                                        wchar_t target_full_path_utf16[512] = {};
+                                        wchar_t target_full_path_utf16[MAX_PATH] = {};
                                         i32 utf_written = {};
                                         HINSTANCE result = {};
                                         intptr_t ec = {};
 
-                                        utf_written = MultiByteToWideChar(
-                                            CP_UTF8, 0,
-                                            target_full_path_utf8.data(), (i32)path_length(target_full_path_utf8),
-                                            target_full_path_utf16,       (i32)lengthof(target_full_path_utf16)
-                                        );
+                                        utf_written = utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16));
 
                                         if (utf_written == 0) {
-                                            debug_log("[%s] MultiByteToWideChar failed: target_full_path_utf8 -> target_full_path_utf16", expl.name);
+                                            debug_log("[%s] utf8_to_utf16 failed: target_full_path_utf8 -> target_full_path_utf16", expl.name);
                                             goto dbl_click_file_end;
                                         }
 
-                                        debug_log("[%s] MultiByteToWideChar wrote %d characters (target_full_path_utf8 -> target_full_path_utf16)", expl.name, utf_written);
+                                        debug_log("[%s] utf8_to_utf16 wrote %d characters (target_full_path_utf8 -> target_full_path_utf16)", expl.name, utf_written);
                                         debug_log("[%s] target_full_path = [%s]", expl.name, target_full_path_utf8.data());
 
                                         result = ShellExecuteW(nullptr, L"open", target_full_path_utf16,
@@ -1809,41 +1824,47 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     }
                     if (ImGui::Selectable("Copy path")) {
                         path_t full_path = path_create(expl.cwd.data());
-                        if (!path_append(full_path, right_clicked_ent->basic.path.data(), dir_separator, true)) {
+                        if (!path_append(full_path, right_clicked_ent->basic.path.data(), dir_sep_utf8, true)) {
                             // error
                         } else {
                             ImGui::SetClipboardText(full_path.data());
                         }
                     }
                     if (ImGui::Selectable("Reveal in File Explorer")) {
+                        i32 utf_written = 0;
                         std::wstring select_command = {};
                         select_command.reserve(1024);
 
-                        wchar_t buffer[512] = {};
+                        wchar_t select_path_cwd_buffer_utf16[MAX_PATH] = {};
+                        wchar_t select_path_dirent_buffer_utf16[MAX_PATH] = {};
 
-                        MultiByteToWideChar(CP_UTF8, 0,
-                                            expl.cwd.data(), (i32)path_length(expl.cwd),
-                                            buffer,          (i32)lengthof(buffer));
+                        utf_written = utf8_to_utf16(expl.cwd.data(), select_path_cwd_buffer_utf16, lengthof(select_path_cwd_buffer_utf16));
+                        if (utf_written == 0) {
+                            debug_log("[%s] utf8_to_utf16 failed (expl.cwd -> select_path_cwd_buffer_utf16)", expl.name);
+                            goto reveal_in_explorer_end;
+                        }
 
                         select_command += L"/select,";
                         select_command += L'"';
-                        select_command += buffer; // append cwd
-                        if (!select_command.ends_with(dir_separator_w)) {
-                            select_command += dir_separator_w;
+                        select_command += select_path_cwd_buffer_utf16;
+                        if (!select_command.ends_with(dir_sep_utf16)) {
+                            select_command += dir_sep_utf16;
                         }
 
-                        memset(buffer, 0, sizeof(*buffer) * lengthof(buffer));
+                        utf_written = utf8_to_utf16(right_clicked_ent->basic.path.data(), select_path_dirent_buffer_utf16, lengthof(select_path_dirent_buffer_utf16));
+                        if (utf_written == 0) {
+                            debug_log("[%s] utf8_to_utf16 failed (right_clicked_ent.basic.path -> select_path_dirent_buffer_utf16)", expl.name);
+                            goto reveal_in_explorer_end;
+                        }
 
-                        MultiByteToWideChar(CP_UTF8, 0,
-                                            right_clicked_ent->basic.path.data(), (i32)path_length(right_clicked_ent->basic.path),
-                                            buffer, (i32)lengthof(buffer));
-
-                        select_command += buffer; // append right_clicked_ent
+                        select_command += select_path_dirent_buffer_utf16;
                         select_command += L'"';
 
                         std::wcout << "select_command: [" << select_command.c_str() << "]\n";
 
                         ShellExecuteW(nullptr, L"open", L"explorer.exe", select_command.c_str(), nullptr, SW_SHOWNORMAL);
+
+                        reveal_in_explorer_end:;
                     }
 
                     ImGui::EndPopup();

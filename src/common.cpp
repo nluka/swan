@@ -249,7 +249,7 @@ bool windows_options::save_to_disk() const noexcept(true)
         out << "show_explorer_2 " << this->show_explorer_2 << '\n';
         out << "show_explorer_3 " << this->show_explorer_3 << '\n';
         out << "show_analytics " << this->show_analytics << '\n';
-    #if !defined (NDEBUG)
+    #if !defined(NDEBUG)
         out << "show_demo " << this->show_demo << '\n';
         out << "show_debug_log " << this->show_debug_log << '\n';
     #endif
