@@ -442,6 +442,7 @@ bool load_focused_window_from_disk(char const *out) noexcept(true)
         }
         else {
             in >> s_focused_window_name;
+            out = s_focused_window_name.c_str();
             success = true;
         }
     }
