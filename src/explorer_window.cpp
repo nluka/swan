@@ -1028,8 +1028,8 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip(
                     " Toggle filter case sensitivity \n"
-                    " %sinsensitive%s \n"
-                    " %ssensitive%s ",
+                    " ------------------------------ \n"
+                    " %sinsensitive%s      %ssensitive%s ",
                     !expl.filter_case_sensitive ? "[" : " ", !expl.filter_case_sensitive ? "]" : " ",
                     expl.filter_case_sensitive ? "[" : " ", expl.filter_case_sensitive ? "]" : " ");
             }
@@ -1814,6 +1814,36 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                         } else {
                             ImGui::SetClipboardText(full_path.data());
                         }
+                    }
+                    if (ImGui::Selectable("Reveal in File Explorer")) {
+                        std::wstring select_command = {};
+                        select_command.reserve(1024);
+
+                        wchar_t buffer[512] = {};
+
+                        MultiByteToWideChar(CP_UTF8, 0,
+                                            expl.cwd.data(), (i32)path_length(expl.cwd),
+                                            buffer,          (i32)lengthof(buffer));
+
+                        select_command += L"/select,";
+                        select_command += L'"';
+                        select_command += buffer; // append cwd
+                        if (!select_command.ends_with(dir_separator_w)) {
+                            select_command += dir_separator_w;
+                        }
+
+                        memset(buffer, 0, sizeof(*buffer) * lengthof(buffer));
+
+                        MultiByteToWideChar(CP_UTF8, 0,
+                                            right_clicked_ent->basic.path.data(), (i32)path_length(right_clicked_ent->basic.path),
+                                            buffer, (i32)lengthof(buffer));
+
+                        select_command += buffer; // append right_clicked_ent
+                        select_command += L'"';
+
+                        std::wcout << "select_command: [" << select_command.c_str() << "]\n";
+
+                        ShellExecuteW(nullptr, L"open", L"explorer.exe", select_command.c_str(), nullptr, SW_SHOWNORMAL);
                     }
 
                     ImGui::EndPopup();

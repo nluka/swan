@@ -76,10 +76,12 @@ entry = file | directory
 - [x] Toggleable auto refresh
 - [x] Adaptive auto refresh (on for small directories, off for large ones)
 - [ ] Create directory
-- [ ] Handle executable .lnk
+- [ ] Create file
+- [x] Handle executable .lnk
+- [x] Reveal in File Explorer
 - [ ] Glob filtering
 - [ ] Bulk renaming
 
-- [ ] Unicode
+- [x] Unicode
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview
