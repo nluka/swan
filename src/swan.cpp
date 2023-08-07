@@ -278,6 +278,13 @@ i32 main(i32, char**) try
 
     seed_fast_rand((u64)current_time().time_since_epoch().count());
 
+    // {
+    //     char const *last_focused_window = nullptr;
+    //     if (load_focused_window_from_disk(last_focused_window)) {
+    //         ImGui::SetWindowFocus(last_focused_window);
+    //     }
+    // }
+
     debug_log("entering render loop...");
 
     while (!glfwWindowShouldClose(window)) {

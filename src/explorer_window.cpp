@@ -669,6 +669,10 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
     auto &io = ImGui::GetIO();
     bool window_focused = ImGui::IsWindowFocused();
 
+    // if (window_focused) {
+    //     save_focused_window(expl.name);
+    // }
+
     bool cwd_exists_before_edit = directory_exists(expl.cwd.data());
     char dir_sep_utf8 = opts.dir_separator();
     wchar_t dir_sep_utf16 = dir_sep_utf8;
