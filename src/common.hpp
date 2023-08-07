@@ -283,6 +283,10 @@ char const *get_just_file_name(char const *std__source_location__file_path) noex
 
 std::string get_last_error_string() noexcept(true);
 
+bool save_focused_window(char const *window_name) noexcept(true);
+
+bool load_focused_window_from_disk(char const *out) noexcept(true);
+
 struct debug_log_package {
     char const *fmt;
     std::source_location loc;
