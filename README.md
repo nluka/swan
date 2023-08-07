@@ -78,8 +78,8 @@ entry = file | directory
 - [x] Adaptive auto refresh (on for small directories, off for large ones)
 - [x] Unicode
 - [x] Handle executable .lnk
-- [ ] Create directory
-- [ ] Create file
+- [x] Create directory
+- [x] Create file
 - [ ] Bulk renaming
 - [ ] Basic drive info
 
