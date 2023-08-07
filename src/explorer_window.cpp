@@ -1059,6 +1059,12 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             static char dir_name_utf8[MAX_PATH] = {};
             static std::string err_msg = {};
 
+            auto cleanup_and_close_popup = [&]() {
+                dir_name_utf8[0] = L'\0';
+                err_msg.clear();
+                ImGui::CloseCurrentPopup();
+            };
+
             // set initial focus on input text below
             if (ImGui::IsWindowAppearing() && !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)) {
                 ImGui::SetKeyboardFocusHere(0);
@@ -1079,12 +1085,14 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 utf_written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
                 if (utf_written == 0) {
                     debug_log("[%s] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.name);
+                    cleanup_and_close_popup();
                     goto end_create_dir;
                 }
 
                 utf_written = utf8_to_utf16(dir_name_utf8, dir_name_utf16, lengthof(dir_name_utf16));
                 if (utf_written == 0) {
                     debug_log("[%s] utf8_to_utf16 failed: dir_name_utf8 -> dir_name_utf16", expl.name);
+                    cleanup_and_close_popup();
                     goto end_create_dir;
                 }
 
@@ -1106,13 +1114,112 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                         case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist; probably a bug. Sorry!"; break;
                         default: err_msg = get_last_error_string(); break;
                     }
-                    debug_log("[%s] CreateDirectoryW failed: %d, %s", result, err_msg.c_str());
+                    debug_log("[%s] CreateDirectoryW failed: %d, %s", expl.name, result, err_msg.c_str());
                 } else {
-                    end_create_dir:;
-                    err_msg.clear();
-                    ImGui::CloseCurrentPopup();
+                    cleanup_and_close_popup();
                     update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
                 }
+
+                end_create_dir:;
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Cancel")) {
+                cleanup_and_close_popup();
+            }
+
+            if (!err_msg.empty()) {
+                ImGui::Spacing();
+                ImGui::TextColored(red, "Error: %s", err_msg.c_str());
+            }
+
+            if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("+file")) {
+            ImGui::OpenPopup("Create file");
+        }
+        if (ImGui::IsPopupOpen("Create file") && ImGui::BeginPopupModal("Create file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            static char file_name_utf8[MAX_PATH] = {};
+            static std::string err_msg = {};
+
+            auto cleanup_and_close_popup = [&]() {
+                file_name_utf8[0] = L'\0';
+                err_msg.clear();
+                ImGui::CloseCurrentPopup();
+            };
+
+            // set initial focus on input text below
+            if (ImGui::IsWindowAppearing() && !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)) {
+                ImGui::SetKeyboardFocusHere(0);
+            }
+            if (ImGui::InputTextWithHint("##dir_name_input", "Directory name...", file_name_utf8, lengthof(file_name_utf8))) {
+                err_msg.clear();
+            }
+
+            ImGui::Spacing();
+
+            if (ImGui::Button("Create")) {
+                std::wstring create_path = {};
+                wchar_t cwd_utf16[MAX_PATH] = {};
+                wchar_t file_name_utf16[MAX_PATH] = {};
+                i32 utf_written = 0;
+                HANDLE result = {};
+
+                utf_written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
+                if (utf_written == 0) {
+                    debug_log("[%s] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.name);
+                    cleanup_and_close_popup();
+                    goto end_create_file;
+                }
+
+                utf_written = utf8_to_utf16(file_name_utf8, file_name_utf16, lengthof(file_name_utf16));
+                if (utf_written == 0) {
+                    debug_log("[%s] utf8_to_utf16 failed: file_name_utf8 -> file_name_utf16", expl.name);
+                    cleanup_and_close_popup();
+                    goto end_create_file;
+                }
+
+                create_path.reserve(1024);
+
+                create_path = cwd_utf16;
+                if (!create_path.ends_with(dir_sep_utf16)) {
+                    create_path += dir_sep_utf16;
+                }
+                create_path += file_name_utf16;
+
+                std::wcout << "CreateFileW [" << create_path << "]\n";
+                result = CreateFileW(
+                    create_path.c_str(),
+                    GENERIC_READ | GENERIC_WRITE,
+                    FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    nullptr,
+                    CREATE_NEW,
+                    FILE_ATTRIBUTE_NORMAL,
+                    nullptr
+                );
+
+                if (result == INVALID_HANDLE_VALUE) {
+                    auto error = GetLastError();
+                    switch (error) {
+                        case ERROR_ALREADY_EXISTS: err_msg = "File already exists."; break;
+                        case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist; probably a bug. Sorry!"; break;
+                        default: err_msg = get_last_error_string(); break;
+                    }
+                    debug_log("[%s] CreateFileW failed: %d, %s", expl.name, result, err_msg.c_str());
+                } else {
+                    cleanup_and_close_popup();
+                    update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                }
+
+                end_create_file:;
             }
 
             ImGui::SameLine();
@@ -1132,12 +1239,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
             ImGui::EndPopup();
         }
-
-        ImGui::SameLine();
-
-        // if (ImGui::Button("+file")) {
-
-        // }
 
         ImGui::SameLine();
         ImGui::Spacing();
