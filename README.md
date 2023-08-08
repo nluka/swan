@@ -71,7 +71,7 @@ entry = file | directory
 - [x] Context menu: copy name
 - [x] Context menu: copy path
 - [x] Context menu: reveal in File Explorer
-- [ ] Context menu: rename
+- [x] Context menu: rename
 - [ ] Context menu: custom commands
 
 - [x] Toggleable auto refresh
@@ -83,6 +83,7 @@ entry = file | directory
 - [ ] Bulk renaming
 - [ ] Basic drive info
 
+- [ ] Filter entry types (directory, file, symlink)
 - [ ] Create shortcut
 - [ ] Glob filtering
 - [ ] Show directory preview (num child files/dirs)

@@ -4,6 +4,7 @@
 #include <regex>
 #include <fstream>
 #include <iostream>
+#include <cstdio>
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -169,6 +170,7 @@ void sort_cwd_entries(explorer_window &expl, ImGuiTableSortSpecs *sort_specs)
                     left_lt_right = (left_precedence > right_precedence) == direction_flipper;
                     break;
                 }
+                // TODO: fix incorrect sort behaviour in "C:\Code\swan\dummy"
                 case cwd_entries_table_col_size_pretty:
                 case cwd_entries_table_col_size_bytes: {
                     left_lt_right = (left.basic.size < right.basic.size) == direction_flipper;
@@ -1042,6 +1044,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 ImGui::CalcTextSize(expl.filter.data()).x + (ImGui::GetStyle().FramePadding.x * 2) + 10.f,
                 ImGui::CalcTextSize("123456789012345").x
             ));
+            // TODO: apply callback to filter illegal characters
             if (ImGui::InputTextWithHint("##filter", "Filter", expl.filter.data(), expl.filter.size())) {
                 (void) update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
                 (void) expl.save_to_disk();
@@ -1055,7 +1058,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         if (ImGui::Button("+dir")) {
             ImGui::OpenPopup("Create directory");
         }
-        if (ImGui::IsPopupOpen("Create directory") && ImGui::BeginPopupModal("Create directory", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::BeginPopupModal("Create directory", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             static char dir_name_utf8[MAX_PATH] = {};
             static std::string err_msg = {};
 
@@ -1069,13 +1072,14 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             if (ImGui::IsWindowAppearing() && !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)) {
                 ImGui::SetKeyboardFocusHere(0);
             }
+            // TODO: apply callback to filter illegal characters
             if (ImGui::InputTextWithHint("##dir_name_input", "Directory name...", dir_name_utf8, lengthof(dir_name_utf8))) {
                 err_msg.clear();
             }
 
             ImGui::Spacing();
 
-            if (ImGui::Button("Create")) {
+            if (ImGui::Button("Create") && dir_name_utf8[0] != '\0') {
                 std::wstring create_path = {};
                 wchar_t cwd_utf16[MAX_PATH] = {};
                 wchar_t dir_name_utf16[MAX_PATH] = {};
@@ -1135,7 +1139,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             }
 
             if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-                ImGui::CloseCurrentPopup();
+                cleanup_and_close_popup();
             }
 
             ImGui::EndPopup();
@@ -1146,7 +1150,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
         if (ImGui::Button("+file")) {
             ImGui::OpenPopup("Create file");
         }
-        if (ImGui::IsPopupOpen("Create file") && ImGui::BeginPopupModal("Create file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::BeginPopupModal("Create file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             static char file_name_utf8[MAX_PATH] = {};
             static std::string err_msg = {};
 
@@ -1160,13 +1164,14 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             if (ImGui::IsWindowAppearing() && !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)) {
                 ImGui::SetKeyboardFocusHere(0);
             }
-            if (ImGui::InputTextWithHint("##dir_name_input", "Directory name...", file_name_utf8, lengthof(file_name_utf8))) {
+            // TODO: apply callback to filter illegal characters
+            if (ImGui::InputTextWithHint("##file_name_input", "File name...", file_name_utf8, lengthof(file_name_utf8))) {
                 err_msg.clear();
             }
 
             ImGui::Spacing();
 
-            if (ImGui::Button("Create")) {
+            if (ImGui::Button("Create") && file_name_utf8[0] != '\0') {
                 std::wstring create_path = {};
                 wchar_t cwd_utf16[MAX_PATH] = {};
                 wchar_t file_name_utf16[MAX_PATH] = {};
@@ -1225,7 +1230,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             ImGui::SameLine();
 
             if (ImGui::Button("Cancel")) {
-                ImGui::CloseCurrentPopup();
+                cleanup_and_close_popup();
             }
 
             if (!err_msg.empty()) {
@@ -1234,7 +1239,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
             }
 
             if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-                ImGui::CloseCurrentPopup();
+                cleanup_and_close_popup();
             }
 
             ImGui::EndPopup();
@@ -1259,7 +1264,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     if (path_append(src, dir_ent.basic.path.data(), dir_sep_utf8, true)) {
                         s_paste_payload.items.push_back({ dir_ent.basic.size, dir_ent.basic.type, src });
                     } else {
-                        // error
+                        // TODO: handle error
                     }
                 }
             }
@@ -1280,7 +1285,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     if (path_append(src, dir_ent.basic.path.data(), dir_sep_utf8, true)) {
                         s_paste_payload.items.push_back({ dir_ent.basic.size, dir_ent.basic.type, src });
                     } else {
-                        // error
+                        // TODO: handle error
                     }
                 }
             }
@@ -1623,6 +1628,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     debug_log("[%s] clear filter button pressed", expl.name);
                     expl.filter[0] = '\0';
                     (void) update_cwd_entries(filter, &expl, expl.cwd.data(), opts);
+                    (void) expl.save_to_disk();
                 }
 
                 ImGui::SameLine();
@@ -1802,6 +1808,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
                                         expl.cwd = symlink_target_path_utf8;
                                         (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                                        new_history_from(expl, expl.cwd);
                                     }
                                     else {
                                         // shortcut to a file, let's open it
@@ -1961,9 +1968,9 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
                 } // cwd_entries loop
 
-                if (ImGui::IsPopupOpen("Context")) {
-                    ImGui::BeginPopup("Context");
+                bool open_rename_popup = false;
 
+                if (ImGui::BeginPopup("Context")) {
                     ImGui::PushStyleColor(ImGuiCol_Text, right_clicked_ent->basic.get_color());
                     ImGui::SeparatorText(right_clicked_ent->basic.path.data());
                     ImGui::PopStyleColor();
@@ -1976,10 +1983,14 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                     if (ImGui::Selectable("Copy path")) {
                         path_t full_path = path_create(expl.cwd.data());
                         if (!path_append(full_path, right_clicked_ent->basic.path.data(), dir_sep_utf8, true)) {
-                            // error
+                            // TODO: handle error
                         } else {
                             ImGui::SetClipboardText(full_path.data());
                         }
+                    }
+                    if (ImGui::Selectable("Rename")) {
+                        // calling OpenPopup here does not work, probably because we are already in a popup
+                        open_rename_popup = true;
                     }
                     if (ImGui::Selectable("Reveal in File Explorer")) {
                         i32 utf_written = 0;
@@ -2016,6 +2027,124 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                         ShellExecuteW(nullptr, L"open", L"explorer.exe", select_command.c_str(), nullptr, SW_SHOWNORMAL);
 
                         reveal_in_explorer_end:;
+                    }
+
+                    ImGui::EndPopup();
+                }
+
+                if (open_rename_popup) {
+                    ImGui::OpenPopup("Rename entry");
+                }
+                if (ImGui::BeginPopupModal("Rename entry", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                    static path_t new_name_utf8 = {};
+                    static std::string err_msg = {};
+
+                    auto cleanup_and_close_popup = [&]() {
+                        new_name_utf8[0] = L'\0';
+                        err_msg.clear();
+                        ImGui::CloseCurrentPopup();
+                    };
+
+                    if (ImGui::SmallButton("Use##use_current_name")) {
+                        new_name_utf8 = path_create(right_clicked_ent->basic.path.data());
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Current name:");
+                    ImGui::SameLine();
+                    ImGui::TextColored(right_clicked_ent->basic.get_color(), right_clicked_ent->basic.path.data());
+
+                    ImGui::Spacing();
+
+                    // set initial focus on input text below
+                    if (ImGui::IsWindowAppearing() && !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)) {
+                        ImGui::SetKeyboardFocusHere(0);
+                    }
+                    {
+                        f32 avail_width = ImGui::GetContentRegionAvail().x;
+                        ImGui::PushItemWidth(avail_width);
+                        // TODO: apply callback to filter illegal characters
+                        if (ImGui::InputTextWithHint("##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(), 0, nullptr, nullptr)) {
+                            err_msg.clear();
+                        }
+                        ImGui::PopItemWidth();
+                    }
+
+                    ImGui::Spacing();
+
+                    if (ImGui::Button("Rename") && new_name_utf8[0] != '\0') {
+                        wchar_t buffer_cwd_utf16[MAX_PATH] = {};
+                        wchar_t buffer_old_name_utf16[MAX_PATH] = {};
+                        wchar_t buffer_new_name_utf16[MAX_PATH] = {};
+                        std::wstring old_path_utf16 = {};
+                        std::wstring new_path_utf16 = {};
+                        i32 utf_written = 0;
+                        i32 result = {};
+
+                        utf_written = utf8_to_utf16(expl.cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
+                        if (utf_written == 0) {
+                            debug_log("[%s] utf8_to_utf16 failed (expl.cwd -> buffer_cwd_utf16)", expl.name);
+                            cleanup_and_close_popup();
+                            goto rename_end;
+                        }
+
+                        utf_written = utf8_to_utf16(right_clicked_ent->basic.path.data(), buffer_old_name_utf16, lengthof(buffer_old_name_utf16));
+                        if (utf_written == 0) {
+                            debug_log("[%s] utf8_to_utf16 failed (right_clicked_ent.basic.path -> buffer_old_name_utf16)", expl.name);
+                            cleanup_and_close_popup();
+                            goto rename_end;
+                        }
+
+                        utf_written = utf8_to_utf16(new_name_utf8.data(), buffer_new_name_utf16, lengthof(buffer_new_name_utf16));
+                        if (utf_written == 0) {
+                            debug_log("[%s] utf8_to_utf16 failed (new_name_utf8 -> buffer_new_name_utf16)", expl.name);
+                            cleanup_and_close_popup();
+                            goto rename_end;
+                        }
+
+                        old_path_utf16 = buffer_cwd_utf16;
+                        if (!old_path_utf16.ends_with(dir_sep_utf16)) {
+                            old_path_utf16 += dir_sep_utf16;
+                        }
+                        old_path_utf16 += buffer_old_name_utf16;
+
+                        new_path_utf16 = buffer_cwd_utf16;
+                        if (!new_path_utf16.ends_with(dir_sep_utf16)) {
+                            new_path_utf16 += dir_sep_utf16;
+                        }
+                        new_path_utf16 += buffer_new_name_utf16;
+
+                        result = _wrename(old_path_utf16.c_str(), new_path_utf16.c_str());
+
+                        if (result != 0) {
+                            auto err_code = errno;
+                            switch (err_code) {
+                                case EACCES: err_msg = "New path already exists or couldn't be created."; break;
+                                case ENOENT: err_msg = "Old path not found, probably a bug. Sorry!"; break;
+                                case EINVAL: err_msg = "Name contains invalid characters."; break;
+                                default: err_msg = get_last_error_string(); break;
+                            }
+                        }
+                        else {
+                            (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                            cleanup_and_close_popup();
+                        }
+
+                        rename_end:;
+                    }
+
+                    ImGui::SameLine();
+
+                    if (ImGui::Button("Cancel")) {
+                        cleanup_and_close_popup();
+                    }
+
+                    if (!err_msg.empty()) {
+                        ImGui::Spacing();
+                        ImGui::TextColored(red, "Error: %s", err_msg.c_str());
+                    }
+
+                    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                        cleanup_and_close_popup();
                     }
 
                     ImGui::EndPopup();

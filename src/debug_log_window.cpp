@@ -42,6 +42,7 @@ void render_debug_log_window() noexcept(true)
         ImGui::Checkbox("Auto-scroll at bottom", &auto_scroll);
 
         // second line
+
         bool jump_to_bottom = ImGui::ArrowButton("Bottom", ImGuiDir_Down);
 
         ImGui::Spacing();
@@ -49,7 +50,7 @@ void render_debug_log_window() noexcept(true)
 
         // third line
 
-        if (ImGui::BeginChild("debug_log_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar)) {
+        if (ImGui::BeginChild("debug_log_scroll")) {
             auto const &debug_buffer = debug_log_package::s_debug_buffer;
             ImGui::TextUnformatted(debug_buffer.c_str());
 
