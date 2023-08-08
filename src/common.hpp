@@ -119,8 +119,6 @@ struct basic_dir_ent
     }
 };
 
-typedef std::array<char, 256> static_cstr_256_t;
-
 struct explorer_window
 {
     struct dir_ent
@@ -180,7 +178,7 @@ struct explorer_window
     swan::path_t prev_valid_cwd = {};
     swan::path_t cwd = {}; // current working directory, persisted in file
     swan::path_t cwd_last_frame = {};
-    static_cstr_256_t filter = {}; // persisted in file
+    std::array<char, 256> filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool needs_sort = true;
 };
