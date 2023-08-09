@@ -14,6 +14,8 @@
 #include <timezoneapi.h>
 #include <datetimeapi.h>
 
+#include <boost/container/static_vector.hpp>
+
 #include "imgui/imgui.h"
 
 #include "primitives.hpp"
@@ -59,6 +61,58 @@ bool init_windows_shell_com_garbage()
     }
 
     return true;
+}
+
+struct drive_info {
+    u64 total_bytes;
+    u64 available_bytes;
+    char name_utf8[512];
+    char filesystem_name_utf8[512];
+    char letter;
+};
+
+boost::container::static_vector<drive_info, 26> get_drives() {
+    boost::container::static_vector<drive_info, 26> drive_info_list;
+
+    i32 drives_mask = GetLogicalDrives();
+
+    for (u64 i = 0; i < 26; ++i) {
+        if (drives_mask & (1 << i)) {
+            char letter = 'A' + i;
+
+            wchar_t drive_root[] = { wchar_t(letter), L':', L'\\', L'\0' };
+            wchar_t volume_name[MAX_PATH + 1] = {};
+            wchar_t filesystem_name_utf8[MAX_PATH + 1] = {};
+            DWORD serial_num = 0;
+            DWORD max_component_length = 0;
+            DWORD filesystem_flags = 0;
+            i32 utf_written = 0;
+
+            auto vol_info_result = GetVolumeInformationW(
+                drive_root, volume_name, lengthof(volume_name),
+                &serial_num, &max_component_length, &filesystem_flags,
+                filesystem_name_utf8, lengthof(filesystem_name_utf8)
+            );
+
+            ULARGE_INTEGER total_bytes;
+            ULARGE_INTEGER free_bytes;
+
+            if (vol_info_result) {
+                auto space_result = GetDiskFreeSpaceExW(drive_root, nullptr, &total_bytes, &free_bytes);
+                if (space_result) {
+                    drive_info info = {};
+                    info.letter = letter;
+                    info.total_bytes = total_bytes.QuadPart;
+                    info.available_bytes = free_bytes.QuadPart;
+                    utf_written = utf16_to_utf8(volume_name, info.name_utf8, lengthof(info.name_utf8));
+                    utf_written = utf16_to_utf8(filesystem_name_utf8, info.filesystem_name_utf8, lengthof(info.filesystem_name_utf8));
+                    drive_info_list.push_back(info);
+                }
+            }
+        }
+    }
+
+    return drive_info_list;
 }
 
 static
@@ -1485,7 +1539,16 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
 
     // cwd entries stats & table start
 
-    if (!cwd_exists_before_edit) {
+    if (path_is_empty(expl.cwd)) {
+        auto drives = get_drives();
+        for (auto const &drive : drives) {
+            ImGui::Text("[%s] %s (%c:) %zu %zu",
+                drive.filesystem_name_utf8, strlen(drive.name_utf8) > 0 ? drive.name_utf8 : "Local Disk",
+                drive.letter, drive.available_bytes, drive.total_bytes
+            );
+        }
+    }
+    else if (!cwd_exists_before_edit) {
         ImGui::TextColored(orange, "Invalid directory.");
     }
     else if (expl.cwd_entries.empty()) {
