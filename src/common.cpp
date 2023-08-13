@@ -472,3 +472,12 @@ bool load_focused_window_from_disk(char const *out) noexcept(true)
     debug_log("[%s] load_focused_window_from_disk: %d", file_path, success);
     return success;
 }
+
+void imgui_sameline_spacing(u64 num_spacing_calls) noexcept(true)
+{
+    ImGui::SameLine();
+    for (u64 i = 0; i < num_spacing_calls; ++i) {
+        ImGui::Spacing();
+        ImGui::SameLine();
+    }
+}

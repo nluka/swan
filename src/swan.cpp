@@ -28,7 +28,7 @@
 #include <glfw3.h> // Will drag system OpenGL headers
 
 static
-void glfw_error_callback(int error, const char* description)
+void glfw_error_callback(i32 error, char const *description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
@@ -36,6 +36,8 @@ void glfw_error_callback(int error, const char* description)
 static
 GLFWwindow *init_glfw_and_imgui()
 {
+    namespace imgui = ImGui;
+
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
         return nullptr;
@@ -66,17 +68,17 @@ GLFWwindow *init_glfw_and_imgui()
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+    imgui::CreateContext();
+    ImGuiIO &io = imgui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     io.ConfigDockingWithShift = true;
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(io.DisplaySize);
-    ImGui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
-    ImGui::StyleColorsDark();
+    imgui::SetNextWindowPos(ImVec2(0, 0));
+    imgui::SetNextWindowSize(io.DisplaySize);
+    imgui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
+    imgui::StyleColorsDark();
 
     // Setup Platform/Renderer backends
     {
@@ -169,7 +171,9 @@ void set_window_icon(GLFWwindow *window)
 static
 void render(GLFWwindow *window)
 {
-    ImGui::Render();
+    namespace imgui = ImGui;
+
+    imgui::Render();
 
     int display_w, display_h;
     ImVec4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
@@ -178,7 +182,7 @@ void render(GLFWwindow *window)
     glViewport(0, 0, display_w, display_h);
     glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    ImGui_ImplOpenGL3_RenderDrawData(imgui::GetDrawData());
 
     glfwSwapBuffers(window);
 }
@@ -186,6 +190,8 @@ void render(GLFWwindow *window)
 // #pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 i32 main(i32, char**) try
 {
+    namespace imgui = ImGui;
+
     debug_log("initializing...");
 
     GLFWwindow *window = init_glfw_and_imgui();
@@ -200,7 +206,7 @@ i32 main(i32, char**) try
     auto cleanup_routine = make_on_scope_exit([window]() {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
+        imgui::DestroyContext();
         glfwDestroyWindow(window);
         glfwTerminate();
         cleanup_windows_shell_com_garbage();
@@ -208,7 +214,7 @@ i32 main(i32, char**) try
 
     set_window_icon(window);
 
-    [[maybe_unused]] auto &io = ImGui::GetIO();
+    [[maybe_unused]] auto &io = imgui::GetIO();
 
     io.IniFilename = "data/swan_imgui.ini";
 
@@ -284,7 +290,7 @@ i32 main(i32, char**) try
     // {
     //     char const *last_focused_window = nullptr;
     //     if (load_focused_window_from_disk(last_focused_window)) {
-    //         ImGui::SetWindowFocus(last_focused_window);
+    //         imgui::SetWindowFocus(last_focused_window);
     //     }
     // }
 
@@ -296,52 +302,52 @@ i32 main(i32, char**) try
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+        imgui::NewFrame();
 
-        ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
+        imgui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
         {
-            ImGuiStyle &style = ImGui::GetStyle();
+            ImGuiStyle &style = imgui::GetStyle();
             f32 original_padding = style.FramePadding.y;
 
             style.FramePadding.y = 7.5f;
 
-            if (ImGui::BeginMainMenuBar()) {
-                if (ImGui::BeginMenu("[Windows]")) {
+            if (imgui::BeginMainMenuBar()) {
+                if (imgui::BeginMenu("[Windows]")) {
                     bool change_made = false;
                     static_assert((false | false) == false);
                     static_assert((false | true) == true);
                     static_assert((true | true) == true);
 
-                    change_made |= ImGui::MenuItem(explorers[0].name, nullptr, &win_opts.show_explorer_0);
-                    change_made |= ImGui::MenuItem(explorers[1].name, nullptr, &win_opts.show_explorer_1);
-                    change_made |= ImGui::MenuItem(explorers[2].name, nullptr, &win_opts.show_explorer_2);
-                    change_made |= ImGui::MenuItem(explorers[3].name, nullptr, &win_opts.show_explorer_3);
+                    change_made |= imgui::MenuItem(explorers[0].name, nullptr, &win_opts.show_explorer_0);
+                    change_made |= imgui::MenuItem(explorers[1].name, nullptr, &win_opts.show_explorer_1);
+                    change_made |= imgui::MenuItem(explorers[2].name, nullptr, &win_opts.show_explorer_2);
+                    change_made |= imgui::MenuItem(explorers[3].name, nullptr, &win_opts.show_explorer_3);
 
-                    change_made |= ImGui::MenuItem("Pinned", nullptr, &win_opts.show_pinned);
-                    change_made |= ImGui::MenuItem("File Operations", nullptr, &win_opts.show_file_operations);
-                    change_made |= ImGui::MenuItem("Analytics", nullptr, &win_opts.show_analytics);
+                    change_made |= imgui::MenuItem("Pinned", nullptr, &win_opts.show_pinned);
+                    change_made |= imgui::MenuItem("File Operations", nullptr, &win_opts.show_file_operations);
+                    change_made |= imgui::MenuItem("Analytics", nullptr, &win_opts.show_analytics);
 
                 #if !defined(NDEBUG)
-                    change_made |= ImGui::MenuItem("Debug Log", nullptr, &win_opts.show_debug_log);
-                    change_made |= ImGui::MenuItem("ImGui Demo", nullptr, &win_opts.show_demo);
+                    change_made |= imgui::MenuItem("Debug Log", nullptr, &win_opts.show_debug_log);
+                    change_made |= imgui::MenuItem("ImGui Demo", nullptr, &win_opts.show_demo);
                 #endif
 
-                    ImGui::EndMenu();
+                    imgui::EndMenu();
 
                     if (change_made) {
                         bool result = win_opts.save_to_disk();
                         debug_log("windows_options::save_to_disk result: %d", result);
                     }
                 }
-                if (ImGui::BeginMenu("[Explorer Options]")) {
+                if (imgui::BeginMenu("[Explorer Options]")) {
                     bool change_made = false;
                     static_assert((false | false) == false);
                     static_assert((false | true) == true);
                     static_assert((true | true) == true);
 
                     {
-                        bool changed_dotdot_dir = ImGui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir);
+                        bool changed_dotdot_dir = imgui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir);
                         if (changed_dotdot_dir) {
                             for (auto &expl : explorers) {
                                 update_cwd_entries(full_refresh, &expl, expl.cwd.data());
@@ -350,11 +356,11 @@ i32 main(i32, char**) try
                         change_made |= changed_dotdot_dir;
                     }
 
-                    change_made |= ImGui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
-                    change_made |= ImGui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
+                    change_made |= imgui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
+                    change_made |= imgui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
 
                     {
-                        bool changed_dir_separator = ImGui::MenuItem("Unix directory separators", nullptr, &expl_opts.unix_directory_separator);
+                        bool changed_dir_separator = imgui::MenuItem("Unix directory separators", nullptr, &expl_opts.unix_directory_separator);
                         if (changed_dir_separator) {
                             for (auto &expl : explorers) {
                                 update_cwd_entries(full_refresh, &expl, expl.cwd.data());
@@ -364,7 +370,7 @@ i32 main(i32, char**) try
                         change_made |= changed_dir_separator;
                     }
 
-                    if (ImGui::BeginMenu("Refreshing")) {
+                    if (imgui::BeginMenu("Refreshing")) {
                         char const *refresh_modes[] = {
                             "Adaptive",
                             "Manual",
@@ -373,32 +379,32 @@ i32 main(i32, char**) try
 
                         static_assert(lengthof(refresh_modes) == (u64)explorer_options::refresh_mode::count);
 
-                        ImGui::SeparatorText("Mode");
-                        change_made |= ImGui::Combo("##refresh_mode", (i32 *)&expl_opts.ref_mode, refresh_modes, lengthof(refresh_modes));
+                        imgui::SeparatorText("Mode");
+                        change_made |= imgui::Combo("##refresh_mode", (i32 *)&expl_opts.ref_mode, refresh_modes, lengthof(refresh_modes));
 
                         if (expl_opts.ref_mode == explorer_options::refresh_mode::adaptive) {
-                            ImGui::SeparatorText("Threshold (# items)");
-                            change_made |= ImGui::InputInt("##adaptive_refresh_threshold", &expl_opts.adaptive_refresh_threshold, 100, 1000);
+                            imgui::SeparatorText("Threshold (# items)");
+                            change_made |= imgui::InputInt("##adaptive_refresh_threshold", &expl_opts.adaptive_refresh_threshold, 100, 1000);
                         }
 
                         if (expl_opts.ref_mode != explorer_options::refresh_mode::manual) {
-                            ImGui::SeparatorText("Interval (ms)");
-                            change_made |= ImGui::InputInt("##auto_refresh_interval_ms", &expl_opts.auto_refresh_interval_ms, 100, 500);
+                            imgui::SeparatorText("Interval (ms)");
+                            change_made |= imgui::InputInt("##auto_refresh_interval_ms", &expl_opts.auto_refresh_interval_ms, 100, 500);
                         }
 
-                        ImGui::EndMenu();
+                        imgui::EndMenu();
                     }
 
-                    change_made |= ImGui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
+                    change_made |= imgui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
 
-                    ImGui::EndMenu();
+                    imgui::EndMenu();
 
                     if (change_made) {
                         bool result = expl_opts.save_to_disk();
                         debug_log("explorer_options::save_to_disk result: %d", result);
                     }
                 }
-                ImGui::EndMainMenuBar();
+                imgui::EndMainMenuBar();
             }
 
             style.FramePadding.y = original_padding;
@@ -432,22 +438,22 @@ i32 main(i32, char**) try
     #endif
 
         if (win_opts.show_analytics) {
-            if (ImGui::Begin("Analytics")) {
+            if (imgui::Begin("Analytics")) {
             #if !defined(NDEBUG)
                 char const *build_mode = "debug";
             #else
                 char const *build_mode = "release";
             #endif
-                ImGui::Text("Build mode : %s", build_mode);
-                ImGui::Text("FPS        : %.1f FPS", io.Framerate);
-                ImGui::Text("ms/frame   : %.3f", 1000.0f / io.Framerate);
+                imgui::Text("Build mode : %s", build_mode);
+                imgui::Text("FPS        : %.1f FPS", io.Framerate);
+                imgui::Text("ms/frame   : %.3f", 1000.0f / io.Framerate);
             }
-            ImGui::End();
+            imgui::End();
         }
 
     #if !defined(NDEBUG)
         if (win_opts.show_demo) {
-            ImGui::ShowDemoWindow();
+            imgui::ShowDemoWindow();
         }
     #endif
 

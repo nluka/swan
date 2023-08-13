@@ -5,66 +5,62 @@
 
 void render_debug_log_window() noexcept(true)
 {
-    if (ImGui::Begin("Debug Log")) {
-        auto same_line_with_spacing = [] {
-            ImGui::SameLine();
-            ImGui::Spacing();
-            ImGui::SameLine();
-        };
+    namespace imgui = ImGui;
 
+    if (imgui::Begin("Debug Log")) {
         static bool auto_scroll = true;
 
         // first line
 
-        bool jump_to_top = ImGui::ArrowButton("Top", ImGuiDir_Up);
+        bool jump_to_top = imgui::ArrowButton("Top", ImGuiDir_Up);
 
-        same_line_with_spacing();
+        imgui_sameline_spacing(1);
 
-        if (ImGui::Button("Clear")) {
+        if (imgui::Button("Clear")) {
             debug_log_package::clear_buffer();
         }
 
-        ImGui::SameLine();
+        imgui::SameLine();
 
     #if 0
-        ImGui::BeginDisabled(true);
-        if (ImGui::Button("Save to file")) {
+        imgui::BeginDisabled(true);
+        if (imgui::Button("Save to file")) {
         }
-        ImGui::EndDisabled();
+        imgui::EndDisabled();
     #endif
 
-        same_line_with_spacing();
+        imgui_sameline_spacing(1);
 
-        ImGui::Checkbox("Logging Enabled", &debug_log_package::s_logging_enabled);
+        imgui::Checkbox("Logging Enabled", &debug_log_package::s_logging_enabled);
 
-        same_line_with_spacing();
+        imgui_sameline_spacing(1);
 
-        ImGui::Checkbox("Auto-scroll at bottom", &auto_scroll);
+        imgui::Checkbox("Auto-scroll at bottom", &auto_scroll);
 
         // second line
 
-        bool jump_to_bottom = ImGui::ArrowButton("Bottom", ImGuiDir_Down);
+        bool jump_to_bottom = imgui::ArrowButton("Bottom", ImGuiDir_Down);
 
-        ImGui::Spacing();
-        ImGui::Separator();
+        imgui::Spacing();
+        imgui::Separator();
 
         // third line
 
-        if (ImGui::BeginChild("debug_log_scroll")) {
+        if (imgui::BeginChild("debug_log_scroll")) {
             auto const &debug_buffer = debug_log_package::s_debug_buffer;
-            ImGui::TextUnformatted(debug_buffer.c_str());
+            imgui::TextUnformatted(debug_buffer.c_str());
 
             if ( jump_to_top ) {
-                ImGui::SetScrollHereY(0.0f);
+                imgui::SetScrollHereY(0.0f);
             }
-            else if ( jump_to_bottom || ( auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() ) ) {
-                ImGui::SetScrollHereY(1.0f);
+            else if ( jump_to_bottom || ( auto_scroll && imgui::GetScrollY() >= imgui::GetScrollMaxY() ) ) {
+                imgui::SetScrollHereY(1.0f);
             }
         }
-        ImGui::EndChild();
+        imgui::EndChild();
     }
 
-    ImGui::End();
+    imgui::End();
 }
 
 #endif // SWAN_DEBUG_LOG_WINDOW_CPP
