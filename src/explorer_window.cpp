@@ -1589,8 +1589,6 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 if (ImGui::TableSetColumnIndex(drive_table_col_id_name)) {
                     static bool selected = false;
 
-                    // selected = false;
-
                     if (ImGui::Selectable(drive.name_utf8[0] == '\0' ? "Unnamed Disk" : drive.name_utf8,
                                           &selected, ImGuiSelectableFlags_SpanAllColumns))
                     {
@@ -1792,7 +1790,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                 ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_size_pretty);
                 ImGui::TableSetupColumn("Bytes", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_size_bytes);
                 // ImGui::TableSetupColumn("Created", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_creation_time);
-                ImGui::TableSetupColumn("Last Edited", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_last_write_time);
+                ImGui::TableSetupColumn("Modified", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_last_write_time);
                 ImGui::TableHeadersRow();
 
                 ImGuiTableSortSpecs *sort_specs = ImGui::TableGetSortSpecs();
@@ -1862,11 +1860,13 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                             }
 
                             static f64 last_click_time = 0;
+                            static path_t last_click_path = {};
+                            path_t const &current_click_path = dir_ent.basic.path;
+                            f64 const double_click_window_sec = 0.3;
                             f64 current_time = ImGui::GetTime();
                             f64 seconds_between_clicks = current_time - last_click_time;
-                            f64 const double_click_window_sec = 0.3;
 
-                            if (seconds_between_clicks <= double_click_window_sec) {
+                            if (seconds_between_clicks <= double_click_window_sec && path_strictly_same(current_click_path, last_click_path)) {
                                 if (dir_ent.basic.is_directory()) {
                                     debug_log("[%s] double clicked directory [%s]", expl.name, dir_ent.basic.path.data());
 
@@ -2052,6 +2052,7 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
                             }
 
                             last_click_time = current_time;
+                            last_click_path = current_click_path;
                             expl.cwd_prev_selected_dirent_idx = i;
 
                         } // ImGui::Selectable
