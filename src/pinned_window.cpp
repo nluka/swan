@@ -8,8 +8,7 @@ using namespace swan;
 
 void render_pinned_window(
     std::array<explorer_window, 4> &explorers,
-    windows_options const &win_opts,
-    explorer_options const &expl_opts) noexcept(true)
+    windows_options const &win_opts) noexcept(true)
 {
     auto render_pin_item = [&](path_t const &pin, u64 pin_idx) {
         u64 num_buttons_rendered = 0;
@@ -24,7 +23,7 @@ void render_pinned_window(
                 debug_log("setting Explorer %zu cwd to [%s]", expl_win_num, pin.data());
                 expl.cwd = pin;
                 new_history_from(expl, pin);
-                update_cwd_entries(full_refresh, &expl, pin.data(), expl_opts);
+                update_cwd_entries(full_refresh, &expl, pin.data());
             }
 
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {

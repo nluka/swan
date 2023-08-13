@@ -130,4 +130,9 @@ i32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capa
     return chars_written;
 }
 
+bool streq(char const *s1, char const *s2) noexcept(true)
+{
+    return strcmp(s1, s2) == 0;
+}
+
 #endif // SWAN_UTIL_CPP

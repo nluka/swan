@@ -58,9 +58,14 @@ struct explorer_options
     bool save_to_disk() const noexcept(true);
     bool load_from_disk() noexcept(true);
 
-    char dir_separator() const noexcept(true)
+    char dir_separator_utf8() const noexcept(true)
     {
         return unix_directory_separator ? '/' : '\\';
+    }
+
+    u16 size_unit_multiplier() const noexcept(true)
+    {
+        return binary_size_system ? 1024 : 1000;
     }
 };
 
@@ -139,11 +144,13 @@ struct explorer_window
     static u64 const NO_SELECTION = UINT64_MAX;
     bool save_to_disk() const noexcept(true);
     bool load_from_disk(char dir_separator) noexcept(true);
+    void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept(true);
+    void deselect_all_cwd_entries() noexcept(true);
 
     // 40 byte members
 
-    // TODO: switch to boost::circular_buffer
-    std::deque<swan::path_t> wd_history = {}; // history for working directories, persisted in file
+    // history for working directories, persisted in file
+    boost::circular_buffer<swan::path_t> wd_history = boost::circular_buffer<swan::path_t>(15);
 
     // 32 byte members
 
@@ -250,6 +257,8 @@ struct file_operation
 
 boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept(true);
 
+explorer_options &get_explorer_options() noexcept(true);
+
 constexpr u8 const query_filesystem = 1 << 0;
 constexpr u8 const filter = 1 << 1;
 constexpr u8 const full_refresh = query_filesystem | filter;
@@ -258,7 +267,6 @@ bool update_cwd_entries(
     u8 actions,
     explorer_window *,
     std::string_view parent_dir,
-    explorer_options const &,
     std::source_location sloc = std::source_location::current());
 
 void new_history_from(explorer_window &expl, swan::path_t const &new_latest_entry);
@@ -278,6 +286,8 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true);
 u64 find_pin_idx(swan::path_t const &) noexcept(true);
 
 char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true);
+
+std::string_view get_everything_minus_file_name(char const *full_path) noexcept(true);
 
 std::string get_last_error_string() noexcept(true);
 
