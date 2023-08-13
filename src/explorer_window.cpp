@@ -71,14 +71,16 @@ struct drive_info {
     char letter;
 };
 
-boost::container::static_vector<drive_info, 26> get_drives() {
-    boost::container::static_vector<drive_info, 26> drive_info_list;
+typedef boost::container::static_vector<drive_info, 26> drive_list_t;
+
+drive_list_t get_drive_list() {
+    drive_list_t drive_list;
 
     i32 drives_mask = GetLogicalDrives();
 
     for (u64 i = 0; i < 26; ++i) {
         if (drives_mask & (1 << i)) {
-            char letter = 'A' + i;
+            char letter = 'A' + (char)i;
 
             wchar_t drive_root[] = { wchar_t(letter), L':', L'\\', L'\0' };
             wchar_t volume_name[MAX_PATH + 1] = {};
@@ -106,13 +108,13 @@ boost::container::static_vector<drive_info, 26> get_drives() {
                     info.available_bytes = free_bytes.QuadPart;
                     utf_written = utf16_to_utf8(volume_name, info.name_utf8, lengthof(info.name_utf8));
                     utf_written = utf16_to_utf8(filesystem_name_utf8, info.filesystem_name_utf8, lengthof(info.filesystem_name_utf8));
-                    drive_info_list.push_back(info);
+                    drive_list.push_back(info);
                 }
             }
         }
     }
 
-    return drive_info_list;
+    return drive_list;
 }
 
 static
@@ -624,7 +626,10 @@ void try_ascend_directory(explorer_window &expl, explorer_options const &opts)
 
     (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
 
-    new_history_from(expl, expl.cwd);
+    if (!path_is_empty(expl.cwd)) {
+        new_history_from(expl, expl.cwd);
+    }
+
     expl.cwd_prev_selected_dirent_idx = explorer_window::NO_SELECTION;
     expl.filter_error.clear();
 
@@ -1540,12 +1545,88 @@ void render_explorer_window(explorer_window &expl, explorer_options &opts)
     // cwd entries stats & table start
 
     if (path_is_empty(expl.cwd)) {
-        auto drives = get_drives();
-        for (auto const &drive : drives) {
-            ImGui::Text("[%s] %s (%c:) %zu %zu",
-                drive.filesystem_name_utf8, strlen(drive.name_utf8) > 0 ? drive.name_utf8 : "Local Disk",
-                drive.letter, drive.available_bytes, drive.total_bytes
-            );
+        static time_point_t last_refresh_time = {};
+        static drive_list_t drives = {};
+
+        // refresh drives once per second
+        {
+            time_point_t now = current_time();
+            i64 diff_ms = compute_diff_ms(last_refresh_time, now);
+            if (diff_ms >= 1000) {
+                drives = get_drive_list();
+                debug_log("[%s] refresh drives, diff = %lld ms", expl.name, diff_ms);
+                last_refresh_time = current_time();
+            }
+        }
+
+        enum drive_table_col_id : i32
+        {
+            drive_table_col_id_letter,
+            drive_table_col_id_name,
+            drive_table_col_id_filesystem,
+            drive_table_col_id_free_space,
+            drive_table_col_id_used_percent,
+            drive_table_col_id_total_space,
+            drive_table_col_id_count,
+        };
+
+        if (ImGui::BeginTable("drives", drive_table_col_id_count)) {
+            ImGui::TableSetupColumn("Drive", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_letter);
+            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_name);
+            ImGui::TableSetupColumn("Filesystem", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_filesystem);
+            ImGui::TableSetupColumn("Free Space", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_free_space);
+            ImGui::TableSetupColumn("Used", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_used_percent);
+            ImGui::TableSetupColumn("Total Space", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_total_space);
+            ImGui::TableHeadersRow();
+
+            for (auto &drive : drives) {
+                ImGui::TableNextRow();
+
+                if (ImGui::TableSetColumnIndex(drive_table_col_id_letter)) {
+                    ImGui::TextColored(basic_dir_ent::get_color(basic_dir_ent::kind::directory), "%C:", drive.letter);
+                }
+
+                if (ImGui::TableSetColumnIndex(drive_table_col_id_name)) {
+                    static bool selected = false;
+
+                    // selected = false;
+
+                    if (ImGui::Selectable(drive.name_utf8[0] == '\0' ? "Unnamed Disk" : drive.name_utf8,
+                                          &selected, ImGuiSelectableFlags_SpanAllColumns))
+                    {
+                        char root[] = { drive.letter, ':', dir_sep_utf8, '\0' };
+                        expl.cwd = path_create(root);
+                        update_cwd_entries(full_refresh, &expl, expl.cwd.data(), opts);
+                        new_history_from(expl, expl.cwd);
+                    }
+
+                    selected = false;
+                }
+
+                if (ImGui::TableSetColumnIndex(drive_table_col_id_filesystem)) {
+                    ImGui::TextUnformatted(drive.filesystem_name_utf8);
+                }
+
+                if (ImGui::TableSetColumnIndex(drive_table_col_id_free_space)) {
+                    std::array<char, 32> formatted = {};
+                    format_file_size(drive.available_bytes, formatted.data(), formatted.size(), opts.binary_size_system ? 1024 : 1000);
+                    ImGui::Text("%s", formatted.data());
+                }
+
+                if (ImGui::TableSetColumnIndex(drive_table_col_id_used_percent)) {
+                    u64 used_bytes = drive.total_bytes - drive.available_bytes;
+                    f64 percent_used = ( f64(used_bytes) / f64(drive.total_bytes) ) * 100.0;
+                    ImGui::Text("%.1lf %%", percent_used);
+                }
+
+                if (ImGui::TableSetColumnIndex(drive_table_col_id_total_space)) {
+                    std::array<char, 32> formatted = {};
+                    format_file_size(drive.total_bytes, formatted.data(), formatted.size(), opts.binary_size_system ? 1024 : 1000);
+                    ImGui::Text("%s", formatted.data());
+                }
+            }
+
+            ImGui::EndTable();
         }
     }
     else if (!cwd_exists_before_edit) {
