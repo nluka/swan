@@ -43,4 +43,6 @@ i32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_cap
 
 i32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept(true);
 
+bool streq(char const *s1, char const *s2) noexcept(true);
+
 #endif // SWAN_UTIL_HPP

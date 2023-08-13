@@ -71,7 +71,7 @@ GLFWwindow *init_glfw_and_imgui()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+    // io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     io.ConfigDockingWithShift = true;
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
@@ -212,7 +212,9 @@ i32 main(i32, char**) try
 
     io.IniFilename = "data/swan_imgui.ini";
 
-    explorer_options expl_opts = {};
+    auto &expl_opts = get_explorer_options();
+
+    // explorer_options expl_opts = {};
     if (!expl_opts.load_from_disk()) {
         debug_log("explorer_options::load_from_disk failed, setting defaults");
         expl_opts.auto_refresh_interval_ms = 1000;
@@ -226,6 +228,7 @@ i32 main(i32, char**) try
     }
 
     windows_options win_opts = {};
+
     if (!win_opts.load_from_disk()) {
         debug_log("windows_options::load_from_disk failed, setting defaults");
         win_opts.show_explorer_1 = true;
@@ -236,7 +239,7 @@ i32 main(i32, char**) try
     }
 
     {
-        auto [success, num_pins_loaded] = load_pins_from_disk(expl_opts.dir_separator());
+        auto [success, num_pins_loaded] = load_pins_from_disk(expl_opts.dir_separator_utf8());
         if (!success) {
             debug_log("load_pins_from_disk failed");
         } else {
@@ -254,7 +257,7 @@ i32 main(i32, char**) try
             expl.name = names[i];
             expl.filter_error.reserve(1024);
 
-            bool load_result = explorers[i].load_from_disk(expl_opts.dir_separator());
+            bool load_result = explorers[i].load_from_disk(expl_opts.dir_separator_utf8());
             debug_log("[Explorer %zu] load_from_disk: %d", i+1, load_result);
 
             if (!load_result) {
@@ -262,7 +265,7 @@ i32 main(i32, char**) try
 
                 path_t startup_path = {};
                 path_append(startup_path, startup_path_stdstr.c_str());
-                path_force_separator(startup_path, expl_opts.dir_separator());
+                path_force_separator(startup_path, expl_opts.dir_separator_utf8());
 
                 expl.cwd = startup_path;
                 expl.cwd_last_frame = startup_path;
@@ -272,7 +275,7 @@ i32 main(i32, char**) try
                 debug_log("[Explorer %zu] save_to_disk: %d", i+1, save_result);
             }
 
-            update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
+            update_cwd_entries(full_refresh, &expl, expl.cwd.data());
         }
     }
 
@@ -310,14 +313,13 @@ i32 main(i32, char**) try
                     static_assert((false | true) == true);
                     static_assert((true | true) == true);
 
-                    change_made |= ImGui::MenuItem("Pinned", nullptr, &win_opts.show_pinned);
-                    change_made |= ImGui::MenuItem("File Operations", nullptr, &win_opts.show_file_operations);
-
                     change_made |= ImGui::MenuItem(explorers[0].name, nullptr, &win_opts.show_explorer_0);
                     change_made |= ImGui::MenuItem(explorers[1].name, nullptr, &win_opts.show_explorer_1);
                     change_made |= ImGui::MenuItem(explorers[2].name, nullptr, &win_opts.show_explorer_2);
                     change_made |= ImGui::MenuItem(explorers[3].name, nullptr, &win_opts.show_explorer_3);
 
+                    change_made |= ImGui::MenuItem("Pinned", nullptr, &win_opts.show_pinned);
+                    change_made |= ImGui::MenuItem("File Operations", nullptr, &win_opts.show_file_operations);
                     change_made |= ImGui::MenuItem("Analytics", nullptr, &win_opts.show_analytics);
 
                 #if !defined(NDEBUG)
@@ -342,27 +344,25 @@ i32 main(i32, char**) try
                         bool changed_dotdot_dir = ImGui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir);
                         if (changed_dotdot_dir) {
                             for (auto &expl : explorers) {
-                                update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
+                                update_cwd_entries(full_refresh, &expl, expl.cwd.data());
                             }
                         }
                         change_made |= changed_dotdot_dir;
                     }
 
                     change_made |= ImGui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
-                    change_made |= ImGui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
+                    change_made |= ImGui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
 
                     {
                         bool changed_dir_separator = ImGui::MenuItem("Unix directory separators", nullptr, &expl_opts.unix_directory_separator);
                         if (changed_dir_separator) {
                             for (auto &expl : explorers) {
-                                update_cwd_entries(full_refresh, &expl, expl.cwd.data(), expl_opts);
+                                update_cwd_entries(full_refresh, &expl, expl.cwd.data());
                             }
-                            update_pin_dir_separators(expl_opts.dir_separator());
+                            update_pin_dir_separators(expl_opts.dir_separator_utf8());
                         }
                         change_made |= changed_dir_separator;
                     }
-
-                    change_made |= ImGui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
 
                     if (ImGui::BeginMenu("Refreshing")) {
                         char const *refresh_modes[] = {
@@ -389,6 +389,8 @@ i32 main(i32, char**) try
                         ImGui::EndMenu();
                     }
 
+                    change_made |= ImGui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
+
                     ImGui::EndMenu();
 
                     if (change_made) {
@@ -403,7 +405,7 @@ i32 main(i32, char**) try
         }
 
         if (win_opts.show_pinned) {
-            render_pinned_window(explorers, win_opts, expl_opts);
+            render_pinned_window(explorers, win_opts);
         }
 
         if (win_opts.show_file_operations) {
@@ -411,16 +413,16 @@ i32 main(i32, char**) try
         }
 
         if (win_opts.show_explorer_0) {
-            render_explorer_window(explorers[0], expl_opts);
+            render_explorer_window(explorers[0]);
         }
         if (win_opts.show_explorer_1) {
-            render_explorer_window(explorers[1], expl_opts);
+            render_explorer_window(explorers[1]);
         }
         if (win_opts.show_explorer_2) {
-            render_explorer_window(explorers[2], expl_opts);
+            render_explorer_window(explorers[2]);
         }
         if (win_opts.show_explorer_3) {
-            render_explorer_window(explorers[3], expl_opts);
+            render_explorer_window(explorers[3]);
         }
 
     #if !defined(NDEBUG)

@@ -10,22 +10,22 @@
 
 using namespace swan;
 
-#if defined(NDEBUG)
-bool debug_log_package::s_logging_enabled = false;
-#   define MAX_FILE_OPS 1000
-#else
-bool debug_log_package::s_logging_enabled = true;
-#   define MAX_FILE_OPS 10
-#endif
-
-static boost::circular_buffer<file_operation> s_file_ops_buffer(MAX_FILE_OPS);
+static boost::circular_buffer<file_operation> s_file_ops_buffer(100);
+static explorer_options s_explorer_options = {};
 static std::vector<path_t> s_pins = {};
 static BS::thread_pool s_thread_pool(1);
+
+bool debug_log_package::s_logging_enabled = true;
 ImGuiTextBuffer debug_log_package::s_debug_buffer = {};
 
 boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept(true)
 {
     return s_file_ops_buffer;
+}
+
+explorer_options &get_explorer_options() noexcept(true)
+{
+    return s_explorer_options;
 }
 
 std::vector<path_t> const &get_pins() noexcept(true)
@@ -341,14 +341,14 @@ bool windows_options::load_from_disk() noexcept(true)
     }
 }
 
-char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true)
+char const *get_just_file_name(char const *full_path) noexcept(true)
 {
     // C:\code\swan\src\explorer_window.cpp
     //                  ^^^^^^^^^^^^^^^^^^^ what we are after
     // src/swan.cpp
     //     ^^^^^^^^ what we are after
 
-    char const *just_the_file_name = std__source_location__file_path;
+    char const *just_the_file_name = full_path;
 
     std::string_view view(just_the_file_name);
 
@@ -359,6 +359,25 @@ char const *get_just_file_name(char const *std__source_location__file_path) noex
     }
 
     return just_the_file_name;
+}
+
+std::string_view get_everything_minus_file_name(char const *full_path) noexcept(true)
+{
+    // C:\code\swan\src\explorer_window.cpp
+    // ^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    // ^^^^ what we are after
+
+    std::string_view full_path_view(full_path);
+
+    u64 last_sep_pos = full_path_view.find_last_of("\\/");
+
+    if (last_sep_pos == std::string::npos) {
+        return full_path;
+    }
+    else {
+        return std::string_view(full_path, last_sep_pos + 1);
+    }
 }
 
 std::string get_last_error_string() noexcept(true)
