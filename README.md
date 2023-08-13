@@ -51,8 +51,8 @@ entry = file | directory
 - [x] Column: "last modified"
 - [x] Automatic refresh
 
-- [x] Copy file
-- [x] Delete file
+- [ ] Copy file
+- [ ] Delete file
 - [ ] Copy directory
 - [ ] Delete directory
 
@@ -80,8 +80,8 @@ entry = file | directory
 - [x] Handle executable .lnk
 - [x] Create directory
 - [x] Create file
+- [x] Basic drive list
 - [ ] Bulk renaming
-- [ ] Basic drive info
 
 - [ ] Filter entry types (directory, file, symlink)
 - [ ] Create shortcut
