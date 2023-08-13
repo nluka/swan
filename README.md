@@ -31,6 +31,8 @@ entry = file | directory
 
 ### Todo
 
+MVP:
+
 - [x] Remove "." directory
 - [x] Double click directory
 - [x] Double click file
@@ -51,23 +53,6 @@ entry = file | directory
 - [x] Column: "last modified"
 - [x] Automatic refresh
 
-- [ ] Copy file
-- [ ] Delete file
-- [ ] Copy directory
-- [ ] Delete directory
-
-- [ ] Undo copy file
-- [ ] Undo delete file
-- [ ] Undo copy directory
-- [ ] Undo delete directory
-
-- [ ] Cut file
-- [ ] Cut directory
-- [ ] Undo cut file
-- [ ] Undo cut directory
-
-- [ ] Persist file operations history
-
 - [x] Context menu: copy name
 - [x] Context menu: copy path
 - [x] Context menu: reveal in File Explorer
@@ -83,8 +68,29 @@ entry = file | directory
 - [x] Basic drive list
 - [ ] Bulk renaming
 
+- [ ] Cut file
+- [ ] Copy file
+- [ ] Delete file
+- [ ] Undo file delete
+
+- [ ] Copy directory
+- [ ] Move directory
+- [ ] Delete directory
+- [ ] Undo directory delete
+
+- [ ] Persist file operations history
+
+Not part of MVP:
+
+- [ ] Undo file move
+- [ ] Undo file copy
+- [ ] Undo directory move
+- [ ] Undo directory copy
+- [ ] Context menu: create shortcut
 - [ ] Filter entry types (directory, file, symlink)
-- [ ] Create shortcut
 - [ ] Glob filtering
 - [ ] Show directory preview (num child files/dirs)
 - [ ] File preview
+
+Performance items:
+- [ ] Cache pretty size, modified timestamp, created timestamp

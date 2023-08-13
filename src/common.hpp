@@ -87,6 +87,16 @@ struct basic_dir_ent
     kind type = kind::nil;
     swan::path_t path = {};
 
+    bool is_dotdot() const noexcept(true)
+    {
+        return swan::path_equals_exactly(path, "..");
+    }
+
+    bool is_dotdot_dir() const noexcept(true)
+    {
+        type == basic_dir_ent::kind::directory && swan::path_equals_exactly(path, "..");
+    }
+
     bool is_directory() const noexcept(true)
     {
         return type == basic_dir_ent::kind::directory;
@@ -124,6 +134,9 @@ struct basic_dir_ent
     }
 };
 
+template<typename T>
+using circular_buffer = boost::circular_buffer<T>;
+
 struct explorer_window
 {
     struct dir_ent
@@ -142,6 +155,7 @@ struct explorer_window
     };
 
     static u64 const NO_SELECTION = UINT64_MAX;
+    static u64 const MAX_WD_HISTORY_SIZE = 15;
     bool save_to_disk() const noexcept(true);
     bool load_from_disk(char dir_separator) noexcept(true);
     void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept(true);
@@ -150,7 +164,7 @@ struct explorer_window
     // 40 byte members
 
     // history for working directories, persisted in file
-    boost::circular_buffer<swan::path_t> wd_history = boost::circular_buffer<swan::path_t>(15);
+    circular_buffer<swan::path_t> wd_history = circular_buffer<swan::path_t>(MAX_WD_HISTORY_SIZE);
 
     // 32 byte members
 
@@ -294,6 +308,8 @@ std::string get_last_error_string() noexcept(true);
 bool save_focused_window(char const *window_name) noexcept(true);
 
 bool load_focused_window_from_disk(char const *out) noexcept(true);
+
+void imgui_sameline_spacing(u64 num_spacing_calls) noexcept(true);
 
 struct debug_log_package {
     char const *fmt;
