@@ -352,16 +352,63 @@ void render_bulk_rename_popup_modal(
 {
     namespace imgui = ImGui;
 
+    static char rename_pattern_utf8[512] = {};
+    static i32 rename_counter_start = 1;
+    static i32 rename_counter_step = 1;
+
     auto cleanup_and_close_popup = [&]() {
+        // rename_pattern_utf8[0] = '\0';
         imgui::CloseCurrentPopup();
         open = false;
     };
 
-    char rename_pattern_utf8[512] = {};
+    {
+        f32 avail_width = imgui::GetContentRegionAvail().x;
+        imgui::PushItemWidth(avail_width);
+        // TODO: apply callback to filter illegal characters
+        imgui::InputTextWithHint("##bulk_rename_pattern", "Rename pattern...", rename_pattern_utf8, lengthof(rename_pattern_utf8));
+        imgui::PopItemWidth();
 
-    imgui::InputTextWithHint("##bulk_rename_pattern", "Rename pattern...", rename_pattern_utf8, lengthof(rename_pattern_utf8));
+        // ${counter}_${name}_${size}
+    }
+
+    imgui::InputInt(" Counter start  ", &rename_counter_start);
+    imgui::InputInt(" Counter inc by ", &rename_counter_step);
 
     imgui::Spacing();
+    imgui::Spacing();
+
+    // imgui::SeparatorText("Preview");
+    if (imgui::BeginTable("bulk_rename_preview", 2)) {
+        imgui::TableSetupColumn("Before");
+        imgui::TableSetupColumn("After");
+        imgui::TableHeadersRow();
+
+        u64 preview_cnt = min(3, expl.cwd_entries.size());
+
+        for (u64 i = 0; i < preview_cnt; ++i) {
+            auto const &dirent = expl.cwd_entries[i];
+
+            imgui::TableNextColumn();
+            imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
+
+            imgui::TableNextColumn();
+            imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
+        }
+
+        imgui::EndTable();
+    }
+
+    imgui::Spacing();
+    imgui::Spacing();
+    imgui::Separator();
+    imgui::Spacing();
+
+    if (imgui::Button("Rename")) {
+        cleanup_and_close_popup();
+    }
+
+    imgui::SameLine();
 
     if (imgui::Button("Cancel")) {
         cleanup_and_close_popup();
