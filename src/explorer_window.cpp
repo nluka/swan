@@ -218,6 +218,19 @@ bool reveal_in_file_explorer(explorer_window::dir_ent const &entry, explorer_win
     return true;
 }
 
+i32 filter_illegal_filename_chars_callback(ImGuiInputTextCallbackData *data) noexcept(true)
+{
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter) {
+        static wchar_t const *forbidden_chars = L"\\/<>\"|?*";
+        bool is_forbidden = StrChrW(forbidden_chars, data->EventChar);
+        if (is_forbidden) {
+            data->EventChar = L'\0';
+        }
+    }
+
+    return 0;
+}
+
 void render_rename_entry_popup_modal(
     explorer_window::dir_ent const &rename_entry,
     explorer_window &expl,
@@ -253,10 +266,14 @@ void render_rename_entry_popup_modal(
     {
         f32 avail_width = imgui::GetContentRegionAvail().x;
         imgui::PushItemWidth(avail_width);
-        // TODO: apply callback to filter illegal characters
-        if (imgui::InputTextWithHint("##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(), 0, nullptr, nullptr)) {
+
+        if (imgui::InputTextWithHint(
+            "##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(),
+            ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback)
+        ) {
             err_msg.clear();
         }
+
         imgui::PopItemWidth();
     }
 
@@ -365,8 +382,12 @@ void render_bulk_rename_popup_modal(
     {
         f32 avail_width = imgui::GetContentRegionAvail().x;
         imgui::PushItemWidth(avail_width);
-        // TODO: apply callback to filter illegal characters
-        imgui::InputTextWithHint("##bulk_rename_pattern", "Rename pattern...", rename_pattern_utf8, lengthof(rename_pattern_utf8));
+
+        imgui::InputTextWithHint(
+            "##bulk_rename_pattern", "Rename pattern...", rename_pattern_utf8, lengthof(rename_pattern_utf8),
+            ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback
+        );
+
         imgui::PopItemWidth();
 
         // ${counter}_${name}_${size}
@@ -1556,11 +1577,12 @@ void render_explorer_window(explorer_window &expl)
                 imgui::CalcTextSize(expl.filter.data()).x + (imgui::GetStyle().FramePadding.x * 2) + 10.f,
                 imgui::CalcTextSize("123456789012345").x
             ));
-            // TODO: apply callback to filter illegal characters
+
             if (imgui::InputTextWithHint("##filter", "Filter", expl.filter.data(), expl.filter.size())) {
                 (void) update_cwd_entries(filter, &expl, expl.cwd.data());
                 (void) expl.save_to_disk();
             }
+
             imgui::PopItemWidth();
         }
         // filter text input end
@@ -1584,8 +1606,10 @@ void render_explorer_window(explorer_window &expl)
             if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
                 imgui::SetKeyboardFocusHere(0);
             }
-            // TODO: apply callback to filter illegal characters
-            if (imgui::InputTextWithHint("##dir_name_input", "Directory name...", dir_name_utf8, lengthof(dir_name_utf8))) {
+            if (imgui::InputTextWithHint(
+                "##dir_name_input", "Directory name...", dir_name_utf8, lengthof(dir_name_utf8)),
+                ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback
+            ) {
                 err_msg.clear();
             }
 
@@ -1676,8 +1700,10 @@ void render_explorer_window(explorer_window &expl)
             if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
                 imgui::SetKeyboardFocusHere(0);
             }
-            // TODO: apply callback to filter illegal characters
-            if (imgui::InputTextWithHint("##file_name_input", "File name...", file_name_utf8, lengthof(file_name_utf8))) {
+            if (imgui::InputTextWithHint(
+                "##file_name_input", "File name...", file_name_utf8, lengthof(file_name_utf8),
+                ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback)
+            ) {
                 err_msg.clear();
             }
 
