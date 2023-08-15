@@ -17,6 +17,8 @@
 #include "util.hpp"
 #include "util.cpp"
 
+#include "bulk_rename.cpp"
+
 using swan::path_t;
 
 i32 main()
@@ -314,6 +316,86 @@ i32 main()
 
     ntest::assert_cstr("1\\2\\3\\", path_squish_adjacent_separators(path_create("1\\2\\3\\")).data());
     ntest::assert_cstr("1\\2\\3\\", path_squish_adjacent_separators(path_create("1\\\\\\2\\3\\\\\\")).data());
+  }
+  #endif
+
+  using bulk_rename::apply_pattern;
+  #if 1
+  {
+    path_t after = {};
+
+    // success == false
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "", 0, 0);
+      ntest::assert_bool(false, success);
+      ntest::assert_cstr("empty pattern", err_msg.data());
+      ntest::assert_cstr("", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "<<", 0, 0);
+      ntest::assert_bool(false, success);
+      ntest::assert_cstr("unexpected '<' at position 1, unclosed '<' at position 0", err_msg.data());
+      ntest::assert_cstr("", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "data<<", 0, 0);
+      ntest::assert_bool(false, success);
+      ntest::assert_cstr("unexpected '<' at position 5, unclosed '<' at position 4", err_msg.data());
+      ntest::assert_cstr("", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, ">", 0, 0);
+      ntest::assert_bool(false, success);
+      ntest::assert_cstr("unexpected '>' at position 0 - no preceding '<' found", err_msg.data());
+      ntest::assert_cstr("", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "<>", 0, 0);
+      ntest::assert_bool(false, success);
+      ntest::assert_cstr("empty expression starting at position 0", err_msg.data());
+      ntest::assert_cstr("", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "data_<bogus>", 0, 0);
+      ntest::assert_bool(false, success);
+      ntest::assert_cstr("unknown expression starting at position 5", err_msg.data());
+      ntest::assert_cstr("", after.data());
+    }
+    // success == true
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "<counter>", 0, 0);
+      ntest::assert_bool(true, success);
+      ntest::assert_cstr("", err_msg.data());
+      ntest::assert_cstr("0", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "<CoUnTeR>", 100, 0);
+      ntest::assert_bool(true, success);
+      ntest::assert_cstr("", err_msg.data());
+      ntest::assert_cstr("100", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "something_<before>_bla", 0, 0);
+      ntest::assert_bool(true, success);
+      ntest::assert_cstr("", err_msg.data());
+      ntest::assert_cstr("something_before_bla", after.data());
+    }
+    {
+      path_t before = path_create("before");
+      auto [success, err_msg] = apply_pattern(before, after, "<bytes>", 0, 42);
+      ntest::assert_bool(true, success);
+      ntest::assert_cstr("", err_msg.data());
+      ntest::assert_cstr("42", after.data());
+    }
   }
   #endif
 

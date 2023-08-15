@@ -5,3 +5,5 @@ data/
 dummy/
 bin/
 swan_tests.md
+*.actual
+*.expected
