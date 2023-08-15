@@ -29,6 +29,7 @@ using namespace swan;
 
 static IShellLinkW *s_shell_link = nullptr;
 static IPersistFile *s_persist_file_interface = nullptr;
+static wchar_t const *s_illegal_filename_chars = L"\\/<>\"|?*";
 
 static
 bool init_windows_shell_com_garbage()
@@ -218,11 +219,13 @@ bool reveal_in_file_explorer(explorer_window::dir_ent const &entry, explorer_win
     return true;
 }
 
-i32 filter_illegal_filename_chars_callback(ImGuiInputTextCallbackData *data) noexcept(true)
+typedef wchar_t* filter_chars_callback_user_data_t;
+
+i32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept(true)
 {
     if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter) {
-        static wchar_t const *forbidden_chars = L"\\/<>\"|?*";
-        bool is_forbidden = StrChrW(forbidden_chars, data->EventChar);
+        wchar_t *chars_to_filter = (filter_chars_callback_user_data_t)data->UserData;
+        bool is_forbidden = StrChrW(chars_to_filter, data->EventChar);
         if (is_forbidden) {
             data->EventChar = L'\0';
         }
@@ -269,7 +272,7 @@ void render_rename_entry_popup_modal(
 
         if (imgui::InputTextWithHint(
             "##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(),
-            ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback)
+            ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)s_illegal_filename_chars)
         ) {
             err_msg.clear();
         }
@@ -385,12 +388,13 @@ void render_bulk_rename_popup_modal(
 
         imgui::InputTextWithHint(
             "##bulk_rename_pattern", "Rename pattern...", rename_pattern_utf8, lengthof(rename_pattern_utf8),
-            ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback
+            ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)L"\\/\"|?*"
+            // don't filter <>, we use them for interpolating the pattern with name, counter, etc.
         );
 
         imgui::PopItemWidth();
 
-        // ${counter}_${name}_${size}
+        // <counter>_<name>
     }
 
     imgui::InputInt(" Counter start  ", &rename_counter_start);
@@ -1607,8 +1611,8 @@ void render_explorer_window(explorer_window &expl)
                 imgui::SetKeyboardFocusHere(0);
             }
             if (imgui::InputTextWithHint(
-                "##dir_name_input", "Directory name...", dir_name_utf8, lengthof(dir_name_utf8)),
-                ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback
+                "##dir_name_input", "Directory name...", dir_name_utf8, lengthof(dir_name_utf8),
+                ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)s_illegal_filename_chars)
             ) {
                 err_msg.clear();
             }
@@ -1702,7 +1706,7 @@ void render_explorer_window(explorer_window &expl)
             }
             if (imgui::InputTextWithHint(
                 "##file_name_input", "File name...", file_name_utf8, lengthof(file_name_utf8),
-                ImGuiInputTextFlags_CallbackCharFilter, filter_illegal_filename_chars_callback)
+                ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)s_illegal_filename_chars)
             ) {
                 err_msg.clear();
             }
