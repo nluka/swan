@@ -9,6 +9,8 @@ The <u>sw</u>iss <u>a</u>rmy k<u>n</u>ife program for Windows. One program to re
 
 ## Explorer
 
+<img src="resource/preview1.png" />
+
 ### Controls
 
 entry = file | directory
