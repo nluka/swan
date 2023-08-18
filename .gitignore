@@ -1,6 +1,10 @@
 .vscode/settings.json
 obj*/
-resource/
+*.rc
+*.res
+*.ico
+jquery*
+swan.png
 data/
 dummy/
 bin/
