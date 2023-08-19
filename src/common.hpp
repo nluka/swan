@@ -299,9 +299,13 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true);
 
 u64 find_pin_idx(swan::path_t const &) noexcept(true);
 
-char const *get_just_file_name(char const *std__source_location__file_path) noexcept(true);
+char *get_file_name(char *path) noexcept(true);
+char const *cget_file_name(char const *path) noexcept(true);
 
-std::string_view get_everything_minus_file_name(char const *full_path) noexcept(true);
+char *get_file_ext(char *path) noexcept(true);
+// char const *cget_file_ext(char const *path) noexcept(true);
+
+std::string_view get_everything_minus_file_name(char const *path) noexcept(true);
 
 std::string get_last_error_string() noexcept(true);
 
@@ -347,7 +351,7 @@ void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&.
         debug_buffer.clear();
     }
 
-    char const *just_the_file_name = get_just_file_name(pack.loc.file_name());
+    char const *just_the_file_name = cget_file_name(pack.loc.file_name());
 
     debug_buffer.appendf("%21s:%5d ", just_the_file_name, pack.loc.line());
     debug_buffer.appendf(pack.fmt, args...);
