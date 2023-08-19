@@ -2406,7 +2406,7 @@ void render_explorer_window(explorer_window &expl)
                                 debug_log("[%s] shift click, [%zu, %zu]", expl.name, first_idx, last_idx);
 
                                 for (u64 j = first_idx; j <= last_idx; ++j) {
-                                    if (expl.cwd_entries[j].basic.is_dotdot()) {
+                                    if (!expl.cwd_entries[j].basic.is_dotdot()) {
                                         expl.cwd_entries[j].is_selected = true;
                                     }
                                 }
