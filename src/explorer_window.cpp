@@ -25,6 +25,8 @@
 #include "util.hpp"
 #include "path.hpp"
 
+#include "bulk_rename.cpp"
+
 using namespace swan;
 
 static IShellLinkW *s_shell_link = nullptr;
@@ -393,8 +395,6 @@ void render_bulk_rename_popup_modal(
         );
 
         imgui::PopItemWidth();
-
-        // <counter>_<name>
     }
 
     imgui::InputInt(" Counter start  ", &rename_counter_start);
@@ -404,21 +404,51 @@ void render_bulk_rename_popup_modal(
     imgui::Spacing();
 
     // imgui::SeparatorText("Preview");
-    if (imgui::BeginTable("bulk_rename_preview", 2)) {
+    if (imgui::BeginTable("bulk_rename_preview", 2, ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchSame)) {
         imgui::TableSetupColumn("Before");
         imgui::TableSetupColumn("After");
         imgui::TableHeadersRow();
 
         u64 preview_cnt = min(3, expl.cwd_entries.size());
 
-        for (u64 i = 0; i < preview_cnt; ++i) {
-            auto const &dirent = expl.cwd_entries[i];
+        for (
+            u64 i = 0, counter = rename_counter_start, previews_shown = 0;
+            i < expl.cwd_entries.size() && previews_shown < preview_cnt;
+            ++i, counter += rename_counter_step
+        ) {
+            auto &dirent = expl.cwd_entries[i];
 
-            imgui::TableNextColumn();
-            imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
+            if (dirent.is_selected) {
+                imgui::TableNextColumn();
+                imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
 
-            imgui::TableNextColumn();
-            imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
+                imgui::TableNextColumn();
+                char *name = get_file_name(dirent.basic.path.data());
+                char *ext = get_file_ext(name);
+                char *dot = ext ? ext - 1 : nullptr;
+
+                if (dot) {
+                    *dot = '\0';
+                }
+
+                std::array<char, 1025> after;
+
+                auto result = bulk_rename::apply_pattern(name, ext, after, rename_pattern_utf8, counter, dirent.basic.size);
+                if (result.success) {
+                    imgui::TextColored(dirent.basic.get_color(), after.data());
+                } else {
+                    ImVec4 red(1.0, 0, 0, 1.0);
+                    auto &err_msg = result.error_msg;
+                    err_msg.front() = (char)toupper(err_msg.front());
+                    imgui::TextColored(red, err_msg.data());
+                }
+
+                if (dot) {
+                    *dot = '.';
+                }
+
+                ++previews_shown;
+            }
         }
 
         imgui::EndTable();
@@ -722,7 +752,7 @@ bool update_cwd_entries(
     std::source_location sloc)
 {
     debug_log("[%s] update_cwd_entries() called from [%s:%d]",
-        expl_ptr->name, get_just_file_name(sloc.file_name()), sloc.line());
+        expl_ptr->name, cget_file_name(sloc.file_name()), sloc.line());
 
     IM_ASSERT(expl_ptr != nullptr);
 
@@ -1941,7 +1971,7 @@ void render_explorer_window(explorer_window &expl)
                             color = white;
                             break;
                     }
-                    imgui::TextColored(color, get_just_file_name(item.path.data()));
+                    imgui::TextColored(color, cget_file_name(item.path.data()));
                 }
 
                 imgui::EndTooltip();

@@ -341,14 +341,16 @@ bool windows_options::load_from_disk() noexcept(true)
     }
 }
 
-char const *get_just_file_name(char const *full_path) noexcept(true)
+char *get_file_name(char *path) noexcept(true)
 {
     // C:\code\swan\src\explorer_window.cpp
     //                  ^^^^^^^^^^^^^^^^^^^ what we are after
     // src/swan.cpp
     //     ^^^^^^^^ what we are after
 
-    char const *just_the_file_name = full_path;
+    assert(path != nullptr);
+
+    char *just_the_file_name = path;
 
     std::string_view view(just_the_file_name);
 
@@ -361,22 +363,69 @@ char const *get_just_file_name(char const *full_path) noexcept(true)
     return just_the_file_name;
 }
 
-std::string_view get_everything_minus_file_name(char const *full_path) noexcept(true)
+char const *cget_file_name(char const *path) noexcept(true)
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                  ^^^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    //     ^^^^^^^^ what we are after
+
+    assert(path != nullptr);
+
+    char const *just_the_file_name = path;
+
+    std::string_view view(just_the_file_name);
+
+    u64 last_sep_pos = view.find_last_of("\\/");
+
+    if (last_sep_pos != std::string::npos) {
+        just_the_file_name += last_sep_pos + 1;
+    }
+
+    return just_the_file_name;
+}
+
+char *get_file_ext(char *path) noexcept(true)
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                                  ^^^ what we are after
+    // src/swan.cpp
+    //          ^^^ what we are after
+
+    assert(path != nullptr);
+
+    char *just_the_file_ext = path;
+
+    std::string_view view(just_the_file_ext);
+
+    u64 last_dot_pos = view.find_last_of(".");
+
+    if (last_dot_pos != std::string::npos) {
+        just_the_file_ext += last_dot_pos + 1;
+        return just_the_file_ext;
+    } else {
+        return nullptr;
+    }
+}
+
+std::string_view get_everything_minus_file_name(char const *path) noexcept(true)
 {
     // C:\code\swan\src\explorer_window.cpp
     // ^^^^^^^^^^^^^^^^^ what we are after
     // src/swan.cpp
     // ^^^^ what we are after
 
-    std::string_view full_path_view(full_path);
+    assert(path != nullptr);
+
+    std::string_view full_path_view(path);
 
     u64 last_sep_pos = full_path_view.find_last_of("\\/");
 
     if (last_sep_pos == std::string::npos) {
-        return full_path;
+        return path;
     }
     else {
-        return std::string_view(full_path, last_sep_pos + 1);
+        return std::string_view(path, last_sep_pos + 1);
     }
 }
 
