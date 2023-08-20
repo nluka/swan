@@ -267,6 +267,7 @@ void render_rename_entry_popup_modal(
     // set initial focus on input text below
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
         imgui::SetKeyboardFocusHere(0);
+        new_name_utf8 = rename_entry.basic.path;
     }
     {
         f32 avail_width = imgui::GetContentRegionAvail().x;
@@ -409,8 +410,9 @@ void render_bulk_rename_popup_modal(
         imgui::TableSetupColumn("After");
         imgui::TableHeadersRow();
 
-        u64 preview_cnt = min(3, expl.cwd_entries.size());
+        u64 preview_cnt = min(5, expl.cwd_entries.size());
 
+        // try to show preview_cnt # of previews, with simulated counter
         for (
             u64 i = 0, counter = rename_counter_start, previews_shown = 0;
             i < expl.cwd_entries.size() && previews_shown < preview_cnt;
@@ -1105,7 +1107,8 @@ void new_history_from(explorer_window &expl, path_t const &new_latest_entry)
     expl.wd_history.push_back(new_latest_entry_clean);
 }
 
-void try_ascend_directory(explorer_window &expl)
+// TODO: make noexcept(true)
+bool try_ascend_directory(explorer_window &expl)
 {
     auto &cwd = expl.cwd;
 
@@ -1127,9 +1130,12 @@ void try_ascend_directory(explorer_window &expl)
     expl.filter_error.clear();
 
     (void) expl.save_to_disk();
+
+    return true;
 }
 
-void try_descend_to_directory(explorer_window &expl, char const *child_dir)
+// TODO: make noexcept(true)
+bool try_descend_to_directory(explorer_window &expl, char const *child_dir)
 {
     path_t new_cwd = expl.cwd;
     char dir_sep_utf8 = get_explorer_options().dir_separator_utf8();
@@ -1146,14 +1152,18 @@ void try_descend_to_directory(explorer_window &expl, char const *child_dir)
             expl.filter_error.clear();
 
             (void) expl.save_to_disk();
+
+            return true;
         }
         else {
             debug_log("[%s] PathCanonicalizeA failed", expl.name);
+            return false;
         }
     }
     else {
         debug_log("[%s] path_append failed, new_cwd = [%s], append data = [%c%s]", expl.name, new_cwd.data(), dir_sep_utf8, child_dir);
         expl.cwd = new_cwd;
+        return false;
     }
 }
 
@@ -1303,6 +1313,7 @@ void render_explorer_window(explorer_window &expl)
     if (window_focused && imgui::IsKeyPressed(ImGuiKey_Enter)) {
         if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
             debug_log("[%s] pressed enter but cwd_prev_selected_dirent_idx = NO_SELECTION", expl.name);
+            // TODO: notify user of failure
         } else {
             auto dirent_which_enter_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
             debug_log("[%s] pressed enter on [%s]", expl.name, dirent_which_enter_was_pressed_on.basic.path.data());
@@ -1318,6 +1329,7 @@ void render_explorer_window(explorer_window &expl)
     if (window_focused && imgui::IsKeyPressed(ImGuiKey_F2)) {
         if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
             debug_log("[%s] pressed F2 but cwd_prev_selected_dirent_idx = NO_SELECTION", expl.name);
+            // TODO: notify user of failure
         } else {
             auto dirent_which_f2_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
             debug_log("[%s] pressed F2 on [%s]", expl.name, dirent_which_f2_was_pressed_on.basic.path.data());
@@ -2374,7 +2386,12 @@ void render_explorer_window(explorer_window &expl)
                     if (imgui::TableSetColumnIndex(cwd_entries_table_col_path)) {
                         imgui::PushStyleColor(ImGuiCol_Text, dir_ent.basic.get_color());
 
+                        // TODO: fix
                         if (imgui::Selectable(dir_ent.basic.path.data(), dir_ent.is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
+                            debug_log("[%s] selected [%s]", expl.name, dir_ent.basic.path.data());
+
+                            bool set_selection_data = true;
+
                             if (!io.KeyCtrl && !io.KeyShift) {
                                 // entry was selected but Ctrl was not held, so deselect everything
                                 for (auto &dir_ent2 : expl.cwd_entries)
@@ -2388,7 +2405,7 @@ void render_explorer_window(explorer_window &expl)
 
                                 u64 first_idx, last_idx;
 
-                                if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
+                                if (expl.cwd_prev_selected_dirent_idx = explorer_window::NO_SELECTION) {
                                     // nothing in cwd has been selected, so start selection from very first entry
                                     expl.cwd_prev_selected_dirent_idx = 0;
                                 }
@@ -2423,19 +2440,29 @@ void render_explorer_window(explorer_window &expl)
                                 if (dir_ent.basic.is_directory()) {
                                     debug_log("[%s] double clicked directory [%s]", expl.name, dir_ent.basic.path.data());
 
+                                    bool cd_success = false;
+
                                     if (dir_ent.basic.is_dotdot()) {
-                                        try_ascend_directory(expl);
+                                        cd_success = try_ascend_directory(expl);
                                     } else {
-                                        try_descend_to_directory(expl, dir_ent.basic.path.data());
+                                        cd_success = try_descend_to_directory(expl, dir_ent.basic.path.data());
+                                    }
+
+                                    if (cd_success) {
+                                        set_selection_data = false;
+                                        // don't set selection data, because we just navigated to a different directory
+                                        // which cleared the selection state - we need to maintain this cleared state
                                     }
                                 }
                                 else if (dir_ent.basic.is_symlink()) {
                                     debug_log("[%s] double clicked symlink [%s]", expl.name, dir_ent.basic.path.data());
+
                                     open_symlink(dir_ent, expl, dir_sep_utf8);
                                     // TODO: handle open failure
                                 }
                                 else {
                                     debug_log("[%s] double clicked file [%s]", expl.name, dir_ent.basic.path.data());
+
                                     open_file(dir_ent, expl, dir_sep_utf8);
                                     // TODO: handle open failure
                                 }
@@ -2444,9 +2471,11 @@ void render_explorer_window(explorer_window &expl)
                                 debug_log("[%s] selected [%s]", expl.name, dir_ent.basic.path.data());
                             }
 
-                            last_click_time = current_time;
-                            last_click_path = current_click_path;
-                            expl.cwd_prev_selected_dirent_idx = i;
+                            if (set_selection_data) {
+                                last_click_time = current_time;
+                                last_click_path = current_click_path;
+                                expl.cwd_prev_selected_dirent_idx = i;
+                            }
 
                         } // imgui::Selectable
 

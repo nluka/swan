@@ -31,16 +31,19 @@ Note: cwd = current working directory
 - [x] Create empty file in cwd
 - [ ] File preview
 
+<!-- TODO: GIF demo -->
 - Pin directories (similar to Quick Access in Window File Explorer)
   - [x] Pin/unpin
   - [ ] Reorder pins
 
+<!-- TODO: GIF demo -->
 - Basic navigation with double clicks
   - [x] Change to a directory by double clicking it
   - [x] Open a file or shortcut to file by double clicking it
   - [x] Navigate through directory shortcut by double clicking it
   - [x] Go to parent directory with up arrow or optional `..` directory
 
+<!-- TODO: GIF demo -->
 - Advanced selection with single clicks and modifiers
   - [x] `Left click` a directory to make it the current selection (clears any previous selection)
   - [x] `Ctrl + left click` a directory to add it to current selection (does not clear previous selection)
@@ -53,6 +56,7 @@ Note: cwd = current working directory
   - [x] `Adaptive` - automatic for directories with <= N entries where N is user defined, falls back to manual for directories with > N entries
   - [x] Selection maintained between refreshes
 
+<!-- TODO: GIF demo -->
 - Filter entries in cwd
   - [x] `Contains` mode - searches for substring
   - [x] `RegExp` mode - full Regular Expression support
@@ -60,6 +64,7 @@ Note: cwd = current working directory
   - [x] Case sensitive and insensitive option for all modes
   - [ ] Discriminate by entry type - e.g. filter for files only, which match pattern
 
+<!-- TODO: GIF demo -->
 - Context menu for directory entries (accessed with right click)
   - [x] Copy file/directory name - e.g. `file.cpp`
   - [x] Copy file/directory path - e.g. `C:\directory\file.cpp`
@@ -68,6 +73,7 @@ Note: cwd = current working directory
   - [ ] Create shortcut
   - [ ] Custom commands
 
+<!-- TODO: GIF demo -->
 - Track directory history
   - [x] Go back/forward in history with left/right arrows
   - [x] View and select from history with popup window
@@ -85,6 +91,7 @@ Note: cwd = current working directory
     - [ ] Undo
   - [ ] Delete directories
     - [ ] Undo
+  <!-- TODO: GIF demo -->
   - [ ] Bulk renaming
     - [ ] Sample preview of current pattern before/after
     - [x] Arbitrary counter with configurable start and step values
@@ -93,10 +100,12 @@ Note: cwd = current working directory
     - [x] Refer to size in bytes using `<bytes>` (= 0 for directories)
     - [ ] Undo
 
+<!-- TODO: GIF demo -->
 - Deal with locked files
   - [ ] See processes blocking an operation
   - [ ] Kill processes blocking an operation
 
+<!-- TODO: GIF demo -->
 - Show directory preview
   - [ ] Number of direct child files
   - [ ] Number of direct child directories
