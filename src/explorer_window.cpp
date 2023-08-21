@@ -375,12 +375,13 @@ void render_bulk_rename_popup_modal(
 {
     namespace imgui = ImGui;
 
-    static char rename_pattern_utf8[512] = {};
-    static i32 rename_counter_start = 1;
-    static i32 rename_counter_step = 1;
+    static char pattern_utf8[512] = "<name>.<ext>";
+    static i32 counter_start = 1;
+    static i32 counter_step = 1;
+    static bool squish_adjacent_spaces = true;
 
     auto cleanup_and_close_popup = [&]() {
-        // rename_pattern_utf8[0] = '\0';
+        // pattern_utf8[0] = '\0';
         imgui::CloseCurrentPopup();
         open = false;
     };
@@ -390,7 +391,7 @@ void render_bulk_rename_popup_modal(
         imgui::PushItemWidth(avail_width);
 
         imgui::InputTextWithHint(
-            "##bulk_rename_pattern", "Rename pattern...", rename_pattern_utf8, lengthof(rename_pattern_utf8),
+            "##bulk_rename_pattern", "Rename pattern...", pattern_utf8, lengthof(pattern_utf8),
             ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)L"\\/\"|?*"
             // don't filter <>, we use them for interpolating the pattern with name, counter, etc.
         );
@@ -398,25 +399,60 @@ void render_bulk_rename_popup_modal(
         imgui::PopItemWidth();
     }
 
-    imgui::InputInt(" Counter start  ", &rename_counter_start);
-    imgui::InputInt(" Counter inc by ", &rename_counter_step);
+    imgui::Spacing();
+
+    imgui::InputInt(" Counter start ", &counter_start);
 
     imgui::Spacing();
+
+    imgui::InputInt(" Counter step ", &counter_step);
+
     imgui::Spacing();
+
+    imgui::Checkbox("Squish adjacent spaces", &squish_adjacent_spaces);
+
+    imgui::Spacing();
+
+    imgui::Separator();
+    imgui::Spacing();
+
+    if (imgui::Button("Rename")) {
+
+
+        cleanup_and_close_popup();
+    }
+
+    imgui::SameLine();
+
+    if (imgui::Button("Cancel")) {
+        cleanup_and_close_popup();
+    }
+
+    imgui::Spacing();
+
+    u64 preview_cnt = min(5, expl.cwd_entries.size());
+    auto const &style = imgui::GetStyle();
+    auto preview_cnt_rows_dimensions = ImVec2(-1, ( imgui::CalcTextSize("Y").y + (style.FramePadding.y * 2) + style.ItemSpacing.y) * f32(preview_cnt));
 
     // imgui::SeparatorText("Preview");
-    if (imgui::BeginTable("bulk_rename_preview", 2, ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchSame)) {
+    if (
+        imgui::BeginTable(
+            "bulk_rename_preview", 2,
+            ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp,
+            preview_cnt_rows_dimensions
+        )
+    ) {
         imgui::TableSetupColumn("Before");
         imgui::TableSetupColumn("After");
         imgui::TableHeadersRow();
 
-        u64 preview_cnt = min(5, expl.cwd_entries.size());
+        i32 counter = counter_start;
 
         // try to show preview_cnt # of previews, with simulated counter
         for (
-            u64 i = 0, counter = rename_counter_start, previews_shown = 0;
+            u64 i = 0, previews_shown = 0;
             i < expl.cwd_entries.size() && previews_shown < preview_cnt;
-            ++i, counter += rename_counter_step
+            ++i, counter += counter_step
         ) {
             auto &dirent = expl.cwd_entries[i];
 
@@ -435,7 +471,16 @@ void render_bulk_rename_popup_modal(
 
                 std::array<char, 1025> after;
 
-                auto result = bulk_rename::apply_pattern(name, ext, after, rename_pattern_utf8, counter, dirent.basic.size);
+                auto result = bulk_rename::apply_pattern(
+                    name,
+                    ext,
+                    after,
+                    pattern_utf8,
+                    counter,
+                    dirent.basic.size,
+                    squish_adjacent_spaces
+                );
+
                 if (result.success) {
                     imgui::TextColored(dirent.basic.get_color(), after.data());
                 } else {
@@ -454,21 +499,6 @@ void render_bulk_rename_popup_modal(
         }
 
         imgui::EndTable();
-    }
-
-    imgui::Spacing();
-    imgui::Spacing();
-    imgui::Separator();
-    imgui::Spacing();
-
-    if (imgui::Button("Rename")) {
-        cleanup_and_close_popup();
-    }
-
-    imgui::SameLine();
-
-    if (imgui::Button("Cancel")) {
-        cleanup_and_close_popup();
     }
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -864,7 +894,7 @@ bool update_cwd_entries(
                     }
                 } else {
                     for (auto const &prev_selected_entry : selected_entries) {
-                        bool was_selected_before_refresh = path_strictly_same(entry.basic.path, prev_selected_entry);
+                        bool was_selected_before_refresh = path_equals_exactly(entry.basic.path, prev_selected_entry);
                         if (was_selected_before_refresh) {
                             entry.is_selected = true;
                         }
@@ -2405,7 +2435,7 @@ void render_explorer_window(explorer_window &expl)
 
                                 u64 first_idx, last_idx;
 
-                                if (expl.cwd_prev_selected_dirent_idx = explorer_window::NO_SELECTION) {
+                                if (expl.cwd_prev_selected_dirent_idx == explorer_window::NO_SELECTION) {
                                     // nothing in cwd has been selected, so start selection from very first entry
                                     expl.cwd_prev_selected_dirent_idx = 0;
                                 }
@@ -2436,7 +2466,7 @@ void render_explorer_window(explorer_window &expl)
                             f64 current_time = imgui::GetTime();
                             f64 seconds_between_clicks = current_time - last_click_time;
 
-                            if (seconds_between_clicks <= double_click_window_sec && path_strictly_same(current_click_path, last_click_path)) {
+                            if (seconds_between_clicks <= double_click_window_sec && path_equals_exactly(current_click_path, last_click_path)) {
                                 if (dir_ent.basic.is_directory()) {
                                     debug_log("[%s] double clicked directory [%s]", expl.name, dir_ent.basic.path.data());
 
@@ -2602,7 +2632,7 @@ void render_explorer_window(explorer_window &expl)
     if (open_bulk_rename_popup) {
         imgui::OpenPopup("Bulk rename");
     }
-    if (imgui::BeginPopupModal("Bulk rename", &open_bulk_rename_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (imgui::BeginPopupModal("Bulk rename", &open_bulk_rename_popup)) {
         render_bulk_rename_popup_modal(expl, dir_sep_utf16, open_bulk_rename_popup);
     }
 

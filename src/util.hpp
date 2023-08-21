@@ -45,4 +45,6 @@ i32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capa
 
 bool streq(char const *s1, char const *s2) noexcept(true);
 
+u64 remove_adjacent_spaces(char *str, u64 len = 0) noexcept(true);
+
 #endif // SWAN_UTIL_HPP

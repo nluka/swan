@@ -310,7 +310,7 @@ i32 main(i32, char**) try
             ImGuiStyle &style = imgui::GetStyle();
             f32 original_padding = style.FramePadding.y;
 
-            style.FramePadding.y = 7.5f;
+            style.FramePadding.y = 10.0f;
 
             if (imgui::BeginMainMenuBar()) {
                 if (imgui::BeginMenu("[Windows]")) {
