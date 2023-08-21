@@ -44,7 +44,7 @@ bool swan::path_equals_exactly(path_t const &p1, char const *p2) noexcept(true)
     return strcmp(p1.data(), p2) == 0;
 }
 
-bool swan::path_strictly_same(path_t const &p1, path_t const &p2) noexcept(true)
+bool swan::path_equals_exactly(path_t const &p1, path_t const &p2) noexcept(true)
 {
     return strcmp(p1.data(), p2.data()) == 0;
 }

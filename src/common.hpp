@@ -319,6 +319,7 @@ struct debug_log_package {
     char const *fmt;
     std::source_location loc;
     time_point_t time;
+
     static ImGuiTextBuffer s_debug_buffer;
     static bool s_logging_enabled;
 

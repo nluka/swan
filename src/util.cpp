@@ -135,4 +135,39 @@ bool streq(char const *s1, char const *s2) noexcept(true)
     return strcmp(s1, s2) == 0;
 }
 
+u64 remove_adjacent_spaces(char *str, u64 len) noexcept(true)
+{
+    assert(str != nullptr);
+
+    if (len == 0) {
+        len = strlen(str);
+    }
+
+    bool in_space = false;
+    u64 write_index = 0;
+    u64 spaces_removed = 0;
+
+    for (u64 i = 0; i < len; i++) {
+        if (str[i] == ' ') {
+            if (!in_space) {
+                str[write_index++] = ' ';
+                in_space = true;
+            } else {
+                spaces_removed++;
+            }
+        } else {
+            str[write_index++] = str[i];
+            in_space = false;
+        }
+    }
+
+    if (write_index > 0 && str[write_index - 1] == ' ') {
+        write_index--; // Remove trailing space, if any
+    }
+
+    str[write_index] = '\0'; // Null-terminate the modified string
+
+    return spaces_removed;
+}
+
 #endif // SWAN_UTIL_CPP

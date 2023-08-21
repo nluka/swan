@@ -326,66 +326,91 @@ i32 main()
 
     // success == false
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "", 0, 0, false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("empty pattern", err_msg.data());
       ntest::assert_cstr("", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "<<", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "<<", 0, 0, false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("unexpected '<' at position 1, unclosed '<' at position 0", err_msg.data());
       ntest::assert_cstr("", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "data<<", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "data<<", 0, 0, false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("unexpected '<' at position 5, unclosed '<' at position 4", err_msg.data());
       ntest::assert_cstr("", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, ">", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, ">", 0, 0, false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("unexpected '>' at position 0 - no preceding '<' found", err_msg.data());
       ntest::assert_cstr("", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "<>", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "<>", 0, 0, false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("empty expression starting at position 0", err_msg.data());
       ntest::assert_cstr("", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "data_<bogus>", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "data_<bogus>", 0, 0, false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("unknown expression starting at position 5", err_msg.data());
       ntest::assert_cstr("", after.data());
     }
     // success == true
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "<counter>", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "<counter>", 0, 0, false);
       ntest::assert_bool(true, success);
       ntest::assert_cstr("", err_msg.data());
       ntest::assert_cstr("0", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "<CoUnTeR>", 100, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "<CoUnTeR>", 100, 0, false);
       ntest::assert_bool(true, success);
       ntest::assert_cstr("", err_msg.data());
       ntest::assert_cstr("100", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "something_<name>_bla", 0, 0);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "something_<name>_bla", 0, 0, false);
       ntest::assert_bool(true, success);
       ntest::assert_cstr("", err_msg.data());
       ntest::assert_cstr("something_before_bla", after.data());
     }
     {
-      auto [success, err_msg] = apply_pattern("before", "ext", after, "<name>_<bytes>.<ext>", 0, 42);
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "<name>  <bytes>.<ext>", 0, 42, false);
       ntest::assert_bool(true, success);
       ntest::assert_cstr("", err_msg.data());
-      ntest::assert_cstr("before_42.ext", after.data());
+      ntest::assert_cstr("before  42.ext", after.data());
     }
+    {
+      auto [success, err_msg] = apply_pattern("29.  Gladiator Boss", "mp3", after, "<name>.<ext>", 0, 42, false);
+      ntest::assert_bool(true, success);
+      ntest::assert_cstr("", err_msg.data());
+      ntest::assert_cstr("29.  Gladiator Boss.mp3", after.data());
+    }
+    {
+      auto [success, err_msg] = apply_pattern("before", "ext", after, "<name>  <bytes>.<ext>", 0, 42, true);
+      ntest::assert_bool(true, success);
+      ntest::assert_cstr("", err_msg.data());
+      ntest::assert_cstr("before 42.ext", after.data());
+    }
+    {
+      auto [success, err_msg] = apply_pattern("29.  Gladiator Boss", "mp3", after, "<name>.<ext>", 0, 42, true);
+      ntest::assert_bool(true, success);
+      ntest::assert_cstr("", err_msg.data());
+      ntest::assert_cstr("29. Gladiator Boss.mp3", after.data());
+    }
+  }
+  #endif
+
+  using bulk_rename::find_collisions;
+  #if 1
+  {
+
   }
   #endif
 

@@ -7,6 +7,7 @@
 
 #include <shlwapi.h>
 
+#include "common.hpp"
 #include "path.hpp"
 
 namespace bulk_rename {
@@ -24,7 +25,8 @@ namespace bulk_rename {
         std::array<char, (256 * 4) + 1> &after,
         char const *pattern,
         i32 counter,
-        u64 bytes) noexcept(true)
+        u64 bytes,
+        bool squish_adjacent_spaces) noexcept(true)
     {
         assert(pattern != nullptr);
 
@@ -91,9 +93,14 @@ namespace bulk_rename {
 
                     if (expr_equals("name")) {
                         u64 len = strlen(name);
+
                         if (len <= space_left) {
                             strcat(out, name);
-                            after_insert_idx += len;
+                            u64 spaces_removed = 0;
+                            if (squish_adjacent_spaces) {
+                                spaces_removed = remove_adjacent_spaces(out, len);
+                            }
+                            after_insert_idx += len - spaces_removed;
                         }
                     }
                     else if (expr_equals("ext")) {
@@ -149,10 +156,16 @@ namespace bulk_rename {
                 // do nothing
             }
             else {
+                // non-special character
+
                 if (after_insert_idx == after.size()) {
                     after = {};
                     snprintf(err_msg.data(), err_msg.size(), "not enough space for pattern");
                     return { false, err_msg };
+                }
+
+                if (squish_adjacent_spaces && i > 0 && pattern[i-1] == ' ' && ch == ' ') {
+                    // don't insert multiple adjacent spaces
                 } else {
                     after[after_insert_idx++] = ch;
                 }
@@ -160,6 +173,33 @@ namespace bulk_rename {
         }
 
         return { true, "" };
+    }
+
+    struct rename_pair {
+        basic_dir_ent before;
+        path_t after;
+    };
+
+    struct collision {
+        basic_dir_ent dest_dirent;
+        rename_pair rename;
+    };
+
+    std::vector<collision> find_collisions(
+        std::vector<explorer_window::dir_ent> const &dest,
+        std::vector<rename_pair> const &renames) noexcept(true)
+    {
+        std::vector<collision> collisions = {};
+
+        for (auto const &rename : renames) {
+            for (auto const &dest_dirent : dest) {
+                if (swan::path_equals_exactly(dest_dirent.basic.path, rename.after)) {
+                    collisions.push_back({ dest_dirent.basic, rename });
+                }
+            }
+        }
+
+        return collisions;
     }
 
 } // namespace bulk_rename
