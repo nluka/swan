@@ -176,25 +176,67 @@ namespace bulk_rename {
     }
 
     struct rename_pair {
-        basic_dir_ent before;
+        basic_dir_ent *before;
         path_t after;
     };
 
     struct collision {
-        basic_dir_ent dest_dirent;
+        basic_dir_ent *dest_dirent;
         rename_pair rename;
+
+        // for ntest
+        bool operator!=(collision const &other) const noexcept(true)
+        {
+            return
+                !swan::path_equals_exactly(other.dest_dirent->path, this->dest_dirent->path) ||
+                !swan::path_equals_exactly(other.rename.before->path, this->rename.before->path) ||
+                !swan::path_equals_exactly(other.rename.after, this->rename.after);
+        }
+
+        // for ntest
+        friend std::ostream& operator<<(std::ostream &os, collision const &c)
+        {
+            os << "D:[" << c.dest_dirent->path.data()
+               << "] B:[" << c.rename.before->path.data()
+               << "] A:[" << c.rename.after.data() << ']';
+            return os;
+        }
     };
 
     std::vector<collision> find_collisions(
-        std::vector<explorer_window::dir_ent> const &dest,
-        std::vector<rename_pair> const &renames) noexcept(true)
+        std::vector<explorer_window::dir_ent> &dest,
+        std::vector<rename_pair> &renames) noexcept(true)
     {
         std::vector<collision> collisions = {};
 
-        for (auto const &rename : renames) {
-            for (auto const &dest_dirent : dest) {
-                if (swan::path_equals_exactly(dest_dirent.basic.path, rename.after)) {
-                    collisions.push_back({ dest_dirent.basic, rename });
+        std::vector<explorer_window::dir_ent *> unaffected_dirents = {};
+        unaffected_dirents.reserve(dest.size());
+
+        for (auto &dest_dirent : dest) {
+            bool affected = false;
+
+            for (auto &rename : renames) {
+                if (rename.before == &dest_dirent.basic) {
+                    affected = true;
+                    break;
+                }
+            }
+
+            if (!affected) {
+                unaffected_dirents.push_back(&dest_dirent);
+            }
+        }
+
+        for (auto &rename : renames) {
+            for (auto &unaffected_dirent : unaffected_dirents) {
+                if (rename.before == &unaffected_dirent->basic) {
+                    continue;
+                }
+                if (swan::path_equals_exactly(unaffected_dirent->basic.path, rename.after)) {
+                    collision c;
+                    c.dest_dirent = &unaffected_dirent->basic;
+                    c.rename = rename;
+                    collisions.push_back(c);
                 }
             }
         }

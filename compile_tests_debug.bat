@@ -7,8 +7,11 @@ src/tests.cpp ^
 /EHsc ^
 /Fo:obj_debug\ ^
 /Fe:bin\swan_tests_debug.exe ^
+/I"C:/code/boost_1_80_0" ^
 /MT ^
+/Zi ^
 /link ^
+/DEBUG:FULL ^
 kernel32.lib ^
 user32.lib ^
 gdi32.lib ^
