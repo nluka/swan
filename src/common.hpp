@@ -305,6 +305,30 @@ char const *cget_file_name(char const *path) noexcept(true);
 char *get_file_ext(char *path) noexcept(true);
 // char const *cget_file_ext(char const *path) noexcept(true);
 
+struct file_name_ext
+{
+    char *name;
+    char *ext;
+    char *dot;
+
+    file_name_ext(char *path) noexcept(true)
+    {
+        this->name = get_file_name(path);
+        this->ext = get_file_ext(name);
+        this->dot = ext ? ext - 1 : nullptr;
+        if (this->dot) {
+            *this->dot = '\0';
+        }
+    }
+
+    ~file_name_ext() noexcept(true)
+    {
+        if (this->dot) {
+            *this->dot = '.';
+        }
+    }
+};
+
 std::string_view get_everything_minus_file_name(char const *path) noexcept(true);
 
 std::string get_last_error_string() noexcept(true);

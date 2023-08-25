@@ -412,22 +412,88 @@ void render_bulk_rename_popup_modal(
     imgui::Checkbox("Squish adjacent spaces", &squish_adjacent_spaces);
 
     imgui::Spacing();
-
     imgui::Separator();
     imgui::Spacing();
 
-    if (imgui::Button("Rename")) {
+    u64 num_pattern_errors = 0;
+    std::vector<bulk_rename::rename_pair> renames = {};
 
+    {
+        i32 counter = counter_start;
+        for (auto &dirent : expl.cwd_entries) {
+            if (dirent.is_selected) {
+                std::array<char, 1025> after = {};
+                file_name_ext name_ext(dirent.basic.path.data());
 
-        cleanup_and_close_popup();
+                auto result = bulk_rename::apply_pattern(
+                    name_ext.name, name_ext.ext,
+                    after, pattern_utf8, counter,
+                    dirent.basic.size, squish_adjacent_spaces
+                );
+
+                if (result.success) {
+                    renames.emplace_back(&dirent.basic, path_create(after.data()));
+                } else {
+                    ++num_pattern_errors;
+                }
+
+                counter += counter_step;
+            }
+        }
     }
 
-    imgui::SameLine();
-
-    if (imgui::Button("Cancel")) {
-        cleanup_and_close_popup();
+#if 0
+    std::vector<bulk_rename::collision_1> collisions;
+    {
+        // scoped_timer<timer_unit::MICROSECONDS> find_collisions_us();
+        collisions = bulk_rename::find_collisions_1(expl.cwd_entries, renames);
     }
 
+    if (collisions.empty()) {
+        if (imgui::Button("Rename")) {
+            cleanup_and_close_popup();
+        }
+    } else {
+        imgui::Text("%zu collisions", collisions.size());
+        for (auto const &c : collisions) {
+            imgui::Text("D:[%s] B:[%s] A:[%s]", c.dest_dirent->path.data(), c.rename.before->path.data(), c.rename.after.data());
+        }
+    }
+#else
+    std::vector<bulk_rename::collision_2> collisions;
+    {
+        // scoped_timer<timer_unit::MICROSECONDS> find_collisions_us();
+        collisions = bulk_rename::find_collisions_2(expl.cwd_entries, renames);
+    }
+
+    if (collisions.empty()) {
+        if (imgui::Button("Rename")) {
+            cleanup_and_close_popup();
+        }
+    } else {
+        imgui::SeparatorText("Collisions");
+        for (auto const &c : collisions) {
+            u64 range = c.last_rename_pair_idx - c.first_rename_pair_idx;
+            if (range > 0) {
+                imgui::Text("!! %zu renames have identical result%s:", range+1, (c.dest_dirent ? " and conflict with an existing entry not being renamed" : ""));
+                for (u64 i = c.first_rename_pair_idx; i <= c.last_rename_pair_idx; ++i) {
+                    auto const &rename = renames[i];
+                    imgui::Text("D:[%s] B:[%s] A:[%s]", c.dest_dirent ? c.dest_dirent->path.data() : "", rename.before->path.data(), rename.after.data());
+                }
+            } else {
+                auto const &rename = renames[c.first_rename_pair_idx];
+                imgui::Text("!! rename conflicts with an existing entry not being renamed:");
+                imgui::Text("D:[%s] B:[%s] A:[%s]", c.dest_dirent ? c.dest_dirent->path.data() : "", rename.before->path.data(), rename.after.data());
+            }
+        }
+    }
+#endif
+    // if (imgui::Button("Cancel")) {
+    //     cleanup_and_close_popup();
+    // }
+
+    imgui::Spacing();
+    imgui::Spacing();
     imgui::Spacing();
 
     u64 preview_cnt = min(5, expl.cwd_entries.size());
@@ -461,19 +527,13 @@ void render_bulk_rename_popup_modal(
                 imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
 
                 imgui::TableNextColumn();
-                char *name = get_file_name(dirent.basic.path.data());
-                char *ext = get_file_ext(name);
-                char *dot = ext ? ext - 1 : nullptr;
-
-                if (dot) {
-                    *dot = '\0';
-                }
+                file_name_ext name_ext(dirent.basic.path.data());
 
                 std::array<char, 1025> after;
 
                 auto result = bulk_rename::apply_pattern(
-                    name,
-                    ext,
+                    name_ext.name,
+                    name_ext.ext,
                     after,
                     pattern_utf8,
                     counter,
@@ -488,10 +548,6 @@ void render_bulk_rename_popup_modal(
                     auto &err_msg = result.error_msg;
                     err_msg.front() = (char)toupper(err_msg.front());
                     imgui::TextColored(red, err_msg.data());
-                }
-
-                if (dot) {
-                    *dot = '.';
                 }
 
                 ++previews_shown;
@@ -1333,6 +1389,8 @@ void render_explorer_window(explorer_window &expl)
     static bool open_rename_popup = false;
     static bool open_bulk_rename_popup = false;
 
+    bool any_popups_open = open_rename_popup || open_bulk_rename_popup;
+
     // if (window_focused) {
     //     save_focused_window(expl.name);
     // }
@@ -1340,7 +1398,7 @@ void render_explorer_window(explorer_window &expl)
     path_force_separator(expl.cwd, dir_sep_utf8);
 
     // handle Enter key pressed on cwd entry
-    if (window_focused && imgui::IsKeyPressed(ImGuiKey_Enter)) {
+    if (window_focused && !any_popups_open && imgui::IsKeyPressed(ImGuiKey_Enter)) {
         if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
             debug_log("[%s] pressed enter but cwd_prev_selected_dirent_idx = NO_SELECTION", expl.name);
             // TODO: notify user of failure
@@ -1356,7 +1414,7 @@ void render_explorer_window(explorer_window &expl)
     static explorer_window::dir_ent const *dirent_to_be_renamed = nullptr;
 
     // handle F2 key pressed on cwd entry
-    if (window_focused && imgui::IsKeyPressed(ImGuiKey_F2)) {
+    if (window_focused && !any_popups_open && imgui::IsKeyPressed(ImGuiKey_F2)) {
         if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
             debug_log("[%s] pressed F2 but cwd_prev_selected_dirent_idx = NO_SELECTION", expl.name);
             // TODO: notify user of failure
