@@ -1,9 +1,59 @@
-#ifndef SWAN_ACTIVITY_WINDOW_CPP
-#define SWAN_ACTIVITY_WINDOW_CPP
+#pragma once
 
 #include "common.hpp"
 
-void render_file_ops_window() noexcept(true)
+#include "imgui/imgui.h"
+
+static circular_buffer<file_operation> s_file_ops_buffer(100);
+
+circular_buffer<file_operation> const &get_file_ops_buffer() noexcept
+{
+    return s_file_ops_buffer;
+}
+
+file_operation::file_operation(type op_type, u64 file_size, swan_path_t const &src, swan_path_t const &dst) noexcept
+    : op_type(op_type)
+    , src_path(src)
+    , dest_path(dst)
+{
+    total_file_size.store(file_size);
+}
+
+// for boost::circular_buffer
+file_operation::file_operation(file_operation const &other) noexcept
+    : op_type(other.op_type)
+    , success(other.success)
+    , src_path(other.src_path)
+    , dest_path(other.dest_path)
+{
+    this->total_file_size.store(other.total_file_size.load());
+    this->total_bytes_transferred.store(other.total_bytes_transferred.load());
+    this->stream_size.store(other.stream_size.load());
+    this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
+    this->start_time.store(other.start_time.load());
+    this->end_time.store(other.end_time.load());
+}
+
+// for boost::circular_buffer
+file_operation &file_operation::operator=(file_operation const &other) noexcept
+{
+    this->total_file_size.store(other.total_file_size.load());
+    this->total_bytes_transferred.store(other.total_bytes_transferred.load());
+    this->stream_size.store(other.stream_size.load());
+    this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
+
+    this->start_time.store(other.start_time.load());
+    this->end_time.store(other.end_time.load());
+
+    this->op_type = other.op_type;
+    this->success = other.success;
+    this->src_path = other.src_path;
+    this->dest_path = other.dest_path;
+
+    return *this;
+}
+
+void swan_render_window_file_operations() noexcept
 {
     namespace imgui = ImGui;
 
@@ -129,5 +179,3 @@ void render_file_ops_window() noexcept(true)
 
     imgui::End();
 }
-
-#endif // SWAN_ACTIVITY_WINDOW_CPP

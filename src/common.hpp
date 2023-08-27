@@ -1,19 +1,57 @@
-#ifndef SWAN_COMMON_HPP
-#define SWAN_COMMON_HPP
+#pragma once
 
 #include <vector>
-#include <deque>
 #include <string>
-#include <source_location>
 #include <atomic>
 #include <string_view>
 
+#include <boost/container/static_vector.hpp>
 #include <boost/circular_buffer.hpp>
 
 #include "path.hpp"
 #include "util.hpp"
 #include "primitives.hpp"
-#include "imgui/imgui.h"
+
+bool explorer_init_windows_shell_com_garbage() noexcept;
+void explorer_cleanup_windows_shell_com_garbage() noexcept;
+
+struct basic_dirent
+{
+    enum class kind : u8 {
+        nil = 0,
+        directory,
+        symlink,
+        file,
+        count
+    };
+
+    u64 size = 0;
+    FILETIME creation_time_raw = {};
+    FILETIME last_write_time_raw = {};
+    u32 id = {};
+    kind type = kind::nil;
+    swan_path_t path = {};
+
+    bool is_dotdot() const noexcept;
+    bool is_dotdot_dir() const noexcept;
+    bool is_directory() const noexcept;
+    bool is_symlink() const noexcept;
+    bool is_file() const noexcept;
+    bool is_non_symlink_file() const noexcept;
+};
+
+struct drive_info
+{
+    u64 total_bytes;
+    u64 available_bytes;
+    char name_utf8[512];
+    char filesystem_name_utf8[512];
+    char letter;
+};
+
+typedef boost::container::static_vector<drive_info, 26> drive_list_t;
+
+drive_list_t query_drive_list();
 
 struct windows_options
 {
@@ -29,8 +67,8 @@ struct windows_options
     bool show_debug_log;
 #endif
 
-    bool save_to_disk() const noexcept(true);
-    bool load_from_disk() noexcept(true);
+    bool save_to_disk() const noexcept;
+    bool load_from_disk() noexcept;
 };
 
 struct explorer_options
@@ -55,83 +93,10 @@ struct explorer_options
     bool show_dotdot_dir;
     bool unix_directory_separator;
 
-    bool save_to_disk() const noexcept(true);
-    bool load_from_disk() noexcept(true);
-
-    char dir_separator_utf8() const noexcept(true)
-    {
-        return unix_directory_separator ? '/' : '\\';
-    }
-
-    u16 size_unit_multiplier() const noexcept(true)
-    {
-        return binary_size_system ? 1024 : 1000;
-    }
-};
-
-struct basic_dir_ent
-{
-    enum class kind : u8
-    {
-        nil = 0,
-        directory,
-        symlink,
-        file,
-        count
-    };
-
-    u64 size = 0;
-    FILETIME creation_time_raw = {};
-    FILETIME last_write_time_raw = {};
-    u32 id = {};
-    kind type = kind::nil;
-    swan::path_t path = {};
-
-    bool is_dotdot() const noexcept(true)
-    {
-        return swan::path_equals_exactly(path, "..");
-    }
-
-    bool is_dotdot_dir() const noexcept(true)
-    {
-        type == basic_dir_ent::kind::directory && swan::path_equals_exactly(path, "..");
-    }
-
-    bool is_directory() const noexcept(true)
-    {
-        return type == basic_dir_ent::kind::directory;
-    }
-
-    bool is_symlink() const noexcept(true)
-    {
-        return type == basic_dir_ent::kind::symlink;
-    }
-
-    bool is_file() const noexcept(true)
-    {
-        return type != basic_dir_ent::kind::directory;
-    }
-
-    bool is_non_symlink_file() const noexcept(true)
-    {
-        return is_file() && !is_symlink();
-    }
-
-    ImVec4 get_color() const noexcept(true)
-    {
-        return get_color(this->type);
-    }
-
-    static ImVec4 get_color(basic_dir_ent::kind t) noexcept(true)
-    {
-        static ImVec4 const pale_green(0.85f, 1, 0.85f, 1);
-        static ImVec4 const yellow(1, 1, 0, 1);
-        static ImVec4 const cyan(0.1f, 1, 1, 1);
-
-        if (t == kind::directory) return yellow;
-        if (t == kind::symlink) return cyan;
-        else return pale_green;
-    }
+    bool save_to_disk() const noexcept;
+    bool load_from_disk() noexcept;
+    char dir_separator_utf8() const noexcept;
+    u16 size_unit_multiplier() const noexcept;
 };
 
 template<typename T>
@@ -139,9 +104,9 @@ using circular_buffer = boost::circular_buffer<T>;
 
 struct explorer_window
 {
-    struct dir_ent
+    struct dirent
     {
-        basic_dir_ent basic;
+        basic_dirent basic;
         bool is_filtered_out = false;
         bool is_selected = false;
     };
@@ -156,15 +121,15 @@ struct explorer_window
 
     static u64 const NO_SELECTION = UINT64_MAX;
     static u64 const MAX_WD_HISTORY_SIZE = 15;
-    bool save_to_disk() const noexcept(true);
-    bool load_from_disk(char dir_separator) noexcept(true);
-    void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept(true);
-    void deselect_all_cwd_entries() noexcept(true);
+    bool save_to_disk() const noexcept;
+    bool load_from_disk(char dir_separator) noexcept;
+    void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept;
+    void deselect_all_cwd_entries() noexcept;
 
     // 40 byte members
 
     // history for working directories, persisted in file
-    circular_buffer<swan::path_t> wd_history = circular_buffer<swan::path_t>(MAX_WD_HISTORY_SIZE);
+    circular_buffer<swan_path_t> wd_history = circular_buffer<swan_path_t>(MAX_WD_HISTORY_SIZE);
 
     // 32 byte members
 
@@ -172,7 +137,7 @@ struct explorer_window
 
     // 24 byte members
 
-    std::vector<dir_ent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
+    std::vector<dirent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
 
     // 8 byte members
 
@@ -196,9 +161,9 @@ struct explorer_window
     // 1 byte alignment members
 
     mutable i8 latest_save_to_disk_result = -1;
-    swan::path_t prev_valid_cwd = {};
-    swan::path_t cwd = {}; // current working directory, persisted in file
-    swan::path_t cwd_last_frame = {};
+    swan_path_t prev_valid_cwd = {};
+    swan_path_t cwd = {}; // current working directory, persisted in file
+    swan_path_t cwd_last_frame = {};
     std::array<char, 256> filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool needs_sort = true;
@@ -223,55 +188,17 @@ struct file_operation
     std::atomic<time_point_t> end_time        = {   };
     type op_type = type::nil;
     bool success = false;
-    swan::path_t src_path = {};
-    swan::path_t dest_path = {};
+    swan_path_t src_path = {};
+    swan_path_t dest_path = {};
 
-    file_operation(type op_type, u64 file_size, swan::path_t const &src, swan::path_t const &dst) noexcept(true)
-        : op_type(op_type)
-        , src_path(src)
-        , dest_path(dst)
-    {
-        total_file_size.store(file_size);
-    }
-
-    // for boost::circular_buffer
-    file_operation(file_operation const &other) noexcept(true)
-        : op_type(other.op_type)
-        , success(other.success)
-        , src_path(other.src_path)
-        , dest_path(other.dest_path)
-    {
-        this->total_file_size.store(other.total_file_size.load());
-        this->total_bytes_transferred.store(other.total_bytes_transferred.load());
-        this->stream_size.store(other.stream_size.load());
-        this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
-        this->start_time.store(other.start_time.load());
-        this->end_time.store(other.end_time.load());
-    }
-
-    // for boost::circular_buffer
-    file_operation &operator=(file_operation const &other) noexcept(true)
-    {
-        this->total_file_size.store(other.total_file_size.load());
-        this->total_bytes_transferred.store(other.total_bytes_transferred.load());
-        this->stream_size.store(other.stream_size.load());
-        this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
-
-        this->start_time.store(other.start_time.load());
-        this->end_time.store(other.end_time.load());
-
-        this->op_type = other.op_type;
-        this->success = other.success;
-        this->src_path = other.src_path;
-        this->dest_path = other.dest_path;
-
-        return *this;
-    }
+    file_operation(type op_type, u64 file_size, swan_path_t const &src, swan_path_t const &dst) noexcept;
+    file_operation(file_operation const &other) noexcept; // for boost::circular_buffer
+    file_operation &operator=(file_operation const &other) noexcept; // for boost::circular_buffer
 };
 
-boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept(true);
+boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept;
 
-explorer_options &get_explorer_options() noexcept(true);
+explorer_options &get_explorer_options() noexcept;
 
 constexpr u8 const query_filesystem = 1 << 0;
 constexpr u8 const filter = 1 << 1;
@@ -283,27 +210,27 @@ bool update_cwd_entries(
     std::string_view parent_dir,
     std::source_location sloc = std::source_location::current());
 
-void new_history_from(explorer_window &expl, swan::path_t const &new_latest_entry);
+void new_history_from(explorer_window &expl, swan_path_t const &new_latest_entry);
 
-std::vector<swan::path_t> const &get_pins() noexcept(true);
+std::vector<swan_path_t> const &get_pins() noexcept;
 
-bool pin(swan::path_t &path, char dir_separator) noexcept(true);
+bool pin(swan_path_t &path, char dir_separator) noexcept;
 
-void unpin(u64 pin_idx) noexcept(true);
+void unpin(u64 pin_idx) noexcept;
 
-void update_pin_dir_separators(char new_dir_separator) noexcept(true);
+void update_pin_dir_separators(char new_dir_separator) noexcept;
 
-bool save_pins_to_disk() noexcept(true);
+bool save_pins_to_disk() noexcept;
 
-std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept(true);
+std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
 
-u64 find_pin_idx(swan::path_t const &) noexcept(true);
+u64 find_pin_idx(swan_path_t const &) noexcept;
 
-char *get_file_name(char *path) noexcept(true);
-char const *cget_file_name(char const *path) noexcept(true);
+char *get_file_name(char *path) noexcept;
+char const *cget_file_name(char const *path) noexcept;
 
-char *get_file_ext(char *path) noexcept(true);
-// char const *cget_file_ext(char const *path) noexcept(true);
+char *get_file_ext(char *path) noexcept;
+// char const *cget_file_ext(char const *path) noexcept;
 
 struct file_name_ext
 {
@@ -311,76 +238,62 @@ struct file_name_ext
     char *ext;
     char *dot;
 
-    file_name_ext(char *path) noexcept(true)
-    {
-        this->name = get_file_name(path);
-        this->ext = get_file_ext(name);
-        this->dot = ext ? ext - 1 : nullptr;
-        if (this->dot) {
-            *this->dot = '\0';
-        }
-    }
-
-    ~file_name_ext() noexcept(true)
-    {
-        if (this->dot) {
-            *this->dot = '.';
-        }
-    }
+    file_name_ext(char *path) noexcept;
+    ~file_name_ext() noexcept;
 };
 
-std::string_view get_everything_minus_file_name(char const *path) noexcept(true);
+std::string_view get_everything_minus_file_name(char const *path) noexcept;
 
-std::string get_last_error_string() noexcept(true);
+std::string get_last_error_string() noexcept;
 
-bool save_focused_window(char const *window_name) noexcept(true);
+bool save_focused_window(char const *window_name) noexcept;
 
-bool load_focused_window_from_disk(char const *out) noexcept(true);
+bool load_focused_window_from_disk(char const *out) noexcept;
 
-void imgui_sameline_spacing(u64 num_spacing_calls) noexcept(true);
+void imgui_sameline_spacing(u64 num_spacing_calls) noexcept;
 
-struct debug_log_package {
-    char const *fmt;
-    std::source_location loc;
-    time_point_t time;
-
-    static ImGuiTextBuffer s_debug_buffer;
-    static bool s_logging_enabled;
-
-    debug_log_package(char const *f, std::source_location l = std::source_location::current()) noexcept(true)
-        : fmt(f)
-        , loc(l)
-        , time(current_time())
-    {}
-
-    static void clear_buffer() noexcept(true)
-    {
-        s_debug_buffer.clear();
-    }
-};
-
-// https://stackoverflow.com/questions/57547273/how-to-use-source-location-in-a-variadic-template-function
-template <typename... Args>
-void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args)
+struct bulk_rename_transform_result
 {
-    if (!debug_log_package::s_logging_enabled) {
-        return;
-    }
+    bool success;
+    std::array<char, 128> error_msg;
+};
 
-    auto &debug_buffer = debug_log_package::s_debug_buffer;
-    u64 const max_size = 1024 * 1024 * 10;
+bulk_rename_transform_result bulk_rename_transform(
+    char const *name,
+    char const *ext,
+    std::array<char, (256 * 4) + 1> &after,
+    char const *pattern,
+    i32 counter,
+    u64 bytes,
+    bool squish_adjacent_spaces) noexcept;
 
-    debug_buffer.reserve(max_size);
+struct bulk_rename_op
+{
+    basic_dirent *before;
+    swan_path_t after;
 
-    if (debug_buffer.size() > max_size) {
-        debug_buffer.clear();
-    }
+    bool operator!=(bulk_rename_op const &other) const noexcept; // for ntest
+    friend std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r); // for ntest
+};
 
-    char const *just_the_file_name = cget_file_name(pack.loc.file_name());
+struct bulk_rename_collision_2
+{
+    basic_dirent *dest_dirent;
+    u64 first_rename_pair_idx;
+    u64 last_rename_pair_idx;
 
-    debug_buffer.appendf("%21s:%5d ", just_the_file_name, pack.loc.line());
-    debug_buffer.appendf(pack.fmt, args...);
-    debug_buffer.append("\n");
-}
+    bool operator!=(bulk_rename_collision_2 const &other) const noexcept; // for ntest
+    friend std::ostream& operator<<(std::ostream &os, bulk_rename_collision_2 const &c); // for ntest
+};
 
-#endif // SWAN_COMMON_HPP
+void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> &renames) noexcept;
+
+std::vector<bulk_rename_collision_2> bulk_rename_find_collisions_2(
+    std::vector<explorer_window::dirent> &dest,
+    std::vector<bulk_rename_op> &renames) noexcept;
+
+// TODO: make noexcept
+void swan_render_window_explorer(explorer_window &);
+void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, windows_options const &) noexcept;
+void swan_render_window_debug_log() noexcept;
+void swan_render_window_file_operations() noexcept;

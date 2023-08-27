@@ -4,6 +4,8 @@
 
 enum class imgui_stylesheet
 {
+    default_light,
+    default_dark,
     deep_dark, // https://github.com/ocornut/imgui/issues/707#issuecomment-917151020
     darcula,
     discord_dark,
@@ -13,6 +15,16 @@ enum class imgui_stylesheet
 void apply_imgui_stylesheet(imgui_stylesheet which)
 {
     switch (which) {
+        case imgui_stylesheet::default_light: {
+            ImGui::StyleColorsLight();
+            break;
+        }
+
+        case imgui_stylesheet::default_dark: {
+            ImGui::StyleColorsDark();
+            break;
+        }
+
         case imgui_stylesheet::deep_dark: {
             ImVec4 *colors = ImGui::GetStyle().Colors;
             colors[ImGuiCol_Text]                   = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);

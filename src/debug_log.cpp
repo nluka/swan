@@ -1,9 +1,12 @@
-#ifndef SWAN_DEBUG_LOG_WINDOW_CPP
-#define SWAN_DEBUG_LOG_WINDOW_CPP
+#pragma once
 
 #include "common.hpp"
+#include "imgui_specific.hpp"
 
-void render_debug_log_window() noexcept(true)
+bool debug_log_package::s_logging_enabled = true;
+ImGuiTextBuffer debug_log_package::s_debug_buffer = {};
+
+void swan_render_window_debug_log() noexcept
 {
     namespace imgui = ImGui;
 
@@ -62,5 +65,3 @@ void render_debug_log_window() noexcept(true)
 
     imgui::End();
 }
-
-#endif // SWAN_DEBUG_LOG_WINDOW_CPP

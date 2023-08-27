@@ -1,6 +1,3 @@
-#ifndef SWAN_PATH_CPP
-#define SWAN_PATH_CPP
-
 #include <array>
 #include <cassert>
 #include <cstring>
@@ -13,11 +10,9 @@
 
 #include "path.hpp"
 
-using swan::path_t;
-
-path_t swan::path_create(char const *data) noexcept(true)
+swan_path_t path_create(char const *data) noexcept
 {
-    path_t p = {};
+    swan_path_t p = {};
 
     if (data == nullptr) {
         return p;
@@ -34,22 +29,22 @@ path_t swan::path_create(char const *data) noexcept(true)
     return p;
 }
 
-u16 swan::path_length(path_t const &path) noexcept(true)
+u16 path_length(swan_path_t const &path) noexcept
 {
     return (u16)strnlen(path.data(), UINT16_MAX);
 }
 
-bool swan::path_equals_exactly(path_t const &p1, char const *p2) noexcept(true)
+bool path_equals_exactly(swan_path_t const &p1, char const *p2) noexcept
 {
     return strcmp(p1.data(), p2) == 0;
 }
 
-bool swan::path_equals_exactly(path_t const &p1, path_t const &p2) noexcept(true)
+bool path_equals_exactly(swan_path_t const &p1, swan_path_t const &p2) noexcept
 {
     return strcmp(p1.data(), p2.data()) == 0;
 }
 
-char swan::path_pop_back(path_t &path) noexcept(true)
+char path_pop_back(swan_path_t &path) noexcept
 {
     u64 len = path_length(path);
 
@@ -63,7 +58,7 @@ char swan::path_pop_back(path_t &path) noexcept(true)
     }
 }
 
-bool swan::path_pop_back_if(path_t &path, char if_ch) noexcept(true)
+bool path_pop_back_if(swan_path_t &path, char if_ch) noexcept
 {
     u64 len = path_length(path);
 
@@ -75,7 +70,7 @@ bool swan::path_pop_back_if(path_t &path, char if_ch) noexcept(true)
     }
 }
 
-bool swan::path_pop_back_if_not(path_t &path, char if_not_ch) noexcept(true)
+bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept
 {
     u64 len = path_length(path);
 
@@ -87,14 +82,14 @@ bool swan::path_pop_back_if_not(path_t &path, char if_not_ch) noexcept(true)
     }
 }
 
-bool swan::path_is_empty(path_t const &path) noexcept(true)
+bool path_is_empty(swan_path_t const &path) noexcept
 {
     assert(path.size() > 0);
 
     return path[0] == '\0';
 }
 
-bool swan::path_ends_with(path_t const &path, char const *end) noexcept(true)
+bool path_ends_with(swan_path_t const &path, char const *end) noexcept
 {
     assert(end != nullptr);
 
@@ -109,7 +104,7 @@ bool swan::path_ends_with(path_t const &path, char const *end) noexcept(true)
     }
 }
 
-bool swan::path_ends_with_one_of(path_t const &path, char const *chars) noexcept(true)
+bool path_ends_with_one_of(swan_path_t const &path, char const *chars) noexcept
 {
     assert(chars != nullptr);
     assert(strlen(chars) > 0);
@@ -125,14 +120,14 @@ bool swan::path_ends_with_one_of(path_t const &path, char const *chars) noexcept
     }
 }
 
-void swan::path_clear(path_t &path) noexcept(true)
+void path_clear(swan_path_t &path) noexcept
 {
     assert(path.size() > 0);
 
     path[0] = '\0';
 }
 
-void swan::path_force_separator(path_t &path, char dir_separator) noexcept(true)
+void path_force_separator(swan_path_t &path, char dir_separator) noexcept
 {
     u64 path_len = path_length(path);
 
@@ -143,12 +138,12 @@ void swan::path_force_separator(path_t &path, char dir_separator) noexcept(true)
     }
 }
 
-u64 swan::path_append(
-    path_t &path,
+u64 path_append(
+    swan_path_t &path,
     char const *str,
     char dir_separator,
     bool prepend_sep,
-    bool postpend_sep) noexcept(true)
+    bool postpend_sep) noexcept
 {
     if (str == nullptr) {
         return 0;
@@ -189,7 +184,7 @@ u64 swan::path_append(
     return 1;
 }
 
-bool swan::path_loosely_same(path_t const &p1, path_t const &p2) noexcept(true)
+bool path_loosely_same(swan_path_t const &p1, swan_path_t const &p2) noexcept
 {
     u16 p1_len = path_length(p1);
     u16 p2_len = path_length(p2);
@@ -203,12 +198,12 @@ bool swan::path_loosely_same(path_t const &p1, path_t const &p2) noexcept(true)
     }
 }
 
-path_t swan::path_squish_adjacent_separators(path_t const &path) noexcept(true)
+swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept
 {
     // shoutout to ChatGPT for writing this for me
 
     // Variable to store the cleaned-up path
-    path_t cleaned_path;
+    swan_path_t cleaned_path;
     u64 cleaned_index = 0;
     u64 path_len = path_length(path);
 
@@ -240,5 +235,3 @@ path_t swan::path_squish_adjacent_separators(path_t const &path) noexcept(true)
 
     return cleaned_path;
 }
-
-#endif // SWAN_PATH_CPP
