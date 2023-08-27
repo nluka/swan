@@ -23,6 +23,7 @@
 #include "file_ops_window.cpp"
 #include "debug_log_window.cpp"
 #include "unicode_test_window.cpp"
+#include "style.cpp"
 
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers
@@ -218,9 +219,10 @@ i32 main(i32, char**) try
 
     io.IniFilename = "data/swan_imgui.ini";
 
+    // apply_imgui_stylesheet(imgui_stylesheet::future_dark);
+
     auto &expl_opts = get_explorer_options();
 
-    // explorer_options expl_opts = {};
     if (!expl_opts.load_from_disk()) {
         debug_log("explorer_options::load_from_disk failed, setting defaults");
         expl_opts.auto_refresh_interval_ms = 1000;
