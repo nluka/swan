@@ -178,6 +178,18 @@ namespace bulk_rename {
     struct rename_pair {
         basic_dir_ent *before;
         path_t after;
+
+        // for ntest
+        bool operator!=(rename_pair const &other) const noexcept(true)
+        {
+            return this->before != other.before || !swan::path_equals_exactly(this->after, other.after);
+        }
+
+        // for ntest
+        friend std::ostream& operator<<(std::ostream &os, rename_pair const &r)
+        {
+            return os << "B:[" << (r.before ? r.before->path.data() : "nullptr") << "] A:[" << r.after.data() << ']';
+        }
     };
 
     struct collision_1 {
@@ -196,10 +208,9 @@ namespace bulk_rename {
         // for ntest
         friend std::ostream& operator<<(std::ostream &os, collision_1 const &c)
         {
-            os << "D:[" << c.dest_dirent->path.data()
-               << "] B:[" << c.rename.before->path.data()
-               << "] A:[" << c.rename.after.data() << ']';
-            return os;
+            return os << "D:[" << (c.dest_dirent ? c.dest_dirent->path.data() : "nullptr")
+                      << "] B:[" << c.rename.before->path.data()
+                      << "] A:[" << c.rename.after.data() << ']';
         }
     };
 
@@ -269,6 +280,26 @@ namespace bulk_rename {
         }
     };
 
+    void sort_renames_dup_elem_sequences_after_non_dups(std::vector<rename_pair> &renames) noexcept(true)
+    {
+        using swan::path_equals_exactly;
+
+        // sort renames such that adjacently equal renames appear at the end.
+        // examples:
+        //  [1,2,5,7,2,4] -> [2,2,6,5,4,1]
+        //  [0,0,1,5,5,2] -> [5,5,0,0,2,1]
+        // (I couldn't figure out how to do it in ascending order... descending will do.)
+
+        std::stable_sort(renames.begin(), renames.end(), [&](rename_pair const &a, rename_pair const &b) {
+            i32 cmp = strcmp(a.after.data(), b.after.data());
+            if (cmp == 0) {
+                return false;
+            } else {
+                return cmp > 0;
+            }
+        });
+    }
+
     std::vector<collision_2> find_collisions_2(
         std::vector<explorer_window::dir_ent> &dest,
         std::vector<rename_pair> &renames) noexcept(true)
@@ -281,31 +312,19 @@ namespace bulk_rename {
 
         collisions.reserve(dest.size());
 
-        std::sort(renames.begin(), renames.end(), [](rename_pair const &lhs, rename_pair const &rhs) {
-            return strcmp(lhs.after.data(), rhs.after.data()) < 0;
-        });
+        sort_renames_dup_elem_sequences_after_non_dups(renames);
 
         static std::vector<explorer_window::dir_ent *> unaffected_dirents = {};
         unaffected_dirents.clear();
         unaffected_dirents.reserve(dest.size());
 
         for (auto &dest_dirent : dest) {
-            bool affected = false;
-
-            for (auto &rename : renames) {
-                if (rename.before == &dest_dirent.basic) {
-                    affected = true;
-                    break;
-                }
-            }
-
-            if (!affected) {
+            if (!dest_dirent.is_selected) {
                 unaffected_dirents.push_back(&dest_dirent);
             }
         }
 
         u64 const npos = std::string::npos;
-        u64 first = npos, last = npos;
 
         auto exists = [npos](u64 pos) {
             return pos != npos;
@@ -320,58 +339,43 @@ namespace bulk_rename {
             return nullptr;
         };
 
+        auto adj_begin = std::adjacent_find(renames.begin(), renames.end(), [](rename_pair const &r0, rename_pair const &r1) {
+            return swan::path_equals_exactly(r0.after, r1.after);
+        });
+
+        // handle unique "after"s
         {
-            auto const &r0 = renames[0];
-            auto const &r1 = renames[1];
-            if (!swan::path_equals_exactly(r0.after, r1.after)) {
-                auto conflict = find_conflict_in_dest(r0);
+            u64 i = 0;
+            for (auto it = renames.begin(); it != adj_begin; ++it, ++i) {
+                auto conflict = find_conflict_in_dest(*it);
                 if (conflict) {
-                    collisions.emplace_back(conflict, 0, 0);
+                    u64 first = i, last = i;
+                    collisions.emplace_back(conflict, first, last);
                 }
             }
         }
+        // handle non-unique "after"s
+        if (adj_begin != renames.end() && swan::path_equals_exactly(renames.front().after, renames.back().after)) {
+            ptrdiff_t start_index = std::distance(renames.begin(), adj_begin);
+            u64 first = (u64)start_index;
+            u64 last = renames.size() - 1;
+            auto conflict = find_conflict_in_dest(renames[first]);
+            collisions.emplace_back(conflict, first, last);
+        } else {
+            ptrdiff_t start_index = std::distance(renames.begin(), adj_begin);
+            u64 i = (u64)start_index + 1;
+            u64 first = i - 1, last = npos;
 
-        for (u64 i = 1; i < renames.size(); ++i) {
-            auto const &prev = renames[i-1];
-            auto const &curr = renames[i];
-
-            if (swan::path_equals_exactly(prev.after, curr.after)) {
-                if (!exists(first)) {
-                    first = i-1;
-                }
-                else if (i == renames.size() - 1) {
-                    last = i;
-                    auto conflict = find_conflict_in_dest(renames[last]);
+            for (; i < renames.size(); ++i) {
+                if (!swan::path_equals_exactly(renames[i].after, renames[first].after)) {
+                    last = i-1;
+                    auto conflict = find_conflict_in_dest(renames[first]);
                     collisions.emplace_back(conflict, first, last);
 
-                    first = npos;
+                    first = i;
                     last = npos;
                 }
             }
-            // ! not sure if this branch is needed, should do some more testing to find out
-            // else if (exists(first) && !exists(last)) {
-            //     last = i-1;
-            //     auto conflict = find_conflict_in_dest(renames[last]);
-            //     collisions.emplace_back(conflict, first, last);
-
-            //     first = npos;
-            //     last = npos;
-            // }
-            else {
-                auto conflict = find_conflict_in_dest(curr);
-                if (conflict) {
-                    collisions.emplace_back(conflict, i, i);
-                }
-            }
-        }
-
-        if (exists(first) && !exists(last)) {
-            last = renames.size()-1;
-            auto conflict = find_conflict_in_dest(renames[last]);
-            collisions.emplace_back(conflict, first, last);
-
-            first = npos;
-            last = npos;
         }
 
         return collisions;

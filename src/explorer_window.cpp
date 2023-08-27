@@ -470,92 +470,119 @@ void render_bulk_rename_popup_modal(
         if (imgui::Button("Rename")) {
             cleanup_and_close_popup();
         }
-    } else {
-        imgui::SeparatorText("Collisions");
-        for (auto const &c : collisions) {
-            u64 range = c.last_rename_pair_idx - c.first_rename_pair_idx;
-            if (range > 0) {
-                imgui::Text("!! %zu renames have identical result%s:", range+1, (c.dest_dirent ? " and conflict with an existing entry not being renamed" : ""));
-                for (u64 i = c.first_rename_pair_idx; i <= c.last_rename_pair_idx; ++i) {
-                    auto const &rename = renames[i];
-                    imgui::Text("D:[%s] B:[%s] A:[%s]", c.dest_dirent ? c.dest_dirent->path.data() : "", rename.before->path.data(), rename.after.data());
+
+        imgui::Spacing();
+        imgui::Spacing();
+        imgui::Spacing();
+
+        u64 preview_cnt = min(5, expl.cwd_entries.size());
+        auto const &style = imgui::GetStyle();
+        auto preview_cnt_rows_dimensions = ImVec2(-1, ( imgui::CalcTextSize("Y").y + (style.FramePadding.y * 2) + style.ItemSpacing.y ) * f32(preview_cnt));
+
+        // imgui::SeparatorText("Preview");
+
+        if (
+            imgui::BeginTable(
+                "bulk_rename_preview", 2,
+                ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp,
+                preview_cnt_rows_dimensions
+            )
+        ) {
+            imgui::TableSetupColumn("Before");
+            imgui::TableSetupColumn("After");
+            imgui::TableHeadersRow();
+
+            i32 counter = counter_start;
+
+            // try to show preview_cnt # of previews, with simulated counter
+            for (
+                u64 i = 0, previews_shown = 0;
+                i < expl.cwd_entries.size() && previews_shown < preview_cnt;
+                ++i, counter += counter_step
+            ) {
+                auto &dirent = expl.cwd_entries[i];
+
+                if (dirent.is_selected) {
+                    imgui::TableNextColumn();
+                    imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
+
+                    imgui::TableNextColumn();
+                    file_name_ext name_ext(dirent.basic.path.data());
+
+                    std::array<char, 1025> after;
+
+                    auto result = bulk_rename::apply_pattern(
+                        name_ext.name,
+                        name_ext.ext,
+                        after,
+                        pattern_utf8,
+                        counter,
+                        dirent.basic.size,
+                        squish_adjacent_spaces
+                    );
+
+                    if (result.success) {
+                        imgui::TextColored(dirent.basic.get_color(), after.data());
+                    } else {
+                        ImVec4 red(1.0, 0, 0, 1.0);
+                        auto &err_msg = result.error_msg;
+                        err_msg.front() = (char)toupper(err_msg.front());
+                        imgui::TextColored(red, err_msg.data());
+                    }
+
+                    ++previews_shown;
                 }
-            } else {
-                auto const &rename = renames[c.first_rename_pair_idx];
-                imgui::Text("!! rename conflicts with an existing entry not being renamed:");
-                imgui::Text("D:[%s] B:[%s] A:[%s]", c.dest_dirent ? c.dest_dirent->path.data() : "", rename.before->path.data(), rename.after.data());
             }
+
+            imgui::EndTable();
+        }
+    }
+    else {
+        enum collisions_table_col_id : i32 {
+            collisions_table_col_problem,
+            collisions_table_col_after,
+            collisions_table_col_before,
+            collisions_table_col_count,
+        };
+
+        imgui::SeparatorText("Collisions");
+
+        if (imgui::BeginTable("Collisions", collisions_table_col_count, ImGuiTableFlags_SizingStretchProp)) {
+            imgui::TableSetupColumn("Problem");
+            imgui::TableSetupColumn("After");
+            imgui::TableSetupColumn("Before");
+            imgui::TableHeadersRow();
+
+            for (auto const &c : collisions) {
+                u64 first = c.first_rename_pair_idx;
+                u64 last = c.last_rename_pair_idx;
+
+                imgui::TableNextRow();
+
+                if (imgui::TableSetColumnIndex(collisions_table_col_problem)) {
+                    ImVec4 red(1.0, 0, 0, 1.0);
+                    imgui::TextColored(red, c.dest_dirent ? "Name taken" : "Same result");
+                }
+                if (imgui::TableSetColumnIndex(collisions_table_col_after)) {
+                    for (u64 i = first; i < last; ++i) {
+                        imgui::TextColored(renames[i].before->get_color(), "%s\n", renames[i].after.data());
+                    }
+                    imgui::TextColored(renames[last].before->get_color(), "%s", renames[last].after.data());
+                }
+                if (imgui::TableSetColumnIndex(collisions_table_col_before)) {
+                    for (u64 i = first; i < last; ++i) {
+                        imgui::TextColored(renames[i].before->get_color(), "%s\n", renames[i].before->path.data());
+                    }
+                    imgui::TextColored(renames[last].before->get_color(), "%s", renames[last].before->path.data());
+                }
+            }
+            imgui::EndTable();
         }
     }
 #endif
     // if (imgui::Button("Cancel")) {
     //     cleanup_and_close_popup();
     // }
-
-    imgui::Spacing();
-    imgui::Spacing();
-    imgui::Spacing();
-
-    u64 preview_cnt = min(5, expl.cwd_entries.size());
-    auto const &style = imgui::GetStyle();
-    auto preview_cnt_rows_dimensions = ImVec2(-1, ( imgui::CalcTextSize("Y").y + (style.FramePadding.y * 2) + style.ItemSpacing.y) * f32(preview_cnt));
-
-    // imgui::SeparatorText("Preview");
-    if (
-        imgui::BeginTable(
-            "bulk_rename_preview", 2,
-            ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp,
-            preview_cnt_rows_dimensions
-        )
-    ) {
-        imgui::TableSetupColumn("Before");
-        imgui::TableSetupColumn("After");
-        imgui::TableHeadersRow();
-
-        i32 counter = counter_start;
-
-        // try to show preview_cnt # of previews, with simulated counter
-        for (
-            u64 i = 0, previews_shown = 0;
-            i < expl.cwd_entries.size() && previews_shown < preview_cnt;
-            ++i, counter += counter_step
-        ) {
-            auto &dirent = expl.cwd_entries[i];
-
-            if (dirent.is_selected) {
-                imgui::TableNextColumn();
-                imgui::TextColored(dirent.basic.get_color(), dirent.basic.path.data());
-
-                imgui::TableNextColumn();
-                file_name_ext name_ext(dirent.basic.path.data());
-
-                std::array<char, 1025> after;
-
-                auto result = bulk_rename::apply_pattern(
-                    name_ext.name,
-                    name_ext.ext,
-                    after,
-                    pattern_utf8,
-                    counter,
-                    dirent.basic.size,
-                    squish_adjacent_spaces
-                );
-
-                if (result.success) {
-                    imgui::TextColored(dirent.basic.get_color(), after.data());
-                } else {
-                    ImVec4 red(1.0, 0, 0, 1.0);
-                    auto &err_msg = result.error_msg;
-                    err_msg.front() = (char)toupper(err_msg.front());
-                    imgui::TextColored(red, err_msg.data());
-                }
-
-                ++previews_shown;
-            }
-        }
-
-        imgui::EndTable();
-    }
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
         cleanup_and_close_popup();

@@ -428,10 +428,10 @@ i32 main()
 
     {
       std::vector<explorer_window::dir_ent> dest = {};
-      std::vector<bulk_rename::rename_pair> renames = {};
+      std::vector<bulk_rename::rename_pair> input_renames = {};
       std::vector<bulk_rename::collision_1> expected = {};
 
-      auto actual = find_collisions_1(dest, renames);
+      auto actual = find_collisions_1(dest, input_renames);
 
       ntest::assert_stdvec(expected, actual);
     }
@@ -443,10 +443,10 @@ i32 main()
         { create_basic_dirent("file3.cpp", ent_kind::file), false, not_selected },
         { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {};
+      std::vector<bulk_rename::rename_pair> input_renames = {};
       std::vector<bulk_rename::collision_1> expected = {};
 
-      auto actual = find_collisions_1(dest, renames);
+      auto actual = find_collisions_1(dest, input_renames);
 
       ntest::assert_stdvec(expected, actual);
     }
@@ -458,7 +458,7 @@ i32 main()
         { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
         { create_basic_dirent("file4.cpp", ent_kind::file), false, selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
+      std::vector<bulk_rename::rename_pair> input_renames = {
         { &dest[0].basic /* file1.cpp */, path_create("file2.cpp") },
         { &dest[1].basic /* file2.cpp */, path_create("file3.cpp") },
         { &dest[2].basic /* file3.cpp */, path_create("file4.cpp") },
@@ -466,7 +466,7 @@ i32 main()
       };
       std::vector<bulk_rename::collision_1> expected = {};
 
-      auto actual = find_collisions_1(dest, renames);
+      auto actual = find_collisions_1(dest, input_renames);
 
       ntest::assert_stdvec(expected, actual);
     }
@@ -478,18 +478,141 @@ i32 main()
         { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
         { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
+      std::vector<bulk_rename::rename_pair> input_renames = {
         { &dest[0].basic /* file1.cpp */, path_create("file2.cpp") },
         { &dest[1].basic /* file2.cpp */, path_create("file3.cpp") },
         { &dest[2].basic /* file3.cpp */, path_create("file4.cpp") },
       };
       std::vector<bulk_rename::collision_1> expected = {
-        { &dest[3].basic /* file4.cpp */, renames[2] /* file3.cpp -> file4.cpp */ },
+        { &dest[3].basic /* file4.cpp */, input_renames[2] /* file3.cpp -> file4.cpp */ },
       };
 
-      auto actual = find_collisions_1(dest, renames);
+      auto actual = find_collisions_1(dest, input_renames);
 
       ntest::assert_stdvec(expected, actual);
+    }
+  }
+  #endif
+
+  using bulk_rename::sort_renames_dup_elem_sequences_after_non_dups;
+  #if 1
+  {
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {};
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({}, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("file1") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("file1") },
+      }, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("file2") },
+        { nullptr, path_create("file2") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("file2") },
+        { nullptr, path_create("file2") },
+      }, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("file3") },
+        { nullptr, path_create("file3") },
+        { nullptr, path_create("file3") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("file3") },
+        { nullptr, path_create("file3") },
+        { nullptr, path_create("file3") },
+      }, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("file1") },
+        { nullptr, path_create("file2") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("file2") },
+        { nullptr, path_create("file1") },
+      }, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("file1") },
+        { nullptr, path_create("file2") },
+        { nullptr, path_create("file3") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("file3") },
+        { nullptr, path_create("file2") },
+        { nullptr, path_create("file1") },
+      }, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("file4") },
+        { nullptr, path_create("file5") },
+        { nullptr, path_create("file6") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("file6") },
+        { nullptr, path_create("file5") },
+        { nullptr, path_create("file4") },
+      }, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("file1") },
+        { nullptr, path_create("file2") },
+        { nullptr, path_create("file3") },
+        { nullptr, path_create("file4") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("file4") },
+        { nullptr, path_create("file3") },
+        { nullptr, path_create("file2") },
+        { nullptr, path_create("file1") },
+      }, input_renames);
+    }
+
+    {
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { nullptr, path_create("apple") },
+        { nullptr, path_create("banana") },
+        { nullptr, path_create("cherry") },
+        { nullptr, path_create("apple") },
+        { nullptr, path_create("banana") },
+        { nullptr, path_create("date") },
+      };
+      sort_renames_dup_elem_sequences_after_non_dups(input_renames);
+      ntest::assert_stdvec({
+        { nullptr, path_create("date") },
+        { nullptr, path_create("cherry") },
+        { nullptr, path_create("banana") },
+        { nullptr, path_create("banana") },
+        { nullptr, path_create("apple") },
+        { nullptr, path_create("apple") },
+      }, input_renames);
     }
   }
   #endif
@@ -515,12 +638,12 @@ i32 main()
 
     {
       std::vector<explorer_window::dir_ent> dest = {};
-      std::vector<bulk_rename::rename_pair> renames = {};
-      std::vector<bulk_rename::collision_2> expected = {};
+      std::vector<bulk_rename::rename_pair> input_renames = {};
+      std::vector<bulk_rename::collision_2> expected_collisions = {};
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
 
     {
@@ -530,139 +653,180 @@ i32 main()
         { create_basic_dirent("file3.cpp", ent_kind::file), false, not_selected },
         { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {};
-      std::vector<bulk_rename::collision_2> expected = {};
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        // none
+      };
+      std::vector<bulk_rename::collision_2> expected_collisions = {
+        // none
+      };
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
 
     {
       std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, selected },
+        { create_basic_dirent("file0", ent_kind::file), false, selected },
+        { create_basic_dirent("file1", ent_kind::file), false, selected },
+        { create_basic_dirent("file2", ent_kind::file), false, selected },
+        { create_basic_dirent("file3", ent_kind::file), false, selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file2.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file3.cpp") },
-        { &dest[2].basic /* file3.cpp */, path_create("file4.cpp") },
-        { &dest[3].basic /* file4.cpp */, path_create("file5.cpp") },
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { &dest[0].basic, path_create("file1") },
+        { &dest[1].basic, path_create("file2") },
+        { &dest[2].basic, path_create("file3") },
+        { &dest[3].basic, path_create("file4") },
       };
-      std::vector<bulk_rename::collision_2> expected = {};
+      std::vector<bulk_rename::collision_2> expected_collisions = {
+        // none
+      };
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
 
     {
       std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file0", ent_kind::file), false, selected },
+        { create_basic_dirent("file1", ent_kind::file), false, selected },
+        { create_basic_dirent("file2", ent_kind::file), false, selected },
+        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file2.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file3.cpp") },
-        { &dest[2].basic /* file3.cpp */, path_create("file4.cpp") },
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { &dest[0].basic, path_create("file1") },
+        { &dest[1].basic, path_create("file2") },
+        { &dest[2].basic, path_create("file3") },
+        //! NOTE: this will get sorted in find_collisions_2, order to check against will be:
+        // file3
+        // file2
+        // file1
       };
-      std::vector<bulk_rename::collision_2> expected = {
-        { &dest[3].basic /* file4.cpp */, 2, 2 },
+      std::vector<bulk_rename::collision_2> expected_collisions = {
+        { &dest[3].basic, 0, 0 },
       };
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
 
     {
       std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file0", ent_kind::file), false, selected },
+        { create_basic_dirent("file1", ent_kind::file), false, selected },
+        { create_basic_dirent("file2", ent_kind::file), false, selected },
+        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file4.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file4.cpp") },
-        { &dest[2].basic /* file3.cpp */, path_create("file4.cpp") },
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { &dest[0].basic, path_create("file3") },
+        { &dest[1].basic, path_create("file3") },
+        { &dest[2].basic, path_create("file3") },
       };
-      std::vector<bulk_rename::collision_2> expected = {
-        { &dest[3].basic /* file4.cpp */, 0, 2 },
+      std::vector<bulk_rename::collision_2> expected_collisions = {
+        { &dest[3].basic, 0, 2 },
       };
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
 
     {
       std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
+        { create_basic_dirent(".cpp", ent_kind::file), false, selected },
+        { create_basic_dirent(".cpp", ent_kind::file), false, selected },
+        { create_basic_dirent(".cpp", ent_kind::file), false, selected },
+        { create_basic_dirent(".cpp", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file5.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file5.cpp") },
-        { &dest[2].basic /* file3.cpp */, path_create("file5.cpp") },
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { &dest[0].basic, path_create("file5") },
+        { &dest[1].basic, path_create("file5") },
+        { &dest[2].basic, path_create("file5") },
       };
-      std::vector<bulk_rename::collision_2> expected = {
+      std::vector<bulk_rename::collision_2> expected_collisions = {
         { nullptr, 0, 2 },
       };
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
 
     {
       std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file5.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file6.cpp", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file0", ent_kind::file), false, selected },
+        { create_basic_dirent("file1", ent_kind::file), false, selected },
+        { create_basic_dirent("file2", ent_kind::file), false, selected },
+        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file4", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file5", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file4.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file5.cpp") },
-        { &dest[2].basic /* file3.cpp */, path_create("file6.cpp") },
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { &dest[0].basic, path_create("file3") },
+        { &dest[1].basic, path_create("file4") },
+        { &dest[2].basic, path_create("file5") },
+        //! NOTE: this will get sorted in find_collisions_2, order to check against will be:
+        // file5
+        // file4
+        // file3
       };
-      std::vector<bulk_rename::collision_2> expected = {
-        { &dest[3].basic, 0, 0 },
+      std::vector<bulk_rename::collision_2> expected_collisions = {
+        { &dest[5].basic, 0, 0 },
         { &dest[4].basic, 1, 1 },
-        { &dest[5].basic, 2, 2 },
+        { &dest[3].basic, 2, 2 },
       };
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
 
     {
       std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file0", ent_kind::file), false, selected },
+        { create_basic_dirent("file1", ent_kind::file), false, selected },
+        { create_basic_dirent("file2", ent_kind::file), false, not_selected },
       };
-      std::vector<bulk_rename::rename_pair> renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file3.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file3.cpp") },
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { &dest[0].basic, path_create("file2") },
+        { &dest[1].basic, path_create("file2") },
       };
-      std::vector<bulk_rename::collision_2> expected = {
+      std::vector<bulk_rename::collision_2> expected_collisions = {
         { &dest[2].basic, 0, 1 },
       };
 
-      auto actual = find_collisions_2(dest, renames);
+      auto actual_collisions = find_collisions_2(dest, input_renames);
 
-      ntest::assert_stdvec(expected, actual);
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
+    }
+
+    {
+      std::vector<explorer_window::dir_ent> dest = {
+        { create_basic_dirent("file0", ent_kind::file), false, selected },
+        { create_basic_dirent("file1", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file2", ent_kind::file), false, selected },
+        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
+        { create_basic_dirent("file4", ent_kind::file), false, selected },
+      };
+      std::vector<bulk_rename::rename_pair> input_renames = {
+        { &dest[0].basic, path_create("file1") },
+        { &dest[2].basic, path_create("fileX") },
+        { &dest[4].basic, path_create("file3") },
+        //! NOTE: this will get sorted in find_collisions_2, order to check against will be:
+        // fileX
+        // file3
+        // file1
+      };
+      std::vector<bulk_rename::collision_2> expected_collisions = {
+        { &dest[3].basic, 1, 1 },
+        { &dest[1].basic, 2, 2 },
+      };
+
+      auto actual_collisions = find_collisions_2(dest, input_renames);
+
+      ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
   }
   #endif
