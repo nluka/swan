@@ -1,8 +1,16 @@
 @call cl.exe ^
-src/swan.cpp ^
-src/common.cpp ^
+src/bulk_rename.cpp ^
+src/debug_log.cpp ^
+src/explorer.cpp ^
+src/file_ops.cpp ^
+src/focused_window.cpp ^
+src/misc.cpp ^
 src/path.cpp ^
+src/pinned_directories.cpp ^
+src/style.cpp ^
+src/swan.cpp ^
 src/util.cpp ^
+src/window_options.cpp ^
 obj_release/imgui_demo.obj ^
 obj_release/imgui_draw.obj ^
 obj_release/imgui_impl_glfw.obj ^
@@ -18,7 +26,7 @@ resource/.res ^
 /I"C:/code/boost_1_80_0" ^
 /std:c++20 ^
 /nologo ^
-/W4 /WX ^
+/W4 ^
 /EHsc ^
 /O2 ^
 /MP ^

@@ -6,6 +6,7 @@ src/tests.cpp ^
 /W4 ^
 /EHsc ^
 /Fo:obj_debug\ ^
+/Fd:bin\vc140_tests_debug.pdb ^
 /Fe:bin\swan_tests_debug.exe ^
 /I"C:/code/boost_1_80_0" ^
 /MT ^

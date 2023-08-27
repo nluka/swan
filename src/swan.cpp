@@ -13,17 +13,10 @@
 #include "imgui/font_awesome.h"
 #include "imgui/material_design.h"
 
-#include "on_scope_exit.hpp"
-#include "primitives.hpp"
 #include "common.hpp"
+#include "imgui_specific.hpp"
+#include "on_scope_exit.hpp"
 #include "util.hpp"
-
-#include "pinned_window.cpp"
-#include "explorer_window.cpp"
-#include "file_ops_window.cpp"
-#include "debug_log_window.cpp"
-#include "unicode_test_window.cpp"
-#include "style.cpp"
 
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers
@@ -74,12 +67,10 @@ GLFWwindow *init_glfw_and_imgui()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    // io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     io.ConfigDockingWithShift = true;
     imgui::SetNextWindowPos(ImVec2(0, 0));
     imgui::SetNextWindowSize(io.DisplaySize);
     imgui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
-    imgui::StyleColorsDark();
 
     // Setup Platform/Renderer backends
     {
@@ -200,7 +191,7 @@ i32 main(i32, char**) try
         return 1;
     }
 
-    if (!init_windows_shell_com_garbage()) {
+    if (!explorer_init_windows_shell_com_garbage()) {
         return 1;
     }
 
@@ -210,7 +201,7 @@ i32 main(i32, char**) try
         imgui::DestroyContext();
         glfwDestroyWindow(window);
         glfwTerminate();
-        cleanup_windows_shell_com_garbage();
+        explorer_cleanup_windows_shell_com_garbage();
     });
 
     set_window_icon(window);
@@ -271,7 +262,7 @@ i32 main(i32, char**) try
             if (!load_result) {
                 std::string startup_path_stdstr = std::filesystem::current_path().string();
 
-                path_t startup_path = {};
+                swan_path_t startup_path = {};
                 path_append(startup_path, startup_path_stdstr.c_str());
                 path_force_separator(startup_path, expl_opts.dir_separator_utf8());
 
@@ -413,29 +404,29 @@ i32 main(i32, char**) try
         }
 
         if (win_opts.show_pinned) {
-            render_pinned_window(explorers, win_opts);
+            swan_render_window_pinned_directories(explorers, win_opts);
         }
 
         if (win_opts.show_file_operations) {
-            render_file_ops_window();
+            swan_render_window_file_operations();
         }
 
         if (win_opts.show_explorer_0) {
-            render_explorer_window(explorers[0]);
+            swan_render_window_explorer(explorers[0]);
         }
         if (win_opts.show_explorer_1) {
-            render_explorer_window(explorers[1]);
+            swan_render_window_explorer(explorers[1]);
         }
         if (win_opts.show_explorer_2) {
-            render_explorer_window(explorers[2]);
+            swan_render_window_explorer(explorers[2]);
         }
         if (win_opts.show_explorer_3) {
-            render_explorer_window(explorers[3]);
+            swan_render_window_explorer(explorers[3]);
         }
 
     #if !defined(NDEBUG)
         if (win_opts.show_debug_log) {
-            render_debug_log_window();
+            swan_render_window_debug_log();
         }
     #endif
 

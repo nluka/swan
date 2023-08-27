@@ -3,8 +3,6 @@
 
 #include <chrono>
 #include <cstdint>
-// #include <ostream>
-// #include <string_view>
 
 namespace timer_unit
 {
@@ -28,9 +26,9 @@ public:
         assert(elapsed_time_out != nullptr);
     }
 
-    scoped_timer(scoped_timer const &) = delete; // copy constructor
-    scoped_timer &operator=(scoped_timer const &) = delete; // copy assignment
-    scoped_timer(scoped_timer &&) noexcept = delete; // move constructor
+    scoped_timer(scoped_timer const &)                = delete; // copy constructor
+    scoped_timer &operator=(scoped_timer const &)     = delete; // copy assignment
+    scoped_timer(scoped_timer &&) noexcept            = delete; // move constructor
     scoped_timer &operator=(scoped_timer &&) noexcept = delete; // move assignment
 
     ~scoped_timer() {

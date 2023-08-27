@@ -10,12 +10,12 @@
 #include "util.hpp"
 
 static u64 s_fast_rand_seed = {};
-void seed_fast_rand(u64 v) noexcept(true)
+void seed_fast_rand(u64 v) noexcept
 {
     s_fast_rand_seed = v;
 }
 
-u64 fast_rand(u64 min, u64 max) noexcept(true)
+u64 fast_rand(u64 min, u64 max) noexcept
 {
     s_fast_rand_seed ^= (s_fast_rand_seed << 21);
     s_fast_rand_seed ^= (s_fast_rand_seed >> 35);
@@ -27,12 +27,12 @@ u64 fast_rand(u64 min, u64 max) noexcept(true)
     return rand_num;
 }
 
-void flip_bool(bool &b) noexcept(true)
+void flip_bool(bool &b) noexcept
 {
     b ^= true;
 }
 
-u64 two_u32_to_one_u64(u32 low, u32 high) noexcept(true)
+u64 two_u32_to_one_u64(u32 low, u32 high) noexcept
 {
     u64 result = {};
     result = static_cast<u64>(high) << 32;
@@ -40,7 +40,7 @@ u64 two_u32_to_one_u64(u32 low, u32 high) noexcept(true)
     return result;
 }
 
-i32 directory_exists(char const *path) noexcept(true)
+i32 directory_exists(char const *path) noexcept
 {
     DWORD attributes = GetFileAttributesA(path);
     return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
@@ -50,7 +50,7 @@ void format_file_size(
     u64 file_size,
     char *out,
     u64 out_size,
-    u64 unit_multiplier) noexcept(true)
+    u64 unit_multiplier) noexcept
 {
     char const *units[] = { "B", "KB", "MB", "GB", "TB" };
     u64 constexpr largest_unit_idx = (sizeof(units) / sizeof(*units)) - 1;
@@ -75,7 +75,7 @@ void format_file_size(
     snprintf(out, out_size, fmt, size, units[unit_idx]);
 }
 
-i64 compute_diff_ms(time_point_t start, time_point_t end) noexcept(true)
+i64 compute_diff_ms(time_point_t start, time_point_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(end);
@@ -83,12 +83,12 @@ i64 compute_diff_ms(time_point_t start, time_point_t end) noexcept(true)
     return diff_ms.count();
 }
 
-time_point_t current_time() noexcept(true)
+time_point_t current_time() noexcept
 {
     return std::chrono::high_resolution_clock::now();
 }
 
-std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noexcept(true)
+std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noexcept
 {
     std::array<char, 64> out = {};
 
@@ -116,26 +116,26 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     return out;
 }
 
-i32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept(true)
+i32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept
 {
     i32 chars_written = MultiByteToWideChar(CP_UTF8, 0, utf8_text, -1, utf16_text, (i32)utf16_text_capacity);
 
     return chars_written;
 }
 
-i32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept(true)
+i32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept
 {
     i32 chars_written = WideCharToMultiByte(CP_UTF8, 0, utf16_text, -1, utf8_text, (i32)utf8_text_capacity, "!", nullptr);
 
     return chars_written;
 }
 
-bool streq(char const *s1, char const *s2) noexcept(true)
+bool streq(char const *s1, char const *s2) noexcept
 {
     return strcmp(s1, s2) == 0;
 }
 
-u64 remove_adjacent_spaces(char *str, u64 len) noexcept(true)
+u64 remove_adjacent_spaces(char *str, u64 len) noexcept
 {
     assert(str != nullptr);
 
