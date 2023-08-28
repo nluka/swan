@@ -8,12 +8,16 @@
 #include <boost/container/static_vector.hpp>
 #include <boost/circular_buffer.hpp>
 
-#include "path.hpp"
-#include "util.hpp"
 #include "primitives.hpp"
+#include "path.hpp"
+#include "BS_thread_pool.hpp"
+#include "util.hpp"
 
 bool explorer_init_windows_shell_com_garbage() noexcept;
 void explorer_cleanup_windows_shell_com_garbage() noexcept;
+
+typedef BS::thread_pool swan_thread_pool_t;
+swan_thread_pool_t &get_thread_pool() noexcept;
 
 struct basic_dirent
 {
@@ -276,19 +280,19 @@ struct bulk_rename_op
     friend std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r); // for ntest
 };
 
-struct bulk_rename_collision_2
+struct bulk_rename_collision
 {
     basic_dirent *dest_dirent;
     u64 first_rename_pair_idx;
     u64 last_rename_pair_idx;
 
-    bool operator!=(bulk_rename_collision_2 const &other) const noexcept; // for ntest
-    friend std::ostream& operator<<(std::ostream &os, bulk_rename_collision_2 const &c); // for ntest
+    bool operator!=(bulk_rename_collision const &other) const noexcept; // for ntest
+    friend std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c); // for ntest
 };
 
 void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> &renames) noexcept;
 
-std::vector<bulk_rename_collision_2> bulk_rename_find_collisions_2(
+std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> &renames) noexcept;
 

@@ -7,7 +7,8 @@
 
 #include "imgui/imgui.h"
 
-static BS::thread_pool s_thread_pool(1);
+static swan_thread_pool_t s_thread_pool(1);
+swan_thread_pool_t &get_thread_pool() noexcept { return s_thread_pool; }
 
 bool basic_dirent::is_dotdot() const noexcept { return path_equals_exactly(path, ".."); }
 bool basic_dirent::is_dotdot_dir() const noexcept { return type == basic_dirent::kind::directory && path_equals_exactly(path, ".."); }

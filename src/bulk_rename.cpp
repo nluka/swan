@@ -22,7 +22,7 @@ std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r)
 }
 
 // for ntest
-bool bulk_rename_collision_2::operator!=(bulk_rename_collision_2 const &other) const noexcept
+bool bulk_rename_collision::operator!=(bulk_rename_collision const &other) const noexcept
 {
     return
         this->first_rename_pair_idx != other.first_rename_pair_idx ||
@@ -31,7 +31,7 @@ bool bulk_rename_collision_2::operator!=(bulk_rename_collision_2 const &other) c
 }
 
 // for ntest
-std::ostream& operator<<(std::ostream &os, bulk_rename_collision_2 const &c)
+std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c)
 {
     return os << "D:[" << (c.dest_dirent ? c.dest_dirent->path.data() : "")
                 << "] [" << c.first_rename_pair_idx << ',' << c.last_rename_pair_idx << ']';
@@ -209,11 +209,11 @@ void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> 
     });
 }
 
-std::vector<bulk_rename_collision_2> bulk_rename_find_collisions_2(
+std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> &renames) noexcept
 {
-    std::vector<bulk_rename_collision_2> collisions = {};
+    std::vector<bulk_rename_collision> collisions = {};
 
     if (renames.empty()) {
         return collisions;

@@ -27,6 +27,13 @@ u64 fast_rand(u64 min, u64 max) noexcept
     return rand_num;
 }
 
+bool chance(f64 probability_fraction) noexcept
+{
+    u64 max_value = static_cast<u64>(1.0 / probability_fraction);
+    u64 random_number = fast_rand(0, max_value);
+    return random_number == 0;
+}
+
 void flip_bool(bool &b) noexcept
 {
     b ^= true;
