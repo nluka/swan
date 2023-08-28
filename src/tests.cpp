@@ -637,9 +637,9 @@ i32 main()
     {
       std::vector<explorer_window::dirent> dest = {};
       std::vector<bulk_rename_op> input_renames = {};
-      std::vector<bulk_rename_collision_2> expected_collisions = {};
+      std::vector<bulk_rename_collision> expected_collisions = {};
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -654,11 +654,11 @@ i32 main()
       std::vector<bulk_rename_op> input_renames = {
         // none
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         // none
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -676,11 +676,11 @@ i32 main()
         { &dest[2].basic, path_create("file3") },
         { &dest[3].basic, path_create("file4") },
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         // none
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -701,11 +701,11 @@ i32 main()
         // file2
         // file1
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         { &dest[3].basic, 0, 0 },
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -722,11 +722,11 @@ i32 main()
         { &dest[1].basic, path_create("file3") },
         { &dest[2].basic, path_create("file3") },
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         { &dest[3].basic, 0, 2 },
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -743,11 +743,11 @@ i32 main()
         { &dest[1].basic, path_create("file5") },
         { &dest[2].basic, path_create("file5") },
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         { nullptr, 0, 2 },
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -770,13 +770,13 @@ i32 main()
         // file4
         // file3
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         { &dest[5].basic, 0, 0 },
         { &dest[4].basic, 1, 1 },
         { &dest[3].basic, 2, 2 },
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -791,11 +791,11 @@ i32 main()
         { &dest[0].basic, path_create("file2") },
         { &dest[1].basic, path_create("file2") },
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         { &dest[2].basic, 0, 1 },
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }
@@ -817,12 +817,12 @@ i32 main()
         // file3
         // file1
       };
-      std::vector<bulk_rename_collision_2> expected_collisions = {
+      std::vector<bulk_rename_collision> expected_collisions = {
         { &dest[3].basic, 1, 1 },
         { &dest[1].basic, 2, 2 },
       };
 
-      auto actual_collisions = bulk_rename_find_collisions_2(dest, input_renames);
+      auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
     }

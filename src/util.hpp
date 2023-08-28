@@ -47,4 +47,7 @@ bool streq(char const *s1, char const *s2) noexcept;
 
 u64 remove_adjacent_spaces(char *str, u64 len = 0) noexcept;
 
+// Has a 1 in probability_fraction chance to return true.
+bool chance(f64 probability_fraction) noexcept;
+
 #endif // SWAN_UTIL_HPP
