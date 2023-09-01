@@ -1,19 +1,18 @@
-#ifndef PRIMITIVES_HPP
-#define PRIMITIVES_HPP
+#pragma once
 
 #include <cstdint>
 
 static_assert(sizeof(int8_t) == 1);
-typedef int8_t i8;
+typedef int8_t s8;
 
 static_assert(sizeof(int16_t) == 2);
-typedef int16_t i16;
+typedef int16_t s16;
 
 static_assert(sizeof(int32_t) == 4);
-typedef int32_t i32;
+typedef int32_t s32;
 
 static_assert(sizeof(int64_t) == 8);
-typedef int64_t i64;
+typedef int64_t s64;
 
 static_assert(sizeof(uint8_t) == 1);
 typedef uint8_t u8;
@@ -37,5 +36,3 @@ typedef double f64;
 
 static_assert(sizeof(bool) == 1);
 typedef bool b8;
-
-#endif // PRIMITIVES_HPP

@@ -1,5 +1,3 @@
-#pragma once
-
 #include <fstream>
 
 #include "common.hpp"
@@ -23,7 +21,8 @@ void swan_render_window_pinned_directories(std::array<explorer_window, 4> &explo
                 debug_log("setting Explorer %zu cwd to [%s]", expl_win_num, pin.data());
                 expl.cwd = pin;
                 new_history_from(expl, pin);
-                update_cwd_entries(full_refresh, &expl, pin.data());
+                (void) update_cwd_entries(full_refresh, &expl, pin.data());
+                (void) expl.save_to_disk();
             }
 
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {

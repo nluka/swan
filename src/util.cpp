@@ -1,5 +1,4 @@
-#ifndef SWAN_UTIL_CPP
-#define SWAN_UTIL_CPP
+#pragma once
 
 #include <iostream>
 #include <cassert>
@@ -47,7 +46,7 @@ u64 two_u32_to_one_u64(u32 low, u32 high) noexcept
     return result;
 }
 
-i32 directory_exists(char const *path) noexcept
+s32 directory_exists(char const *path) noexcept
 {
     DWORD attributes = GetFileAttributesA(path);
     return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
@@ -82,7 +81,7 @@ void format_file_size(
     snprintf(out, out_size, fmt, size, units[unit_idx]);
 }
 
-i64 compute_diff_ms(time_point_t start, time_point_t end) noexcept
+s64 compute_diff_ms(time_point_t start, time_point_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(end);
@@ -99,10 +98,10 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
 {
     std::array<char, 64> out = {};
 
-    i64 ms_diff = compute_diff_ms(start, end);
-    i64 one_minute = 60'000;
-    i64 one_hour = one_minute * 60;
-    i64 one_day = one_hour * 24;
+    s64 ms_diff = compute_diff_ms(start, end);
+    s64 one_minute = 60'000;
+    s64 one_hour = one_minute * 60;
+    s64 one_day = one_hour * 24;
 
     if (ms_diff < one_minute) {
         strncpy(out.data(), "just now", out.size());
@@ -123,16 +122,16 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     return out;
 }
 
-i32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept
+s32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept
 {
-    i32 chars_written = MultiByteToWideChar(CP_UTF8, 0, utf8_text, -1, utf16_text, (i32)utf16_text_capacity);
+    s32 chars_written = MultiByteToWideChar(CP_UTF8, 0, utf8_text, -1, utf16_text, (s32)utf16_text_capacity);
 
     return chars_written;
 }
 
-i32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept
+s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept
 {
-    i32 chars_written = WideCharToMultiByte(CP_UTF8, 0, utf16_text, -1, utf8_text, (i32)utf8_text_capacity, "!", nullptr);
+    s32 chars_written = WideCharToMultiByte(CP_UTF8, 0, utf16_text, -1, utf8_text, (s32)utf8_text_capacity, "!", nullptr);
 
     return chars_written;
 }
@@ -177,4 +176,47 @@ u64 remove_adjacent_spaces(char *str, u64 len) noexcept
     return spaces_removed;
 }
 
-#endif // SWAN_UTIL_CPP
+char const *lorem_ipsum() noexcept
+{
+    char const *data =
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
+        "Ut quis elit ut lorem pharetra hendrerit vel ut lacus. "
+        "Integer congue velit ut ipsum hendrerit, quis auctor elit aliquam. "
+        "Phasellus nec venenatis nulla. "
+        "Suspendisse nunc elit, pharetra ac suscipit tincidunt, volutpat et mauris. "
+        "Curabitur elementum pulvinar vestibulum. "
+        "Curabitur odio turpis, molestie quis scelerisque nec, pharetra at turpis. "
+        "Mauris dignissim velit sit amet erat aliquam luctus. "
+        "Sed eu augue eu ex ullamcorper posuere a vel arcu. "
+        "Vivamus at ligula urna. "
+        "Praesent ac quam urna. "
+        "Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. "
+        "Donec euismod consectetur sapien, quis porta mi sagittis ac. "
+        "Nullam cursus rutrum erat, sed facilisis eros interdum eget. "
+        "Proin vitae tincidunt velit. "
+        "Morbi consectetur lacus dolor, quis congue dui consequat euismod. "
+        "Proin in gravida diam. "
+        "Fusce sit amet euismod urna. "
+        "Quisque quis orci sit amet mi facilisis egestas vel vitae nunc. "
+        "Aliquam tincidunt mauris vitae tincidunt porttitor. "
+        "Nunc tincidunt, nibh sed varius ornare, lectus erat ornare sem, non semper magna odio sit amet erat. "
+        "Praesent imperdiet justo neque, eu malesuada diam fringilla quis. "
+        "Vestibulum eget iaculis est. "
+        "Nam ultricies turpis at risus vulputate, congue eleifend risus tincidunt. "
+        "Nulla scelerisque dui tortor, et mollis ex egestas at. "
+        "Duis quis ante non nulla ultrices rutrum. "
+        "Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. "
+        "Quisque in justo luctus, sagittis magna a, ullamcorper diam. "
+        "Integer efficitur vestibulum lacus sed vulputate. "
+        "Maecenas justo lorem, convallis nec tempor vitae, ullamcorper et ligula. "
+        "Morbi finibus nulla sed risus posuere, non pharetra lorem pellentesque. "
+        "Nam posuere odio eu orci euismod scelerisque. "
+        "Mauris commodo lorem a finibus volutpat. ";
+
+    return data;
+
+    // std::array<char, 2048> retval;
+    // static_assert(lengthof(data) <= retval.size());
+    // std::memcpy(retval.data(), data, lengthof(data));
+    // return retval;
+}

@@ -22,7 +22,7 @@
 #include <glfw3.h> // Will drag system OpenGL headers
 
 static
-void glfw_error_callback(i32 error, char const *description)
+void glfw_error_callback(s32 error, char const *description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
@@ -180,7 +180,7 @@ void render(GLFWwindow *window)
 }
 
 // #pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
-i32 main(i32, char**) try
+s32 main(s32, char**) try
 {
     namespace imgui = ImGui;
 
@@ -373,7 +373,7 @@ i32 main(i32, char**) try
                         static_assert(lengthof(refresh_modes) == (u64)explorer_options::refresh_mode::count);
 
                         imgui::SeparatorText("Mode");
-                        change_made |= imgui::Combo("##refresh_mode", (i32 *)&expl_opts.ref_mode, refresh_modes, lengthof(refresh_modes));
+                        change_made |= imgui::Combo("##refresh_mode", (s32 *)&expl_opts.ref_mode, refresh_modes, lengthof(refresh_modes));
 
                         if (expl_opts.ref_mode == explorer_options::refresh_mode::adaptive) {
                             imgui::SeparatorText("Threshold (# items)");

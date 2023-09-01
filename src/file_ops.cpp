@@ -1,5 +1,3 @@
-#pragma once
-
 #include "common.hpp"
 
 #include "imgui/imgui.h"
@@ -66,7 +64,7 @@ void swan_render_window_file_operations() noexcept
 
     auto const &file_ops_buffer = get_file_ops_buffer();
 
-    enum file_ops_table_col : i32
+    enum file_ops_table_col : s32
     {
         file_ops_table_col_action,
         file_ops_table_col_status,

@@ -1,5 +1,3 @@
-#pragma once
-
 #include <string>
 #include <cassert>
 #include <iostream>
@@ -42,7 +40,7 @@ bulk_rename_transform_result bulk_rename_transform(
     char const *ext,
     std::array<char, (256 * 4) + 1> &after,
     char const *pattern,
-    i32 counter,
+    s32 counter,
     u64 bytes,
     bool squish_adjacent_spaces) noexcept
 {
@@ -99,11 +97,11 @@ bulk_rename_transform_result bulk_rename_transform(
                 }
 
                 auto expr_equals = [&](char const *known_expr) {
-                    return StrCmpNIA(pattern + opening_chevron_pos + 1, known_expr, (i32)expr_len) == 0;
+                    return StrCmpNIA(pattern + opening_chevron_pos + 1, known_expr, (s32)expr_len) == 0;
                 };
 
                 bool known_expression = true;
-                i32 written = 0;
+                s32 written = 0;
                 u64 space_left = after.size() - after_insert_idx;
                 char *out = after.data() + after_insert_idx;
 
@@ -200,7 +198,7 @@ void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> 
     // (I couldn't figure out how to do it in ascending order... descending will do.)
 
     std::stable_sort(renames.begin(), renames.end(), [&](bulk_rename_op const &a, bulk_rename_op const &b) {
-        i32 cmp = strcmp(a.after.data(), b.after.data());
+        s32 cmp = strcmp(a.after.data(), b.after.data());
         if (cmp == 0) {
             return false;
         } else {
