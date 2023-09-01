@@ -40,8 +40,8 @@ bool windows_options::load_from_disk() noexcept
             return false;
         }
 
-        static_assert(i8(1) == i8(true));
-        static_assert(i8(0) == i8(false));
+        static_assert(s8(1) == s8(true));
+        static_assert(s8(0) == s8(false));
 
         std::string what = {};
         what.reserve(100);

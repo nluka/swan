@@ -17,15 +17,26 @@ bool basic_dirent::is_symlink() const noexcept { return type == basic_dirent::ki
 bool basic_dirent::is_file() const noexcept { return type != basic_dirent::kind::directory; }
 bool basic_dirent::is_non_symlink_file() const noexcept { return is_file() && !is_symlink(); }
 
+char const *basic_dirent::kind_cstr() const noexcept
+{
+    assert(this->type >= basic_dirent::kind::directory && this->type <= basic_dirent::kind::symlink);
+
+    switch (this->type) {
+        case basic_dirent::kind::directory: return "directory";
+        case basic_dirent::kind::file: return "file";
+        case basic_dirent::kind::symlink: return "symlink";
+        default: return "";
+    }
+}
+
 ImVec4 get_color(basic_dirent::kind t) noexcept
 {
-    static ImVec4 const pale_green(0.85f, 1, 0.85f, 1);
-    static ImVec4 const yellow(1, 1, 0, 1);
-    static ImVec4 const cyan(0.1f, 1, 1, 1);
-
-    if (t == basic_dirent::kind::directory) return yellow;
-    if (t == basic_dirent::kind::symlink) return cyan;
-    else return pale_green;
+    if (t == basic_dirent::kind::directory)
+        return ImVec4(1, 1, 0, 1); // yellow
+    if (t == basic_dirent::kind::symlink)
+        return ImVec4(0.1f, 1, 1, 1); // cyan
+    else
+        return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
 }
 
 char explorer_options::dir_separator_utf8() const noexcept { return unix_directory_separator ? '/' : '\\'; }

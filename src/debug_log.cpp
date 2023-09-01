@@ -1,5 +1,3 @@
-#pragma once
-
 #include "common.hpp"
 #include "imgui_specific.hpp"
 

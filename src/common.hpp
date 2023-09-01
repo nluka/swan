@@ -42,6 +42,7 @@ struct basic_dirent
     bool is_symlink() const noexcept;
     bool is_file() const noexcept;
     bool is_non_symlink_file() const noexcept;
+    char const *kind_cstr() const noexcept;
 };
 
 struct drive_info
@@ -55,7 +56,7 @@ struct drive_info
 
 typedef boost::container::static_vector<drive_info, 26> drive_list_t;
 
-drive_list_t query_drive_list();
+drive_list_t query_drive_list() noexcept;
 
 struct windows_options
 {
@@ -77,7 +78,7 @@ struct windows_options
 
 struct explorer_options
 {
-    enum class refresh_mode : i32
+    enum class refresh_mode : s32
     {
         adaptive,
         manual,
@@ -85,10 +86,10 @@ struct explorer_options
         count
     };
 
-    static i32 const min_tolerable_refresh_interval_ms = 500;
+    static s32 const min_tolerable_refresh_interval_ms = 500;
 
-    i32 auto_refresh_interval_ms;
-    i32 adaptive_refresh_threshold;
+    s32 auto_refresh_interval_ms;
+    s32 adaptive_refresh_threshold;
     refresh_mode ref_mode;
     bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
     bool show_cwd_len;
@@ -164,7 +165,7 @@ struct explorer_window
 
     // 1 byte alignment members
 
-    mutable i8 latest_save_to_disk_result = -1;
+    mutable s8 latest_save_to_disk_result = -1;
     swan_path_t prev_valid_cwd = {};
     swan_path_t cwd = {}; // current working directory, persisted in file
     swan_path_t cwd_last_frame = {};
@@ -212,7 +213,7 @@ bool update_cwd_entries(
     u8 actions,
     explorer_window *,
     std::string_view parent_dir,
-    std::source_location sloc = std::source_location::current());
+    std::source_location sloc = std::source_location::current()) noexcept;
 
 void new_history_from(explorer_window &expl, swan_path_t const &new_latest_entry);
 
@@ -267,7 +268,7 @@ bulk_rename_transform_result bulk_rename_transform(
     char const *ext,
     std::array<char, (256 * 4) + 1> &after,
     char const *pattern,
-    i32 counter,
+    s32 counter,
     u64 bytes,
     bool squish_adjacent_spaces) noexcept;
 
@@ -296,8 +297,7 @@ std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> &renames) noexcept;
 
-// TODO: make noexcept
-void swan_render_window_explorer(explorer_window &);
+void swan_render_window_explorer(explorer_window &) noexcept;
 void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, windows_options const &) noexcept;
 void swan_render_window_debug_log() noexcept;
 void swan_render_window_file_operations() noexcept;

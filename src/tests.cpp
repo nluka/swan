@@ -21,7 +21,7 @@
 
 #include "bulk_rename.cpp"
 
-i32 main()
+s32 main()
 {
   using namespace term;
   using term::printf;
