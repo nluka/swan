@@ -92,12 +92,13 @@ Note: cwd = current working directory
   - [ ] Delete directories
     - [ ] Undo
   <!-- TODO: GIF demo -->
-  - [ ] Bulk renaming
-    - [ ] Sample preview of current pattern before/after
+  - Bulk renaming
+    - [x] Preview of current pattern's before/after tranformation
     - [x] Arbitrary counter with configurable start and step values
     - [x] Refer to current name minus extension using `<name>` (e.g. if `file.cpp`, `<name>` = `file`)
     - [x] Refer to current extension using `<ext>` (e.g. if `file.cpp`, `<ext>` = `cpp`, blank for directories)
     - [x] Refer to size in bytes using `<bytes>` (= 0 for directories)
+    - [ ] Transactional
     - [ ] Undo
 
 <!-- TODO: GIF demo -->
