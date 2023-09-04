@@ -220,3 +220,108 @@ char const *lorem_ipsum() noexcept
     // std::memcpy(retval.data(), data, lengthof(data));
     // return retval;
 }
+
+file_name_ext::file_name_ext(char *path) noexcept
+{
+    this->name = get_file_name(path);
+    this->ext = get_file_ext(name);
+    this->dot = ext ? ext - 1 : nullptr;
+    if (this->dot) {
+        *this->dot = '\0';
+    }
+}
+
+file_name_ext::~file_name_ext() noexcept
+{
+    if (this->dot) {
+        *this->dot = '.';
+    }
+}
+
+char *get_file_name(char *path) noexcept
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                  ^^^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    //     ^^^^^^^^ what we are after
+
+    assert(path != nullptr);
+
+    char *just_the_file_name = path;
+
+    std::string_view view(just_the_file_name);
+
+    u64 last_sep_pos = view.find_last_of("\\/");
+
+    if (last_sep_pos != std::string::npos) {
+        just_the_file_name += last_sep_pos + 1;
+    }
+
+    return just_the_file_name;
+}
+
+char const *cget_file_name(char const *path) noexcept
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                  ^^^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    //     ^^^^^^^^ what we are after
+
+    assert(path != nullptr);
+
+    char const *just_the_file_name = path;
+
+    std::string_view view(just_the_file_name);
+
+    u64 last_sep_pos = view.find_last_of("\\/");
+
+    if (last_sep_pos != std::string::npos) {
+        just_the_file_name += last_sep_pos + 1;
+    }
+
+    return just_the_file_name;
+}
+
+char *get_file_ext(char *path) noexcept
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                                  ^^^ what we are after
+    // src/swan.cpp
+    //          ^^^ what we are after
+
+    assert(path != nullptr);
+
+    char *just_the_file_ext = path;
+
+    std::string_view view(just_the_file_ext);
+
+    u64 last_dot_pos = view.find_last_of(".");
+
+    if (last_dot_pos != std::string::npos) {
+        just_the_file_ext += last_dot_pos + 1;
+        return just_the_file_ext;
+    } else {
+        return nullptr;
+    }
+}
+
+std::string_view get_everything_minus_file_name(char const *path) noexcept
+{
+    // C:\code\swan\src\explorer_window.cpp
+    // ^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    // ^^^^ what we are after
+
+    assert(path != nullptr);
+
+    std::string_view full_path_view(path);
+
+    u64 last_sep_pos = full_path_view.find_last_of("\\/");
+
+    if (last_sep_pos == std::string::npos) {
+        return path;
+    }
+    else {
+        return std::string_view(path, last_sep_pos + 1);
+    }
+}

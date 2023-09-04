@@ -231,24 +231,6 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
 
 u64 find_pin_idx(swan_path_t const &) noexcept;
 
-char *get_file_name(char *path) noexcept;
-char const *cget_file_name(char const *path) noexcept;
-
-char *get_file_ext(char *path) noexcept;
-// char const *cget_file_ext(char const *path) noexcept;
-
-struct file_name_ext
-{
-    char *name;
-    char *ext;
-    char *dot;
-
-    file_name_ext(char *path) noexcept;
-    ~file_name_ext() noexcept;
-};
-
-std::string_view get_everything_minus_file_name(char const *path) noexcept;
-
 std::string get_last_error_string() noexcept;
 
 bool save_focused_window(char const *window_name) noexcept;
@@ -257,20 +239,54 @@ bool load_focused_window_from_disk(char const *out) noexcept;
 
 void imgui_sameline_spacing(u64 num_spacing_calls) noexcept;
 
+struct bulk_rename_compiled_pattern
+{
+    struct op
+    {
+        enum class type : u8
+        {
+            insert_char,
+            insert_name,
+            insert_ext,
+            insert_size,
+            insert_counter,
+        };
+
+        type kind;
+        char ch = 0;
+        // char text[1024+1];
+        // u64 text_len = 0;
+
+        bool operator!=(op const &other) const noexcept; // for ntest
+        friend std::ostream& operator<<(std::ostream &os, op const &r); // for ntest
+    };
+
+    std::vector<op> ops;
+    bool squish_adjacent_spaces;
+};
+
+struct bulk_rename_compile_pattern_result
+{
+    bool success;
+    bulk_rename_compiled_pattern compiled_pattern;
+    std::array<char, 256> error;
+};
+
+bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *pattern, bool squish_adjacent_spaces) noexcept;
+
 struct bulk_rename_transform_result
 {
     bool success;
-    std::array<char, 128> error_msg;
+    std::array<char, 256> error;
 };
 
 bulk_rename_transform_result bulk_rename_transform(
+    bulk_rename_compiled_pattern compiled_pattern,
+    swan_path_t &after,
     char const *name,
     char const *ext,
-    std::array<char, (256 * 4) + 1> &after,
-    char const *pattern,
     s32 counter,
-    u64 bytes,
-    bool squish_adjacent_spaces) noexcept;
+    u64 bytes) noexcept;
 
 struct bulk_rename_op
 {

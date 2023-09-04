@@ -317,91 +317,207 @@ s32 main()
   }
   #endif
 
-  // bulk_rename_transform;
+  // bulk_rename_compile_pattern, bulk_rename_transform;
   #if 1
   {
-    std::array<char, 1025> after = {};
+    bool squish_adjacent_spaces = false;
+    swan_path_t after = {};
 
-    // success == false
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "", 0, 0, false);
+      char const *pattern = "";
+      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("empty pattern", err_msg.data());
-      ntest::assert_cstr("", after.data());
+      ntest::assert_stdvec({}, compiled.ops);
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "<<", 0, 0, false);
+      char const *pattern = "asdf\t";
+      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
       ntest::assert_bool(false, success);
-      ntest::assert_cstr("unexpected '<' at position 1, unclosed '<' at position 0", err_msg.data());
-      ntest::assert_cstr("", after.data());
+      ntest::assert_cstr("illegal filename character 9 at position 4", err_msg.data());
+      ntest::assert_stdvec({}, compiled.ops);
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "data<<", 0, 0, false);
+      char const *pattern = "data<<";
+      auto [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("unexpected '<' at position 5, unclosed '<' at position 4", err_msg.data());
-      ntest::assert_cstr("", after.data());
+      ntest::assert_stdvec({}, compiled.ops);
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, ">", 0, 0, false);
+      char const *pattern = "<";
+      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
+      ntest::assert_bool(false, success);
+      ntest::assert_cstr("unclosed '<' at position 0", err_msg.data());
+      ntest::assert_stdvec({}, compiled.ops);
+    }
+    {
+      char const *pattern = ">";
+      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("unexpected '>' at position 0 - no preceding '<' found", err_msg.data());
-      ntest::assert_cstr("", after.data());
+      ntest::assert_stdvec({}, compiled.ops);
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "<>", 0, 0, false);
+      char const *pattern = "<>";
+      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("empty expression starting at position 0", err_msg.data());
-      ntest::assert_cstr("", after.data());
+      ntest::assert_stdvec({}, compiled.ops);
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "data_<bogus>", 0, 0, false);
+      char const *pattern = "data_<bogus>";
+      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
       ntest::assert_bool(false, success);
       ntest::assert_cstr("unknown expression starting at position 5", err_msg.data());
-      ntest::assert_cstr("", after.data());
+      ntest::assert_stdvec({}, compiled.ops);
     }
-    // success == true
+
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "<counter>", 0, 0, false);
-      ntest::assert_bool(true, success);
-      ntest::assert_cstr("", err_msg.data());
+      char const *pattern = "<counter>";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = 0;
+      u64 size = {};
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
       ntest::assert_cstr("0", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "<CoUnTeR>", 100, 0, false);
-      ntest::assert_bool(true, success);
-      ntest::assert_cstr("", err_msg.data());
+      char const *pattern = "<CoUnTeR>";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = 100;
+      u64 size = {};
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
       ntest::assert_cstr("100", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "something_<name>_bla", 0, 0, false);
-      ntest::assert_bool(true, success);
-      ntest::assert_cstr("", err_msg.data());
+      char const *pattern = "something_<name>_bla";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = {};
+      u64 size = {};
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
       ntest::assert_cstr("something_before_bla", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "<name>  <bytes>.<ext>", 0, 42, false);
-      ntest::assert_bool(true, success);
-      ntest::assert_cstr("", err_msg.data());
+      char const *pattern = "<name>.<name>.<name>";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = {};
+      u64 size = {};
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
+      ntest::assert_cstr("before.before.before", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
+    }
+    {
+      char const *pattern = "<name>  <bytes>.<ext>";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = {};
+      u64 size = 42;
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
       ntest::assert_cstr("before  42.ext", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("29.  Gladiator Boss", "mp3", after, "<name>.<ext>", 0, 42, false);
-      ntest::assert_bool(true, success);
-      ntest::assert_cstr("", err_msg.data());
-      ntest::assert_cstr("29.  Gladiator Boss.mp3", after.data());
-    }
-    {
-      auto [success, err_msg] = bulk_rename_transform("before", "ext", after, "<name>  <bytes>.<ext>", 0, 42, true);
-      ntest::assert_bool(true, success);
-      ntest::assert_cstr("", err_msg.data());
+      char const *pattern = "<name>   <bytes>.<ext>";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = true);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = {};
+      u64 size = 42;
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
       ntest::assert_cstr("before 42.ext", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
     }
     {
-      auto [success, err_msg] = bulk_rename_transform("29.  Gladiator Boss", "mp3", after, "<name>.<ext>", 0, 42, true);
-      ntest::assert_bool(true, success);
-      ntest::assert_cstr("", err_msg.data());
-      ntest::assert_cstr("29. Gladiator Boss.mp3", after.data());
+      char const *pattern = "29.  Gladiator Boss";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = {};
+      u64 size = 42;
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
+      ntest::assert_cstr("29.  Gladiator Boss", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
     }
+    {
+      char const *pattern = "29.  Gladiator Boss";
+
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = true);
+      ntest::assert_bool(true, success_compile);
+      ntest::assert_cstr("", err_msg_compile.data());
+      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+
+      char const *name = "before";
+      char const *ext = "ext";
+      s32 counter = {};
+      u64 size = 42;
+
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
+      ntest::assert_bool(true, success_transform);
+      ntest::assert_cstr("29. Gladiator Boss", after.data());
+      ntest::assert_cstr("", err_msg_transform.data());
+    }
+
   }
   #endif
 
@@ -615,7 +731,7 @@ s32 main()
   }
   #endif
 
-  // bulk_rename_find_collisions_2;
+  // bulk_rename_find_collisions;
   #if 1
   {
     using ent_kind = basic_dirent::kind;
@@ -696,7 +812,7 @@ s32 main()
         { &dest[0].basic, path_create("file1") },
         { &dest[1].basic, path_create("file2") },
         { &dest[2].basic, path_create("file3") },
-        //! NOTE: this will get sorted in bulk_rename_find_collisions_2, order to check against will be:
+        //! NOTE: this will get sorted in bulk_rename_find_collisions, order to check against will be:
         // file3
         // file2
         // file1
@@ -765,7 +881,7 @@ s32 main()
         { &dest[0].basic, path_create("file3") },
         { &dest[1].basic, path_create("file4") },
         { &dest[2].basic, path_create("file5") },
-        //! NOTE: this will get sorted in bulk_rename_find_collisions_2, order to check against will be:
+        //! NOTE: this will get sorted in bulk_rename_find_collisions, order to check against will be:
         // file5
         // file4
         // file3
@@ -812,7 +928,7 @@ s32 main()
         { &dest[0].basic, path_create("file1") },
         { &dest[2].basic, path_create("fileX") },
         { &dest[4].basic, path_create("file3") },
-        //! NOTE: this will get sorted in bulk_rename_find_collisions_2, order to check against will be:
+        //! NOTE: this will get sorted in bulk_rename_find_collisions, order to check against will be:
         // fileX
         // file3
         // file1
@@ -825,6 +941,30 @@ s32 main()
       auto actual_collisions = bulk_rename_find_collisions(dest, input_renames);
 
       ntest::assert_stdvec(expected_collisions, actual_collisions);
+    }
+  }
+  #endif
+
+  // file_name_ext;
+  #if 1
+  {
+    {
+      char name[] = "src/swan.cpp";
+      file_name_ext sut(name);
+      ntest::assert_cstr("swan", sut.name);
+      ntest::assert_cstr("cpp", sut.ext);
+    }
+    {
+      char name[] = "C:/code/swan/src/explorer_window.cpp";
+      file_name_ext sut(name);
+      ntest::assert_cstr("explorer_window", sut.name);
+      ntest::assert_cstr("cpp", sut.ext);
+    }
+    {
+      char name[] = "a.b.c";
+      file_name_ext sut(name);
+      ntest::assert_cstr("a.b", sut.name);
+      ntest::assert_cstr("c", sut.ext);
     }
   }
   #endif

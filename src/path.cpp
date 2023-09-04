@@ -14,17 +14,13 @@ swan_path_t path_create(char const *data) noexcept
 {
     swan_path_t p = {};
 
-    if (data == nullptr) {
-        return p;
-    }
-
+#if !defined(NDEBUG)
+    assert(data != nullptr);
     u16 data_len = (u16)strnlen(data, UINT16_MAX);
+    assert(data_len < p.max_size());
+#endif
 
-    if (data_len >= p.max_size()) {
-        return p;
-    }
-
-    strcpy(p.data(), data);
+    strncpy(p.data(), data, p.max_size() - 1);
 
     return p;
 }
