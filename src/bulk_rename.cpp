@@ -137,6 +137,11 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_name;
                     compiled.ops.push_back(op);
                 }
+                else if (expr_equals("dotext")) {
+                    bulk_rename_compiled_pattern::op op = {};
+                    op.kind = bulk_rename_compiled_pattern::op::type::insert_dotext;
+                    compiled.ops.push_back(op);
+                }
                 else if (expr_equals("ext")) {
                     bulk_rename_compiled_pattern::op op = {};
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_ext;
@@ -261,6 +266,28 @@ bulk_rename_transform_result bulk_rename_transform(
                 }
                 break;
             }
+            case op_type::insert_dotext: {
+                if (ext != nullptr) {
+                    if (after_insert_idx < after.max_size()) {
+                        after[after_insert_idx++] = '.';
+                    } else {
+                        result.success = false;
+                        strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                        return result;
+                    }
+
+                    u64 len = strlen(ext);
+                    if (len <= space_left) {
+                        strcat(out, ext);
+                        after_insert_idx += len;
+                    } else {
+                        result.success = false;
+                        strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                        return result;
+                    }
+                }
+                break;
+            }
             case op_type::insert_size: {
                 char buffer[21] = {};
                 written = snprintf(buffer, lengthof(buffer), "%zu", bytes);
@@ -314,17 +341,18 @@ void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> 
 
 std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
-    std::vector<bulk_rename_op> &renames) noexcept
+    std::vector<bulk_rename_op> const &renames_in) noexcept
 {
     std::vector<bulk_rename_collision> collisions = {};
 
-    if (renames.empty()) {
+    if (renames_in.empty()) {
         return collisions;
     }
 
-    collisions.reserve(dest.size());
-
+    auto renames = renames_in; // make a copy cuz we gotta sort this sucker
     sort_renames_dup_elem_sequences_after_non_dups(renames);
+
+    collisions.reserve(dest.size());
 
     static std::vector<explorer_window::dirent *> unaffected_dirents = {};
     unaffected_dirents.clear();

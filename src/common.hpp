@@ -248,6 +248,7 @@ struct bulk_rename_compiled_pattern
             insert_char,
             insert_name,
             insert_ext,
+            insert_dotext,
             insert_size,
             insert_counter,
         };
@@ -309,9 +310,10 @@ struct bulk_rename_collision
 
 void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> &renames) noexcept;
 
+// Slow function which allocates & deallocates memory. Cache the result, don't call this function every frame.
 std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
-    std::vector<bulk_rename_op> &renames) noexcept;
+    std::vector<bulk_rename_op> const &renames) noexcept;
 
 void swan_render_window_explorer(explorer_window &) noexcept;
 void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, windows_options const &) noexcept;

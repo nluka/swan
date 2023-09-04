@@ -480,13 +480,16 @@ bool render_bulk_rename_popup_modal(
     explorer_window &expl,
     std::vector<explorer_window::dirent *> const &selection,
     wchar_t dir_sep_utf16,
-    bool &open) noexcept
+    bool &open,
+    ImGuiTableSortSpecs *sort_specs) noexcept
 {
+    assert(sort_specs != nullptr);
+
     bool retval_rename_completed = false;
 
     namespace imgui = ImGui;
 
-    static char pattern_utf8[512] = "<name>.<ext>";
+    static char pattern_utf8[512] = "<name><dotext>";
     static s32 counter_start = 1;
     static s32 counter_step = 1;
     static bool squish_adjacent_spaces = true;
@@ -504,12 +507,12 @@ bool render_bulk_rename_popup_modal(
     static std::atomic<u64> num_renames_fail(0);
     static std::atomic<u64> num_renames_total = 0;
 
+    static bool any_directories_selected = false;
+    static bool any_files_selected = false;
     static bool initial_computed = false;
     static bulk_rename_compile_pattern_result pattern_compile_res = {};
-
     static f64 transform_us = {};
     static std::vector<bulk_rename_op> renames = {};
-
     static f64 collisions_us = {};
     static std::vector<bulk_rename_collision> collisions;
 
@@ -519,6 +522,8 @@ bool render_bulk_rename_popup_modal(
         num_renames_fail.store(0);
         num_renames_total.store(0);
         initial_computed = false;
+        any_directories_selected = false;
+        any_files_selected = false;
         pattern_compile_res = {};
         transform_us = {};
         renames.clear();
@@ -528,11 +533,49 @@ bool render_bulk_rename_popup_modal(
         imgui::CloseCurrentPopup();
     };
 
-    bool recompute = imgui::InputTextWithHint(
-        " Pattern ##bulk_rename_pattern", "Rename pattern...", pattern_utf8, lengthof(pattern_utf8),
+    bool recompute = false;
+
+    recompute |= imgui::InputTextWithHint(
+        " Pattern##bulk_rename_pattern", "Rename pattern...", pattern_utf8, lengthof(pattern_utf8),
         ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)L"\\/\"|?*"
         // don't filter <>, we use them for interpolating the pattern with name, counter, etc.
     );
+
+    imgui::SameLine();
+
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && ImGui::BeginTooltip()) {
+        char const *tooltip =
+            "Interpolate the pattern with:\n"
+            "\n"
+            "Expression  Description                 Example   \n"
+            "----------  --------------------------  ----------\n"
+            "<name>      File name minus extension   [Song].mp3\n"
+            "<ext>       File extension              Song.[mp3]\n"
+            "<dotext>    Dot + file extension        Song[.mp3]\n"
+            "<counter>   Uses start and step inputs            \n"
+            "<bytes>     File size in bytes                    \n"
+        ;
+
+        ImGui::TextUnformatted(tooltip);
+        ImGui::EndTooltip();
+    }
+
+    imgui::Spacing();
+
+    recompute |= imgui::InputInt(" Counter start ", &counter_start);
+
+    imgui::Spacing();
+
+    recompute |= imgui::InputInt(" Counter step ", &counter_step);
+
+    imgui::Spacing();
+
+    recompute |= imgui::Checkbox("Squish adjacent spaces", &squish_adjacent_spaces);
+
+    imgui::Spacing();
+    imgui::Separator();
+    imgui::Spacing();
 
     if (!initial_computed || recompute) {
         debug_log("[%s] bulk_rename: recomputing pattern, renames, collisions", expl.name);
@@ -552,11 +595,15 @@ bool render_bulk_rename_popup_modal(
                 // TODO: timer
                 // scoped_timer<timer_unit::MICROSECONDS> tranform_us();
 
+                s32 counter = counter_start;
+
                 for (auto &p_dirent : selection) {
                     auto &dirent = *p_dirent;
-                    s32 counter = counter_start;
                     file_name_ext name_ext(dirent.basic.path.data());
                     swan_path_t after;
+
+                    any_directories_selected = dirent.basic.is_directory();
+                    any_files_selected       = dirent.basic.is_file();
 
                     auto transform = bulk_rename_transform(pattern_compile_res.compiled_pattern, after, name_ext.name,
                                                            name_ext.ext, counter, dirent.basic.size);
@@ -566,6 +613,8 @@ bool render_bulk_rename_popup_modal(
                     } else {
                         ++num_transform_errors;
                     }
+
+                    counter += counter_step;
                 }
             }
             {
@@ -576,24 +625,23 @@ bool render_bulk_rename_popup_modal(
             }
         }
 
+        // if (!initial_computed) {
+        //     if (any_directories_selected && any_files_selected) {
+        //         strncpy(pattern_utf8, "<name><dotext>", lengthof(pattern_utf8));
+        //     }
+        //     else if (any_directories_selected && !any_files_selected) {
+        //         strncpy(pattern_utf8, "<name>", lengthof(pattern_utf8));
+        //     }
+        //     else if (!any_directories_selected && any_files_selected) {
+        //         strncpy(pattern_utf8, "<name>.<ext>", lengthof(pattern_utf8));
+        //     }
+        //     else {
+        //         pattern_utf8[0] = '\0';
+        //     }
+        // }
+
         initial_computed = true;
     }
-
-    imgui::Spacing();
-
-    imgui::InputInt(" Counter start ", &counter_start);
-
-    imgui::Spacing();
-
-    imgui::InputInt(" Counter step ", &counter_step);
-
-    imgui::Spacing();
-
-    imgui::Checkbox("Squish adjacent spaces", &squish_adjacent_spaces);
-
-    imgui::Spacing();
-    imgui::Separator();
-    imgui::Spacing();
 
     bulk_rename_state state = rename_state.load();
     u64 success = num_renames_success.load();
@@ -1106,18 +1154,16 @@ enum cwd_entries_table_col : ImGuiID
 };
 
 static
-void sort_cwd_entries(explorer_window &expl, ImGuiTableSortSpecs *sort_specs)
+void sort_cwd_entries(std::vector<explorer_window::dirent> &cwd_entries, ImGuiTableSortSpecs *sort_specs)
 {
     assert(sort_specs != nullptr);
-
-    scoped_timer<timer_unit::MICROSECONDS> sort_timer(&expl.sort_us);
 
     using dir_ent_t = explorer_window::dirent;
 
     // start with a preliminary sort by path.
     // this ensures no matter the initial state, the final state is always same (deterministic).
     // necessary for avoiding unexpected movement from a refresh (especially unsightly with auto refresh).
-    std::sort(expl.cwd_entries.begin(), expl.cwd_entries.end(), [](dir_ent_t const &left, dir_ent_t const &right) {
+    std::sort(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const &left, dir_ent_t const &right) {
         return lstrcmpiA(left.basic.path.data(), right.basic.path.data()) < 0;
     });
 
@@ -1187,7 +1233,90 @@ void sort_cwd_entries(explorer_window &expl, ImGuiTableSortSpecs *sort_specs)
         return left_lt_right;
     };
 
-    std::sort(expl.cwd_entries.begin(), expl.cwd_entries.end(), compare);
+    std::sort(cwd_entries.begin(), cwd_entries.end(), compare);
+}
+
+static
+void sort_cwd_entries(std::vector<explorer_window::dirent *> &cwd_entries, ImGuiTableSortSpecs *sort_specs)
+{
+    assert(sort_specs != nullptr);
+
+    using dir_ent_t = explorer_window::dirent;
+
+    // start with a preliminary sort by path.
+    // this ensures no matter the initial state, the final state is always same (deterministic).
+    // necessary for avoiding unexpected movement from a refresh (especially unsightly with auto refresh).
+    std::sort(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const *left, dir_ent_t const *right) {
+        return lstrcmpiA(left->basic.path.data(), right->basic.path.data()) < 0;
+    });
+
+    // needs to return true when left < right
+    auto compare = [&](dir_ent_t const *left, dir_ent_t const *right) {
+        bool left_lt_right = false;
+
+        for (s32 i = 0; i < sort_specs->SpecsCount; ++i) {
+            auto const &sort_spec = sort_specs->Specs[i];
+
+            // comparing with this variable using == will handle the sort direction
+            bool direction_flipper = sort_spec.SortDirection == ImGuiSortDirection_Ascending ? false : true;
+
+            switch (sort_spec.ColumnUserID) {
+                default:
+                case cwd_entries_table_col_id: {
+                    left_lt_right = (left->basic.id < right->basic.id) == direction_flipper;
+                    break;
+                }
+                case cwd_entries_table_col_path: {
+                    left_lt_right = (lstrcmpiA(left->basic.path.data(), right->basic.path.data()) < 0) == direction_flipper;
+                    break;
+                }
+                case cwd_entries_table_col_type: {
+                    auto compute_precedence = [](explorer_window::dirent const &ent) -> u32 {
+                        // lower items (and thus higher values) have greater precedence
+                        enum class precedence : u32
+                        {
+                            everything_else,
+                            symlink,
+                            directory,
+                        };
+
+                        if      (ent.basic.is_directory()) return (u32)precedence::directory;
+                        else if (ent.basic.is_symlink())   return (u32)precedence::symlink;
+                        else                               return (u32)precedence::everything_else;
+                    };
+
+                    u32 left_precedence = compute_precedence(*left);
+                    u32 right_precedence = compute_precedence(*right);
+
+                    left_lt_right = (left_precedence > right_precedence) == direction_flipper;
+                    break;
+                }
+                case cwd_entries_table_col_size_pretty:
+                case cwd_entries_table_col_size_bytes: {
+                    if (left->basic.is_directory() && right->basic.is_file() && right->basic.size == 0) {
+                        left_lt_right = true == direction_flipper;
+                    } else {
+                        left_lt_right = (left->basic.size < right->basic.size) == direction_flipper;
+                    }
+                    break;
+                }
+                // case cwd_entries_table_col_creation_time: {
+                //     s32 cmp = CompareFileTime(&left.creation_time_raw, &right.creation_time_raw);
+                //     left_lt_right = (cmp <= 0) == direction_flipper;
+                //     break;
+                // }
+                case cwd_entries_table_col_last_write_time: {
+                    s32 cmp = CompareFileTime(&left->basic.last_write_time_raw, &right->basic.last_write_time_raw);
+                    left_lt_right = (cmp <= 0) == direction_flipper;
+                    break;
+                }
+            }
+        }
+
+        return left_lt_right;
+    };
+
+    std::sort(cwd_entries.begin(), cwd_entries.end(), compare);
 }
 
 bool update_cwd_entries(
@@ -1742,15 +1871,16 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
     struct update_cwd_entries_call_handler
     {
         bool requested = false;
-        explorer_window *expl_ptr = nullptr;
+        explorer_window &expl;
         std::string_view parent_dir = {};
         std::source_location from = {};
         u8 actions = {};
 
-        update_cwd_entries_call_handler() noexcept = default;
+        update_cwd_entries_call_handler(explorer_window &e) noexcept : expl(e) {}
 
         void request(u8 a, std::string_view p, std::source_location f = std::source_location::current()) noexcept
         {
+            assert(!requested);
             requested = true;
             parent_dir = p;
             from = f;
@@ -1760,8 +1890,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         ~update_cwd_entries_call_handler() noexcept
         {
             if (requested) {
-                assert(expl_ptr != nullptr);
-                update_cwd_entries(actions, expl_ptr, parent_dir, from);
+                update_cwd_entries(actions, &expl, parent_dir, from);
             }
         }
     };
@@ -1770,8 +1899,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
     // because we want to avoid invalidating any pointers or references into `expl.cwd_entries`.
     // instead, we request a call to `update_cwd_entries` through this object,
     // and when it destructs it will perform the call with appropriate arguments.
-    update_cwd_entries_call_handler update_cwd_entries_call = {};
-    update_cwd_entries_call.expl_ptr = &expl;
+    update_cwd_entries_call_handler update_cwd_entries_call(expl);
 
     auto &io = imgui::GetIO();
     bool any_window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
@@ -2667,6 +2795,8 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
     u64 num_selected_dirents = num_selected_directories + num_selected_symlinks + num_selected_files;
     expl.num_selected_cwd_entries = num_selected_dirents;
 
+    ImGuiTableSortSpecs *cwd_entries_sort_specs = nullptr;
+
     if (path_is_empty(expl.cwd)) {
         static time_point_t last_refresh_time = {};
         static drive_list_t drives = {};
@@ -2865,10 +2995,13 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                 imgui::TableSetupColumn("Modified", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_last_write_time);
                 imgui::TableHeadersRow();
 
-                ImGuiTableSortSpecs *sort_specs = imgui::TableGetSortSpecs();
-                if (sort_specs != nullptr && (expl.needs_sort || sort_specs->SpecsDirty)) {
-                    sort_cwd_entries(expl, sort_specs);
-                    sort_specs->SpecsDirty = false;
+                cwd_entries_sort_specs = imgui::TableGetSortSpecs();
+                if (cwd_entries_sort_specs != nullptr && (expl.needs_sort || cwd_entries_sort_specs->SpecsDirty)) {
+                    {
+                        scoped_timer<timer_unit::MICROSECONDS> sort_timer(&expl.sort_us);
+                        sort_cwd_entries(expl.cwd_entries, cwd_entries_sort_specs);
+                    }
+                    cwd_entries_sort_specs->SpecsDirty = false;
                     expl.needs_sort = false;
                 }
 
@@ -3143,9 +3276,13 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
     if (open_bulk_rename_popup) {
         imgui::OpenPopup("Bulk rename");
+
+        // would be nice if we could avoid this sort by populating `selection` with `expl.cwd_entries` sorted beforehand,
+        // but for now I want to render number of items, number filtered, etc. before rendering this table, therefore this sort is necessary.
+        sort_cwd_entries(selection, cwd_entries_sort_specs);
     }
     if (imgui::BeginPopupModal("Bulk rename", nullptr)) {
-        bool rename_finished = render_bulk_rename_popup_modal(expl, selection, dir_sep_utf16, open_bulk_rename_popup);
+        bool rename_finished = render_bulk_rename_popup_modal(expl, selection, dir_sep_utf16, open_bulk_rename_popup, cwd_entries_sort_specs);
         if (rename_finished) {
             update_cwd_entries_call.request(full_refresh, expl.cwd.data());
         }
