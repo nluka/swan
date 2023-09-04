@@ -52,4 +52,22 @@ bool chance(f64 probability_fraction) noexcept;
 
 char const *lorem_ipsum() noexcept;
 
+char *get_file_name(char *path) noexcept;
+char const *cget_file_name(char const *path) noexcept;
+
+char *get_file_ext(char *path) noexcept;
+// char const *cget_file_ext(char const *path) noexcept;
+
+std::string_view get_everything_minus_file_name(char const *path) noexcept;
+
+struct file_name_ext
+{
+    char *name;
+    char *ext;
+    char *dot;
+
+    file_name_ext(char *path) noexcept;
+    ~file_name_ext() noexcept;
+};
+
 #endif // SWAN_UTIL_HPP
