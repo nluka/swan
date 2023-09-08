@@ -3,6 +3,8 @@
 #include <iostream>
 #include <cstring>
 
+#include <boost/stacktrace.hpp>
+
 #include <shlwapi.h>
 
 #include "term.hpp"
@@ -22,6 +24,7 @@
 #include "bulk_rename.cpp"
 
 s32 main()
+try
 {
   using namespace term;
   using term::printf;
@@ -215,7 +218,8 @@ s32 main()
     {
       swan_path_t p = {};
 
-      std::string temp(p.size() - 1, 'x');
+      // std::string temp(swan_path_t::static_capacity, 'x');
+      std::string temp(p.max_size() - 1, 'x');
 
       ntest::assert_uint64(1, path_append(p, temp.c_str()));
       ntest::assert_cstr(temp.c_str(), p.data());
@@ -518,93 +522,6 @@ s32 main()
       ntest::assert_cstr("", err_msg_transform.data());
     }
 
-  }
-  #endif
-
-  // bulk_rename_find_collisions_1
-  #if 0
-  {
-    using ent_kind = basic_dir_ent::kind;
-
-    auto create_basic_dirent = [](char const *path, ent_kind type) -> basic_dir_ent {
-      return {
-        0, // size
-        {}, // creation_time_raw
-        {}, // last_write_time_raw
-        {}, // id
-        type,
-        path_create(path)
-      };
-    };
-
-    bool selected = true;
-    bool not_selected = false;
-
-    {
-      std::vector<explorer_window::dir_ent> dest = {};
-      std::vector<bulk_rename_op> input_renames = {};
-      std::vector<bulk_rename::collision_1> expected = {};
-
-      auto actual = find_collisions_1(dest, input_renames);
-
-      ntest::assert_stdvec(expected, actual);
-    }
-
-    {
-      std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
-      };
-      std::vector<bulk_rename_op> input_renames = {};
-      std::vector<bulk_rename::collision_1> expected = {};
-
-      auto actual = find_collisions_1(dest, input_renames);
-
-      ntest::assert_stdvec(expected, actual);
-    }
-
-    {
-      std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, selected },
-      };
-      std::vector<bulk_rename_op> input_renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file2.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file3.cpp") },
-        { &dest[2].basic /* file3.cpp */, path_create("file4.cpp") },
-        { &dest[3].basic /* file4.cpp */, path_create("file5.cpp") },
-      };
-      std::vector<bulk_rename::collision_1> expected = {};
-
-      auto actual = find_collisions_1(dest, input_renames);
-
-      ntest::assert_stdvec(expected, actual);
-    }
-
-    {
-      std::vector<explorer_window::dir_ent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
-      };
-      std::vector<bulk_rename_op> input_renames = {
-        { &dest[0].basic /* file1.cpp */, path_create("file2.cpp") },
-        { &dest[1].basic /* file2.cpp */, path_create("file3.cpp") },
-        { &dest[2].basic /* file3.cpp */, path_create("file4.cpp") },
-      };
-      std::vector<bulk_rename::collision_1> expected = {
-        { &dest[3].basic /* file4.cpp */, input_renames[2] /* file3.cpp -> file4.cpp */ },
-      };
-
-      auto actual = find_collisions_1(dest, input_renames);
-
-      ntest::assert_stdvec(expected, actual);
-    }
   }
   #endif
 
@@ -997,4 +914,12 @@ s32 main()
 
     return 0;
   }
+}
+catch (std::exception const &err) {
+  std::printf("FATAL: %s\n", err.what());
+  std::cout << boost::stacktrace::stacktrace();
+}
+catch (...) {
+  std::printf("FATAL: unusual exception - catch (...)\n");
+  std::cout << boost::stacktrace::stacktrace();
 }

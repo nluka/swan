@@ -1,5 +1,7 @@
 #include <filesystem>
 
+#include <boost/stacktrace.hpp>
+
 #pragma warning(push)
 #pragma warning(disable: 4244)
 #define STB_IMAGE_IMPLEMENTATION
@@ -180,8 +182,13 @@ void render(GLFWwindow *window)
 }
 
 // #pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
-s32 main(s32, char**) try
+s32 main(s32, char**)
+try
 {
+    std::atexit([]() {
+        std::cout << boost::stacktrace::stacktrace();
+    });
+
     namespace imgui = ImGui;
 
     debug_log("initializing...");
@@ -286,6 +293,12 @@ s32 main(s32, char**) try
     //         imgui::SetWindowFocus(last_focused_window);
     //     }
     // }
+
+    {
+        SYSTEM_INFO system_info;
+        GetSystemInfo(&system_info);
+        debug_log("GetSystemInfo.dwPageSize = %d", system_info.dwPageSize);
+    }
 
     debug_log("entering render loop...");
 
@@ -457,13 +470,17 @@ s32 main(s32, char**) try
 }
 catch (std::exception const &except) {
     fprintf(stderr, "fatal: %s\n", except.what());
+    std::cout << boost::stacktrace::stacktrace();
 }
 catch (std::string const &err) {
     fprintf(stderr, "fatal: %s\n", err.c_str());
+    std::cout << boost::stacktrace::stacktrace();
 }
 catch (char const *err) {
     fprintf(stderr, "fatal: %s\n", err);
+    std::cout << boost::stacktrace::stacktrace();
 }
 catch (...) {
     fprintf(stderr, "fatal: unknown error, catch(...)\n");
+    std::cout << boost::stacktrace::stacktrace();
 }
