@@ -80,8 +80,6 @@ bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept
 
 bool path_is_empty(swan_path_t const &path) noexcept
 {
-    assert(path.size() > 0);
-
     return path[0] == '\0';
 }
 
@@ -119,7 +117,6 @@ bool path_ends_with_one_of(swan_path_t const &path, char const *chars) noexcept
 void path_clear(swan_path_t &path) noexcept
 {
     assert(path.size() > 0);
-
     path[0] = '\0';
 }
 
@@ -198,21 +195,17 @@ swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept
 {
     // shoutout to ChatGPT for writing this for me
 
-    // Variable to store the cleaned-up path
     swan_path_t cleaned_path;
     u64 cleaned_index = 0;
     u64 path_len = path_length(path);
 
     char previous_char = '\0';
 
-    for (u64 i = 0; i < path_len; ++i)
-    {
+    for (u64 i = 0; i < path_len; ++i) {
         char current_char = path[i];
 
-        if (strchr("\\/", current_char) && strchr("\\/", previous_char))
-        {
-            // Skip the additional consecutive slashes
-            continue;
+        if (strchr("\\/", current_char) && strchr("\\/", previous_char)) {
+            continue; // Skip the additional consecutive slashes
         }
 
         // Add the current character to the cleaned-up path
@@ -223,9 +216,8 @@ swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept
         previous_char = current_char;
     }
 
-    // Fill the remaining characters in the cleaned-up path with null characters
-    for (; cleaned_index < cleaned_path.size(); ++cleaned_index)
-    {
+    // Fill the remaining characters in the cleaned-up path with NUL characters
+    for (; cleaned_index < cleaned_path.size(); ++cleaned_index) {
         cleaned_path[cleaned_index] = '\0';
     }
 

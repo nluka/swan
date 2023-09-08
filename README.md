@@ -98,6 +98,7 @@ Note: cwd = current working directory
     - [x] Refer to current name minus extension using `<name>` (e.g. if `file.cpp`, `<name>` = `file`)
     - [x] Refer to current extension using `<ext>` (e.g. if `file.cpp`, `<ext>` = `cpp`, blank for directories)
     - [x] Refer to size in bytes using `<bytes>` (= 0 for directories)
+    - [ ] Freeform mode
     - [ ] Transactional
     - [ ] Undo
 
@@ -115,4 +116,4 @@ Note: cwd = current working directory
 
 ## Performance TODOs
 
-- [ ] Cache pretty size, modified timestamp, created timestamp
+- [ ] Implement fixed_string_allocator to reduce memory wasteage from swan_path_t
