@@ -39,6 +39,13 @@ ImVec4 get_color(basic_dirent::kind t) noexcept
         return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
 }
 
+void imgui_spacing(u64 n) noexcept
+{
+    for (u64 i = 0; i < n; ++i) {
+        ImGui::Spacing();
+    }
+}
+
 char explorer_options::dir_separator_utf8() const noexcept { return unix_directory_separator ? '/' : '\\'; }
 u16 explorer_options::size_unit_multiplier() const noexcept { return binary_size_system ? 1024 : 1000; }
 
