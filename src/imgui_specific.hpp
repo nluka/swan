@@ -8,6 +8,8 @@
 
 ImVec4 get_color(basic_dirent::kind t) noexcept;
 
+void imgui_spacing(u64 n) noexcept;
+
 struct debug_log_package
 {
     char const *fmt;
