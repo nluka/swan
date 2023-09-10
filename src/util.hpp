@@ -44,6 +44,8 @@ s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capa
 
 bool streq(char const *s1, char const *s2) noexcept;
 
+bool strempty(char const *s) noexcept;
+
 u64 remove_adjacent_spaces(char *str, u64 len = 0) noexcept;
 
 // Has a 1 in probability_fraction chance to return true.
@@ -68,3 +70,8 @@ struct file_name_ext
     file_name_ext(char *path) noexcept;
     ~file_name_ext() noexcept;
 };
+
+wchar_t const *windows_illegal_filename_chars() noexcept;
+
+void init_empty_cstr(char *s) noexcept;
+void init_empty_cstr(wchar_t *s) noexcept;

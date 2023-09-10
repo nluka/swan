@@ -270,18 +270,12 @@ try
             debug_log("[Explorer %zu] load_from_disk: %d", i+1, load_result);
 
             if (!load_result) {
-                // std::string startup_path_stdstr = std::filesystem::current_path().string();
-
                 swan_path_t startup_path = {};
-                // path_append(startup_path, startup_path_stdstr.c_str());
-                // path_force_separator(startup_path, expl_opts.dir_separator_utf8());
-
                 expl.cwd = startup_path;
                 expl.cwd_last_frame = startup_path;
-                // expl.wd_history.push_back(startup_path);
 
                 bool save_result = explorers[i].save_to_disk();
-                debug_log("[Explorer %zu] save_to_disk: %d", i+1, save_result);
+                debug_log("[%s] save_to_disk: %d", expl.name, save_result);
             }
 
             update_cwd_entries(full_refresh, &expl, expl.cwd.data());
@@ -483,8 +477,14 @@ try
         }
     #endif
 
+        if (swan_is_popup_modal_open_single_rename()) {
+            swan_render_popup_modal_single_rename();
+        }
         if (swan_is_popup_modal_open_bulk_rename()) {
             swan_render_popup_modal_bulk_rename();
+        }
+        if (swan_is_popup_modal_open_error()) {
+            swan_render_popup_modal_error();
         }
 
         if (win_opts.show_analytics) {

@@ -4,10 +4,10 @@
 
 namespace imgui = ImGui;
 
-static bool s_open = false;
-static explorer_window *s_expl = nullptr;
-static std::vector<explorer_window::dirent *> const *s_selection = nullptr;
-static std::function<void ()> s_on_rename_finish_callback = {};
+static bool s_bulk_rename_open = false;
+static explorer_window *s_bulk_rename_expl = nullptr;
+static std::vector<explorer_window::dirent *> const *s_bulk_rename_selection = nullptr;
+static std::function<void ()> s_bulk_rename_on_rename_finish_callback = {};
 
 char const *swan_id_bulk_rename_popup_modal() noexcept
 {
@@ -19,36 +19,36 @@ void swan_open_popup_modal_bulk_rename(
     std::vector<explorer_window::dirent *> const &selection,
     std::function<void ()> on_rename_finish_callback) noexcept
 {
-    s_open = true;
+    s_bulk_rename_open = true;
 
-    assert(s_selection == nullptr);
-    s_selection = &selection;
+    assert(s_bulk_rename_selection == nullptr);
+    s_bulk_rename_selection = &selection;
 
-    assert(s_expl == nullptr);
-    s_expl = &expl;
+    assert(s_bulk_rename_expl == nullptr);
+    s_bulk_rename_expl = &expl;
 
-    s_on_rename_finish_callback = on_rename_finish_callback;
+    s_bulk_rename_on_rename_finish_callback = on_rename_finish_callback;
 }
 
 bool swan_is_popup_modal_open_bulk_rename() noexcept
 {
-    return s_open;
+    return s_bulk_rename_open;
 }
 
 void swan_render_popup_modal_bulk_rename() noexcept
 {
-    if (s_open) {
+    if (s_bulk_rename_open) {
         imgui::OpenPopup(swan_id_bulk_rename_popup_modal());
     }
     if (!imgui::BeginPopupModal(swan_id_bulk_rename_popup_modal(), nullptr)) {
         return;
     }
 
-    assert(s_expl != nullptr);
-    assert(s_selection != nullptr);
+    assert(s_bulk_rename_expl != nullptr);
+    assert(s_bulk_rename_selection != nullptr);
 
-    auto expl = *s_expl;
-    auto selection = *s_selection;
+    auto expl = *s_bulk_rename_expl;
+    auto selection = *s_bulk_rename_selection;
 
     wchar_t dir_sep_utf16 = get_explorer_options().dir_separator_utf16();
 
@@ -93,10 +93,10 @@ void swan_render_popup_modal_bulk_rename() noexcept
         collisions_us = {};
         collisions.clear();
 
-        s_open = false;
-        s_expl = nullptr;
-        s_selection = nullptr;
-        s_on_rename_finish_callback = {};
+        s_bulk_rename_open = false;
+        s_bulk_rename_expl = nullptr;
+        s_bulk_rename_selection = nullptr;
+        s_bulk_rename_on_rename_finish_callback = {};
 
         imgui::CloseCurrentPopup();
     };
@@ -230,7 +230,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
     else {
         if (imgui::Button("Exit##bulk_rename")) {
             if (state == bulk_rename_state::done) {
-                s_on_rename_finish_callback();
+                s_bulk_rename_on_rename_finish_callback();
             }
             cleanup_and_close_popup();
         }
@@ -262,7 +262,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
                 imgui::SameLine();
                 imgui::ProgressBar(progress);
             } else {
-                s_on_rename_finish_callback();
+                s_bulk_rename_on_rename_finish_callback();
                 cleanup_and_close_popup();
             }
             break;
@@ -402,9 +402,10 @@ void swan_render_popup_modal_bulk_rename() noexcept
                     // }
 
                     auto const &rename = rename_ops[i];
-                    wchar_t buffer_cwd_utf16[MAX_PATH] = {};
-                    wchar_t buffer_before_utf16[MAX_PATH] = {};
-                    wchar_t buffer_after_utf16[MAX_PATH] = {};
+
+                    wchar_t buffer_cwd_utf16[MAX_PATH];     init_empty_cstr(buffer_cwd_utf16);
+                    wchar_t buffer_before_utf16[MAX_PATH];  init_empty_cstr(buffer_before_utf16);
+                    wchar_t buffer_after_utf16[MAX_PATH];   init_empty_cstr(buffer_after_utf16);
                     s32 utf_written = 0;
 
                     utf_written = utf8_to_utf16(expl_cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
@@ -467,7 +468,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape) && rename_state.load() != bulk_rename_state::in_progress) {
         if (state == bulk_rename_state::done) {
-            s_on_rename_finish_callback();
+            s_bulk_rename_on_rename_finish_callback();
         }
         cleanup_and_close_popup();
     }
