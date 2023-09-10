@@ -1,5 +1,4 @@
-#ifndef SWAN_UTIL_HPP
-#define SWAN_UTIL_HPP
+#pragma once
 
 #include <array>
 #include <chrono>
@@ -69,5 +68,3 @@ struct file_name_ext
     file_name_ext(char *path) noexcept;
     ~file_name_ext() noexcept;
 };
-
-#endif // SWAN_UTIL_HPP

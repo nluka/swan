@@ -1,7 +1,4 @@
-#include <array>
-#include <cassert>
 #include <cstring>
-#include <algorithm>
 
 #include <windows.h>
 #include <shlwapi.h>

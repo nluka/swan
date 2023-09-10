@@ -1,6 +1,5 @@
-#include <string>
-#include <cassert>
-#include <iostream>
+#include <assert.h>
+#include <ostream>
 
 #include <shlwapi.h>
 
@@ -84,7 +83,7 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
         return result;
     }
 
-    u64 const npos = std::string::npos;
+    u64 const npos = (u64)-1;
     u64 opening_chevron_pos = npos;
     u64 closing_chevron_pos = npos;
 
@@ -364,7 +363,7 @@ std::vector<bulk_rename_collision> bulk_rename_find_collisions(
         }
     }
 
-    u64 const npos = std::string::npos;
+    u64 const npos = (u64)-1;
 
     auto find_conflict_in_dest = [&](bulk_rename_op const &rename) -> basic_dirent* {
         for (auto &dirent : unaffected_dirents) {

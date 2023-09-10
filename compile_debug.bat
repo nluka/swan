@@ -1,16 +1,5 @@
 @call cl.exe ^
-src/bulk_rename.cpp ^
-src/debug_log.cpp ^
-src/explorer.cpp ^
-src/file_ops.cpp ^
-src/focused_window.cpp ^
-src/misc.cpp ^
-src/path.cpp ^
-src/pinned_directories.cpp ^
-src/style.cpp ^
-src/swan.cpp ^
-src/util.cpp ^
-src/window_options.cpp ^
+src/all_in_one.cpp ^
 obj_debug/imgui_demo.obj ^
 obj_debug/imgui_draw.obj ^
 obj_debug/imgui_impl_glfw.obj ^
