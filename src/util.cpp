@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <stringapiset.h>
+#include <fileapi.h>
 
 #include "util.hpp"
 
@@ -323,4 +324,27 @@ std::string_view get_everything_minus_file_name(char const *path) noexcept
     else {
         return std::string_view(path, last_sep_pos + 1);
     }
+}
+
+bool strempty(char const *s) noexcept
+{
+    assert(s != nullptr);
+    return s[0] == '\0';
+}
+
+wchar_t const *windows_illegal_filename_chars() noexcept
+{
+    return L"\\/<>\"|?*";
+}
+
+void init_empty_cstr(char *s) noexcept
+{
+    assert(s != nullptr);
+    s[0] = '\0';
+}
+
+void init_empty_cstr(wchar_t *s) noexcept
+{
+    assert(s != nullptr);
+    s[0] = L'\0';
 }

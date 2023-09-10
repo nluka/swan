@@ -287,8 +287,6 @@ struct bulk_rename_compiled_pattern
 
         type kind;
         char ch = 0;
-        // char text[1024+1];
-        // u64 text_len = 0;
 
         bool operator!=(op const &other) const noexcept; // for ntest
         friend std::ostream& operator<<(std::ostream &os, op const &r); // for ntest
@@ -363,3 +361,17 @@ void swan_open_popup_modal_bulk_rename(
 char const *swan_id_bulk_rename_popup_modal() noexcept;
 bool swan_is_popup_modal_open_bulk_rename() noexcept;
 void swan_render_popup_modal_bulk_rename() noexcept;
+
+void swan_open_popup_modal_error(char const *action, char const *failure) noexcept;
+char const *swan_id_error_popup_modal() noexcept;
+bool swan_is_popup_modal_open_error() noexcept;
+void swan_render_popup_modal_error() noexcept;
+
+void swan_open_popup_modal_single_rename(
+    explorer_window &expl,
+    explorer_window::dirent const &entry_to_be_renamed,
+    std::function<void ()> on_rename_finish_callback) noexcept;
+
+char const *swan_id_single_rename_popup_modal() noexcept;
+bool swan_is_popup_modal_open_single_rename() noexcept;
+void swan_render_popup_modal_single_rename() noexcept;

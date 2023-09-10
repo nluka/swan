@@ -288,7 +288,7 @@ bulk_rename_transform_result bulk_rename_transform(
                 break;
             }
             case op_type::insert_size: {
-                char buffer[21] = {};
+                char buffer[21]; init_empty_cstr(buffer);
                 written = snprintf(buffer, lengthof(buffer), "%zu", bytes);
                 if (written <= space_left) {
                     strcat(out, buffer);
@@ -301,7 +301,7 @@ bulk_rename_transform_result bulk_rename_transform(
                 break;
             }
             case op_type::insert_counter: {
-                char buffer[11] = {};
+                char buffer[11]; init_empty_cstr(buffer);
                 written = snprintf(buffer, lengthof(buffer), "%d", counter);
                 if (written <= space_left) {
                     strcat(out, buffer);
