@@ -1272,7 +1272,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
     // handle [Enter] pressed on cwd entry
     if (any_window_focused && !any_popups_open && imgui::IsKeyPressed(ImGuiKey_Enter)) {
         if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
-            swan_open_popup_modal_error("[Enter] was pressed (function: open)", "nothing is selected");
+            // swan_open_popup_modal_error("[Enter] was pressed (function: open)", "nothing is selected");
         } else {
             auto dirent_which_enter_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
             debug_log("[%s] pressed enter on [%s]", expl.name, dirent_which_enter_was_pressed_on.basic.path.data());
@@ -1368,7 +1368,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
         imgui::Spacing();
         imgui::Separator();
-        imgui::Spacing();
+        imgui_spacing(2);
     }
     // debug info end
 
@@ -1901,6 +1901,19 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         imgui::PopItemWidth();
     }
     // filter text input end
+
+    imgui::SameLine();
+
+    // filter text clear button start
+    {
+        imgui::BeginDisabled(strempty(expl.filter.data()));
+        if (imgui::Button("X##clear_filter")) {
+            init_empty_cstr(expl.filter.data());
+            update_cwd_entries(filter, &expl, expl.cwd.data());
+        }
+        imgui::EndDisabled();
+    }
+    // filter text clear button end
 
     imgui_spacing(3);
 
