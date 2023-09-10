@@ -1,10 +1,9 @@
 #pragma once
 
-#include <iostream>
-#include <cassert>
-#include <cstring>
+#include <assert.h>
+#include <string.h>
 
-#include <windows.h>
+#include <stringapiset.h>
 
 #include "util.hpp"
 

@@ -6,9 +6,18 @@
 
 #include "imgui/imgui.h"
 
+ImVec4 orange() noexcept;
+ImVec4 red() noexcept;
+ImVec4 dir_color() noexcept;
+ImVec4 symlink_color() noexcept;
+ImVec4 file_color() noexcept;
+
 ImVec4 get_color(basic_dirent::kind t) noexcept;
 
 void imgui_spacing(u64 n) noexcept;
+
+typedef wchar_t* filter_chars_callback_user_data_t;
+s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept;
 
 struct debug_log_package
 {

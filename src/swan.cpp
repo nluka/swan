@@ -1,9 +1,10 @@
-#include <filesystem>
+// #include <filesystem>
 
 #include <boost/stacktrace.hpp>
 
 #pragma warning(push)
 #pragma warning(disable: 4244)
+// #pragma warning(disable: 4459)
 #define STB_IMAGE_IMPLEMENTATION
 #include "stbi_image.h"
 #pragma warning(pop)
@@ -23,8 +24,10 @@
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers
 
+namespace imgui = ImGui;
+
 static
-void glfw_error_callback(s32 error, char const *description)
+void glfw_error_callback(s32 error, char const *description) noexcept
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
@@ -32,8 +35,6 @@ void glfw_error_callback(s32 error, char const *description)
 static
 GLFWwindow *init_glfw_and_imgui()
 {
-    namespace imgui = ImGui;
-
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
         return nullptr;
@@ -138,22 +139,21 @@ GLFWwindow *init_glfw_and_imgui()
 }
 
 static
-void set_window_icon(GLFWwindow *window)
+void set_window_icon(GLFWwindow *window) noexcept
 {
     GLFWimage icon;
     icon.pixels = nullptr;
     icon.width = 0;
     icon.height = 0;
 
-    int icon_width, icon_height, icon_channels;
+    s32 icon_width, icon_height, icon_channels;
     u8 *icon_pixels = stbi_load("resource/swan.png", &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
 
     auto cleanup_icon_pixels_routine = make_on_scope_exit([icon_pixels] {
         stbi_image_free(icon_pixels);
     });
 
-    if (icon_pixels)
-    {
+    if (icon_pixels) {
         icon.pixels = icon_pixels;
         icon.width = icon_width;
         icon.height = icon_height;
@@ -163,13 +163,11 @@ void set_window_icon(GLFWwindow *window)
 }
 
 static
-void render(GLFWwindow *window)
+void render(GLFWwindow *window) noexcept
 {
-    namespace imgui = ImGui;
-
     imgui::Render();
 
-    int display_w, display_h;
+    s32 display_w, display_h;
     ImVec4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
 
     glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -185,11 +183,9 @@ void render(GLFWwindow *window)
 s32 main(s32, char**)
 try
 {
-    std::atexit([]() {
-        std::cout << boost::stacktrace::stacktrace();
-    });
-
-    namespace imgui = ImGui;
+    // std::atexit([]() {
+    //     std::cout << boost::stacktrace::stacktrace();
+    // });
 
     debug_log("initializing...");
 
@@ -214,13 +210,10 @@ try
     set_window_icon(window);
 
     [[maybe_unused]] auto &io = imgui::GetIO();
-
     io.IniFilename = "data/swan_imgui.ini";
 
-    // apply_imgui_stylesheet(imgui_stylesheet::future_dark);
-
     auto &expl_opts = get_explorer_options();
-
+    // init explorer options
     if (!expl_opts.load_from_disk()) {
         debug_log("explorer_options::load_from_disk failed, setting defaults");
         expl_opts.auto_refresh_interval_ms = 1000;
@@ -234,7 +227,7 @@ try
     }
 
     windows_options win_opts = {};
-
+    // init window options
     if (!win_opts.load_from_disk()) {
         debug_log("windows_options::load_from_disk failed, setting defaults");
         win_opts.show_explorer_1 = true;
@@ -244,6 +237,15 @@ try
     #endif
     }
 
+    misc_options misc_opts = {};
+    // init misc. options
+    if (!misc_opts.load_from_disk()) {
+        debug_log("misc_options::load_from_disk failed, setting defaults");
+        misc_opts.stylesheet = imgui_stylesheet::future_dark;
+    }
+    apply_imgui_stylesheet(misc_opts.stylesheet);
+
+    // init pins
     {
         auto [success, num_pins_loaded] = load_pins_from_disk(expl_opts.dir_separator_utf8());
         if (!success) {
@@ -254,6 +256,7 @@ try
     }
 
     std::array<explorer_window, 4> explorers = {};
+    // init explorers
     {
         char const *names[] = { "Explorer 1", "Explorer 2", "Explorer 3", "Explorer 4" };
 
@@ -267,15 +270,15 @@ try
             debug_log("[Explorer %zu] load_from_disk: %d", i+1, load_result);
 
             if (!load_result) {
-                std::string startup_path_stdstr = std::filesystem::current_path().string();
+                // std::string startup_path_stdstr = std::filesystem::current_path().string();
 
                 swan_path_t startup_path = {};
-                path_append(startup_path, startup_path_stdstr.c_str());
-                path_force_separator(startup_path, expl_opts.dir_separator_utf8());
+                // path_append(startup_path, startup_path_stdstr.c_str());
+                // path_force_separator(startup_path, expl_opts.dir_separator_utf8());
 
                 expl.cwd = startup_path;
                 expl.cwd_last_frame = startup_path;
-                expl.wd_history.push_back(startup_path);
+                // expl.wd_history.push_back(startup_path);
 
                 bool save_result = explorers[i].save_to_disk();
                 debug_log("[Explorer %zu] save_to_disk: %d", i+1, save_result);
@@ -305,13 +308,13 @@ try
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         imgui::NewFrame();
 
         imgui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
+        // main menu bar
         {
             ImGuiStyle &style = imgui::GetStyle();
             f32 original_padding = style.FramePadding.y;
@@ -410,6 +413,43 @@ try
                         debug_log("explorer_options::save_to_disk result: %d", result);
                     }
                 }
+                if (imgui::BeginMenu("[Misc Options]")) {
+                    bool change_made = false;
+                    static_assert((false | false) == false);
+                    static_assert((false | true) == true);
+                    static_assert((true | true) == true);
+
+                    if (imgui::BeginMenu("Style")) {
+                        char const *styleheets[] = {
+                            // "Default Light",
+                            "Default Dark",
+                            "Unreal",
+                            "Visual Studio",
+                            "Rounded Visual Studio",
+                            "Material Flat",
+                            "Photoshop",
+                            "Deep Dark",
+                            "Darcula",
+                            "Discord Dark",
+                            "Future Dark",
+                        };
+
+                        static_assert(lengthof(styleheets) == (u64)imgui_stylesheet::count);
+
+                        imgui::SeparatorText("Style");
+                        change_made |= imgui::Combo("##stylesheet", (s32 *)&misc_opts.stylesheet, styleheets, lengthof(styleheets));
+
+                        imgui::EndMenu();
+                    }
+
+                    imgui::EndMenu();
+
+                    if (change_made) {
+                        bool result = misc_opts.save_to_disk();
+                        debug_log("misc_options::save_to_disk result: %d", result);
+                        apply_imgui_stylesheet(misc_opts.stylesheet);
+                    }
+                }
                 imgui::EndMainMenuBar();
             }
 
@@ -443,6 +483,10 @@ try
         }
     #endif
 
+        if (swan_is_popup_modal_open_bulk_rename()) {
+            swan_render_popup_modal_bulk_rename();
+        }
+
         if (win_opts.show_analytics) {
             if (imgui::Begin("Analytics")) {
             #if !defined(NDEBUG)
@@ -470,17 +514,17 @@ try
 }
 catch (std::exception const &except) {
     fprintf(stderr, "fatal: %s\n", except.what());
-    std::cout << boost::stacktrace::stacktrace();
+    // std::cout << boost::stacktrace::stacktrace();
 }
 catch (std::string const &err) {
     fprintf(stderr, "fatal: %s\n", err.c_str());
-    std::cout << boost::stacktrace::stacktrace();
+    // std::cout << boost::stacktrace::stacktrace();
 }
 catch (char const *err) {
     fprintf(stderr, "fatal: %s\n", err);
-    std::cout << boost::stacktrace::stacktrace();
+    // std::cout << boost::stacktrace::stacktrace();
 }
 catch (...) {
     fprintf(stderr, "fatal: unknown error, catch(...)\n");
-    std::cout << boost::stacktrace::stacktrace();
+    // std::cout << boost::stacktrace::stacktrace();
 }

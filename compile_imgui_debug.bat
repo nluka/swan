@@ -15,3 +15,5 @@ src/imgui/imgui_impl_opengl3.cpp ^
 /Fo:obj_debug\ ^
 /c ^
 /I"C:/code/glfw"
+
+@REM @call cl.exe /Yc"src/imgui/imgui.cpp" /Fp"src/imgui/precompiled/imgui.pch" "src/imgui/imgui.cpp"

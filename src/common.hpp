@@ -13,6 +13,24 @@
 #include "BS_thread_pool.hpp"
 #include "util.hpp"
 
+enum class imgui_stylesheet : s32
+{
+    // default_light,
+    default_dark,
+    unreal,
+    visual_studio,
+    rounded_visual_studio,
+    material_flat,
+    photoshop,
+    deep_dark, // https://github.com/ocornut/imgui/issues/707#issuecomment-917151020
+    darcula,
+    discord_dark,
+    future_dark,
+    count,
+};
+
+void apply_imgui_stylesheet(imgui_stylesheet which) noexcept;
+
 bool explorer_init_windows_shell_com_garbage() noexcept;
 void explorer_cleanup_windows_shell_com_garbage() noexcept;
 
@@ -101,7 +119,16 @@ struct explorer_options
     bool save_to_disk() const noexcept;
     bool load_from_disk() noexcept;
     char dir_separator_utf8() const noexcept;
+    wchar_t dir_separator_utf16() const noexcept;
     u16 size_unit_multiplier() const noexcept;
+};
+
+struct misc_options
+{
+    imgui_stylesheet stylesheet;
+
+    bool save_to_disk() const noexcept;
+    bool load_from_disk() noexcept;
 };
 
 template<typename T>
@@ -143,6 +170,8 @@ struct explorer_window
     // 24 byte members
 
     std::vector<dirent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
+    std::vector<dirent *> cwd_entries_selected = {}; // 24 bytes, all selected cwd entries
+    std::vector<dirent *> cwd_entries_passing_filter = {}; // 24 bytes, all cwd entries passing filter
 
     // 8 byte members
 
@@ -205,12 +234,15 @@ boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept;
 
 explorer_options &get_explorer_options() noexcept;
 
-constexpr u8 const query_filesystem = 1 << 0;
-constexpr u8 const filter = 1 << 1;
-constexpr u8 const full_refresh = query_filesystem | filter;
+enum update_cwd_entries_actions : u8
+{
+    query_filesystem = 0b01,
+    filter           = 0b10,
+    full_refresh     = 0b11,
+};
 
 bool update_cwd_entries(
-    u8 actions,
+    update_cwd_entries_actions actions,
     explorer_window *,
     std::string_view parent_dir,
     std::source_location sloc = std::source_location::current()) noexcept;
@@ -316,6 +348,18 @@ std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<bulk_rename_op> const &renames) noexcept;
 
 void swan_render_window_explorer(explorer_window &) noexcept;
+
 void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, windows_options const &) noexcept;
+
 void swan_render_window_debug_log() noexcept;
+
 void swan_render_window_file_operations() noexcept;
+
+void swan_open_popup_modal_bulk_rename(
+    explorer_window &,
+    std::vector<explorer_window::dirent *> const &selection,
+    std::function<void ()> on_rename_finish_callback) noexcept;
+
+char const *swan_id_bulk_rename_popup_modal() noexcept;
+bool swan_is_popup_modal_open_bulk_rename() noexcept;
+void swan_render_popup_modal_bulk_rename() noexcept;

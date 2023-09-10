@@ -17,7 +17,7 @@
 #include <exception>          // std::current_exception
 #include <functional>         // std::bind, std::function, std::invoke
 #include <future>             // std::future, std::promise
-#include <iostream>           // std::cout, std::endl, std::flush, std::ostream
+// #include <iostream>           // std::cout, std::endl, std::flush, std::ostream
 #include <memory>             // std::make_shared, std::make_unique, std::shared_ptr, std::unique_ptr
 #include <mutex>              // std::mutex, std::scoped_lock, std::unique_lock
 #include <queue>              // std::queue
@@ -714,7 +714,7 @@ public:
      *
      * @param out_stream_ The output stream to print to. The default value is std::cout.
      */
-    synced_stream(std::ostream& out_stream_ = std::cout) : out_stream(out_stream_) {}
+    synced_stream(std::ostream& out_stream_) : out_stream(out_stream_) {}
 
     /**
      * @brief Print any number of items into the output stream. Ensures that no other threads print to this stream simultaneously, as long as they all exclusively use the same synced_stream object to print.

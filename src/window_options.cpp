@@ -1,7 +1,5 @@
-#pragma once
-
 #include <fstream>
-#include <cassert>
+#include <assert.h>
 
 #include "common.hpp"
 
