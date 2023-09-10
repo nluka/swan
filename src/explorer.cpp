@@ -262,6 +262,114 @@ std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
     return { length, buffer };
 }
 
+bool delete_selected_entries(
+    explorer_window const &expl,
+    std::vector<explorer_window::dirent *> const &selection,
+    wchar_t dir_sep_utf16) noexcept
+{
+    {
+        SHQUERYRBINFO recycle_bin_info;
+        recycle_bin_info.cbSize = sizeof(recycle_bin_info);
+
+        auto result = SHQueryRecycleBinW(nullptr, &recycle_bin_info);
+
+        if (result == S_OK) {
+            u64 used_bytes = recycle_bin_info.i64Size;
+            u64 num_items = recycle_bin_info.i64NumItems;
+
+            u64 multiplier = get_explorer_options().size_unit_multiplier();
+
+            char used[32]; init_empty_cstr(used);
+            format_file_size(used_bytes,  used,  lengthof(used),  multiplier);
+
+            debug_log("RecycleBin size: %zu (%s), %zu items", used_bytes, used, num_items);
+        }
+        else {
+            debug_log("SHQueryRecycleBinW failed: %ld", (s64)result);
+        }
+    }
+
+    HRESULT result = {};
+
+    // HRESULT handle = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    // if (FAILED(handle)) {
+    //     goto end_paste;
+    // }
+
+    IFileOperation *file_op = nullptr;
+
+    result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = file_op->SetOperationFlags(FOF_ALLOWUNDO | FOF_NOCONFIRMATION);
+    if (FAILED(result)) {
+        file_op->Release();
+        return false;
+    }
+
+    s32 written = 0;
+    wchar_t cwd_utf16[MAX_PATH]; init_empty_cstr(cwd_utf16);
+    std::wstring delete_full_path = {};
+    delete_full_path.reserve(2048);
+
+    written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
+    if (written == 0) {
+        debug_log("FAILED utf8_to_utf16(expl.data -> cwd_utf16)");
+        return false;
+    }
+
+    for (auto const item : selection) {
+        wchar_t item_utf16[MAX_PATH]; init_empty_cstr(item_utf16);
+
+        written = utf8_to_utf16(item->basic.path.data(), item_utf16, lengthof(item_utf16));
+        if (written == 0) {
+            debug_log("FAILED utf8_to_utf16(item.basic.path -> item_utf16)");
+            continue;
+        }
+
+        delete_full_path = cwd_utf16;
+        if (!delete_full_path.ends_with(dir_sep_utf16)) {
+            delete_full_path += dir_sep_utf16;
+        }
+        delete_full_path += item_utf16;
+
+        IShellItem *to_delete = nullptr;
+        result = SHCreateItemFromParsingName(delete_full_path.c_str(), nullptr, IID_PPV_ARGS(&to_delete));
+        if (FAILED(result)) {
+            debug_log("FAILED SHCreateItemFromParsingName");
+            file_op->Release();
+            continue;
+        }
+
+        result = file_op->DeleteItem(to_delete, nullptr);
+        if (FAILED(result)) {
+            debug_log("FAILED file_op->DeleteItem");
+            to_delete->Release();
+            file_op->Release();
+        } else {
+            to_delete->Release();
+        }
+    }
+
+    result = file_op->PerformOperations();
+    if (FAILED(result)) {
+        debug_log("FAILED file_op->DeleteItem");
+        return false;
+    }
+
+    file_op->Release();
+
+    if (SUCCEEDED(result)) {
+        debug_log("SUCCESS deleted %zu items", selection.size());
+        return true;
+    } else {
+        debug_log("FAILED to delete %zu items", selection.size());
+        return false;
+    }
+}
+
 struct generic_result
 {
     bool success;
@@ -1691,22 +1799,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
     imgui::BeginDisabled(expl.num_selected_cwd_entries == 0);
     if (imgui::Button("Delete")) {
-        // TODO: setup IFileOperation
-
-        for (auto const &dirent : expl.cwd_entries) {
-            if (!dirent.is_selected || dirent.basic.is_dotdot()) {
-                continue;
-            }
-
-            if (dirent.basic.is_directory()) {
-                // delete directory
-            }
-            else {
-                // delete file
-            }
-        }
-
-        // TODO: cleanup IFileOperation
+        delete_selected_entries(expl, expl.cwd_entries_selected, dir_sep_utf16);
     }
     imgui::EndDisabled();
 
@@ -2667,60 +2760,3 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         expl.prev_valid_cwd = expl.cwd;
     }
 }
-
-// HRESULT handle = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-
-// if (FAILED(handle)) {
-//     goto end_paste;
-// }
-
-// IFileOperation *file_op = NULL;
-// handle = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
-// if (FAILED(handle)) {
-//     CoUninitialize();
-//     goto end_paste;
-// }
-
-// // Set the operation flags
-// handle = file_op->SetOperationFlags(FOF_NOCONFIRMATION | FOFX_NOCOPYHOOKS);
-// if (FAILED(handle)) {
-//     file_op->Release();
-//     CoUninitialize();
-//     goto end_paste;
-// }
-
-// // Set the destination directory
-// IShellItem* psiTo = NULL;
-// hr = SHCreateItemFromParsingName(destinationDir.c_str(), NULL, IID_PPV_ARGS(&psiTo));
-// if (FAILED(hr)) {
-//     psiFrom->Release();
-//     pfo->Release();
-//     CoUninitialize();
-//     return false;
-// }
-
-// // Add the move operation
-// hr = pfo->MoveItem(psiFrom, psiTo, NULL, NULL);
-// if (FAILED(hr)) {
-//     psiTo->Release();
-//     psiFrom->Release();
-//     pfo->Release();
-//     CoUninitialize();
-//     return false;
-// }
-
-// // Perform the operation
-// hr = pfo->PerformOperations();
-// if (FAILED(hr)) {
-//     psiTo->Release();
-//     psiFrom->Release();
-//     pfo->Release();
-//     CoUninitialize();
-//     return false;
-// }
-
-// psiTo->Release();
-// psiFrom->Release();
-// pfo->Release();
-// CoUninitialize();
-// return true;
