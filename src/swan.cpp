@@ -272,7 +272,6 @@ try
             if (!load_result) {
                 swan_path_t startup_path = {};
                 expl.cwd = startup_path;
-                expl.cwd_last_frame = startup_path;
 
                 bool save_result = explorers[i].save_to_disk();
                 debug_log("[%s] save_to_disk: %d", expl.name, save_result);
