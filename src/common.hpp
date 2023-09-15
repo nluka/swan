@@ -197,7 +197,6 @@ struct explorer_window
     mutable s8 latest_save_to_disk_result = -1;
     swan_path_t prev_valid_cwd = {};
     swan_path_t cwd = {}; // current working directory, persisted in file
-    swan_path_t cwd_last_frame = {};
     std::array<char, 256> filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool filter_polarity = true; // persisted in file
