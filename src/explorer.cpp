@@ -1878,36 +1878,21 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
             }
         };
 
-        if (
-            opts.ref_mode == explorer_options::refresh_mode::manual ||
-            (opts.ref_mode == explorer_options::refresh_mode::adaptive && expl.cwd_entries.size() > opts.adaptive_refresh_threshold)
-        ) {
-            if (imgui::Button("Refresh") && !refreshed) {
-                debug_log("[%s] refresh button pressed", expl.name);
+        if (cwd_exists_before_edit) {
+            // see if it's time for an automatic refresh
+
+            time_point_t now = current_time();
+            s64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
+            auto min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
+
+            if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms)) {
+                debug_log("[%s] auto refresh, diff_ms = %lld", expl.name, diff_ms);
                 refresh();
-            }
-
-            imgui_sameline_spacing(2);
-        }
-        else {
-            if (!refreshed && cwd_exists_before_edit) {
-                // see if it's time for an automatic refresh
-
-                time_point_t now = current_time();
-
-                s64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
-
-                auto min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
-
-                if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms)) {
-                    debug_log("[%s] auto refresh, diff_ms = %lld", expl.name, diff_ms);
-                    refresh();
-                }
             }
         }
 
         if (any_window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
-            debug_log("[%s] ctrl-r, refresh triggered", expl.name);
+            debug_log("[%s] Ctrl-R, refresh triggered", expl.name);
             refresh();
         }
     }
@@ -2190,6 +2175,9 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         if (slices.size() > 1) {
             imgui::GetStyle().ItemSpacing.x = original_spacing;
         }
+    }
+    else {
+        imgui::InvisibleButton("##clicknav_placeholder", ImVec2(-1, imgui::CalcTextSize("X").y + imgui::GetStyle().FramePadding.y * 2.0f));
     }
     // clicknav end
 
