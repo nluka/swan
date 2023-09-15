@@ -200,6 +200,7 @@ struct explorer_window
     swan_path_t cwd_last_frame = {};
     std::array<char, 256> filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
+    bool filter_polarity = true; // persisted in file
     bool needs_sort = true;
 };
 
