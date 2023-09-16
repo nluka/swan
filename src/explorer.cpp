@@ -682,15 +682,14 @@ enum cwd_entries_table_col : ImGuiID
 };
 
 static
-void sort_cwd_entries(
-    explorer_window const &expl,
-    std::vector<explorer_window::dirent> &cwd_entries,
-    ImGuiTableSortSpecs *sort_specs,
-    std::source_location sloc = std::source_location::current()) noexcept
+void sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_location::current()) noexcept
 {
+    ImGuiTableSortSpecs const *sort_specs = expl.sort_specs;
     assert(sort_specs != nullptr);
 
-    debug_log("[%s] sort_cwd_entries(=) called from [%s:%d]", expl.name, cget_file_name(sloc.file_name()), sloc.line());
+    auto &cwd_entries = expl.cwd_entries;
+
+    debug_log("[%s] sort_cwd_entries() called from [%s:%d]", expl.name, cget_file_name(sloc.file_name()), sloc.line());
 
     using dir_ent_t = explorer_window::dirent;
 
@@ -770,95 +769,6 @@ void sort_cwd_entries(
     std::sort(cwd_entries.begin(), cwd_entries.end(), compare);
 }
 
-static
-void sort_cwd_entries(
-    explorer_window const &expl,
-    std::vector<explorer_window::dirent *> &cwd_entries,
-    ImGuiTableSortSpecs *sort_specs,
-    std::source_location sloc = std::source_location::current()) noexcept
-{
-    assert(sort_specs != nullptr);
-
-    debug_log("[%s] sort_cwd_entries(*) called from [%s:%d]", expl.name, cget_file_name(sloc.file_name()), sloc.line());
-
-    using dir_ent_t = explorer_window::dirent;
-
-    // start with a preliminary sort by path.
-    // this ensures no matter the initial state, the final state is always same (deterministic).
-    // necessary for avoiding unexpected rearrangement post refresh (especially unsightly with auto refresh).
-    std::sort(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const *left, dir_ent_t const *right) {
-        return lstrcmpiA(left->basic.path.data(), right->basic.path.data()) < 0;
-    });
-
-    // needs to return true when left < right
-    auto compare = [&](dir_ent_t const *left, dir_ent_t const *right) {
-        bool left_lt_right = false;
-
-        for (s32 i = 0; i < sort_specs->SpecsCount; ++i) {
-            auto const &sort_spec = sort_specs->Specs[i];
-
-            // comparing with this variable using == will handle the sort direction
-            bool direction_flipper = sort_spec.SortDirection == ImGuiSortDirection_Ascending ? false : true;
-
-            switch (sort_spec.ColumnUserID) {
-                default:
-                case cwd_entries_table_col_id: {
-                    left_lt_right = (left->basic.id < right->basic.id) == direction_flipper;
-                    break;
-                }
-                case cwd_entries_table_col_path: {
-                    left_lt_right = (lstrcmpiA(left->basic.path.data(), right->basic.path.data()) < 0) == direction_flipper;
-                    break;
-                }
-                case cwd_entries_table_col_type: {
-                    auto compute_precedence = [](explorer_window::dirent const &ent) -> u32 {
-                        // lower items (and thus higher values) have greater precedence
-                        enum class precedence : u32
-                        {
-                            everything_else,
-                            symlink,
-                            directory,
-                        };
-
-                        if      (ent.basic.is_directory()) return (u32)precedence::directory;
-                        else if (ent.basic.is_symlink())   return (u32)precedence::symlink;
-                        else                               return (u32)precedence::everything_else;
-                    };
-
-                    u32 left_precedence = compute_precedence(*left);
-                    u32 right_precedence = compute_precedence(*right);
-
-                    left_lt_right = (left_precedence > right_precedence) == direction_flipper;
-                    break;
-                }
-                case cwd_entries_table_col_size_pretty:
-                case cwd_entries_table_col_size_bytes: {
-                    if (left->basic.is_directory() && right->basic.is_file() && right->basic.size == 0) {
-                        left_lt_right = true == direction_flipper;
-                    } else {
-                        left_lt_right = (left->basic.size < right->basic.size) == direction_flipper;
-                    }
-                    break;
-                }
-                // case cwd_entries_table_col_creation_time: {
-                //     s32 cmp = CompareFileTime(&left.creation_time_raw, &right.creation_time_raw);
-                //     left_lt_right = (cmp <= 0) == direction_flipper;
-                //     break;
-                // }
-                case cwd_entries_table_col_last_write_time: {
-                    s32 cmp = CompareFileTime(&left->basic.last_write_time_raw, &right->basic.last_write_time_raw);
-                    left_lt_right = (cmp <= 0) == direction_flipper;
-                    break;
-                }
-            }
-        }
-
-        return left_lt_right;
-    };
-
-    std::sort(cwd_entries.begin(), cwd_entries.end(), compare);
-}
-
 bool update_cwd_entries(
     update_cwd_entries_actions actions,
     explorer_window *expl_ptr,
@@ -876,7 +786,6 @@ bool update_cwd_entries(
     char dir_sep_utf8 = get_explorer_options().dir_separator_utf8();
 
     explorer_window &expl = *expl_ptr;
-    expl.needs_sort = true;
     expl.update_cwd_entries_total_us = 0;
     expl.update_cwd_entries_searchpath_setup_us = 0;
     expl.update_cwd_entries_filesystem_us = 0;
@@ -1001,6 +910,11 @@ bool update_cwd_entries(
                 ++id;
             }
             while (FindNextFileW(find_handle, &find_data));
+
+            if (expl.sort_specs != nullptr) {
+                scoped_timer<timer_unit::MICROSECONDS> sort_timer(&expl.sort_us);
+                sort_cwd_entries(expl);
+            }
         }
     }
 
@@ -1265,7 +1179,7 @@ ascend_result try_ascend_directory(explorer_window &expl) noexcept
 
     if (parent_dir_exists) {
         if (!path_is_empty(expl.cwd)) {
-            new_history_from(expl, expl.cwd);
+            new_history_from(expl, res.parent_dir);
         }
         expl.filter_error.clear();
         expl.cwd_prev_selected_dirent_idx = explorer_window::NO_SELECTION;
@@ -1483,7 +1397,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
     bool cwd_exists_before_edit = directory_exists(expl.cwd.data());
     bool cwd_exists_after_edit = cwd_exists_before_edit;
     char dir_sep_utf8 = opts.dir_separator_utf8();
-    wchar_t dir_sep_utf16 = dir_sep_utf8;
+    wchar_t dir_sep_utf16 = opts.dir_separator_utf16();
     u64 size_unit_multiplier = opts.size_unit_multiplier();
 
     bool open_single_rename_popup = false;
@@ -1507,7 +1421,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
             swan_open_popup_modal_error("[F2] was pressed (function: rename)", "nothing is selected");
         } else {
-            auto dirent_which_f2_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
+            auto &dirent_which_f2_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
             debug_log("[%s] pressed F2 on [%s]", expl.name, dirent_which_f2_was_pressed_on.basic.path.data());
             open_single_rename_popup = true;
             dirent_to_be_renamed = &dirent_which_f2_was_pressed_on;
@@ -1545,7 +1459,8 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
         auto refresh = [&](std::source_location sloc = std::source_location::current()) {
             if (!refreshed) {
-                (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data(), sloc);
+                cwd_exists_before_edit = update_cwd_entries(full_refresh, &expl, expl.cwd.data(), sloc);
+                cwd_exists_after_edit = cwd_exists_before_edit;
                 refreshed = true;
             }
         };
@@ -2066,9 +1981,10 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
     // filter polarity button start
     {
-        if (imgui::Button(expl.filter_polarity ? "+##polarity" : "-##polarity")) {
+        if (imgui::Button(expl.filter_polarity ? "+##filter_polarity" : "-##filter_polarity")) {
             flip_bool(expl.filter_polarity);
             (void) update_cwd_entries(filter, &expl, expl.cwd.data());
+            (void) expl.save_to_disk();
         }
         if (imgui::IsItemHovered()) {
             imgui::SetTooltip(
@@ -2100,6 +2016,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         imgui::PushItemWidth(max_dropdown_elem_size.x + 30.f); // some extra for the dropdown button
         if (imgui::Combo("##filter_mode", (s32 *)(&expl.filter_mode), filter_modes, lengthof(filter_modes))) {
             (void) update_cwd_entries(filter, &expl, expl.cwd.data());
+            (void) expl.save_to_disk();
         }
         imgui::PopItemWidth();
     }
@@ -2112,6 +2029,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         if (imgui::Button(expl.filter_case_sensitive ? "s" : "i")) {
             flip_bool(expl.filter_case_sensitive);
             (void) update_cwd_entries(filter, &expl, expl.cwd.data());
+            (void) expl.save_to_disk();
         }
         if (imgui::IsItemHovered()) {
             imgui::SetTooltip(
@@ -2151,6 +2069,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         if (imgui::Button("X##clear_filter")) {
             init_empty_cstr(expl.filter.data());
             (void) update_cwd_entries(filter, &expl, expl.cwd.data());
+            (void) expl.save_to_disk();
         }
         imgui::EndDisabled();
     }
@@ -2344,7 +2263,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                 char pretty_size[32]; init_empty_cstr(pretty_size);
                 format_file_size(s_paste_payload.bytes, pretty_size, lengthof(pretty_size), size_unit_multiplier);
                 if (s_paste_payload.has_directories) {
-                    imgui::Text("> %s", pretty_size);
+                    imgui::Text(">= %s", pretty_size);
                 } else {
                     imgui::TextUnformatted(pretty_size);
                 }
@@ -2492,6 +2411,8 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
             static_assert(u64(false) == 0);
             static_assert(u64(true)  == 1);
 
+            [[maybe_unused]] char const *path = dirent.basic.path.data();
+
             bool is_dotdot = dirent.basic.is_dotdot();
 
             num_filtered_directories += u64(dirent.is_filtered_out && dirent.basic.is_directory() && !is_dotdot);
@@ -2519,8 +2440,6 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         u64 num_filtered_dirents = num_filtered_directories + num_filtered_symlinks + num_filtered_files;
         u64 num_selected_dirents = num_selected_directories + num_selected_symlinks + num_selected_files;
         expl.num_selected_cwd_entries = num_selected_dirents;
-
-        ImGuiTableSortSpecs *cwd_entries_sort_specs = nullptr;
 
         if (expl.filter_error != "") {
             imgui::PushTextWrapPos(imgui::GetColumnWidth());
@@ -2625,16 +2544,22 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                 imgui::TableSetupColumn("Modified", ImGuiTableColumnFlags_DefaultSort, 0.0f, cwd_entries_table_col_last_write_time);
                 imgui::TableHeadersRow();
 
-                cwd_entries_sort_specs = imgui::TableGetSortSpecs();
-                if (cwd_entries_sort_specs != nullptr && (expl.needs_sort || cwd_entries_sort_specs->SpecsDirty)) {
+                expl.sort_specs = imgui::TableGetSortSpecs();
+
+                if (expl.sort_specs != nullptr && expl.sort_specs->SpecsDirty) {
                     {
                         scoped_timer<timer_unit::MICROSECONDS> sort_timer(&expl.sort_us);
-                        // sort_cwd_entries(expl, cwd_entries_passing_filter, cwd_entries_sort_specs);
-                        sort_cwd_entries(expl, expl.cwd_entries, cwd_entries_sort_specs);
-                        sort_cwd_entries(expl, expl.cwd_entries_selected, cwd_entries_sort_specs);
+                        sort_cwd_entries(expl);
                     }
-                    cwd_entries_sort_specs->SpecsDirty = false;
-                    expl.needs_sort = false;
+
+                    expl.cwd_entries_passing_filter.clear();
+                    for (auto &dirent : expl.cwd_entries) {
+                        if (!dirent.is_filtered_out) {
+                            expl.cwd_entries_passing_filter.push_back(&dirent);
+                        }
+                    }
+
+                    expl.sort_specs->SpecsDirty = false;
                 }
 
                 static explorer_window::dirent const *right_clicked_ent = nullptr;
@@ -2646,6 +2571,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                 while (clipper.Step()) {
                     for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
                         auto &dirent = *expl.cwd_entries_passing_filter[i];
+                        [[maybe_unused]] char const *path = dirent.basic.path.data();
 
                         imgui::TableNextRow();
 
