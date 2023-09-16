@@ -34,4 +34,5 @@ shell32.lib ^
 kernel32.lib ^
 msvcrt.lib ^
 ole32.lib ^
-shlwapi.lib
+shlwapi.lib ^
+Pathcch.lib
