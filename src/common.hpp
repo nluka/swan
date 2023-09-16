@@ -8,6 +8,8 @@
 #include <boost/container/static_vector.hpp>
 #include <boost/circular_buffer.hpp>
 
+#include "imgui/imgui.h"
+
 #include "primitives.hpp"
 #include "path.hpp"
 #include "BS_thread_pool.hpp"
@@ -181,6 +183,7 @@ struct explorer_window
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
     u64 num_selected_cwd_entries = 0;
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
+    ImGuiTableSortSpecs *sort_specs = nullptr;
     mutable u64 num_file_finds = 0;
     mutable f64 sort_us = 0;
     mutable f64 check_if_pinned_us = 0;
@@ -200,7 +203,6 @@ struct explorer_window
     std::array<char, 256> filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool filter_polarity = true; // persisted in file
-    bool needs_sort = true;
 };
 
 struct file_operation
