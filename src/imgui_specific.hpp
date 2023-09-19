@@ -25,7 +25,8 @@ struct debug_log_package
     std::source_location loc;
     time_point_t time;
 
-    static ImGuiTextBuffer s_debug_buffer;
+    static ImGuiTextBuffer s_buffer;
+    static std::mutex s_mutex;
     static bool s_logging_enabled;
 
     debug_log_package(char const *f, std::source_location l = std::source_location::current()) noexcept
@@ -36,7 +37,7 @@ struct debug_log_package
 
     static void clear_buffer() noexcept
     {
-        s_debug_buffer.clear();
+        s_buffer.clear();
     }
 };
 
@@ -48,18 +49,22 @@ void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&.
         return;
     }
 
-    auto &debug_buffer = debug_log_package::s_debug_buffer;
     u64 const max_size = 1024 * 1024 * 10;
-
-    debug_buffer.reserve(max_size);
-
-    if (debug_buffer.size() > max_size) {
-        debug_buffer.clear();
-    }
-
     char const *just_the_file_name = cget_file_name(pack.loc.file_name());
 
-    debug_buffer.appendf("%22s:%5d ", just_the_file_name, pack.loc.line());
-    debug_buffer.appendf(pack.fmt, args...);
-    debug_buffer.append("\n");
+    {
+        std::scoped_lock lock(debug_log_package::s_mutex);
+
+        auto &debug_buffer = debug_log_package::s_buffer;
+
+        debug_buffer.reserve(max_size);
+
+        if (debug_buffer.size() > max_size) {
+            debug_buffer.clear();
+        }
+
+        debug_buffer.appendf("%22s:%5d ", just_the_file_name, pack.loc.line());
+        debug_buffer.appendf(pack.fmt, args...);
+        debug_buffer.append("\n");
+    }
 }

@@ -15,12 +15,14 @@
 #include "on_scope_exit.hpp"
 #include "scoped_timer.hpp"
 #include "util.hpp"
+#include "BS_thread_pool.hpp"
 
 namespace imgui = ImGui;
 
 static IShellLinkW *s_shell_link = nullptr;
 static IPersistFile *s_persist_file_interface = nullptr;
 static explorer_options s_explorer_options = {};
+static BS::thread_pool s_change_notif_thread_pool(1);
 
 bool explorer_init_windows_shell_com_garbage() noexcept
 {
@@ -697,7 +699,8 @@ void sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::so
     // this ensures no matter the initial state, the final state is always same (deterministic).
     // necessary for avoiding unexpected rearrangement post refresh (especially unsightly with auto refresh).
     std::sort(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const &left, dir_ent_t const &right) {
-        return lstrcmpiA(left.basic.path.data(), right.basic.path.data()) < 0;
+        // return lstrcmpiA(left.basic.path.data(), right.basic.path.data()) < 0;
+        return left.basic.id < right.basic.id;
     });
 
     // needs to return true when left < right
@@ -1176,6 +1179,7 @@ ascend_result try_ascend_directory(explorer_window &expl) noexcept
 
     bool parent_dir_exists = update_cwd_entries(full_refresh, &expl, res.parent_dir.data());
     res.success = parent_dir_exists;
+    debug_log("[%s] try_ascend_directory parent_dir=[%s] res.success=%d", expl.name, res.parent_dir.data(), res.success);
 
     if (parent_dir_exists) {
         if (!path_is_empty(expl.cwd)) {
@@ -1386,9 +1390,13 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists_before_
 
 void swan_render_window_explorer(explorer_window &expl) noexcept
 {
-    if (!imgui::Begin(expl.name)) {
-        imgui::End();
-        return;
+    {
+        bool is_window_visible = imgui::Begin(expl.name);
+        expl.is_window_visible.store(is_window_visible);
+        if (!is_window_visible) {
+            imgui::End();
+            return;
+        }
     }
 
     auto &io = imgui::GetIO();
@@ -1412,8 +1420,6 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
     //     save_focused_window(expl.name);
     // }
 
-    path_force_separator(expl.cwd, dir_sep_utf8);
-
     static explorer_window::dirent const *dirent_to_be_renamed = nullptr;
 
     // handle [F2] pressed on cwd entry
@@ -1430,31 +1436,6 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
     // refresh logic start
     {
-        // wchar_t cwd_utf16[MAX_PATH]; init_empty_cstr(cwd_utf16);
-
-        // s32 utf_written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-
-        // if (utf_written == 0) {
-        //     debug_log("[%s] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.name);
-        // }
-        // else {
-        //     DWORD notify_filter =
-        //         FILE_NOTIFY_CHANGE_CREATION   |
-        //         FILE_NOTIFY_CHANGE_DIR_NAME   |
-        //         FILE_NOTIFY_CHANGE_FILE_NAME  |
-        //         FILE_NOTIFY_CHANGE_LAST_WRITE |
-        //         FILE_NOTIFY_CHANGE_SIZE
-        //     ;
-
-        //     HANDLE change_handle = FindFirstChangeNotificationW(cwd_utf16, false, notify_filter);
-        //     if (change_handle == INVALID_HANDLE_VALUE || change_handle == nullptr) {
-        //         // error
-        //     }
-        //     else {
-        //         DWORD wait_status = WaitForSingleObject(change_handle, INFINITE);
-        //     }
-        // }
-
         bool refreshed = false; // to avoid refreshing twice in one frame
 
         auto refresh = [&](std::source_location sloc = std::source_location::current()) {
@@ -1465,23 +1446,39 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
             }
         };
 
+        if (any_window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
+            debug_log("[%s] Ctrl-R, refresh triggered", expl.name);
+            refresh();
+        }
+
+    #if 1
+        if (cwd_exists_before_edit) {
+            time_point_t now = current_time();
+            s64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
+            s32 min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
+
+            if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms.load())) {
+                auto refresh_notif_time = expl.refresh_notif_time.load();
+                if (expl.last_refresh_time.time_since_epoch().count() < refresh_notif_time.time_since_epoch().count()) {
+                    debug_log("[%s] refresh notification", expl.name);
+                    refresh();
+                }
+            }
+        }
+    #else
         if (cwd_exists_before_edit) {
             // see if it's time for an automatic refresh
 
             time_point_t now = current_time();
             s64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
-            auto min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
 
-            if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms)) {
+
+            if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms.load())) {
                 debug_log("[%s] auto refresh, diff_ms = %lld", expl.name, diff_ms);
                 refresh();
             }
         }
-
-        if (any_window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
-            debug_log("[%s] Ctrl-R, refresh triggered", expl.name);
-            refresh();
-        }
+    #endif
     }
     // refresh logic end
 
@@ -1829,7 +1826,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                         // TODO: include size of children in s_paste_payload.bytes
                     }
                 } else {
-                    char action[1024]; init_empty_cstr(action);
+                    char action[2048]; init_empty_cstr(action);
                     s32 written = snprintf(action, lengthof(action), "add %s [%s] to Cut clipboard", dirent.basic.kind_cstr(), dirent.basic.path.data());
                     assert(written < lengthof(action));
 
@@ -1862,7 +1859,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                         // TODO: include size of children in s_paste_payload.bytes
                     }
                 } else {
-                    char action[1024]; init_empty_cstr(action);
+                    char action[2048]; init_empty_cstr(action);
                     s32 written = snprintf(action, lengthof(action), "add %s [%s] to Copy clipboard", dirent.basic.kind_cstr(), dirent.basic.path.data());
                     assert(written < lengthof(action));
 
@@ -1896,14 +1893,18 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         if (imgui::Button("..##up")) {
             debug_log("[%s] (..) button triggered", expl.name);
 
+            // TODO: handle ascend from drive (C:) gracefully
             auto result = try_ascend_directory(expl);
 
             if (!result.success) {
-                char action[1024]; init_empty_cstr(action);
+                char action[2048]; init_empty_cstr(action);
                 s32 written = snprintf(action, lengthof(action), "ascend to directory [%s]", result.parent_dir.data());
                 assert(written < lengthof(action));
 
                 swan_open_popup_modal_error(action, "could not find directory");
+            }
+            else {
+                ++expl.watch_id;
             }
         }
 
@@ -1928,6 +1929,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
             expl.cwd = expl.wd_history[expl.wd_history_pos];
             (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+            ++expl.watch_id;
         }
 
         imgui::EndDisabled();
@@ -1953,6 +1955,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
             expl.cwd = expl.wd_history[expl.wd_history_pos];
             (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+            ++expl.watch_id;
         }
 
         imgui::EndDisabled();
@@ -1971,6 +1974,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         if (history_item_clicked) {
             (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
             (void) expl.save_to_disk();
+            ++expl.watch_id;
         }
 
         imgui::EndPopup();
@@ -2087,6 +2091,8 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
             + 60.f
         );
 
+        std::scoped_lock lock(expl.cwd_mutex);
+
         static swan_path_t cwd_input = {};
         cwd_input = expl.cwd;
 
@@ -2096,6 +2102,8 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
         if (user_data.edit_occurred) {
             expl.cwd = path_squish_adjacent_separators(cwd_input);
+            path_force_separator(expl.cwd, dir_sep_utf8);
+
             cwd_exists_after_edit = update_cwd_entries(full_refresh, &expl, expl.cwd.data());
             if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
                 if (path_is_empty(expl.prev_valid_cwd) || !path_loosely_same(expl.cwd, expl.prev_valid_cwd)) {
@@ -2105,6 +2113,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                     expl.prev_valid_cwd = expl.cwd;
                 }
                 (void) expl.save_to_disk();
+                ++expl.watch_id;
             }
         }
 
@@ -2151,16 +2160,19 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                 expl.cwd[len] = '\0';
                 new_history_from(expl, expl.cwd);
             }
+
+            (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+            (void) expl.save_to_disk();
+            ++expl.watch_id;
         };
 
         f32 original_spacing = imgui::GetStyle().ItemSpacing.x;
 
         for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
+            // TODO: using slice_it as button id is risky
             if (imgui::Button(*slice_it)) {
                 debug_log("[%s] clicked slice [%s]", expl.name, *slice_it);
                 cd_to_slice(*slice_it);
-                (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
-                (void) expl.save_to_disk();
             }
             imgui::GetStyle().ItemSpacing.x = 2;
             imgui::SameLine();
@@ -2170,8 +2182,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
         if (imgui::Button(slices.back())) {
             debug_log("[%s] clicked slice [%s]", expl.name, slices.back());
-            cd_to_slice(slices.back());
-            (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+            // cd_to_slice(slices.back());
         }
 
         if (slices.size() > 1) {
@@ -2641,11 +2652,14 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                                             auto result = try_ascend_directory(expl);
 
                                             if (!result.success) {
-                                                char action[1024]; init_empty_cstr(action);
+                                                char action[2048]; init_empty_cstr(action);
                                                 s32 written = snprintf(action, lengthof(action), "ascend to directory [%s]", result.parent_dir.data());
                                                 assert(written < lengthof(action));
 
                                                 swan_open_popup_modal_error(action, "could not find directory");
+                                            }
+                                            else {
+                                                ++expl.watch_id;
                                             }
 
                                             imgui::PopStyleColor();
@@ -2656,11 +2670,14 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                                             auto result = try_descend_to_directory(expl, target);
 
                                             if (!result.success) {
-                                                char action[1024]; init_empty_cstr(action);
+                                                char action[2048]; init_empty_cstr(action);
                                                 s32 written = snprintf(action, lengthof(action), "descend to directory [%s]", target);
                                                 assert(written < lengthof(action));
 
                                                 swan_open_popup_modal_error(action, result.err_msg.c_str());
+                                            }
+                                            else {
+                                                ++expl.watch_id;
                                             }
 
                                             imgui::PopStyleColor();
@@ -2680,7 +2697,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                                                 new_history_from(expl, expl.cwd);
                                             }
                                         } else {
-                                            char action[1024]; init_empty_cstr(action);
+                                            char action[2048]; init_empty_cstr(action);
                                             s32 written = snprintf(action, lengthof(action), "open symlink [%s]", dirent.basic.path.data());
                                             assert(written < lengthof(action));
 
@@ -2697,7 +2714,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
                                             }
                                         } else {
-                                            char action[1024]; init_empty_cstr(action);
+                                            char action[2048]; init_empty_cstr(action);
                                             s32 written = snprintf(action, lengthof(action), "open file [%s]", dirent.basic.path.data());
                                             assert(written < lengthof(action));
 
@@ -2789,7 +2806,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                     if (imgui::Selectable("Copy full path")) {
                         swan_path_t full_path = path_create(expl.cwd.data());
                         if (!path_append(full_path, right_clicked_ent->basic.path.data(), dir_sep_utf8, true)) {
-                            char action[1024]; init_empty_cstr(action);
+                            char action[2048]; init_empty_cstr(action);
                             s32 written = snprintf(action, lengthof(action), "copy full path of [%s]", right_clicked_ent->basic.path.data());
                             assert(written < lengthof(action));
 
@@ -2818,7 +2835,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                         auto res = reveal_in_file_explorer(*right_clicked_ent, expl, dir_sep_utf16);
 
                         if (!res.success) {
-                            char action[1024]; init_empty_cstr(action);
+                            char action[2048]; init_empty_cstr(action);
                             s32 written = snprintf(action, lengthof(action), "reveal [%s] in File Explorer", right_clicked_ent->basic.path.data());
                             assert(written < lengthof(action));
 

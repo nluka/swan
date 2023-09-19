@@ -47,8 +47,8 @@ void swan_render_popup_modal_bulk_rename() noexcept
     assert(s_bulk_rename_expl != nullptr);
     assert(s_bulk_rename_selection != nullptr);
 
-    auto expl = *s_bulk_rename_expl;
-    auto selection = *s_bulk_rename_selection;
+    auto &expl = *s_bulk_rename_expl;
+    auto &selection = *s_bulk_rename_selection;
 
     wchar_t dir_sep_utf16 = get_explorer_options().dir_separator_utf16();
 

@@ -2,7 +2,8 @@
 #include "imgui_specific.hpp"
 
 bool debug_log_package::s_logging_enabled = true;
-ImGuiTextBuffer debug_log_package::s_debug_buffer = {};
+ImGuiTextBuffer debug_log_package::s_buffer = {};
+std::mutex debug_log_package::s_mutex = {};
 
 void swan_render_window_debug_log() noexcept
 {
@@ -48,8 +49,11 @@ void swan_render_window_debug_log() noexcept
         // third line
 
         if (imgui::BeginChild("debug_log_scroll")) {
-            auto const &debug_buffer = debug_log_package::s_debug_buffer;
-            imgui::TextUnformatted(debug_buffer.c_str());
+            {
+                std::scoped_lock lock(debug_log_package::s_mutex);
+                auto const &debug_buffer = debug_log_package::s_buffer;
+                imgui::TextUnformatted(debug_buffer.c_str());
+            }
 
             if ( jump_to_top ) {
                 imgui::SetScrollHereY(0.0f);
