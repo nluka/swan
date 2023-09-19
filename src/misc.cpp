@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <mutex>
 
 #include <shlwapi.h>
 

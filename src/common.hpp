@@ -108,7 +108,7 @@ struct explorer_options
 
     static s32 const min_tolerable_refresh_interval_ms = 500;
 
-    s32 auto_refresh_interval_ms;
+    std::atomic<s32> auto_refresh_interval_ms;
     s32 adaptive_refresh_threshold;
     refresh_mode ref_mode;
     bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
@@ -160,22 +160,26 @@ struct explorer_window
     void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept;
     void deselect_all_cwd_entries() noexcept;
 
-    // 40 byte members
+    // 80 bytes alignment members
+
+    std::mutex cwd_mutex = {};
+
+    // 40 byte alignment members
 
     // history for working directories, persisted in file
     circular_buffer<swan_path_t> wd_history = circular_buffer<swan_path_t>(MAX_WD_HISTORY_SIZE);
 
-    // 32 byte members
+    // 32 byte alignment members
 
     std::string filter_error = "";
 
-    // 24 byte members
+    // 24 byte alignment members
 
     std::vector<dirent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
     std::vector<dirent *> cwd_entries_selected = {}; // 24 bytes, all selected cwd entries
     std::vector<dirent *> cwd_entries_passing_filter = {}; // 24 bytes, all cwd entries passing filter
 
-    // 8 byte members
+    // 8 byte alignment members
 
     char const *name = nullptr;
     filter_mode filter_mode = filter_mode::contains; // persisted in file
@@ -184,6 +188,10 @@ struct explorer_window
     u64 num_selected_cwd_entries = 0;
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
     ImGuiTableSortSpecs *sort_specs = nullptr;
+
+    std::atomic<u64> watch_id = 0;
+    std::atomic<time_point_t> refresh_notif_time = {};
+
     mutable u64 num_file_finds = 0;
     mutable f64 sort_us = 0;
     mutable f64 check_if_pinned_us = 0;
@@ -197,12 +205,15 @@ struct explorer_window
 
     // 1 byte alignment members
 
-    mutable s8 latest_save_to_disk_result = -1;
     swan_path_t prev_valid_cwd = {};
     swan_path_t cwd = {}; // current working directory, persisted in file
     std::array<char, 256> filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool filter_polarity = true; // persisted in file
+
+    std::atomic<bool> is_window_visible = false;
+
+    mutable s8 latest_save_to_disk_result = -1;
 };
 
 struct file_operation
