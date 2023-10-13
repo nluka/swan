@@ -299,171 +299,13 @@ try
 
     std::atomic<s32> window_close_flag = glfwWindowShouldClose(window);
 
-    std::thread explorer_change_notif_thread([&]() {
-        DWORD const notify_filter =
-            FILE_NOTIFY_CHANGE_CREATION   |
-            FILE_NOTIFY_CHANGE_DIR_NAME   |
-            FILE_NOTIFY_CHANGE_FILE_NAME  |
-            FILE_NOTIFY_CHANGE_LAST_WRITE |
-            FILE_NOTIFY_CHANGE_SIZE
-        ;
-
-        struct watch
-        {
-            HANDLE handle = {};
-            u64 id = 0;
-            wchar_t target_utf16[2048] = {};
-            swan_path_t target_utf8 = {};
-        };
-
-        std::array<watch, num_explorers> watches = {};
-        // std::array<HANDLE,         num_explorers> handles = {};
-        // std::array<u64,            num_explorers> watch_ids = {};
-        // std::array<wchar_t [2048], num_explorers> watch_targets_utf16 = {};
-
-        for (u64 i = 0; i < num_explorers; ++i) {
-            auto &expl = explorers[i];
-
-            swan_path_t initial_watch_target_utf8;
-            {
-                std::scoped_lock lock(expl.cwd_mutex);
-                initial_watch_target_utf8 = expl.cwd;
-            }
-
-            watches[i].target_utf8 = initial_watch_target_utf8;
-
-            wchar_t *watch_target_utf16 = watches[i].target_utf16; // watch_targets_utf16[i];
-
-            s32 utf_written = utf8_to_utf16(initial_watch_target_utf8.data(), watch_target_utf16, 2048);
-            if (utf_written == 0) {
-                debug_log("[Explorer %zu] utf8_to_utf16 failed during setup: initial_watch_target_utf8 -> watch_target_utf16", i);
-                continue;
-            }
-
-            HANDLE &handle = watches[i].handle; // handles[i];
-            handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
-            if (handle == INVALID_HANDLE_VALUE) {
-                debug_log("[Explorer %zu] FindFirstChangeNotificationW failed during setup: INVALID_HANDLE_VALUE", i);
-            } else {
-                debug_log("[Explorer %zu] FindFirstChangeNotificationW initial setup success for [%s]", i, initial_watch_target_utf8.data());
-            }
-        }
-
-        while (!window_close_flag.load()) {
-            auto refresh_itv_ms = get_explorer_options().auto_refresh_interval_ms.load();
-
-            // put watches with handle == INVALID_HANDLE_VALUE towards the back
-            std::sort(watches.begin(), watches.end(), [](watch const &left, watch const &right) { return left.handle < right.handle; });
-
-            std::array<HANDLE, num_explorers> handles = {};
-            for (u64 i = 0; i < num_explorers; ++i) {
-                handles[i] = watches[i].handle;
-            }
-
-            s32 num_valid_handles = 0;
-            for (auto const &handle : handles) {
-                num_valid_handles += s32(handle != INVALID_HANDLE_VALUE);
-            }
-
-            {
-                static std::stringstream temp = {};
-
-                temp.clear();
-                temp.str("");
-                for (u64 i = 0; i < num_explorers; ++i) {
-                    temp << "{ h=";
-                    temp << s64(watches[i].handle);
-                    temp << " id=";
-                    temp << watches[i].id;
-                    temp << " t[";
-                    temp << watches[i].target_utf8.data();
-                    temp << "] }, ";
-                }
-
-                debug_log("watches: %s", temp.str().c_str());
-            }
-
-            DWORD wait_status = WaitForMultipleObjects(num_valid_handles, handles.data(), false, refresh_itv_ms);
-
-            auto after_wait_status = [&](u64 i) {
-                auto &expl = explorers[i];
-                if (!expl.is_window_visible.load()) {
-                    return;
-                }
-
-                u64 &prev_watch_id = watches[i].id; // watch_ids[i];
-                u64 curr_watch_id = expl.watch_id.load();
-                HANDLE &handle = handles[i];
-                auto watch_target_utf16 = watches[i].target_utf16; // watch_targets_utf16[i];
-
-                if (curr_watch_id != prev_watch_id) {
-
-                    // watch target changed
-                    prev_watch_id = curr_watch_id;
-
-                    FindCloseChangeNotification(handle); // stop watching old directory
-
-                    swan_path_t new_target_utf8;
-                    {
-                        std::scoped_lock lock(expl.cwd_mutex);
-                        new_target_utf8 = expl.cwd;
-                    }
-
-                    watches[i].target_utf8 = new_target_utf8;
-                    debug_log("[Explorer %zu] watch_id changed, new target: [%s]", i, new_target_utf8.data());
-
-                    if (path_is_empty(new_target_utf8)) {
-                        handle = INVALID_HANDLE_VALUE;
-                        return;
-                    }
-
-                    s32 utf_written = utf8_to_utf16(new_target_utf8.data(), watch_target_utf16, 2048);
-                    if (utf_written == 0) {
-                        debug_log("[Explorer %zu] utf8_to_utf16 failed: new_target_utf8 -> watch_target_utf16", i);
-                        return;
-                    }
-
-                    handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
-                    if (handle == INVALID_HANDLE_VALUE) {
-                        debug_log("[Explorer %zu] FindFirstChangeNotificationW failed: INVALID_HANDLE_VALUE", i);
-                    }
-                }
-                else {
-                    // watch target unchanged and window visible, notify render thread to refresh this explorer
-                    expl.refresh_notif_time.store(current_time());
-                    if (!FindNextChangeNotification(handle)) {
-                        debug_log("[%zu] FindNextChangeNotification failed", i);
-                    }
-                }
-            };
-
-            switch (wait_status) {
-                case WAIT_OBJECT_0:     after_wait_status(0); break;
-                case WAIT_OBJECT_0 + 1: after_wait_status(1); break;
-                case WAIT_OBJECT_0 + 2: after_wait_status(2); break;
-                case WAIT_OBJECT_0 + 3: after_wait_status(3); break;
-                case WAIT_TIMEOUT:
-                    debug_log("WAIT_TIMEOUT");
-                    break;
-                case WAIT_FAILED:
-                    debug_log("WAIT_FAILED");
-                    break;
-                default:
-                    assert(false && "Unhandled wait_status");
-                    break;
-            }
-        }
-
-        for (u64 i = 0; i < num_explorers; ++i) {
-            HANDLE &handle = watches[i].handle; // handles[i];
-            BOOL closed = FindCloseChangeNotification(handle);
-            assert(closed && "FindCloseChangeNotification failed at program exit");
-        }
-    });
+    std::thread expl_change_notif_thread_0([&]() { explorer_change_notif_thread_func(explorers[0], window_close_flag); });
+    // std::thread expl_change_notif_thread_1(explorer_change_notif_thread_func, explorers[1], window_close_flag);
+    // std::thread expl_change_notif_thread_2(explorer_change_notif_thread_func, explorers[2], window_close_flag);
+    // std::thread expl_change_notif_thread_3(explorer_change_notif_thread_func, explorers[3], window_close_flag);
 
     debug_log("entering render loop...");
 
-    // while (!glfwWindowShouldClose(window)) {
     for (
         ;
         !window_close_flag.load();
@@ -684,7 +526,16 @@ try
         render(window);
     }
 
-    explorer_change_notif_thread.join();
+#if 1
+    //? I don't know if this is safe to do, would be good to look into it
+    std::exit(0); // kill all change notif threads instantly
+#else
+    // this will cause program to wait up to refresh interval milliseconds before exiting, but is safest method?
+    expl_change_notif_thread_0.join();
+    expl_change_notif_thread_1.join();
+    expl_change_notif_thread_2.join();
+    expl_change_notif_thread_3.join();
+#endif
 
     return 0;
 }
