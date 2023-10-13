@@ -388,3 +388,5 @@ void swan_open_popup_modal_single_rename(
 char const *swan_id_single_rename_popup_modal() noexcept;
 bool swan_is_popup_modal_open_single_rename() noexcept;
 void swan_render_popup_modal_single_rename() noexcept;
+
+void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> const &window_close_flag) noexcept;

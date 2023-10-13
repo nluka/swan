@@ -2882,3 +2882,118 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
     imgui::End();
 }
+
+void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> const &window_close_flag) noexcept
+{
+    DWORD const notify_filter =
+        FILE_NOTIFY_CHANGE_CREATION   |
+        FILE_NOTIFY_CHANGE_DIR_NAME   |
+        FILE_NOTIFY_CHANGE_FILE_NAME  |
+        FILE_NOTIFY_CHANGE_LAST_WRITE |
+        FILE_NOTIFY_CHANGE_SIZE
+    ;
+
+    HANDLE watch_handle = {};
+    u64 watch_id = 0;
+    wchar_t watch_target_utf16[2048] = {};
+    swan_path_t watch_target_utf8 = {};
+
+    swan_path_t initial_watch_target_utf8;
+    {
+        std::scoped_lock lock(expl.cwd_mutex);
+        initial_watch_target_utf8 = expl.cwd;
+    }
+    watch_target_utf8 = initial_watch_target_utf8;
+
+    s32 utf_written = utf8_to_utf16(initial_watch_target_utf8.data(), watch_target_utf16, 2048);
+    if (utf_written == 0) {
+        debug_log("[%s] utf8_to_utf16 failed during setup: initial_watch_target_utf8 -> watch_target_utf16", expl.name);
+    }
+
+    watch_handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
+    if (watch_handle == INVALID_HANDLE_VALUE) {
+        debug_log("[%s] FindFirstChangeNotificationW failed during setup: INVALID_HANDLE_VALUE", expl.name);
+    } else {
+        debug_log("[%s] FindFirstChangeNotificationW initial setup success for [%s]", expl.name, initial_watch_target_utf8.data());
+    }
+
+    while (!window_close_flag.load()) {
+        auto refresh_itv_ms = get_explorer_options().auto_refresh_interval_ms.load();
+
+        // check if the cwd changed
+        {
+            u64 curr_watch_id = expl.watch_id.load();
+            u64 &prev_watch_id = watch_id;
+
+            if (curr_watch_id != prev_watch_id) {
+                prev_watch_id = curr_watch_id;
+
+                if (watch_handle != INVALID_HANDLE_VALUE) {
+                    FindCloseChangeNotification(watch_handle); // stop watching old directory, if there was one
+                }
+
+                swan_path_t new_target_utf8;
+                {
+                    std::scoped_lock lock(expl.cwd_mutex);
+                    new_target_utf8 = expl.cwd;
+                }
+                watch_target_utf8 = new_target_utf8;
+
+                debug_log("[%s] watch_id changed, new target: [%s]", expl.name, new_target_utf8.data());
+
+                if (path_is_empty(new_target_utf8)) {
+                    watch_handle = INVALID_HANDLE_VALUE;
+                    break;
+                }
+
+                utf_written = utf8_to_utf16(new_target_utf8.data(), watch_target_utf16, 2048);
+                if (utf_written == 0) {
+                    debug_log("[%s] utf8_to_utf16 failed: new_target_utf8 -> watch_target_utf16", expl.name);
+                } else {
+                    watch_handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
+                    if (watch_handle == INVALID_HANDLE_VALUE) {
+                        debug_log("[%s] FindFirstChangeNotificationW failed: INVALID_HANDLE_VALUE", expl.name);
+                    }
+                }
+            }
+        }
+
+        if (watch_handle == INVALID_HANDLE_VALUE) {
+            // not watching anything
+            std::this_thread::sleep_for(std::chrono::milliseconds(refresh_itv_ms));
+        }
+        else {
+            DWORD wait_status = WaitForSingleObject(watch_handle, refresh_itv_ms);
+
+            switch (wait_status) {
+                case WAIT_OBJECT_0: {
+                    debug_log("[%s] WAIT_OBJECT_0", expl.name);
+
+                    if (expl.is_window_visible.load()) {
+                        debug_log("[%s] window visible, sending refresh notification", expl.name);
+                        expl.refresh_notif_time.store(current_time());
+                        if (!FindNextChangeNotification(watch_handle)) {
+                            debug_log("[%s] FindNextChangeNotification failed", expl.name);
+                        }
+                    }
+
+                    break;
+                }
+                case WAIT_TIMEOUT:
+                    debug_log("[%s] WAIT_TIMEOUT", expl.name);
+                    break;
+                case WAIT_FAILED:
+                    debug_log("[%s] WAIT_FAILED", expl.name);
+                    break;
+                default:
+                    assert(false && "Unhandled wait_status");
+                    break;
+            }
+        }
+
+        debug_log("[%s] h=%d id=%zu target=[%s]", expl.name, watch_handle, watch_id, watch_target_utf8.data());
+    }
+
+    BOOL closed = FindCloseChangeNotification(watch_handle);
+    assert(closed && "FindCloseChangeNotification failed at program exit");
+}

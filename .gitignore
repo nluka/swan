@@ -6,7 +6,7 @@ obj*/
 jquery*
 swan.png
 data/
-dummy/
+dummy*/
 bin/
 swan_tests.md
 *.actual
