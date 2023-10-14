@@ -2,39 +2,36 @@
 
 The <u>sw</u>iss <u>a</u>rmy k<u>n</u>ife program for Windows. One program to replace many, featuring:
 
-- [ ] Powerful [file explorer](#explorer) (wayyy better than Windows Explorer)
-- [ ] Super fast file finder (Windows Explorer? pfff)
-- [ ] Fast, useful terminal (unlike Command Prompt)
-- [ ] yt-dlp frontend
+| Component | State |
+| - | - |
+| [File Explorer](#explorer) | MVP near completion |
+| File Finder | Not started |
+| yt-dlp Frontend | Not started |
+| YouTube client | Not started |
+| Terminal | Not started |
 
-## Explorer
+# Explorer
 
-<img src="resource/preview1.png" />
+## Problems with Windows File Explorer
 
-## Problems with Windows Explorer which swan's Explorer solves
-
-- Single pane per window
-- Lack of useful filtering (search exists, but is not fast enough)
+- Serious performance issues in certain cases
+- Lack of multiple panes per window, annoying to manage multiple windows
+- Lack of useful filtering
+  - There is "Search", but it's always recursive and generally very slow or straight up broken at times
 - No bulk renaming
 - Inability to tell if a directory has things inside without looking inside (file? directories?)
 - Inability to see/kill processes which are locking a file
 
 ## Feature List
 
-Note: cwd = current working directory
+### General/Navigation
 
 - [x] Unicode support
 - [x] Multiple explorer panes
 - [x] Sort by any column - name, size, entry type, creation date, last modified date, etc.
 - [x] Full support for unix separator - `/` instead of `\\`
-- [x] Create empty directory in cwd
-- [x] Create empty file in cwd
+- [x] Create empty files and directories
 - [ ] File preview
-
-<!-- TODO: GIF demo -->
-- Pin directories (similar to Quick Access in Window File Explorer)
-  - [x] Pin/unpin
-  - [ ] Reorder pins
 
 <!-- TODO: GIF demo -->
 - Basic navigation with double clicks
@@ -57,14 +54,6 @@ Note: cwd = current working directory
   - [x] Selection maintained between refreshes
 
 <!-- TODO: GIF demo -->
-- Filter entries in cwd
-  - [x] `Contains` mode - searches for substring
-  - [x] `RegExp` mode - full Regular Expression support
-  - [ ] `Glob` mode - basic wildcards like * and ?
-  - [x] Case sensitive and insensitive option for all modes
-  - [ ] Discriminate by entry type - e.g. filter for files only, which match pattern
-
-<!-- TODO: GIF demo -->
 - Context menu for directory entries (accessed with right click)
   - [x] Copy file/directory name - e.g. `file.cpp`
   - [x] Copy file/directory path - e.g. `C:\directory\file.cpp`
@@ -78,34 +67,58 @@ Note: cwd = current working directory
   - [x] Go back/forward in history with left/right arrows
   - [x] View and select from history with popup window
 
-- Bulk file operations
-  - [ ] Copy files
-    - [ ] Undo
-  - [ ] Copy directories
-    - [ ] Undo
-  - [ ] Cut (move) files
-    - [ ] Undo
-  - [ ] Cut (move) directories
-    - [ ] Undo
-  - [ ] Delete files
-    - [ ] Undo
-  - [ ] Delete directories
-    - [ ] Undo
-  <!-- TODO: GIF demo -->
-  - Bulk renaming
-    - [x] Preview of current pattern's before/after tranformation
-    - [x] Arbitrary counter with configurable start and step values
-    - [x] Refer to current name minus extension using `<name>` (e.g. if `file.cpp`, `<name>` = `file`)
-    - [x] Refer to current extension using `<ext>` (e.g. if `file.cpp`, `<ext>` = `cpp`, blank for directories)
-    - [x] Refer to size in bytes using `<bytes>` (= 0 for directories)
-    - [ ] Freeform mode
-    - [ ] Transactional
-    - [ ] Undo
+### Pins
 
 <!-- TODO: GIF demo -->
-- Deal with locked files
-  - [ ] See processes blocking an operation
-  - [ ] Kill processes blocking an operation
+
+- [x] Pin/unpin directories
+- [ ] Reorder pins
+
+### Filtering
+
+<!-- TODO: GIF demo -->
+- Fast, powerful filtering
+  - Several match modes:
+    - [x] `Contains` mode - searches for substring
+    - [x] `RegExp` mode - full Regular Expression support
+    - [ ] `Glob` mode - basic wildcards like * and ?
+  - [x] Case sensitivity toggle
+  - [ ] Match polarity (i.e. == vs. !=)
+  - [ ] Discriminate by entry type - e.g. filter for files only, which match pattern
+
+### Bulk File Operations
+
+<!-- TODO: GIF demo -->
+- [ ] Copy files
+  - [ ] Undo
+- [ ] Copy directories
+  - [ ] Undo
+- [ ] Cut (move) files
+  - [ ] Undo
+- [ ] Cut (move) directories
+  - [ ] Undo
+- [ ] Delete files
+  - [ ] Undo
+- [ ] Delete directories
+  - [ ] Undo
+
+- Bulk renaming
+  - [x] Preview of current pattern's before/after transformation
+  - [x] Arbitrary counter with configurable start and step values
+  - [x] Refer to current name minus extension using `<name>` (e.g. if `file.cpp`, `<name>` = `file`)
+  - [x] Refer to current extension using `<ext>` (e.g. if `file.cpp`, `<ext>` = `cpp`, blank for directories)
+  - [x] Refer to size in bytes using `<bytes>` (= 0 for directories)
+  - [ ] Freeform mode
+  - [ ] Transactional
+  - [ ] Undo
+
+### Advanced Features
+
+<!-- TODO: GIF demo -->
+- Tools for dealing with locked files
+  - [ ] See process blocking an operation
+  - [ ] Bring blocking process into focus
+  - [ ] Kill process blocking an operation
 
 <!-- TODO: GIF demo -->
 - Show directory preview
@@ -116,4 +129,4 @@ Note: cwd = current working directory
 
 ## Performance TODOs
 
-- [ ] Implement fixed_string_allocator to reduce memory wasteage from swan_path_t
+- [ ] Implement fixed_string_allocator to reduce memory waste from swan_path_t
