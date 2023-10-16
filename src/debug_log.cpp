@@ -15,6 +15,8 @@ void swan_render_window_debug_log() noexcept
         // first line
 
         bool jump_to_top = imgui::ArrowButton("Top", ImGuiDir_Up);
+        imgui::SameLine();
+        bool jump_to_bottom = imgui::ArrowButton("Bottom", ImGuiDir_Down);
 
         imgui_sameline_spacing(1);
 
@@ -41,9 +43,8 @@ void swan_render_window_debug_log() noexcept
 
         // second line
 
-        bool jump_to_bottom = imgui::ArrowButton("Bottom", ImGuiDir_Down);
-
-        imgui::Spacing();
+        imgui_spacing(2);
+        imgui::Text("%-5s %18s:%-5s %s", "tid", "source_file", "line", "message");
         imgui::Separator();
 
         // third line

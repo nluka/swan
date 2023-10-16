@@ -187,7 +187,7 @@ try
     //     std::cout << boost::stacktrace::stacktrace();
     // });
 
-    debug_log("initializing...");
+    debug_log("Initializing...");
 
     GLFWwindow *window = init_glfw_and_imgui();
     if (window == nullptr) {
@@ -279,11 +279,12 @@ try
         for (u64 i = 0; i < explorers.size(); ++i) {
             auto &expl = explorers[i];
 
+            expl.id = i+1;
             expl.name = names[i];
             expl.filter_error.reserve(1024);
 
             bool load_result = explorers[i].load_from_disk(expl_opts.dir_separator_utf8());
-            debug_log("[Explorer %zu] load_from_disk: %d", i+1, load_result);
+            debug_log("[ %d ] load_from_disk: %d", i+1, load_result);
 
             if (!load_result) {
                 swan_path_t startup_path = {};
@@ -300,11 +301,11 @@ try
     std::atomic<s32> window_close_flag = glfwWindowShouldClose(window);
 
     std::thread expl_change_notif_thread_0([&]() { explorer_change_notif_thread_func(explorers[0], window_close_flag); });
-    // std::thread expl_change_notif_thread_1(explorer_change_notif_thread_func, explorers[1], window_close_flag);
-    // std::thread expl_change_notif_thread_2(explorer_change_notif_thread_func, explorers[2], window_close_flag);
-    // std::thread expl_change_notif_thread_3(explorer_change_notif_thread_func, explorers[3], window_close_flag);
+    // std::thread expl_change_notif_thread_1([&]() { explorer_change_notif_thread_func(explorers[1], window_close_flag); });
+    // std::thread expl_change_notif_thread_2([&]() { explorer_change_notif_thread_func(explorers[2], window_close_flag); });
+    // std::thread expl_change_notif_thread_3([&]() { explorer_change_notif_thread_func(explorers[3], window_close_flag); });
 
-    debug_log("entering render loop...");
+    debug_log("Entering render loop...");
 
     for (
         ;
@@ -333,10 +334,26 @@ try
                     static_assert((false | true) == true);
                     static_assert((true | true) == true);
 
-                    change_made |= imgui::MenuItem(explorers[0].name, nullptr, &win_opts.show_explorer_0);
-                    change_made |= imgui::MenuItem(explorers[1].name, nullptr, &win_opts.show_explorer_1);
-                    change_made |= imgui::MenuItem(explorers[2].name, nullptr, &win_opts.show_explorer_2);
-                    change_made |= imgui::MenuItem(explorers[3].name, nullptr, &win_opts.show_explorer_3);
+                    if (imgui::MenuItem(explorers[0].name, nullptr, &win_opts.show_explorer_0)) {
+                        change_made = true;
+                        ++explorers[0].watch_id;
+                        explorers[0].is_window_visible.store(!explorers[0].is_window_visible.load());
+                    }
+                    if (imgui::MenuItem(explorers[1].name, nullptr, &win_opts.show_explorer_1)) {
+                        change_made = true;
+                        ++explorers[1].watch_id;
+                        explorers[1].is_window_visible.store(!explorers[1].is_window_visible.load());
+                    }
+                    if (imgui::MenuItem(explorers[2].name, nullptr, &win_opts.show_explorer_2)) {
+                        change_made = true;
+                        ++explorers[2].watch_id;
+                        explorers[2].is_window_visible.store(!explorers[2].is_window_visible.load());
+                    }
+                    if (imgui::MenuItem(explorers[3].name, nullptr, &win_opts.show_explorer_3)) {
+                        change_made = true;
+                        ++explorers[3].watch_id;
+                        explorers[3].is_window_visible.store(!explorers[3].is_window_visible.load());
+                    }
 
                     change_made |= imgui::MenuItem("Pinned", nullptr, &win_opts.show_pinned);
                     change_made |= imgui::MenuItem("File Operations", nullptr, &win_opts.show_file_operations);
