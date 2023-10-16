@@ -5,7 +5,7 @@
 
 #include "imgui/imgui.h"
 
-#include "BS_thread_pool.hpp"
+#include "thread_pool.hpp"
 #include "common.hpp"
 #include "imgui_specific.hpp"
 #include "path.hpp"

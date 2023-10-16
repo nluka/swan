@@ -12,7 +12,7 @@
 
 #include "primitives.hpp"
 #include "path.hpp"
-#include "BS_thread_pool.hpp"
+#include "thread_pool.hpp"
 #include "util.hpp"
 
 enum class imgui_stylesheet : s32
@@ -147,7 +147,7 @@ struct explorer_window
 
     enum filter_mode : u64
     {
-        contains,
+        contains = 0,
         regex,
         // glob,
         count,
@@ -182,6 +182,7 @@ struct explorer_window
     // 8 byte alignment members
 
     char const *name = nullptr;
+    s64 id = -1;
     filter_mode filter_mode = filter_mode::contains; // persisted in file
     time_point_t last_refresh_time = {};
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one

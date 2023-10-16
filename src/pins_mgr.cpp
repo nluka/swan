@@ -23,6 +23,7 @@ void swan_render_window_pinned_directories(std::array<explorer_window, 4> &explo
                 new_history_from(expl, pin);
                 (void) update_cwd_entries(full_refresh, &expl, pin.data());
                 (void) expl.save_to_disk();
+                ++expl.watch_id;
             }
 
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {

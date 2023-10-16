@@ -51,6 +51,7 @@ void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&.
 
     u64 const max_size = 1024 * 1024 * 10;
     char const *just_the_file_name = cget_file_name(pack.loc.file_name());
+    s32 thread_id = GetCurrentThreadId();
 
     {
         std::scoped_lock lock(debug_log_package::s_mutex);
@@ -63,7 +64,7 @@ void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&.
             debug_buffer.clear();
         }
 
-        debug_buffer.appendf("%22s:%5d ", just_the_file_name, pack.loc.line());
+        debug_buffer.appendf("%-5d %18s:%-5d ", thread_id, just_the_file_name, pack.loc.line());
         debug_buffer.appendf(pack.fmt, args...);
         debug_buffer.append("\n");
     }
