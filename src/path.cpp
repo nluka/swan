@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cassert>
 
 #include <windows.h>
 #include <shlwapi.h>

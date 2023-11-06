@@ -1,4 +1,4 @@
-// #include <filesystem>
+#include <iostream>
 
 #include <boost/stacktrace.hpp>
 
@@ -111,7 +111,7 @@ GLFWwindow *init_glfw_and_imgui()
         font = io.Fonts->AddFontFromFileTTF("data/CascadiaMonoPL.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesCyrillic());
         assert(font != nullptr);
 
-    #if 0
+    #if 1
         [[maybe_unused]] f32 base_font_size = 15.0f;
         f32 icon_font_size = base_font_size * 1;
 
@@ -183,16 +183,16 @@ void render(GLFWwindow *window) noexcept
 s32 main(s32, char**)
 try
 {
-    // std::atexit([]() {
-    //     std::cout << boost::stacktrace::stacktrace();
-    // });
-
-    debug_log("Initializing...");
+    std::atexit([]() {
+        std::cout << boost::stacktrace::stacktrace();
+    });
 
     GLFWwindow *window = init_glfw_and_imgui();
     if (window == nullptr) {
         return 1;
     }
+
+    debug_log("Initializing...");
 
     if (!explorer_init_windows_shell_com_garbage()) {
         return 1;
@@ -225,6 +225,7 @@ try
         SYSTEM_INFO system_info;
         GetSystemInfo(&system_info);
         debug_log("GetSystemInfo.dwPageSize = %d", system_info.dwPageSize);
+        set_page_size(system_info.dwPageSize);
     }
 
     auto &expl_opts = get_explorer_options();
@@ -246,7 +247,7 @@ try
     if (!win_opts.load_from_disk()) {
         debug_log("windows_options::load_from_disk failed, setting defaults");
         win_opts.show_explorer_1 = true;
-        win_opts.show_pinned = true;
+        win_opts.show_pins_mgr = true;
     #if !defined(NDEBUG)
         win_opts.show_demo = true;
     #endif
@@ -284,7 +285,7 @@ try
             expl.filter_error.reserve(1024);
 
             bool load_result = explorers[i].load_from_disk(expl_opts.dir_separator_utf8());
-            debug_log("[ %d ] load_from_disk: %d", i+1, load_result);
+            debug_log("[ %d ] explorer_window::load_from_disk: %d", i+1, load_result);
 
             if (!load_result) {
                 swan_path_t startup_path = {};
@@ -294,16 +295,19 @@ try
                 debug_log("[%s] save_to_disk: %d", expl.name, save_result);
             }
 
-            update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+            bool starting_dir_exists = update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+            if (starting_dir_exists) {
+                expl.set_latest_valid_cwd_then_notify(expl.cwd);
+            }
         }
     }
 
     std::atomic<s32> window_close_flag = glfwWindowShouldClose(window);
 
-    std::thread expl_change_notif_thread_0([&]() { explorer_change_notif_thread_func(explorers[0], window_close_flag); });
-    // std::thread expl_change_notif_thread_1([&]() { explorer_change_notif_thread_func(explorers[1], window_close_flag); });
-    // std::thread expl_change_notif_thread_2([&]() { explorer_change_notif_thread_func(explorers[2], window_close_flag); });
-    // std::thread expl_change_notif_thread_3([&]() { explorer_change_notif_thread_func(explorers[3], window_close_flag); });
+    std::jthread expl_change_notif_thread_0([&]() { explorer_change_notif_thread_func(explorers[0], window_close_flag); });
+    std::jthread expl_change_notif_thread_1([&]() { explorer_change_notif_thread_func(explorers[1], window_close_flag); });
+    std::jthread expl_change_notif_thread_2([&]() { explorer_change_notif_thread_func(explorers[2], window_close_flag); });
+    std::jthread expl_change_notif_thread_3([&]() { explorer_change_notif_thread_func(explorers[3], window_close_flag); });
 
     debug_log("Entering render loop...");
 
@@ -336,26 +340,22 @@ try
 
                     if (imgui::MenuItem(explorers[0].name, nullptr, &win_opts.show_explorer_0)) {
                         change_made = true;
-                        ++explorers[0].watch_id;
                         explorers[0].is_window_visible.store(!explorers[0].is_window_visible.load());
                     }
                     if (imgui::MenuItem(explorers[1].name, nullptr, &win_opts.show_explorer_1)) {
                         change_made = true;
-                        ++explorers[1].watch_id;
                         explorers[1].is_window_visible.store(!explorers[1].is_window_visible.load());
                     }
                     if (imgui::MenuItem(explorers[2].name, nullptr, &win_opts.show_explorer_2)) {
                         change_made = true;
-                        ++explorers[2].watch_id;
                         explorers[2].is_window_visible.store(!explorers[2].is_window_visible.load());
                     }
                     if (imgui::MenuItem(explorers[3].name, nullptr, &win_opts.show_explorer_3)) {
                         change_made = true;
-                        ++explorers[3].watch_id;
                         explorers[3].is_window_visible.store(!explorers[3].is_window_visible.load());
                     }
 
-                    change_made |= imgui::MenuItem("Pinned", nullptr, &win_opts.show_pinned);
+                    change_made |= imgui::MenuItem("Pinned", nullptr, &win_opts.show_pins_mgr);
                     change_made |= imgui::MenuItem("File Operations", nullptr, &win_opts.show_file_operations);
                     change_made |= imgui::MenuItem("Analytics", nullptr, &win_opts.show_analytics);
 
@@ -397,6 +397,8 @@ try
                                 update_cwd_entries(full_refresh, &expl, expl.cwd.data());
                             }
                             update_pin_dir_separators(expl_opts.dir_separator_utf8());
+                            bool success = save_pins_to_disk();
+                            debug_log("save_pins_to_disk: %d", success);
                         }
                         change_made |= changed_dir_separator;
                     }
@@ -483,7 +485,7 @@ try
             style.FramePadding.y = original_padding;
         }
 
-        if (win_opts.show_pinned) {
+        if (win_opts.show_pins_mgr) {
             swan_render_window_pinned_directories(explorers, win_opts);
         }
 
@@ -516,6 +518,12 @@ try
         if (swan_is_popup_modal_open_bulk_rename()) {
             swan_render_popup_modal_bulk_rename();
         }
+        if (swan_is_popup_modal_open_new_pin()) {
+            swan_render_popup_modal_new_pin();
+        }
+        if (swan_is_popup_modal_open_edit_pin()) {
+            swan_render_popup_modal_edit_pin();
+        }
         if (swan_is_popup_modal_open_error()) {
             swan_render_popup_modal_error();
         }
@@ -543,16 +551,9 @@ try
         render(window);
     }
 
-#if 1
-    //? I don't know if this is safe to do, would be good to look into it
-    std::exit(0); // kill all change notif threads instantly
-#else
-    // this will cause program to wait up to refresh interval milliseconds before exiting, but is safest method?
-    expl_change_notif_thread_0.join();
-    expl_change_notif_thread_1.join();
-    expl_change_notif_thread_2.join();
-    expl_change_notif_thread_3.join();
-#endif
+    //? I don't know if this is safe to do, would be good to look into it,
+    //? but as of now the program seems to work...
+    std::exit(0); // kill all change notif threads
 
     return 0;
 }

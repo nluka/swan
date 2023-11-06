@@ -29,6 +29,7 @@ void format_file_size(
     u64 unit_multiplier) noexcept;
 
 s64 compute_diff_ms(time_point_t start, time_point_t end) noexcept;
+s64 compute_diff_us(time_point_t start, time_point_t end) noexcept;
 
 std::array<char, 64> compute_when_str(
     time_point_t start,
@@ -72,6 +73,7 @@ struct file_name_ext
 };
 
 wchar_t const *windows_illegal_filename_chars() noexcept;
+wchar_t const *windows_illegal_path_chars() noexcept;
 
 void init_empty_cstr(char *s) noexcept;
 void init_empty_cstr(wchar_t *s) noexcept;

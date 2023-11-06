@@ -89,6 +89,14 @@ s64 compute_diff_ms(time_point_t start, time_point_t end) noexcept
     return diff_ms.count();
 }
 
+s64 compute_diff_us(time_point_t start, time_point_t end) noexcept
+{
+    auto start_ms = std::chrono::time_point_cast<std::chrono::microseconds>(start);
+    auto end_ms = std::chrono::time_point_cast<std::chrono::microseconds>(end);
+    auto diff_us = end_ms - start_ms;
+    return diff_us.count();
+}
+
 time_point_t current_time() noexcept
 {
     return std::chrono::high_resolution_clock::now();
@@ -335,6 +343,11 @@ bool strempty(char const *s) noexcept
 wchar_t const *windows_illegal_filename_chars() noexcept
 {
     return L"\\/<>\"|?*";
+}
+
+wchar_t const *windows_illegal_path_chars() noexcept
+{
+    return L"<>\"|?*";
 }
 
 void init_empty_cstr(char *s) noexcept
