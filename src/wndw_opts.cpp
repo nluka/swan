@@ -11,7 +11,7 @@ bool windows_options::save_to_disk() const noexcept
         return false;
         }
 
-        out << "show_pinned " << this->show_pinned << '\n';
+        out << "show_pinned " << this->show_pins_mgr << '\n';
         out << "show_file_operations " << this->show_file_operations << '\n';
         out << "show_explorer_0 " << this->show_explorer_0 << '\n';
         out << "show_explorer_1 " << this->show_explorer_1 << '\n';
@@ -49,7 +49,7 @@ bool windows_options::load_from_disk() noexcept
             in >> what;
             assert(what == "show_pinned");
             in >> bit_ch;
-            this->show_pinned = bit_ch == '1' ? 1 : 0;
+            this->show_pins_mgr = bit_ch == '1' ? 1 : 0;
         }
         {
             in >> what;

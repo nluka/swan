@@ -8,9 +8,9 @@
 
 typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> swan_path_t;
 
-swan_path_t path_create(char const *data) noexcept;
+[[nodiscard]] swan_path_t path_create(char const *data) noexcept;
 
-u16 path_length(swan_path_t const &path) noexcept;
+[[nodiscard]] u16 path_length(swan_path_t const &path) noexcept;
 
 bool path_ends_with(swan_path_t const &path, char const *end) noexcept;
 
@@ -28,7 +28,7 @@ bool path_pop_back_if(swan_path_t &path, char if_ch) noexcept;
 
 bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept;
 
-u64 path_append(
+[[nodiscard]] u64 path_append(
   swan_path_t &path,
   char const *str,
   char dir_separator = 0,
@@ -41,4 +41,4 @@ bool path_equals_exactly(swan_path_t const &p1, swan_path_t const &p2) noexcept;
 
 bool path_equals_exactly(swan_path_t const &p1, char const *p2) noexcept;
 
-swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept;
+[[nodiscard]] swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept;

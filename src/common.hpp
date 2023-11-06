@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include <boost/container/static_vector.hpp>
+#include <boost/static_string.hpp>
 #include <boost/circular_buffer.hpp>
 
 #include "imgui/imgui.h"
@@ -14,6 +15,9 @@
 #include "path.hpp"
 #include "thread_pool.hpp"
 #include "util.hpp"
+
+s32 get_page_size() noexcept;
+void set_page_size(s32) noexcept;
 
 enum class imgui_stylesheet : s32
 {
@@ -80,7 +84,7 @@ drive_list_t query_drive_list() noexcept;
 
 struct windows_options
 {
-    bool show_pinned;
+    bool show_pins_mgr;
     bool show_file_operations;
     bool show_explorer_0;
     bool show_explorer_1;
@@ -159,10 +163,15 @@ struct explorer_window
     bool load_from_disk(char dir_separator) noexcept;
     void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept;
     void deselect_all_cwd_entries() noexcept;
+    void set_latest_valid_cwd_then_notify(swan_path_t const &new_val) noexcept;
 
-    // 80 bytes alignment members
+    // 80 byte alignment members
 
-    std::mutex cwd_mutex = {};
+    std::mutex latest_valid_cwd_mutex = {};
+
+    // 72 byte alignment members
+
+    std::condition_variable latest_valid_cwd_cond = {};
 
     // 40 byte alignment members
 
@@ -190,7 +199,6 @@ struct explorer_window
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
     ImGuiTableSortSpecs *sort_specs = nullptr;
 
-    std::atomic<u64> watch_id = 0;
     std::atomic<time_point_t> refresh_notif_time = {};
 
     mutable u64 num_file_finds = 0;
@@ -206,13 +214,12 @@ struct explorer_window
 
     // 1 byte alignment members
 
-    swan_path_t prev_valid_cwd = {};
+    std::atomic<bool> is_window_visible = false;
+    swan_path_t latest_valid_cwd = {};
     swan_path_t cwd = {}; // current working directory, persisted in file
     std::array<char, 256> filter = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool filter_polarity = true; // persisted in file
-
-    std::atomic<bool> is_window_visible = false;
 
     mutable s8 latest_save_to_disk_result = -1;
 };
@@ -263,9 +270,18 @@ bool update_cwd_entries(
 
 void new_history_from(explorer_window &expl, swan_path_t const &new_latest_entry);
 
-std::vector<swan_path_t> const &get_pins() noexcept;
+struct pinned_path
+{
+    static u64 const LABEL_MAX_LEN = 64;
 
-bool pin(swan_path_t &path, char dir_separator) noexcept;
+    ImVec4 color;
+    boost::static_string<LABEL_MAX_LEN> label;
+    swan_path_t path;
+};
+
+std::vector<pinned_path> &get_pins() noexcept;
+
+bool pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept;
 
 void unpin(u64 pin_idx) noexcept;
 
@@ -389,5 +405,15 @@ void swan_open_popup_modal_single_rename(
 char const *swan_id_single_rename_popup_modal() noexcept;
 bool swan_is_popup_modal_open_single_rename() noexcept;
 void swan_render_popup_modal_single_rename() noexcept;
+
+void swan_open_popup_modal_new_pin(swan_path_t const &init_path, bool mutable_path) noexcept;
+char const *swan_id_new_pin_popup_modal() noexcept;
+bool swan_is_popup_modal_open_new_pin() noexcept;
+void swan_render_popup_modal_new_pin() noexcept;
+
+char const *swan_id_edit_pin_popup_modal() noexcept;
+void swan_open_popup_modal_edit_pin(pinned_path *pin) noexcept;
+bool swan_is_popup_modal_open_edit_pin() noexcept;
+void swan_render_popup_modal_edit_pin() noexcept;
 
 void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> const &window_close_flag) noexcept;

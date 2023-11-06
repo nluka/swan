@@ -44,7 +44,7 @@ void swan_render_window_debug_log() noexcept
         // second line
 
         imgui_spacing(2);
-        imgui::Text("%-5s %18s:%-5s %s", "tid", "source_file", "line", "message");
+        imgui::Text("%-5s %10s %18s:%-5s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
         imgui::Separator();
 
         // third line
