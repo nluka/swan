@@ -21,7 +21,7 @@
 #include "util.hpp"
 #include "util.cpp"
 
-#include "bulk_rename.cpp"
+#include "bulk_rnm.cpp"
 
 s32 main()
 try
@@ -299,6 +299,30 @@ try
       swan_path_t p2 = path_create("C:\\code");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+    {
+      swan_path_t p1 = path_create("C:/code/");
+      swan_path_t p2 = path_create("C:/code/");
+      ntest::assert_bool(true, path_loosely_same(p1, p2));
+      ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+    {
+      swan_path_t p1 = path_create("C:/code///");
+      swan_path_t p2 = path_create("C:/code/");
+      ntest::assert_bool(true, path_loosely_same(p1, p2));
+      ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+    {
+      swan_path_t p1 = path_create("C:/code///");
+      swan_path_t p2 = path_create("C:/code//");
+      ntest::assert_bool(true, path_loosely_same(p1, p2));
+      ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+    {
+      swan_path_t p1 = path_create("C:/code///");
+      swan_path_t p2 = path_create("C:/cod");
+      ntest::assert_bool(false, path_loosely_same(p1, p2));
+      ntest::assert_bool(false, path_loosely_same(p2, p1));
     }
     {
       swan_path_t p1 = path_create("C:\\code");

@@ -180,12 +180,26 @@ bool path_loosely_same(swan_path_t const &p1, swan_path_t const &p2) noexcept
     u16 p1_len = path_length(p1);
     u16 p2_len = path_length(p2);
     s32 len_diff = (s32)std::max(p1_len, p2_len) - (s32)std::min(p1_len, p2_len);
+    assert(len_diff >= 0);
 
-    if (len_diff <= 1) {
+    if (len_diff == 0) {
         return StrCmpNIA(p1.data(), p2.data(), std::min(p1_len, p2_len)) == 0;
     }
     else {
-        return false;
+        bool same_beginning = StrCmpNIA(p1.data(), p2.data(), std::min(p1_len, p2_len)) == 0;
+        bool all_rest_are_separators = {};
+
+        if (p1_len > p2_len) { // p1 is longer one
+            all_rest_are_separators = std::all_of(p1.data() + p1_len - len_diff,
+                                                  p1.data() + p1_len,
+                                                  [](char ch) { return strchr("\\/", ch); });
+        } else { // p2 is longer one
+            all_rest_are_separators = std::all_of(p2.data() + p2_len - len_diff,
+                                                  p2.data() + p2_len,
+                                                  [](char ch) { return strchr("\\/", ch); });
+        }
+
+        return same_beginning && all_rest_are_separators;
     }
 }
 

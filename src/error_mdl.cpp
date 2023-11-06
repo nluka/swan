@@ -53,7 +53,7 @@ void swan_render_popup_modal_error() noexcept
     if (s_error_open) {
         imgui::OpenPopup(swan_id_error_popup_modal());
     }
-    if (!imgui::BeginPopupModal(swan_id_error_popup_modal(), nullptr)) {
+    if (!imgui::BeginPopupModal(swan_id_error_popup_modal(), &s_error_open)) {
         return;
     }
 
@@ -81,6 +81,7 @@ void swan_render_popup_modal_error() noexcept
     }
     imgui::PopTextWrapPos();
 
+#if 0
     imgui::Spacing();
     imgui::Spacing();
     imgui::Separator();
@@ -89,6 +90,7 @@ void swan_render_popup_modal_error() noexcept
     if (imgui::Button("OK")) {
         cleanup_and_close_popup();
     }
+#endif
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
         cleanup_and_close_popup();
