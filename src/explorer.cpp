@@ -1,5 +1,6 @@
 #include <regex>
 #include <fstream>
+#include <iostream>
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -360,8 +361,8 @@ generic_result delete_selected_entries(
 
     s32 written = 0;
     wchar_t cwd_utf16[MAX_PATH]; init_empty_cstr(cwd_utf16);
-    std::wstring delete_full_path = {};
-    delete_full_path.reserve(2048);
+    std::wstring delete_full_path_utf16 = {};
+    delete_full_path_utf16.reserve(2048);
 
     written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
     if (written == 0) {
@@ -380,19 +381,25 @@ generic_result delete_selected_entries(
             return { false, err.str() };
         }
 
-        delete_full_path = cwd_utf16;
-        if (!delete_full_path.ends_with(dir_sep_utf16)) {
-            delete_full_path += dir_sep_utf16;
+        delete_full_path_utf16 = cwd_utf16;
+        if (!delete_full_path_utf16.ends_with(dir_sep_utf16)) {
+            delete_full_path_utf16 += dir_sep_utf16;
         }
-        delete_full_path += item_utf16;
+        delete_full_path_utf16 += item_utf16;
+
+        // shlwapi doesn't like '/', force them all to '\'
+        if (get_explorer_options().unix_directory_separator) {
+            std::replace(delete_full_path_utf16.begin(), delete_full_path_utf16.end(), L'/', L'\\');
+        }
 
         IShellItem *to_delete = nullptr;
-        result = SHCreateItemFromParsingName(delete_full_path.c_str(), nullptr, IID_PPV_ARGS(&to_delete));
+        result = SHCreateItemFromParsingName(delete_full_path_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_delete));
         if (FAILED(result)) {
             debug_log("FAILED SHCreateItemFromParsingName");
             file_op->Release();
             std::stringstream err;
-            err << "SHCreateItemFromParsingName(" << item->basic.path.data() << ")";
+            err << "SHCreateItemFromParsingName [" << item->basic.path.data() << "]";
+            std::wcout << "failed: SHCreateItemFromParsingName [" << delete_full_path_utf16.c_str() << "]\n";
             return { false, err.str() };
         }
 
@@ -402,7 +409,7 @@ generic_result delete_selected_entries(
             to_delete->Release();
             file_op->Release();
             std::stringstream err;
-            err << "IFileOperation::DeleteItem(" << item->basic.path.data() << ")";
+            err << "IFileOperation::DeleteItem [" << item->basic.path.data() << "]";
             return { false, err.str() };
         } else {
             // std::wcout << "file_op->DeleteItem [" << delete_full_path.c_str() << "]\n";
@@ -2115,16 +2122,22 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
         f32 original_spacing = imgui::GetStyle().ItemSpacing.x;
 
-        for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it) {
-            // TODO: using slice_it as button id is risky
-            if (imgui::Button(*slice_it)) {
-                debug_log("[ %d ] clicked slice [%s]", expl.id, *slice_it);
-                cd_to_slice(*slice_it);
+        {
+            u64 i = 0;
+            for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it, ++i) {
+                char buffer[1024]; init_empty_cstr(buffer);
+                snprintf(buffer, lengthof(buffer), "%s##slice%zu", *slice_it, i);
+
+                if (imgui::Button(buffer)) {
+                    debug_log("[ %d ] clicked slice [%s]", expl.id, *slice_it);
+                    cd_to_slice(*slice_it);
+                }
+
+                imgui::GetStyle().ItemSpacing.x = 2;
+                imgui::SameLine();
+                imgui::Text("%c", dir_sep_utf8);
+                imgui::SameLine();
             }
-            imgui::GetStyle().ItemSpacing.x = 2;
-            imgui::SameLine();
-            imgui::Text("%c", dir_sep_utf8);
-            imgui::SameLine();
         }
 
         if (imgui::Button(slices.back())) {
@@ -2161,24 +2174,24 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
             cwd_text_input_callback, (void *)&user_data);
 
         if (user_data.edit_occurred) {
-            expl.cwd = path_squish_adjacent_separators(cwd_input);
-            path_force_separator(expl.cwd, dir_sep_utf8);
+            if (!path_loosely_same(expl.cwd, cwd_input)) {
+                expl.cwd = path_squish_adjacent_separators(cwd_input);
+                path_force_separator(expl.cwd, dir_sep_utf8);
 
-            cwd_exists_after_edit = update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+                cwd_exists_after_edit = update_cwd_entries(full_refresh, &expl, expl.cwd.data());
 
-            if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
-                if (path_is_empty(expl.latest_valid_cwd) || !path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
-                    new_history_from(expl, expl.cwd);
+                if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
+                    if (path_is_empty(expl.latest_valid_cwd) || !path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
+                        new_history_from(expl, expl.cwd);
+                    }
+                    if (!path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
+                        std::scoped_lock lock(expl.latest_valid_cwd_mutex);
+                        expl.latest_valid_cwd = expl.cwd;
+                        while (path_pop_back_if(expl.latest_valid_cwd, dir_sep_utf8));
+                    }
+                    expl.set_latest_valid_cwd_then_notify(expl.cwd);
                 }
-                if (!path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
-                    std::scoped_lock lock(expl.latest_valid_cwd_mutex);
-                    expl.latest_valid_cwd = expl.cwd;
-                    while (path_pop_back_if(expl.latest_valid_cwd, dir_sep_utf8));
-                }
-                (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
-                expl.set_latest_valid_cwd_then_notify(expl.cwd);
             }
-
             (void) expl.save_to_disk();
         }
 
@@ -2928,10 +2941,6 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                             format_file_size(right_clicked_ent->basic.size, buffer, lengthof(buffer), size_unit_multiplier);
                             imgui::SetClipboardText(buffer);
                         }
-                        if (imgui::Selectable("Rename##single_open")) {
-                            open_single_rename_popup = true;
-                            dirent_to_be_renamed = right_clicked_ent;
-                        }
                         if (imgui::Selectable("Reveal in File Explorer")) {
                             auto res = reveal_in_file_explorer(*right_clicked_ent, expl, dir_sep_utf16);
 
@@ -2941,6 +2950,18 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                                 assert(written < lengthof(action));
 
                                 swan_open_popup_modal_error(action, res.error_or_utf8_path.c_str());
+                            }
+                        }
+                        if (imgui::Selectable("Rename##single_open")) {
+                            open_single_rename_popup = true;
+                            dirent_to_be_renamed = right_clicked_ent;
+                        }
+                        if (imgui::Selectable("Delete##from_context")) {
+                            auto result = delete_selected_entries(expl, expl.cwd_entries_selected, dir_sep_utf16);
+                            if (!result.success) {
+                                std::stringstream action;
+                                action << "delete [" << right_clicked_ent->basic.path.data() << "]";
+                                swan_open_popup_modal_error(action.str().c_str(), result.error_or_utf8_path.c_str());
                             }
                         }
                     }
@@ -2954,7 +2975,12 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
                         }
                         if (imgui::Selectable("Delete")) {
-                            delete_selected_entries(expl, expl.cwd_entries_selected, dir_sep_utf16);
+                            auto result = delete_selected_entries(expl, expl.cwd_entries_selected, dir_sep_utf16);
+                            if (!result.success) {
+                                std::stringstream action;
+                                action << "delete " << num_selected_dirents << " entries from [" << expl.cwd.data() << "]";
+                                swan_open_popup_modal_error(action.str().c_str(), result.error_or_utf8_path.c_str());
+                            }
                         }
                         if (imgui::Selectable("Bulk Rename")) {
                             open_bulk_rename_popup = true;
