@@ -1,9 +1,12 @@
 #pragma once
 
-#include <array>
-#include <chrono>
+#include "stdafx.hpp"
 
-#include "primitives.hpp"
+#if !defined(NDEBUG)
+#define WCOUT_IF_DEBUG(x) std::wcout << x
+#else
+#define WCOUT_IF_DEBUG(x) do {} while(0)
+#endif
 
 // Returns the size of a static C-style array at compile time.
 template <typename ElemTy, u64 Length>
@@ -77,3 +80,5 @@ wchar_t const *windows_illegal_path_chars() noexcept;
 
 void init_empty_cstr(char *s) noexcept;
 void init_empty_cstr(wchar_t *s) noexcept;
+
+bool set_thread_priority(s32 priority_relative_to_normal) noexcept;

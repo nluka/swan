@@ -1,10 +1,9 @@
 #pragma once
 
-#include <source_location>
-
-#include "common.hpp"
-
 #include "imgui/imgui.h"
+
+#include "stdafx.hpp"
+#include "common.hpp"
 
 ImVec4 orange() noexcept;
 ImVec4 red() noexcept;
@@ -26,34 +25,19 @@ struct imgui_scoped_avail_width
         f32 avail_width = ImGui::GetContentRegionAvail().x;
         ImGui::PushItemWidth(max(avail_width - subtract_amt, 0.f));
     }
-    ~imgui_scoped_avail_width() noexcept
-    {
-        ImGui::PopItemWidth();
-    }
+    ~imgui_scoped_avail_width() noexcept { ImGui::PopItemWidth(); }
 };
 
 struct imgui_scoped_disabled
 {
-    imgui_scoped_disabled(bool disabled) noexcept
-    {
-        ImGui::BeginDisabled(disabled);
-    }
-    ~imgui_scoped_disabled() noexcept
-    {
-        ImGui::EndDisabled();
-    }
+    imgui_scoped_disabled(bool disabled) noexcept { ImGui::BeginDisabled(disabled); }
+    ~imgui_scoped_disabled()             noexcept { ImGui::EndDisabled(); }
 };
 
 struct imgui_scoped_text_color
 {
-    imgui_scoped_text_color(ImVec4 const &color) noexcept
-    {
-        ImGui::PushStyleColor(ImGuiCol_Text, color);
-    }
-    ~imgui_scoped_text_color() noexcept
-    {
-        ImGui::PopStyleColor();
-    }
+    imgui_scoped_text_color(ImVec4 const &color) noexcept { ImGui::PushStyleColor(ImGuiCol_Text, color); }
+    ~imgui_scoped_text_color()                   noexcept { ImGui::PopStyleColor(); }
 };
 
 struct debug_log_package
@@ -85,7 +69,7 @@ void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&.
     }
 
     f64 current_time = ImGui::GetTime();
-    u64 const max_size = 1024 * 1024 * 10;
+    u64 const max_size = 1024 * 1024 * 50;
     char const *just_the_file_name = cget_file_name(pack.loc.file_name());
     s32 thread_id = GetCurrentThreadId();
 

@@ -1,5 +1,4 @@
-#include <fstream>
-
+#include "stdafx.hpp"
 #include "common.hpp"
 #include "imgui_specific.hpp"
 

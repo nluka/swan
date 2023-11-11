@@ -1,22 +1,13 @@
-#include <regex>
-#include <fstream>
-#include <iostream>
-
-#include <windows.h>
-#include <shlwapi.h>
-#include <shlobj_core.h>
-#include <shobjidl_core.h>
-#include <pathcch.h>
 
 #include "imgui/imgui.h"
+#include "libs/thread_pool.hpp"
 
+#include "stdafx.hpp"
 #include "common.hpp"
 #include "imgui_specific.hpp"
 #include "path.hpp"
-#include "on_scope_exit.hpp"
 #include "scoped_timer.hpp"
 #include "util.hpp"
-#include "thread_pool.hpp"
 
 namespace imgui = ImGui;
 
@@ -107,7 +98,6 @@ bool explorer_options::save_to_disk() const noexcept
         static_assert(s8(0) == s8(false));
 
         out << "auto_refresh_interval_ms " << this->auto_refresh_interval_ms << '\n';
-        out << "adaptive_refresh_threshold " << this->adaptive_refresh_threshold << '\n';
         out << "ref_mode " << (s32)this->ref_mode << '\n';
         out << "binary_size_system " << (s32)this->binary_size_system << '\n';
         out << "show_cwd_len " << (s32)this->show_cwd_len << '\n';
@@ -141,11 +131,6 @@ bool explorer_options::load_from_disk() noexcept
             in >> what;
             assert(what == "auto_refresh_interval_ms");
             in >> (s32 &)this->auto_refresh_interval_ms;
-        }
-        {
-            in >> what;
-            assert(what == "adaptive_refresh_threshold");
-            in >> (s32 &)this->adaptive_refresh_threshold;
         }
         {
             in >> what;
@@ -270,8 +255,6 @@ void explorer_window::deselect_all_cwd_entries() noexcept
     }
 
     this->cwd_entries_selected.clear();
-
-    // num_selected_cwd_entries = 0;
 }
 
 void explorer_window::select_all_cwd_entries(bool select_dotdot_dir) noexcept
@@ -284,8 +267,6 @@ void explorer_window::select_all_cwd_entries(bool select_dotdot_dir) noexcept
             this->cwd_entries_selected.push_back(&dirent);
         }
     }
-
-    // num_selected_cwd_entries = this->cwd_entries.size();
 }
 
 void explorer_window::set_latest_valid_cwd_then_notify(swan_path_t const &new_val) noexcept
@@ -300,12 +281,12 @@ void explorer_window::set_latest_valid_cwd_then_notify(swan_path_t const &new_va
 static
 std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
 {
-    std::array<char, 64> buffer = {};
+    std::array<char, 64> buffer;
     DWORD flags = FDTF_SHORTDATE | FDTF_SHORTTIME;
     s32 length = SHFormatDateTimeA(time, &flags, buffer.data(), (u32)buffer.size());
 
     // for some reason, SHFormatDateTimeA will pad parts of the string with ASCII 63 (?)
-    // when using LONGDATE or LONGTIME, so we will simply convert them to spaces
+    // when using LONGDATE or LONGTIME, so we will simply replace them with spaces
     std::replace(buffer.begin(), buffer.end(), '?', ' ');
 
     return { length, buffer };
@@ -399,7 +380,7 @@ generic_result delete_selected_entries(
             file_op->Release();
             std::stringstream err;
             err << "SHCreateItemFromParsingName [" << item->basic.path.data() << "]";
-            std::wcout << "failed: SHCreateItemFromParsingName [" << delete_full_path_utf16.c_str() << "]\n";
+            WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << delete_full_path_utf16.c_str() << "]\n");
             return { false, err.str() };
         }
 
@@ -410,9 +391,10 @@ generic_result delete_selected_entries(
             file_op->Release();
             std::stringstream err;
             err << "IFileOperation::DeleteItem [" << item->basic.path.data() << "]";
+            WCOUT_IF_DEBUG("FAILED: IFileOperation::DeleteItem [" << delete_full_path_utf16.c_str() << "]\n");
             return { false, err.str() };
         } else {
-            // std::wcout << "file_op->DeleteItem [" << delete_full_path.c_str() << "]\n";
+            WCOUT_IF_DEBUG("file_op->DeleteItem [" << delete_full_path_utf16.c_str() << "]\n");
             to_delete->Release();
         }
     }
@@ -454,18 +436,14 @@ generic_result delete_selected_entries(
         CoUninitialize();
     };
 
-    // get_thread_pool().push_task(file_operation_task, file_op);
-    file_operation_task(file_op);
+#if 1
+    // TODO:
+    get_thread_pool().push_task(file_operation_task, file_op);
+#else
+    // file_operation_task(file_op);
+#endif
 
     return { true, "" };
-
-    // if (FAILED(result)) {
-    //     debug_log("FAILED IFileOperation::PerformOperations on %zu items", selection.size());
-    //     return { false, "IFileOperation::PerformOperations" };
-    // } else {
-    //     debug_log("SUCCESS deleted %zu items", selection.size());
-    //     return { true, "" };
-    // }
 }
 
 generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, explorer_window const &expl, wchar_t dir_sep_utf16) noexcept
@@ -501,7 +479,7 @@ generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, exp
     select_command += select_path_dirent_buffer_utf16;
     select_command += L'"';
 
-    // std::wcout << "select_command: [" << select_command.c_str() << "]\n";
+    WCOUT_IF_DEBUG("select_command: [" << select_command.c_str() << "]\n");
 
     HINSTANCE result = ShellExecuteW(nullptr, L"open", L"explorer.exe", select_command.c_str(), nullptr, SW_SHOWNORMAL);
 
@@ -583,7 +561,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
         return { false, "conversion of symlink path from UTF-8 to UTF-16" };
     } else {
         debug_log("[ %d ] utf8_to_utf16 wrote %d characters", expl.id, utf_written);
-        // std::wcout << "symlink_self_path_utf16 = [" << symlink_self_path_utf16 << "]\n";
+        WCOUT_IF_DEBUG("symlink_self_path_utf16 = [" << symlink_self_path_utf16 << "]\n");
     }
 
     com_handle = s_persist_file_interface->Load(symlink_self_path_utf16, STGM_READ);
@@ -592,7 +570,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
         debug_log("[ %d ] s_persist_file_interface->Load [%s] failed: %s", expl.id, symlink_self_path_utf8, get_last_error_string().c_str());
         return { false, "conversion of symlink path from UTF-8 to UTF-16" };
     } else {
-        // std::wcout << "s_persist_file_interface->Load [" << symlink_self_path_utf16 << "]\n";
+        WCOUT_IF_DEBUG("s_persist_file_interface->Load [" << symlink_self_path_utf16 << "]\n");
     }
 
     com_handle = s_shell_link->GetIDList(&item_id_list);
@@ -608,7 +586,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
         debug_log("[ %d ] SHGetPathFromIDListW failed: %s", expl.id, err.c_str());
         return { false, err + " (SHGetPathFromIDListW)" };
     } else {
-        // std::wcout << "symlink_target_path_utf16 = [" << symlink_target_path_utf16 << "]\n";
+        WCOUT_IF_DEBUG("symlink_target_path_utf16 = [" << symlink_target_path_utf16 << "]\n");
     }
 
     if (com_handle != S_OK) {
@@ -641,7 +619,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
             debug_log("[ %d ] s_shell_link->GetWorkingDirectory failed: %s", expl.id, err.c_str());
             return { false, err + " (IShellLinkW::GetWorkingDirectory)" };
         } else {
-            // std::wcout << "s_shell_link->GetWorkingDirectory [" << working_dir_utf16 << "]\n";
+            WCOUT_IF_DEBUG("s_shell_link->GetWorkingDirectory [" << working_dir_utf16 << "]\n");
         }
 
         com_handle = s_shell_link->GetArguments(command_line_utf16, lengthof(command_line_utf16));
@@ -651,7 +629,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
             debug_log("[ %d ] s_shell_link->GetArguments failed: %s", expl.id, err.c_str());
             return { false, err + " (IShellLinkW::GetArguments)" };
         } else {
-            // std::wcout << "s_shell_link->GetArguments [" << command_line_utf16 << "]\n";
+            WCOUT_IF_DEBUG("s_shell_link->GetArguments [" << command_line_utf16 << "]\n");
         }
 
         com_handle = s_shell_link->GetShowCmd(&show_command);
@@ -661,7 +639,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
             debug_log("[ %d ] s_shell_link->GetShowCmd failed: %s", expl.id, err.c_str());
             return { false, err + " (IShellLinkW::GetShowCmd)" };
         } else {
-            // std::wcout << "s_shell_link->GetShowCmd [" << show_command << "]\n";
+            WCOUT_IF_DEBUG("s_shell_link->GetShowCmd [" << show_command << "]\n");
         }
 
         HINSTANCE result = ShellExecuteW(nullptr, L"open", symlink_target_path_utf16,
@@ -714,9 +692,8 @@ void sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::so
 
     using dir_ent_t = explorer_window::dirent;
 
-    // start with a preliminary sort by path.
-    // this ensures no matter the initial state, the final state is always same (deterministic).
-    // necessary for avoiding unexpected rearrangement post refresh (especially unsightly with auto refresh).
+    // start with a preliminary sort to ensure deterministic behaviour regardless of initial state.
+    // necessary or else auto refresh can cause unexpected reordering of directory entries.
     std::sort(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const &left, dir_ent_t const &right) {
         // return lstrcmpiA(left.basic.path.data(), right.basic.path.data()) < 0;
         return left.basic.id < right.basic.id;
@@ -772,6 +749,7 @@ void sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::so
                     }
                     break;
                 }
+                // TODO: reintroduce column
                 // case cwd_entries_table_col_creation_time: {
                 //     s32 cmp = CompareFileTime(&left.creation_time_raw, &right.creation_time_raw);
                 //     left_lt_right = (cmp <= 0) == direction_flipper;
@@ -797,7 +775,7 @@ bool update_cwd_entries(
     std::string_view parent_dir,
     std::source_location sloc) noexcept
 {
-    debug_log("[ %d ] update_cwd_entries() called from [%s:%d]", expl_ptr->id, cget_file_name(sloc.file_name()), sloc.line());
+    debug_log("[ %d ] update_cwd_entries(%d) called from [%s:%d]", expl_ptr->id, actions, cget_file_name(sloc.file_name()), sloc.line());
 
     IM_ASSERT(expl_ptr != nullptr);
 
@@ -830,8 +808,6 @@ bool update_cwd_entries(
         std::fill(expl.cwd_entries_selected.begin(), expl.cwd_entries_selected.end(), nullptr);
         std::fill(expl.cwd_entries_passing_filter.begin(), expl.cwd_entries_passing_filter.end(), nullptr);
 
-        // this seems inefficient but was measured to be faster than the "efficient" way,
-        // or maybe both are so fast that it doesn't matter...
         while (parent_dir.ends_with(' ')) {
             parent_dir = std::string_view(parent_dir.data(), parent_dir.size() - 1);
         }
@@ -1508,49 +1484,28 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
     // refresh logic start
     {
-        bool refreshed = false; // to avoid refreshing twice in one frame
-
         auto refresh = [&](std::source_location sloc = std::source_location::current()) {
-            if (!refreshed) {
-                cwd_exists_before_edit = update_cwd_entries(full_refresh, &expl, expl.cwd.data(), sloc);
-                cwd_exists_after_edit = cwd_exists_before_edit;
-                refreshed = true;
-            }
+            cwd_exists_before_edit = update_cwd_entries(full_refresh, &expl, expl.cwd.data(), sloc);
+            cwd_exists_after_edit = cwd_exists_before_edit;
         };
 
         if (any_window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
             debug_log("[ %d ] Ctrl-R, refresh triggered", expl.id);
             refresh();
         }
-
-    #if 1
-        if (cwd_exists_before_edit) {
+        else if (cwd_exists_before_edit) {
             time_point_t now = current_time();
             s64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
             s32 min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
 
             if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms.load())) {
-                auto refresh_notif_time = expl.refresh_notif_time.load();
+                auto refresh_notif_time = expl.refresh_notif_time.load(std::memory_order::seq_cst);
                 if (expl.last_refresh_time.time_since_epoch().count() < refresh_notif_time.time_since_epoch().count()) {
                     debug_log("[ %d ] refresh notif RECV", expl.id);
                     refresh();
                 }
             }
         }
-    #else
-        if (cwd_exists_before_edit) {
-            // see if it's time for an automatic refresh
-
-            time_point_t now = current_time();
-            s64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
-
-
-            if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms.load())) {
-                debug_log("[ %d ] auto refresh, diff_ms = %lld", expl.id, diff_ms);
-                refresh();
-            }
-        }
-    #endif
     }
     // refresh logic end
 
@@ -1560,19 +1515,40 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
     if (opts.show_debug_info) {
         imgui::Text("latest_valid_cwd = [%s]", expl.latest_valid_cwd.data());
 
+    #if 1
+        {
+            u64 bytes_occupied = expl.cwd_entries.size() * sizeof(swan_path_t);
+            u64 bytes_actually_used = 0;
+
+            for (auto const &dirent : expl.cwd_entries) {
+                bytes_actually_used += path_length(dirent.basic.path);
+            }
+
+            char buffer1[32]; init_empty_cstr(buffer1);
+            format_file_size(bytes_occupied, buffer1, lengthof(buffer1), size_unit_multiplier);
+
+            f64 usage_ratio = f64(bytes_actually_used) / f64(bytes_occupied);
+            f64 waste_percent = 100.0 - (usage_ratio * 100.0);
+            u64 bytes_wasted = u64( bytes_occupied * (1.0 - usage_ratio) );
+
+            char buffer2[32]; init_empty_cstr(buffer2);
+            format_file_size(bytes_wasted, buffer2, lengthof(buffer1), size_unit_multiplier);
+
+            imgui::Text("swan_path_t memory footprint = %s / %3.1lf %% waste -> %s", buffer1, waste_percent, buffer2);
+        }
+    #endif
+
         if (imgui::BeginTable("explorer_timers", 3, ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_Resizable)) {
             imgui::TableNextColumn();
             imgui::SeparatorText("misc. state");
             imgui::TextUnformatted("num_file_finds");
             imgui::TextUnformatted("cwd_prev_selected_dirent_idx");
-            // imgui::TextUnformatted("num_selected_cwd_entries");
             imgui::TextUnformatted("latest_save_to_disk_result");
 
             imgui::TableNextColumn();
             imgui::SeparatorText("");
             imgui::Text("%zu", expl.num_file_finds);
             imgui::Text("%lld", expl.cwd_prev_selected_dirent_idx);
-            // imgui::Text("%zu", expl.num_selected_cwd_entries);
             imgui::Text("%d", expl.latest_save_to_disk_result);
 
             imgui::TableNextColumn();
@@ -1943,7 +1919,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
             }
             create_path += dir_name_utf16;
 
-            // std::wcout << "CreateDirectoryW [" << create_path << "]\n";
+            WCOUT_IF_DEBUG("CreateDirectoryW [" << create_path << "]\n");
             result = CreateDirectoryW(create_path.c_str(), nullptr);
 
             if (result == 0) {
@@ -2037,7 +2013,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
             }
             create_path += file_name_utf16;
 
-            // std::wcout << "CreateFileW [" << create_path << "]\n";
+            WCOUT_IF_DEBUG("CreateFileW [" << create_path << "]\n");
             result = CreateFileW(
                 create_path.c_str(),
                 GENERIC_READ | GENERIC_WRITE,
@@ -2427,13 +2403,12 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
         static time_point_t last_refresh_time = {};
         static drive_list_t drives = {};
 
-        // refresh drives once per second
+        // refresh drives occasionally
         {
             time_point_t now = current_time();
             s64 diff_ms = compute_diff_ms(last_refresh_time, now);
             if (diff_ms >= 1000) {
                 drives = query_drive_list();
-                // debug_log("[ %d ] refresh drives, diff = %lld ms", expl.id, diff_ms);
                 last_refresh_time = current_time();
             }
         }
@@ -2567,7 +2542,6 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
         u64 num_filtered_dirents = num_filtered_directories + num_filtered_symlinks + num_filtered_files;
         u64 num_selected_dirents = num_selected_directories + num_selected_symlinks + num_selected_files;
-        // expl.num_selected_cwd_entries = num_selected_dirents;
 
         if (expl.filter_error != "") {
             imgui::PushTextWrapPos(imgui::GetColumnWidth());
@@ -2857,7 +2831,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
                             imgui::PopStyleColor();
 
-                        } // path col
+                        } // path column
 
                         if (imgui::TableSetColumnIndex(cwd_entries_table_col_type)) {
                             if (dirent.basic.is_directory()) {
@@ -2891,6 +2865,7 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
                             }
                         }
 
+                        // TODO: reintroduce column
                         // if (imgui::TableSetColumnIndex(cwd_entries_table_col_creation_time)) {
                         //     auto [result, buffer] = filetime_to_string(&dirent.last_write_time_raw);
                         //     imgui::TextUnformatted(buffer.data());
@@ -2992,17 +2967,11 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
                 imgui::EndTable();
             }
-            // if (any_window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_A)) {
             if (ImGui::IsItemHovered() && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_A)) {
-                // s32 focus_id = imgui::GetFocusID();
-                // s32 cwd_id = imgui::GetID("##cwd");
-                // s32 filter_id = imgui::GetID("##filter");
-                // debug_log("[ %d ] focus=%d cwd=%d filter=%d", expl.id, focus_id, cwd_id, filter_id);
                 for (auto const &dirent : expl.cwd_entries_passing_filter) {
                     dirent->is_selected = true;
                 }
             }
-            // if (any_window_focused && imgui::IsKeyPressed(ImGuiKey_Escape)) {
             if (ImGui::IsItemHovered() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
                 expl.deselect_all_cwd_entries();
             }
@@ -3030,6 +2999,8 @@ void swan_render_window_explorer(explorer_window &expl) noexcept
 
 void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> const &window_close_flag) noexcept
 {
+    // (void) set_thread_priority(THREAD_PRIORITY_BELOW_NORMAL);
+
     DWORD const notify_filter =
         FILE_NOTIFY_CHANGE_CREATION   |
         FILE_NOTIFY_CHANGE_DIR_NAME   |
@@ -3041,6 +3012,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
     HANDLE watch_handle = {};
     wchar_t watch_target_utf16[2048] = {};
     swan_path_t watch_target_utf8 = {};
+    time_point_t last_refresh_notif_sent = {};
 
     {
         std::scoped_lock lock(expl.latest_valid_cwd_mutex);
@@ -3098,11 +3070,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
             // latest_valid_cwd is invalid for some reason, wait for it to change.
             // during this time window visibility can change, but it doesn't matter.
             std::unique_lock lock(expl.latest_valid_cwd_mutex);
-
             expl.latest_valid_cwd_cond.wait(lock, []() { return true; });
-
-            // auto const latest_valid_cwd = expl.latest_valid_cwd;
-            // expl.latest_valid_cwd_cond.wait(lock, [&]() { return !path_loosely_same(latest_valid_cwd, expl.latest_valid_cwd); });
         }
         else {
             // latest_valid_cwd is in fact a valid directory, so sit here and wait for a change notification.
@@ -3125,10 +3093,17 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
                         debug_log("[ %d ] WAIT_OBJECT_0 h=%d target=[%s]", expl.id, watch_handle, watch_target_utf8.data());
 
                         if (expl.is_window_visible.load()) {
-                            debug_log("[ %d ] refresh notif SEND", expl.id);
-                            expl.refresh_notif_time.store(current_time());
-                            if (!FindNextChangeNotification(watch_handle)) {
-                                debug_log("[ %d ] FindNextChangeNotification failed", expl.id);
+                            time_point_t now = current_time();
+
+                            if (compute_diff_ms(last_refresh_notif_sent, now) >= get_explorer_options().min_tolerable_refresh_interval_ms) {
+                                debug_log("[ %d ] refresh notif SEND", expl.id);
+
+                                expl.refresh_notif_time.store(now, std::memory_order::seq_cst);
+                                last_refresh_notif_sent = now;
+
+                                if (!FindNextChangeNotification(watch_handle)) {
+                                    debug_log("[ %d ] FindNextChangeNotification failed", expl.id);
+                                }
                             }
                         }
 

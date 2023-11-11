@@ -1,15 +1,9 @@
-#include <assert.h>
-#include <mutex>
-
-#include <shlwapi.h>
-
 #include "imgui/imgui.h"
+#include "libs/thread_pool.hpp"
 
-#include "thread_pool.hpp"
 #include "common.hpp"
 #include "imgui_specific.hpp"
 #include "path.hpp"
-#include "on_scope_exit.hpp"
 
 static s32 s_page_size = 0;
 s32 get_page_size() noexcept { return s_page_size <= 0 ? 4096 : s_page_size; }

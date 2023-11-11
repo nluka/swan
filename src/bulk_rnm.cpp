@@ -1,25 +1,17 @@
-#include <assert.h>
-#include <ostream>
-
-#include <shlwapi.h>
-
 #include "common.hpp"
 #include "path.hpp"
 
-// for ntest
-bool bulk_rename_op::operator!=(bulk_rename_op const &other) const noexcept
+bool bulk_rename_op::operator!=(bulk_rename_op const &other) const noexcept // for ntest
 {
     return this->before != other.before || !path_equals_exactly(this->after, other.after);
 }
 
-// for ntest
-std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r)
+std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r) // for ntest
 {
     return os << "B:[" << (r.before ? r.before->path.data() : "nullptr") << "] A:[" << r.after.data() << ']';
 }
 
-// for ntest
-bool bulk_rename_collision::operator!=(bulk_rename_collision const &other) const noexcept
+bool bulk_rename_collision::operator!=(bulk_rename_collision const &other) const noexcept // for ntest
 {
     return
         this->first_rename_pair_idx != other.first_rename_pair_idx ||
@@ -27,21 +19,18 @@ bool bulk_rename_collision::operator!=(bulk_rename_collision const &other) const
         this->dest_dirent != other.dest_dirent;
 }
 
-// for ntest
-std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c)
+std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c) // for ntest
 {
     return os << "D:[" << (c.dest_dirent ? c.dest_dirent->path.data() : "")
                 << "] [" << c.first_rename_pair_idx << ',' << c.last_rename_pair_idx << ']';
 }
 
-// for ntest
-bool bulk_rename_compiled_pattern::op::operator!=(bulk_rename_compiled_pattern::op const &other) const noexcept
+bool bulk_rename_compiled_pattern::op::operator!=(bulk_rename_compiled_pattern::op const &other) const noexcept // for ntest
 {
     return this->kind != other.kind || this->ch != other.ch;
 }
 
-// for ntest
-std::ostream& operator<<(std::ostream &os, bulk_rename_compiled_pattern::op const &op)
+std::ostream& operator<<(std::ostream &os, bulk_rename_compiled_pattern::op const &op) // for ntest
 {
     using op_type = bulk_rename_compiled_pattern::op::type;
 

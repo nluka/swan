@@ -1,19 +1,9 @@
-#define NO_GUI
+#include "stdafx.hpp"
 
-#include <iostream>
-#include <cstring>
-
-#include <boost/stacktrace.hpp>
-
-#include <shlwapi.h>
-
-#include "term.hpp"
-#include "term.cpp"
-
-#include "ntest.hpp"
-#include "ntest.cpp"
-
-#include "primitives.hpp"
+#include "libs/term.hpp"
+#include "libs/term.cpp"
+#include "libs/ntest.hpp"
+#include "libs/ntest.cpp"
 
 #include "path.hpp"
 #include "path.cpp"
@@ -318,6 +308,13 @@ try
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
+    {
+      swan_path_t p1 = path_create("C:/code///");
+      swan_path_t p2 = path_create("C:/Code//");
+      ntest::assert_bool(true, path_loosely_same(p1, p2));
+      ntest::assert_bool(true, path_loosely_same(p2, p1));
+    }
+
     {
       swan_path_t p1 = path_create("C:/code///");
       swan_path_t p2 = path_create("C:/cod");

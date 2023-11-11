@@ -1,3 +1,2 @@
-cls; cd C:\code\swan\
-cls; .\compile_tests_debug; .\bin\swan_tests_debug.exe
-cls; .\compile_debug; .\bin\swan_debug.exe
+cls && cd C:/code/swan/ && ptime.exe .\compile_debug && .\bin\swan_debug.exe
+cls && cd C:/code/swan/ && ptime.exe .\compile_tests_debug && .\bin\swan_tests_debug.exe

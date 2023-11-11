@@ -1,4 +1,5 @@
 #include "imgui/imgui.h"
+
 #include "common.hpp"
 #include "imgui_specific.hpp"
 #include "scoped_timer.hpp"
@@ -71,8 +72,6 @@ void swan_render_popup_modal_bulk_rename() noexcept
     static std::atomic<u64> num_renames_fail(0);
     static std::atomic<u64> num_renames_total = 0;
 
-    static bool any_directories_selected = false;
-    static bool any_files_selected = false;
     static bool initial_computed = false;
     static bulk_rename_compile_pattern_result pattern_compile_res = {};
     static std::vector<bulk_rename_op> renames = {};
@@ -86,8 +85,6 @@ void swan_render_popup_modal_bulk_rename() noexcept
         num_renames_fail.store(0);
         num_renames_total.store(0);
         initial_computed = false;
-        any_directories_selected = false;
-        any_files_selected = false;
         pattern_compile_res = {};
         renames.clear();
         collisions.clear();
@@ -170,9 +167,6 @@ void swan_render_popup_modal_bulk_rename() noexcept
                     file_name_ext name_ext(dirent.basic.path.data());
                     swan_path_t after;
 
-                    any_directories_selected = dirent.basic.is_directory();
-                    any_files_selected       = dirent.basic.is_file();
-
                     auto transform = bulk_rename_transform(pattern_compile_res.compiled_pattern, after, name_ext.name,
                                                            name_ext.ext, counter, dirent.basic.size);
 
@@ -190,21 +184,6 @@ void swan_render_popup_modal_bulk_rename() noexcept
                 collisions = bulk_rename_find_collisions(expl.cwd_entries, renames);
             }
         }
-
-        // if (!initial_computed) {
-        //     if (any_directories_selected && any_files_selected) {
-        //         strncpy(pattern_utf8, "<name><dotext>", lengthof(pattern_utf8));
-        //     }
-        //     else if (any_directories_selected && !any_files_selected) {
-        //         strncpy(pattern_utf8, "<name>", lengthof(pattern_utf8));
-        //     }
-        //     else if (!any_directories_selected && any_files_selected) {
-        //         strncpy(pattern_utf8, "<name>.<ext>", lengthof(pattern_utf8));
-        //     }
-        //     else {
-        //         pattern_utf8[0] = '\0';
-        //     }
-        // }
 
         initial_computed = true;
     }
@@ -384,13 +363,18 @@ void swan_render_popup_modal_bulk_rename() noexcept
                     if (rename_state.load() == bulk_rename_state::cancelled) {
                         return;
                     }
-                    // if (chance(1/100.f)) {
-                    //     ++num_renames_fail;
-                    //     continue;
-                    // }
-                    // if (i == 1) {
-                    //     throw "test";
-                    // }
+
+                #if 0
+                    if (chance(1/100.f)) {
+                        ++num_renames_fail;
+                        continue;
+                    }
+                #endif
+                #if 0
+                    if (i == 1) {
+                        throw "test";
+                    }
+                #endif
 
                     auto const &rename = rename_ops[i];
 
@@ -436,9 +420,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
                     }
                     after_path_utf16 += buffer_after_utf16;
 
-                #if !defined(NDEBUG)
-                    // std::wcout << "[" << before_path_utf16.c_str() << "] -> [" << after_path_utf16.c_str() << "]\n";
-                #endif
+                    WCOUT_IF_DEBUG("[" << before_path_utf16.c_str() << "] -> [" << after_path_utf16.c_str() << "]\n");
                     s32 result = _wrename(before_path_utf16.c_str(), after_path_utf16.c_str());
 
                     if (result == 0) {

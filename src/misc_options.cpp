@@ -1,6 +1,4 @@
-#include <fstream>
-#include <assert.h>
-
+#include "stdafx.hpp"
 #include "common.hpp"
 
 bool misc_options::save_to_disk() const noexcept

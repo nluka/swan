@@ -1,3 +1,7 @@
+cls;
+
+cd C:/code/swan/;
+
 @call cl.exe ^
 src/imgui/imgui.cpp ^
 src/imgui/imgui_demo.cpp ^
@@ -6,6 +10,7 @@ src/imgui/imgui_tables.cpp ^
 src/imgui/imgui_widgets.cpp ^
 src/imgui/imgui_impl_glfw.cpp ^
 src/imgui/imgui_impl_opengl3.cpp ^
+src/stbi_image.cpp ^
 /nologo ^
 /std:c++20 ^
 /W4 ^
@@ -15,5 +20,3 @@ src/imgui/imgui_impl_opengl3.cpp ^
 /Fo:obj_debug\ ^
 /c ^
 /I"C:/code/glfw"
-
-@REM @call cl.exe /Yc"src/imgui/imgui.cpp" /Fp"src/imgui/precompiled/imgui.pch" "src/imgui/imgui.cpp"

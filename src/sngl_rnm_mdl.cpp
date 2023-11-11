@@ -1,4 +1,5 @@
 #include "imgui/imgui.h"
+
 #include "common.hpp"
 #include "imgui_specific.hpp"
 
@@ -81,8 +82,7 @@ void swan_render_popup_modal_single_rename() noexcept
         new_name_utf8 = s_single_rename_entry_to_be_renamed->basic.path;
     }
     {
-        f32 avail_width = imgui::GetContentRegionAvail().x;
-        imgui::PushItemWidth(avail_width);
+        [[maybe_unused]] imgui_scoped_avail_width width = {};
 
         if (imgui::InputTextWithHint(
             "##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(),
@@ -90,8 +90,6 @@ void swan_render_popup_modal_single_rename() noexcept
         ) {
             err_msg.clear();
         }
-
-        imgui::PopItemWidth();
     }
 
     imgui::Spacing();

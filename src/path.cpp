@@ -1,12 +1,8 @@
-#include <cstring>
-#include <cassert>
+#include "stdafx.hpp"
+#include "path.hpp"
 
-#include <windows.h>
-#include <shlwapi.h>
 #undef min
 #undef max
-
-#include "path.hpp"
 
 swan_path_t path_create(char const *data) noexcept
 {
