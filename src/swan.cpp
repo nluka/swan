@@ -1,28 +1,7 @@
-#include <iostream>
-
-#include <boost/stacktrace.hpp>
-
-#pragma warning(push)
-#pragma warning(disable: 4244)
-// #pragma warning(disable: 4459)
-#define STB_IMAGE_IMPLEMENTATION
-#include "stbi_image.h"
-#pragma warning(pop)
-
-#define IMGUI_DEFINE_MATH_OPERATORS 1
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_opengl3.h"
-#include "imgui/font_awesome.h"
-#include "imgui/material_design.h"
-
+#include "stdafx.hpp"
 #include "common.hpp"
 #include "imgui_specific.hpp"
-#include "on_scope_exit.hpp"
 #include "util.hpp"
-
-#define GL_SILENCE_DEPRECATION
-#include <glfw3.h> // Will drag system OpenGL headers
 
 namespace imgui = ImGui;
 
@@ -233,8 +212,7 @@ try
     if (!expl_opts.load_from_disk()) {
         debug_log("explorer_options::load_from_disk failed, setting defaults");
         expl_opts.auto_refresh_interval_ms = 1000;
-        expl_opts.adaptive_refresh_threshold = 1000;
-        expl_opts.ref_mode = explorer_options::refresh_mode::adaptive;
+        expl_opts.ref_mode = explorer_options::refresh_mode::automatic;
         expl_opts.show_dotdot_dir = true;
     #if !defined(NDEBUG)
         expl_opts.show_debug_info = true;
@@ -308,6 +286,8 @@ try
     std::jthread expl_change_notif_thread_1([&]() { explorer_change_notif_thread_func(explorers[1], window_close_flag); });
     std::jthread expl_change_notif_thread_2([&]() { explorer_change_notif_thread_func(explorers[2], window_close_flag); });
     std::jthread expl_change_notif_thread_3([&]() { explorer_change_notif_thread_func(explorers[3], window_close_flag); });
+
+    // (void) set_thread_priority(THREAD_PRIORITY_HIGHEST);
 
     debug_log("Entering render loop...");
 
@@ -405,9 +385,8 @@ try
 
                     if (imgui::BeginMenu("Refreshing")) {
                         char const *refresh_modes[] = {
-                            "Adaptive",
-                            "Manual",
                             "Automatic",
+                            "Manual",
                         };
 
                         static_assert(lengthof(refresh_modes) == (u64)explorer_options::refresh_mode::count);
@@ -415,12 +394,7 @@ try
                         imgui::SeparatorText("Mode");
                         change_made |= imgui::Combo("##refresh_mode", (s32 *)&expl_opts.ref_mode, refresh_modes, lengthof(refresh_modes));
 
-                        if (expl_opts.ref_mode == explorer_options::refresh_mode::adaptive) {
-                            imgui::SeparatorText("Threshold (# items)");
-                            change_made |= imgui::InputInt("##adaptive_refresh_threshold", &expl_opts.adaptive_refresh_threshold, 100, 1000);
-                        }
-
-                        if (expl_opts.ref_mode != explorer_options::refresh_mode::manual) {
+                        if (expl_opts.ref_mode == explorer_options::refresh_mode::automatic) {
                             imgui::SeparatorText("Interval (ms)");
                             static s32 refresh_itv = expl_opts.auto_refresh_interval_ms.load();
                             bool new_refresh_itv = imgui::InputInt("##auto_refresh_interval_ms", &refresh_itv, 100, 500);

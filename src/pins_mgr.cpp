@@ -1,8 +1,4 @@
-#include <fstream>
-#include <sstream>
-
-#include "imgui/font_awesome.h"
-
+#include "stdafx.hpp"
 #include "common.hpp"
 #include "imgui_specific.hpp"
 #include "util.hpp"

@@ -7,10 +7,13 @@ obj_debug/imgui_impl_opengl3.obj ^
 obj_debug/imgui_tables.obj ^
 obj_debug/imgui_widgets.obj ^
 obj_debug/imgui.obj ^
+obj_debug/stbi_image.obj ^
+obj_debug/stdafx.obj ^
 resource/.res ^
 /Fo:obj_debug\ ^
 /Fe:bin\swan_debug.exe ^
 /Fd:bin\vc140_debug.pdb ^
+/Yustdafx.hpp ^
 /I"C:/code/glfw" ^
 /I"C:/code/boost_1_80_0" ^
 /std:c++20 ^

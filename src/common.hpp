@@ -1,19 +1,10 @@
 #pragma once
 
-#include <vector>
-#include <string>
-#include <atomic>
-#include <string_view>
-
-#include <boost/container/static_vector.hpp>
-#include <boost/static_string.hpp>
-#include <boost/circular_buffer.hpp>
-
 #include "imgui/imgui.h"
+#include "libs/thread_pool.hpp"
 
-#include "primitives.hpp"
+#include "stdafx.hpp"
 #include "path.hpp"
-#include "thread_pool.hpp"
 #include "util.hpp"
 
 s32 get_page_size() noexcept;
@@ -104,16 +95,14 @@ struct explorer_options
 {
     enum class refresh_mode : s32
     {
-        adaptive,
-        manual,
         automatic,
+        manual,
         count
     };
 
-    static s32 const min_tolerable_refresh_interval_ms = 500;
+    static s32 const min_tolerable_refresh_interval_ms = 100;
 
     std::atomic<s32> auto_refresh_interval_ms;
-    s32 adaptive_refresh_threshold;
     refresh_mode ref_mode;
     bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
     bool show_cwd_len;
@@ -195,7 +184,7 @@ struct explorer_window
     filter_mode filter_mode = filter_mode::contains; // persisted in file
     time_point_t last_refresh_time = {};
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
-    u64 num_selected_cwd_entries = 0;
+    // u64 num_selected_cwd_entries = 0;
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
     ImGuiTableSortSpecs *sort_specs = nullptr;
 
@@ -257,9 +246,9 @@ explorer_options &get_explorer_options() noexcept;
 
 enum update_cwd_entries_actions : u8
 {
-    query_filesystem = 0b01,
-    filter           = 0b10,
-    full_refresh     = 0b11,
+    query_filesystem = 0b01, // 1
+    filter           = 0b10, // 2
+    full_refresh     = 0b11, // 3
 };
 
 bool update_cwd_entries(

@@ -1,4 +1,7 @@
-// This nearly doubles compile speed lol (from >6 seconds to ~3.5 seconds)
+// Single translation unit compilation nearly doubles compile speed.
+// Precompiled header (stdafx.hpp) offers another 3x speed increase.
+
+#include "stdafx.hpp"
 
 #include "bulk_rnm_mdl.cpp"
 #include "bulk_rnm.cpp"

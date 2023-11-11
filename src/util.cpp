@@ -1,11 +1,6 @@
 #pragma once
 
-#include <assert.h>
-#include <string.h>
-
-#include <stringapiset.h>
-#include <fileapi.h>
-
+#include "stdafx.hpp"
 #include "util.hpp"
 
 static u64 s_fast_rand_seed = {};
@@ -360,4 +355,11 @@ void init_empty_cstr(wchar_t *s) noexcept
 {
     assert(s != nullptr);
     s[0] = L'\0';
+}
+
+bool set_thread_priority(s32 priority_relative_to_normal) noexcept
+{
+    HANDLE handle = GetCurrentThread();
+    auto result = SetThreadPriority(handle, priority_relative_to_normal);
+    return result;
 }

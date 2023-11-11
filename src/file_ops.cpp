@@ -1,6 +1,6 @@
-#include "common.hpp"
-
 #include "imgui/imgui.h"
+
+#include "common.hpp"
 
 static circular_buffer<file_operation> s_file_ops_buffer(100);
 
@@ -17,8 +17,7 @@ file_operation::file_operation(type op_type, u64 file_size, swan_path_t const &s
     total_file_size.store(file_size);
 }
 
-// for boost::circular_buffer
-file_operation::file_operation(file_operation const &other) noexcept
+file_operation::file_operation(file_operation const &other) noexcept // for boost::circular_buffer
     : op_type(other.op_type)
     , success(other.success)
     , src_path(other.src_path)
@@ -32,8 +31,7 @@ file_operation::file_operation(file_operation const &other) noexcept
     this->end_time.store(other.end_time.load());
 }
 
-// for boost::circular_buffer
-file_operation &file_operation::operator=(file_operation const &other) noexcept
+file_operation &file_operation::operator=(file_operation const &other) noexcept // for boost::circular_buffer
 {
     this->total_file_size.store(other.total_file_size.load());
     this->total_bytes_transferred.store(other.total_bytes_transferred.load());
