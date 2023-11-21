@@ -8,7 +8,7 @@ namespace imgui = ImGui;
 
 static bool s_bulk_rename_open = false;
 static explorer_window *s_bulk_rename_expl = nullptr;
-static std::vector<explorer_window::dirent *> const *s_bulk_rename_selection = nullptr;
+static std::vector<explorer_window::dirent *> s_bulk_rename_selection = {};
 static std::function<void ()> s_bulk_rename_on_rename_finish_callback = {};
 
 char const *swan_id_bulk_rename_popup_modal() noexcept
@@ -18,13 +18,16 @@ char const *swan_id_bulk_rename_popup_modal() noexcept
 
 void swan_open_popup_modal_bulk_rename(
     explorer_window &expl,
-    std::vector<explorer_window::dirent *> const &selection,
     std::function<void ()> on_rename_finish_callback) noexcept
 {
     s_bulk_rename_open = true;
 
-    assert(s_bulk_rename_selection == nullptr);
-    s_bulk_rename_selection = &selection;
+    s_bulk_rename_selection.clear();
+    for (auto &dirent : expl.cwd_entries) {
+        if (dirent.is_selected) {
+            s_bulk_rename_selection.push_back(&dirent);
+        }
+    }
 
     assert(s_bulk_rename_expl == nullptr);
     s_bulk_rename_expl = &expl;
@@ -47,10 +50,10 @@ void swan_render_popup_modal_bulk_rename() noexcept
     }
 
     assert(s_bulk_rename_expl != nullptr);
-    assert(s_bulk_rename_selection != nullptr);
+    assert(!s_bulk_rename_selection.empty());
 
     auto &expl = *s_bulk_rename_expl;
-    auto &selection = *s_bulk_rename_selection;
+    auto &selection = s_bulk_rename_selection;
 
     wchar_t dir_sep_utf16 = get_explorer_options().dir_separator_utf16();
 
@@ -93,7 +96,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
 
         s_bulk_rename_open = false;
         s_bulk_rename_expl = nullptr;
-        s_bulk_rename_selection = nullptr;
+        s_bulk_rename_selection.clear();
         s_bulk_rename_on_rename_finish_callback = {};
 
         imgui::CloseCurrentPopup();
