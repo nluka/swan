@@ -174,8 +174,6 @@ struct explorer_window
     // 24 byte alignment members
 
     std::vector<dirent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
-    std::vector<dirent *> cwd_entries_selected = {}; // 24 bytes, all selected cwd entries
-    std::vector<dirent *> cwd_entries_passing_filter = {}; // 24 bytes, all cwd entries passing filter
 
     // 8 byte alignment members
 
@@ -374,7 +372,6 @@ void swan_render_window_file_operations() noexcept;
 
 void swan_open_popup_modal_bulk_rename(
     explorer_window &,
-    std::vector<explorer_window::dirent *> const &selection,
     std::function<void ()> on_rename_finish_callback) noexcept;
 
 char const *swan_id_bulk_rename_popup_modal() noexcept;
