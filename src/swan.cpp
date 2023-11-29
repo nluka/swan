@@ -128,9 +128,10 @@ void set_window_icon(GLFWwindow *window) noexcept
     s32 icon_width, icon_height, icon_channels;
     u8 *icon_pixels = stbi_load("resource/swan.png", &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
 
-    auto cleanup_icon_pixels_routine = make_on_scope_exit([icon_pixels] {
-        stbi_image_free(icon_pixels);
-    });
+    SCOPE_EXIT { stbi_image_free(icon_pixels); };
+    // auto cleanup_icon_pixels_routine = make_on_scope_exit([icon_pixels] {
+    //     stbi_image_free(icon_pixels);
+    // });
 
     if (icon_pixels) {
         icon.pixels = icon_pixels;
@@ -177,14 +178,22 @@ try
         return 1;
     }
 
-    auto cleanup_routine = make_on_scope_exit([window]() {
+    SCOPE_EXIT {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         imgui::DestroyContext();
         glfwDestroyWindow(window);
         glfwTerminate();
         explorer_cleanup_windows_shell_com_garbage();
-    });
+    };
+    // auto cleanup_routine = make_on_scope_exit([window]() {
+    //     ImGui_ImplOpenGL3_Shutdown();
+    //     ImGui_ImplGlfw_Shutdown();
+    //     imgui::DestroyContext();
+    //     glfwDestroyWindow(window);
+    //     glfwTerminate();
+    //     explorer_cleanup_windows_shell_com_garbage();
+    // });
 
     set_window_icon(window);
 
@@ -237,7 +246,10 @@ try
         debug_log("misc_options::load_from_disk failed, setting defaults");
         misc_opts.stylesheet = imgui_stylesheet::future_dark;
     }
-    apply_imgui_stylesheet(misc_opts.stylesheet);
+    // apply_imgui_stylesheet(misc_opts.stylesheet);
+
+    imgui::StyleColorsDark();
+    // apply_swan_stylesheet();
 
     // init pins
     {
@@ -253,7 +265,12 @@ try
     std::array<explorer_window, num_explorers> explorers = {};
     // init explorers
     {
-        char const *names[] = { "Explorer 1", "Explorer 2", "Explorer 3", "Explorer 4" };
+        char const *names[] = {
+            "Explorer_1",
+            "Explorer_2",
+            "Explorer_3",
+            "Explorer_4"
+        };
 
         for (u64 i = 0; i < explorers.size(); ++i) {
             auto &expl = explorers[i];
@@ -342,6 +359,7 @@ try
                 #if !defined(NDEBUG)
                     change_made |= imgui::MenuItem("Debug Log", nullptr, &win_opts.show_debug_log);
                     change_made |= imgui::MenuItem("ImGui Demo", nullptr, &win_opts.show_demo);
+                    change_made |= imgui::MenuItem("Show FA Icons", nullptr, &win_opts.show_fa_icons);
                 #endif
 
                     imgui::EndMenu();
@@ -416,6 +434,7 @@ try
                         debug_log("explorer_options::save_to_disk result: %d", result);
                     }
                 }
+            #if 0
                 if (imgui::BeginMenu("[Misc Options]")) {
                     bool change_made = false;
                     static_assert((false | false) == false);
@@ -450,9 +469,10 @@ try
                     if (change_made) {
                         bool result = misc_opts.save_to_disk();
                         debug_log("misc_options::save_to_disk result: %d", result);
-                        apply_imgui_stylesheet(misc_opts.stylesheet);
+                        // apply_imgui_stylesheet(misc_opts.stylesheet);
                     }
                 }
+            #endif
                 imgui::EndMainMenuBar();
             }
 
@@ -460,7 +480,7 @@ try
         }
 
         if (win_opts.show_pins_mgr) {
-            swan_render_window_pinned_directories(explorers, win_opts);
+            swan_render_window_pinned_directories(explorers, win_opts.show_pins_mgr);
         }
 
         if (win_opts.show_file_operations) {
@@ -468,21 +488,25 @@ try
         }
 
         if (win_opts.show_explorer_0) {
-            swan_render_window_explorer(explorers[0]);
+            swan_render_window_explorer(explorers[0], win_opts.show_explorer_0);
         }
         if (win_opts.show_explorer_1) {
-            swan_render_window_explorer(explorers[1]);
+            swan_render_window_explorer(explorers[1], win_opts.show_explorer_1);
         }
         if (win_opts.show_explorer_2) {
-            swan_render_window_explorer(explorers[2]);
+            swan_render_window_explorer(explorers[2], win_opts.show_explorer_2);
         }
         if (win_opts.show_explorer_3) {
-            swan_render_window_explorer(explorers[3]);
+            swan_render_window_explorer(explorers[3], win_opts.show_explorer_3);
         }
 
     #if !defined(NDEBUG)
         if (win_opts.show_debug_log) {
-            swan_render_window_debug_log();
+            swan_render_window_debug_log(win_opts.show_debug_log);
+        }
+
+        if (win_opts.show_fa_icons) {
+            swan_render_window_fa_icons(win_opts.show_fa_icons);
         }
     #endif
 
@@ -503,7 +527,7 @@ try
         }
 
         if (win_opts.show_analytics) {
-            if (imgui::Begin("Analytics")) {
+            if (imgui::Begin(" " ICON_FA_LIGHTBULB " Analytics ", &win_opts.show_analytics)) {
             #if !defined(NDEBUG)
                 char const *build_mode = "debug";
             #else
@@ -518,7 +542,7 @@ try
 
     #if !defined(NDEBUG)
         if (win_opts.show_demo) {
-            imgui::ShowDemoWindow();
+            imgui::ShowDemoWindow(&win_opts.show_demo);
         }
     #endif
 

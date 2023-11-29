@@ -10,7 +10,7 @@ src/imgui/imgui_tables.cpp ^
 src/imgui/imgui_widgets.cpp ^
 src/imgui/imgui_impl_glfw.cpp ^
 src/imgui/imgui_impl_opengl3.cpp ^
-src/stbi_image.cpp ^
+src/_image.cpp ^
 /nologo ^
 /std:c++20 ^
 /W4 ^

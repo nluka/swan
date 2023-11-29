@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="natvis_sanity_check">
+    <DisplayString>{{ len={len} }}</DisplayString>
+    <!-- <StringView>str,len</StringView> -->
+  </Type>
+
+  <Type Name="explorer_window::dirent">
+    <DisplayString>{{ path={basic.path._Elems} }}</DisplayString>
+    <StringView>basic.path._Elems</StringView>
+  </Type>
+
+  <Type Name="basic_dirent">
+    <DisplayString>{{ path={path._Elems} }}</DisplayString>
+    <StringView>path._Elems</StringView>
+  </Type>
+
+</AutoVisualizer>

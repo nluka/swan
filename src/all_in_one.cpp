@@ -9,6 +9,7 @@
 #include "edit_pin_mdl.cpp"
 #include "error_mdl.cpp"
 #include "explorer.cpp"
+#include "fa_icons.cpp"
 #include "file_ops.cpp"
 #include "focused_wndw.cpp"
 #include "misc_options.cpp"

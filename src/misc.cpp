@@ -50,12 +50,24 @@ char const *basic_dirent::kind_cstr() const noexcept
     }
 }
 
+char const *basic_dirent::kind_icon() const noexcept
+{
+    switch (this->type) {
+        case basic_dirent::kind::directory: return ICON_FA_FOLDER;
+        case basic_dirent::kind::file: return ICON_FA_FILE;
+        case basic_dirent::kind::symlink: return ICON_FA_EXTERNAL_LINK_ALT;
+        default: assert(false && "has no icon"); break;
+    }
+    return ICON_MD_ERROR;
+}
+
 ImVec4 get_color(basic_dirent::kind t) noexcept
 {
     if (t == basic_dirent::kind::directory)
         return ImVec4(1, 1, 0, 1); // yellow
     if (t == basic_dirent::kind::symlink)
-        return ImVec4(0.1f, 1, 1, 1); // cyan
+        return ImVec4(1, 0.7f, 0, 1); // orange
+        // return ImVec4(0.1f, 1, 1, 1); // cyan
     else
         return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
 }

@@ -10,7 +10,7 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
 {
     if (elem_idx >= vec.size() || new_elem_idx >= vec.size()) {
         return false;
-    }
+}
     else if (new_elem_idx == elem_idx) {
         return true;
     }
@@ -27,61 +27,11 @@ struct reorder_pin_payload
     u64 src_index;
 };
 
-void swan_render_window_pinned_directories(std::array<explorer_window, 4> &explorers, windows_options const &win_opts) noexcept
+void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_window, 4> &explorers, bool &open) noexcept
 {
     namespace imgui = ImGui;
 
-    auto render_pin_item = [&](swan_path_t const &pin, u64 pin_idx) {
-        u64 num_buttons_rendered = 0;
-
-        auto render_pin_button = [&](u64 expl_win_num, explorer_window &expl) {
-            imgui::BeginDisabled(path_loosely_same(expl.cwd, pin));
-
-            char buffer[32];
-            snprintf(buffer, lengthof(buffer), "%zu##%zu", expl_win_num, pin_idx);
-
-            if (imgui::Button(buffer)) {
-                debug_log("setting Explorer %zu cwd to [%s]", expl_win_num, pin.data());
-                expl.cwd = pin;
-                new_history_from(expl, pin);
-                bool pin_is_valid_dir = update_cwd_entries(full_refresh, &expl, pin.data());
-                if (pin_is_valid_dir) {
-                    expl.set_latest_valid_cwd_then_notify(pin);
-                }
-                (void) expl.save_to_disk();
-            }
-
-            if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-                imgui::SetTooltip("Click here to set this pin as the cwd for Explorer %zu", expl_win_num);
-            }
-
-            imgui::EndDisabled();
-            ++num_buttons_rendered;
-        };
-
-        if (win_opts.show_explorer_0) {
-            render_pin_button(1, explorers[0]);
-        }
-        if (win_opts.show_explorer_1) {
-            imgui::SameLine();
-            render_pin_button(2, explorers[1]);
-        }
-        if (win_opts.show_explorer_2) {
-            imgui::SameLine();
-            render_pin_button(3, explorers[2]);
-        }
-        if (win_opts.show_explorer_3) {
-            imgui::SameLine();
-            render_pin_button(4, explorers[3]);
-        }
-
-        if (num_buttons_rendered > 0) {
-            imgui::SameLine();
-        }
-        imgui::TextColored(get_color(basic_dirent::kind::directory), pin.data());
-    };
-
-    if (imgui::Begin("Pinned")) {
+    if (imgui::Begin(" " ICON_FA_MAP_PIN " Pinned ", &open)) {
         std::vector<pinned_path> &pins = get_pins();
 
         u64 const npos = u64(-1);

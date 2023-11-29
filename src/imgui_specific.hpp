@@ -28,6 +28,12 @@ struct imgui_scoped_avail_width
     ~imgui_scoped_avail_width() noexcept { ImGui::PopItemWidth(); }
 };
 
+struct imgui_scoped_item_width
+{
+    imgui_scoped_item_width(f32 width) noexcept { ImGui::PushItemWidth(width); }
+    ~imgui_scoped_item_width()         noexcept { ImGui::PopItemWidth(); }
+};
+
 struct imgui_scoped_disabled
 {
     imgui_scoped_disabled(bool disabled) noexcept { ImGui::BeginDisabled(disabled); }

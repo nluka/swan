@@ -5,11 +5,11 @@ bool debug_log_package::s_logging_enabled = true;
 ImGuiTextBuffer debug_log_package::s_buffer = {};
 std::mutex debug_log_package::s_mutex = {};
 
-void swan_render_window_debug_log() noexcept
+void swan_render_window_debug_log(bool &open) noexcept
 {
     namespace imgui = ImGui;
 
-    if (imgui::Begin("Debug Log")) {
+    if (imgui::Begin(" " ICON_FA_BARS " Debug Log ", &open)) {
         static bool auto_scroll = true;
 
         // first line

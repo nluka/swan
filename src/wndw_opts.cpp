@@ -6,7 +6,7 @@ bool windows_options::save_to_disk() const noexcept
     try {
         std::ofstream out("data/windows_options.txt", std::ios::binary);
         if (!out) {
-        return false;
+            return false;
         }
 
         out << "show_pinned " << this->show_pins_mgr << '\n';
@@ -19,6 +19,7 @@ bool windows_options::save_to_disk() const noexcept
     #if !defined(NDEBUG)
         out << "show_demo " << this->show_demo << '\n';
         out << "show_debug_log " << this->show_debug_log << '\n';
+        out << "show_fa_icons " << this->show_fa_icons << '\n';
     #endif
 
         return true;
@@ -98,6 +99,12 @@ bool windows_options::load_from_disk() noexcept
             assert(what == "show_debug_log");
             in >> bit_ch;
             this->show_debug_log = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_fa_icons");
+            in >> bit_ch;
+            this->show_fa_icons = bit_ch == '1' ? 1 : 0;
         }
     #endif
 

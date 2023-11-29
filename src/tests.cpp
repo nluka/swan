@@ -675,14 +675,10 @@ try
     using ent_kind = basic_dirent::kind;
 
     auto create_basic_dirent = [](char const *path, ent_kind type) -> basic_dirent {
-      return {
-        0, // size
-        {}, // creation_time_raw
-        {}, // last_write_time_raw
-        {}, // id
-        type,
-        path_create(path)
-      };
+      basic_dirent ent = {};
+      ent.type = type;
+      ent.path = path_create(path);
+      return ent;
     };
 
     bool selected = true;
