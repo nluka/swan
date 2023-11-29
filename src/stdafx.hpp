@@ -1,6 +1,7 @@
 #include "primitives.hpp"
 #include "libs/thread_pool.hpp"
 #include "libs/on_scope_exit.hpp"
+#include "libs/on_scope_exit_2.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -23,6 +24,7 @@
 #include <shobjidl_core.h>
 #include <source_location>
 #include <sstream>
+#include <span>
 #include <string_view>
 #include <string.h>
 #include <string>
@@ -43,5 +45,5 @@
 #pragma warning(push)
 #pragma warning(disable: 4244)
 // #pragma warning(disable: 4459)
-#include "libs/stbi_image.h"
+#include "libs/stb_image.h"
 #pragma warning(pop)

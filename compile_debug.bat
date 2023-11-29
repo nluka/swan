@@ -7,7 +7,7 @@ obj_debug/imgui_impl_opengl3.obj ^
 obj_debug/imgui_tables.obj ^
 obj_debug/imgui_widgets.obj ^
 obj_debug/imgui.obj ^
-obj_debug/stbi_image.obj ^
+obj_debug/stb_image.obj ^
 obj_debug/stdafx.obj ^
 resource/.res ^
 /Fo:obj_debug\ ^
@@ -25,6 +25,7 @@ resource/.res ^
 /D_CRT_SECURE_NO_WARNINGS ^
 /Zi ^
 /link ^
+/NATVIS:swan.natvis ^
 /DEBUG:FULL ^
 /NODEFAULTLIB:MSVCRTD ^
 /NODEFAULTLIB:LIBCMT ^

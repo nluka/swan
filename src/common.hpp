@@ -27,6 +27,7 @@ enum class imgui_stylesheet : s32
 };
 
 void apply_imgui_stylesheet(imgui_stylesheet which) noexcept;
+void apply_swan_stylesheet() noexcept;
 
 bool explorer_init_windows_shell_com_garbage() noexcept;
 void explorer_cleanup_windows_shell_com_garbage() noexcept;
@@ -58,6 +59,7 @@ struct basic_dirent
     bool is_file() const noexcept;
     bool is_non_symlink_file() const noexcept;
     char const *kind_cstr() const noexcept;
+    char const *kind_icon() const noexcept;
 };
 
 struct drive_info
@@ -85,6 +87,7 @@ struct windows_options
 #if !defined(NDEBUG)
     bool show_demo;
     bool show_debug_log;
+    bool show_fa_icons;
 #endif
 
     bool save_to_disk() const noexcept;
@@ -362,13 +365,15 @@ std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> const &renames) noexcept;
 
-void swan_render_window_explorer(explorer_window &) noexcept;
+void swan_render_window_explorer(explorer_window &, bool &open) noexcept;
 
-void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, windows_options const &) noexcept;
+void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, bool &open) noexcept;
 
-void swan_render_window_debug_log() noexcept;
+void swan_render_window_debug_log(bool &open) noexcept;
 
 void swan_render_window_file_operations() noexcept;
+
+void swan_render_window_fa_icons(bool &open) noexcept;
 
 void swan_open_popup_modal_bulk_rename(
     explorer_window &,
