@@ -105,6 +105,8 @@ struct explorer_options
     u16 size_unit_multiplier() const noexcept;
 };
 
+explorer_options &get_explorer_options() noexcept;
+
 struct misc_options
 {
     bool save_to_disk() const noexcept;
@@ -135,18 +137,20 @@ struct explorer_window
     static u64 const MAX_WD_HISTORY_SIZE = 15;
     bool save_to_disk() const noexcept;
     bool load_from_disk(char dir_separator) noexcept;
-    void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept;
+    void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
     void deselect_all_cwd_entries() noexcept;
-    void invert_selected_cwd_entries() noexcept;
+    void invert_selected_visible_cwd_entries() noexcept;
     void set_latest_valid_cwd_then_notify(swan_path_t const &new_val) noexcept;
 
     // 80 byte alignment members
 
     std::mutex latest_valid_cwd_mutex = {};
+    std::mutex shlwapi_task_initialization_mutex = {};
 
     // 72 byte alignment members
 
     std::condition_variable latest_valid_cwd_cond = {};
+    std::condition_variable shlwapi_task_initialization_cond = {};
 
     // 40 byte alignment members
 
@@ -235,8 +239,6 @@ struct file_operation
 };
 
 boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept;
-
-explorer_options &get_explorer_options() noexcept;
 
 enum update_cwd_entries_actions : u8
 {

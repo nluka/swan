@@ -3,7 +3,7 @@
 #include "stdafx.hpp"
 
 #if !defined(NDEBUG)
-#define WCOUT_IF_DEBUG(x) std::wcout << x
+#define WCOUT_IF_DEBUG(x) std::wcout << '[' << std::source_location::current().file_name() << ':' << std::source_location::current().line() << "] " << x
 #else
 #define WCOUT_IF_DEBUG(x) do {} while(0)
 #endif

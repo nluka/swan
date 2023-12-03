@@ -18,6 +18,7 @@
 #include <list>
 #include <mutex>
 #include <pathcch.h>
+#include <ranges>
 #include <regex>
 #include <shlobj_core.h>
 #include <shlwapi.h>
