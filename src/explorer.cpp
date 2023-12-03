@@ -269,10 +269,10 @@ void explorer_window::deselect_all_cwd_entries() noexcept
     }
 }
 
-void explorer_window::select_all_cwd_entries(bool select_dotdot_dir) noexcept
+void explorer_window::select_all_visible_cwd_entries(bool select_dotdot_dir) noexcept
 {
     for (auto &dirent : this->cwd_entries) {
-        if (!select_dotdot_dir && dirent.basic.is_dotdot()) {
+        if ((!select_dotdot_dir && dirent.basic.is_dotdot()) || dirent.is_filtered_out) {
             continue;
         } else {
             dirent.is_selected = true;
@@ -280,10 +280,14 @@ void explorer_window::select_all_cwd_entries(bool select_dotdot_dir) noexcept
     }
 }
 
-void explorer_window::invert_selected_cwd_entries() noexcept
+void explorer_window::invert_selected_visible_cwd_entries() noexcept
 {
     for (auto &dirent : this->cwd_entries) {
-        dirent.is_selected = !dirent.is_selected;
+        if (dirent.is_filtered_out) {
+            dirent.is_selected = false;
+        } else {
+            dirent.is_selected = !dirent.is_selected;
+        }
     }
 }
 
@@ -321,114 +325,134 @@ struct generic_result
     std::string error_or_utf8_path;
 };
 
-generic_result delete_selected_entries(
-    explorer_window const &expl,
-    std::vector<explorer_window::dirent> const &selection,
-    wchar_t dir_sep_utf16) noexcept
+struct recycle_bin_info
 {
-    {
-        SHQUERYRBINFO recycle_bin_info;
-        recycle_bin_info.cbSize = sizeof(recycle_bin_info);
+    HRESULT result;
+    s64 bytes_used;
+    s64 num_items;
+};
 
-        auto result = SHQueryRecycleBinW(nullptr, &recycle_bin_info);
+recycle_bin_info query_recycle_bin() noexcept
+{
+    SHQUERYRBINFO query_info;
+    query_info.cbSize = sizeof(query_info);
 
-        if (result == S_OK) {
-            u64 used_bytes = recycle_bin_info.i64Size;
-            u64 num_items = recycle_bin_info.i64NumItems;
+    recycle_bin_info retval = {};
 
-            u64 multiplier = get_explorer_options().size_unit_multiplier();
+    retval.result = SHQueryRecycleBinW(nullptr, &query_info);
 
-            char used[32]; init_empty_cstr(used);
-            format_file_size(used_bytes,  used,  lengthof(used),  multiplier);
-
-            debug_log("RecycleBin size: %zu (%s), %zu items", used_bytes, used, num_items);
-        }
-        else {
-            debug_log("SHQueryRecycleBinW failed: %ld", (s64)result);
-        }
+    if (retval.result == S_OK) {
+        retval.bytes_used = query_info.i64Size;
+        retval.num_items = query_info.i64NumItems;
     }
 
-    HRESULT result = {};
+    return retval;
+}
 
-    IFileOperation *file_op = nullptr;
-
-    result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
-    if (FAILED(result)) {
-        return { false, "CoCreateInstance" };
-    }
-
-    result = file_op->SetOperationFlags(FOF_ALLOWUNDO | FOF_NOCONFIRMATION);
-    if (FAILED(result)) {
-        file_op->Release();
-        return { false, "IFileOperation::SetOperationFlags" };
-    }
-
-    s32 written = 0;
-    wchar_t cwd_utf16[MAX_PATH]; init_empty_cstr(cwd_utf16);
-    std::wstring delete_full_path_utf16 = {};
-    delete_full_path_utf16.reserve(2048);
-
-    written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-    if (written == 0) {
-        debug_log("FAILED utf8_to_utf16(expl.data -> cwd_utf16)");
-        return { false, "conversion of cwd path from UTF-8 to UTF-16" };
-    }
-
-    for (auto const item : selection) {
-        wchar_t item_utf16[MAX_PATH]; init_empty_cstr(item_utf16);
-
-        written = utf8_to_utf16(item.basic.path.data(), item_utf16, lengthof(item_utf16));
-        if (written == 0) {
-            debug_log("FAILED utf8_to_utf16(item.basic.path -> item_utf16)");
-            std::stringstream err;
-            err << "conversion of [" << item.basic.path.data() << "] from UTF-8 to UTF-16";
-            return { false, err.str() };
+static
+generic_result delete_selected_entries(explorer_window &expl) noexcept
+{
+    auto file_operation_task = [](
+        std::wstring working_directory_utf16,
+        std::wstring paths_to_delete_utf16,
+        std::mutex *init_done_mutex,
+        std::condition_variable *init_done_cond,
+        bool *init_done,
+        std::string *init_error
+    ) {
+        {
+            assert(!working_directory_utf16.empty());
+            if (!StrChrW(L"\\/", working_directory_utf16.back())) {
+                working_directory_utf16 += L'\\';
+            }
         }
 
-        delete_full_path_utf16 = cwd_utf16;
-        if (!delete_full_path_utf16.ends_with(dir_sep_utf16)) {
-            delete_full_path_utf16 += dir_sep_utf16;
-        }
-        delete_full_path_utf16 += item_utf16;
+        auto set_init_error_and_notify = [&](char const *err) {
+            std::unique_lock lock(*init_done_mutex);
+            *init_done = true;
+            *init_error = err;
+            init_done_cond->notify_one();
+        };
 
-        // shlwapi doesn't like '/', force them all to '\'
-        if (get_explorer_options().unix_directory_separator) {
-            std::replace(delete_full_path_utf16.begin(), delete_full_path_utf16.end(), L'/', L'\\');
-        }
-
-        IShellItem *to_delete = nullptr;
-        result = SHCreateItemFromParsingName(delete_full_path_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_delete));
-        if (FAILED(result)) {
-            debug_log("FAILED SHCreateItemFromParsingName");
-            file_op->Release();
-            std::stringstream err;
-            err << "SHCreateItemFromParsingName [" << item.basic.path.data() << "]";
-            WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << delete_full_path_utf16.c_str() << "]\n");
-            return { false, err.str() };
-        }
-
-        result = file_op->DeleteItem(to_delete, nullptr);
-        if (FAILED(result)) {
-            debug_log("FAILED file_op->DeleteItem");
-            to_delete->Release();
-            file_op->Release();
-            std::stringstream err;
-            err << "IFileOperation::DeleteItem [" << item.basic.path.data() << "]";
-            WCOUT_IF_DEBUG("FAILED: IFileOperation::DeleteItem [" << delete_full_path_utf16.c_str() << "]\n");
-            return { false, err.str() };
-        } else {
-            WCOUT_IF_DEBUG("file_op->DeleteItem [" << delete_full_path_utf16.c_str() << "]\n");
-            to_delete->Release();
-        }
-    }
-
-    auto file_operation_task = [](IFileOperation *file_op) {
         HRESULT result = {};
 
         result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (FAILED(result)) {
-            debug_log("file_operation_task CoInitializeEx failed");
-            return;
+            return set_init_error_and_notify("CoInitializeEx(COINIT_APARTMENTTHREADED)");
+        }
+        SCOPE_EXIT { CoUninitialize(); };
+
+        IFileOperation *file_op = nullptr;
+
+        result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
+        if (FAILED(result)) {
+            return set_init_error_and_notify("CoCreateInstance(CLSID_FileOperation)");
+        }
+        SCOPE_EXIT { file_op->Release(); };
+
+        result = file_op->SetOperationFlags(FOF_ALLOWUNDO);
+        if (FAILED(result)) {
+            return set_init_error_and_notify("IFileOperation::SetOperationFlags");
+        }
+
+        // attach items (IShellItem) for deletion to IFileOperation
+        {
+            auto items_to_delete = std::wstring_view(paths_to_delete_utf16.data()) | std::ranges::views::split('\n');
+            std::stringstream err = {};
+            std::wstring full_path_to_delete_utf16 = {};
+
+            full_path_to_delete_utf16.reserve(get_page_size());
+
+            for (auto item_utf16 : items_to_delete) {
+                full_path_to_delete_utf16.clear();
+                full_path_to_delete_utf16.append(working_directory_utf16);
+                std::wstring_view view(item_utf16.begin(), item_utf16.end());
+                full_path_to_delete_utf16 += view;
+                // u64 num_chars_to_copy = view.size();
+
+                //? I wish this worked but it doesn't
+                // std::copy(view.begin(), view.end(), full_path_to_delete_utf16.end());
+
+                // shlwapi doesn't like '/', force them all to '\'
+                std::replace(full_path_to_delete_utf16.begin(), full_path_to_delete_utf16.end(), L'/', L'\\');
+
+                swan_path_t item_path_utf8 = path_create("");
+                s32 written = 0;
+
+                IShellItem *to_delete = nullptr;
+                result = SHCreateItemFromParsingName(full_path_to_delete_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_delete));
+                if (FAILED(result)) {
+                    WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_delete_utf16.c_str() << "]\n");
+                    written = utf16_to_utf8(full_path_to_delete_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
+                    if (written == 0) {
+                        err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8\n";
+                    } else {
+                        err << "SHCreateItemFromParsingName [" << item_path_utf8.data() << "]\n";
+                    }
+                    continue;
+                }
+
+                SCOPE_EXIT { to_delete->Release(); };
+
+                result = file_op->DeleteItem(to_delete, nullptr);
+                if (FAILED(result)) {
+                    WCOUT_IF_DEBUG("FAILED: IFileOperation::DeleteItem [" << full_path_to_delete_utf16.c_str() << "]\n");
+                    written = utf16_to_utf8(full_path_to_delete_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
+                    if (written == 0) {
+                        err << "IFileOperation::DeleteItem and conversion of delete path from UTF-16 to UTF-8\n";
+                    } else {
+                        err << "IFileOperation::DeleteItem [" << item_path_utf8.data() << "]";
+                    }
+                } else {
+                    WCOUT_IF_DEBUG("file_op->DeleteItem [" << full_path_to_delete_utf16.c_str() << "]\n");
+                }
+            }
+
+            std::string errors = err.str();
+            if (!errors.empty()) {
+                errors.pop_back(); // remove trailing '\n'
+                return set_init_error_and_notify(errors.c_str());
+            }
         }
 
         progress_sink prog_sink;
@@ -436,37 +460,78 @@ generic_result delete_selected_entries(
 
         result = file_op->Advise(&prog_sink, &cookie);
         if (FAILED(result)) {
-            debug_log("file_operation_task file_op->Advise failed");
-            file_op->Release();
-            CoUninitialize();
-            return;
+            return set_init_error_and_notify("IFileOperation::Advise(IFileOperationProgressSink *pfops, DWORD *pdwCookie)");
         }
+        debug_log("IFileOperation::Advise(%d)", cookie);
+
+        set_init_error_and_notify(""); // init succeeded, no error
 
         result = file_op->PerformOperations();
         if (FAILED(result)) {
-            debug_log("file_operation_task file_op->PerformOperations failed");
-            file_op->Release();
-            CoUninitialize();
-            return;
+            debug_log("FAILED IFileOperation::PerformOperations()");
         }
 
         file_op->Unadvise(cookie);
         if (FAILED(result)) {
-            debug_log("file_operation_task file_op->Unadvise failed");
+            debug_log("FAILED IFileOperation::Unadvise(%d)", cookie);
         }
-
-        file_op->Release();
-        CoUninitialize();
     };
 
-#if 1
-    // TODO:
-    get_thread_pool().push_task(file_operation_task, file_op);
-#else
-    // file_operation_task(file_op);
-#endif
+    wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
+    s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
+    if (written == 0) {
+        debug_log("FAILED utf8_to_utf16(expl.cwd -> cwd_utf16)");
+        return { false, "conversion of current working directory path from UTF-8 to UTF-16" };
+    }
 
-    return { true, "" };
+    std::wstring packed_paths_to_delete_utf16 = {};
+    {
+        wchar_t item_utf16[MAX_PATH];
+        std::stringstream err = {};
+
+        for (auto const &item : expl.cwd_entries) {
+            if (!item.is_filtered_out && item.is_selected) {
+                init_empty_cstr(item_utf16);
+                written = utf8_to_utf16(item.basic.path.data(), item_utf16, lengthof(item_utf16));
+
+                if (written == 0) {
+                    debug_log("FAILED utf8_to_utf16(item.basic.path -> item_utf16)");
+                    err << "conversion of [" << item.basic.path.data() << "] from UTF-8 to UTF-16\n";
+                }
+
+                packed_paths_to_delete_utf16.append(item_utf16).append(L"\n");
+            }
+        }
+
+        WCOUT_IF_DEBUG("packed_paths_to_delete_utf16:\n" << packed_paths_to_delete_utf16);
+
+        if (!packed_paths_to_delete_utf16.empty()) {
+            packed_paths_to_delete_utf16.pop_back(); // remove trailing \n
+        }
+
+        std::string errors = err.str();
+        if (!errors.empty()) {
+            return { false, errors };
+        }
+    }
+
+    bool initialization_done = false;
+    std::string initialization_error = {};
+
+    get_thread_pool().push_task(file_operation_task,
+        cwd_utf16,
+        std::move(packed_paths_to_delete_utf16),
+        &expl.shlwapi_task_initialization_mutex,
+        &expl.shlwapi_task_initialization_cond,
+        &initialization_done,
+        &initialization_error);
+
+    {
+        std::unique_lock lock(expl.shlwapi_task_initialization_mutex);
+        expl.shlwapi_task_initialization_cond.wait(lock, [&]() { return initialization_done; });
+    }
+
+    return { initialization_error.empty(), initialization_error };
 }
 
 generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, explorer_window const &expl, wchar_t dir_sep_utf16) noexcept
@@ -2590,7 +2655,7 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
             imgui::SameLine();
 
             if (imgui::Button(ICON_CI_SYMBOL_NULL "##invert_selection")) {
-                expl.invert_selected_cwd_entries();
+                expl.invert_selected_visible_cwd_entries();
             }
             if (imgui::IsItemHovered()) {
                 imgui::SetTooltip("Invert selection");
@@ -3132,7 +3197,7 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
                             dirent_to_be_renamed = right_clicked_ent;
                         }
                         if (imgui::Selectable("Delete##from_context")) {
-                            auto result = delete_selected_entries(expl, expl.cwd_entries, dir_sep_utf16);
+                            auto result = delete_selected_entries(expl);
                             if (!result.success) {
                                 std::stringstream action;
                                 action << "delete [" << right_clicked_ent->basic.path.data() << "]";
@@ -3150,7 +3215,7 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
 
                         }
                         if (imgui::Selectable("Delete")) {
-                            auto result = delete_selected_entries(expl, expl.cwd_entries, dir_sep_utf16);
+                            auto result = delete_selected_entries(expl);
                             if (!result.success) {
                                 std::stringstream action;
                                 action << "delete " << cnt.selected_dirents << " entries from [" << expl.cwd.data() << "]";
@@ -3168,7 +3233,7 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
                 imgui::EndTable();
             }
             if (ImGui::IsItemHovered() && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_A)) {
-                expl.select_all_cwd_entries();
+                expl.select_all_visible_cwd_entries();
             }
             if (ImGui::IsItemHovered() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
                 expl.deselect_all_cwd_entries();
