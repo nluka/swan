@@ -130,21 +130,11 @@ void swan_render_popup_modal_bulk_rename() noexcept
         ImGui::EndTooltip();
     }
 
-    imgui::Spacing();
-
     recompute |= imgui::InputInt(" Counter start ", &counter_start);
-
-    imgui::Spacing();
 
     recompute |= imgui::InputInt(" Counter step ", &counter_step);
 
-    imgui::Spacing();
-
     recompute |= imgui::Checkbox("Squish adjacent spaces", &squish_adjacent_spaces);
-
-    imgui::Spacing();
-    imgui::Separator();
-    imgui::Spacing();
 
     u64 num_transform_errors = 0;
 
@@ -249,14 +239,11 @@ void swan_render_popup_modal_bulk_rename() noexcept
         }
     }
 
-    imgui::Spacing();
     imgui::Separator();
-    imgui::Spacing();
 
     if (get_explorer_options().show_debug_info) {
         imgui::Text("transform_us: %.2lf", transform_us);
         imgui::Text("collisions_us: %.2lf", collisions_us);
-        imgui_spacing(2);
     }
 
     bool all_renames_attempted = (success + fail) == total;

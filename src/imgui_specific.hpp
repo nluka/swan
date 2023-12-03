@@ -18,6 +18,8 @@ void imgui_spacing(u64 n) noexcept;
 typedef wchar_t* filter_chars_callback_user_data_t;
 s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept;
 
+ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;
+
 struct imgui_scoped_avail_width
 {
     imgui_scoped_avail_width(f32 subtract_amt = 0) noexcept
@@ -44,6 +46,33 @@ struct imgui_scoped_text_color
 {
     imgui_scoped_text_color(ImVec4 const &color) noexcept { ImGui::PushStyleColor(ImGuiCol_Text, color); }
     ~imgui_scoped_text_color()                   noexcept { ImGui::PopStyleColor(); }
+};
+
+struct imgui_scoped_color
+{
+    imgui_scoped_color(ImGuiCol which, ImVec4 const &color) noexcept { ImGui::PushStyleColor(which, color); }
+    ~imgui_scoped_color()                                   noexcept { ImGui::PopStyleColor(); }
+};
+
+template <typename Ty>
+struct imgui_scoped_style
+{
+    Ty &m_attr;
+    Ty m_original_value;
+
+    imgui_scoped_style() = delete;
+
+    imgui_scoped_style(Ty &attr, Ty const &override_value) noexcept
+        : m_attr(attr)
+        , m_original_value(attr)
+    {
+        attr = override_value;
+    }
+
+    ~imgui_scoped_style() noexcept
+    {
+        m_attr = m_original_value;
+    }
 };
 
 struct debug_log_package

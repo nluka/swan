@@ -13,7 +13,6 @@ bool misc_options::save_to_disk() const noexcept
         static_assert(s8(1) == s8(true));
         static_assert(s8(0) == s8(false));
 
-        out << "stylesheet " << (s32)this->stylesheet << '\n';
 
         return true;
     }
@@ -37,11 +36,6 @@ bool misc_options::load_from_disk() noexcept
         what.reserve(100);
         // char bit_ch = 0;
 
-        {
-            in >> what;
-            assert(what == "stylesheet");
-            in >> (s32 &)this->stylesheet;
-        }
 
         return true;
     }

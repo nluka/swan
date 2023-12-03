@@ -91,25 +91,44 @@ GLFWwindow *init_glfw_and_imgui()
         assert(font != nullptr);
 
     #if 1
-        [[maybe_unused]] f32 base_font_size = 15.0f;
-        f32 icon_font_size = base_font_size * 1;
-
+        // font awesome
         {
+            f32 size = 16;
             static ImWchar const icons_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
             ImFontConfig icons_config;
             icons_config.MergeMode = true;
             icons_config.PixelSnapH = true;
-            icons_config.GlyphMinAdvanceX = icon_font_size;
-            io.Fonts->AddFontFromFileTTF("data/" FONT_ICON_FILE_NAME_FAS, icon_font_size, &icons_config, icons_ranges);
+            icons_config.GlyphOffset.x = 0.25f;
+            icons_config.GlyphOffset.y = 0;
+            icons_config.GlyphMinAdvanceX = size;
+            icons_config.GlyphMaxAdvanceX = size;
+            io.Fonts->AddFontFromFileTTF("data/" FONT_ICON_FILE_NAME_FAS, size, &icons_config, icons_ranges);
         }
-
+        // codicons
         {
+            f32 size = 18;
+            static ImWchar const icons_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
+            ImFontConfig icons_config;
+            icons_config.MergeMode = true;
+            icons_config.PixelSnapH = true;
+            icons_config.GlyphOffset.x = 0;
+            icons_config.GlyphOffset.y = 3;
+            icons_config.GlyphMinAdvanceX = size;
+            icons_config.GlyphMaxAdvanceX = size;
+            io.Fonts->AddFontFromFileTTF("data/" FONT_ICON_FILE_NAME_CI, size, &icons_config, icons_ranges);
+        }
+        // material design
+        {
+            f32 size = 18;
             static ImWchar const icons_ranges[] = { ICON_MIN_MD, ICON_MAX_16_MD, 0 };
             ImFontConfig icons_config;
             icons_config.MergeMode = true;
-            icons_config.PixelSnapH = false;
-            icons_config.GlyphMinAdvanceX = icon_font_size;
-            io.Fonts->AddFontFromFileTTF("data/" FONT_ICON_FILE_NAME_MD, icon_font_size, &icons_config, icons_ranges);
+            icons_config.PixelSnapH = true;
+            icons_config.GlyphOffset.x = 0;
+            icons_config.GlyphOffset.y = 3;
+            icons_config.GlyphMinAdvanceX = size;
+            icons_config.GlyphMaxAdvanceX = size;
+            io.Fonts->AddFontFromFileTTF("data/" FONT_ICON_FILE_NAME_MD, 13, &icons_config, icons_ranges);
         }
     #endif
     }
@@ -159,7 +178,9 @@ void render(GLFWwindow *window) noexcept
     glfwSwapBuffers(window);
 }
 
-// #pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
+#if defined(NDEBUG)
+#   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
+#endif
 s32 main(s32, char**)
 try
 {
@@ -244,12 +265,10 @@ try
     // init misc. options
     if (!misc_opts.load_from_disk()) {
         debug_log("misc_options::load_from_disk failed, setting defaults");
-        misc_opts.stylesheet = imgui_stylesheet::future_dark;
     }
-    // apply_imgui_stylesheet(misc_opts.stylesheet);
 
     imgui::StyleColorsDark();
-    // apply_swan_stylesheet();
+    apply_swan_style_overrides();
 
     // init pins
     {
@@ -266,10 +285,10 @@ try
     // init explorers
     {
         char const *names[] = {
-            "Explorer_1",
-            "Explorer_2",
-            "Explorer_3",
-            "Explorer_4"
+            "Explorer 1",
+            "Explorer 2",
+            "Explorer 3",
+            "Explorer 4"
         };
 
         for (u64 i = 0; i < explorers.size(); ++i) {
@@ -323,10 +342,7 @@ try
 
         // main menu bar
         {
-            ImGuiStyle &style = imgui::GetStyle();
-            f32 original_padding = style.FramePadding.y;
-
-            style.FramePadding.y = 10.0f;
+            imgui_scoped_style<f32> s(ImGui::GetStyle().FramePadding.y, 10.0f);
 
             if (imgui::BeginMainMenuBar()) {
                 if (imgui::BeginMenu("[Windows]")) {
@@ -360,6 +376,8 @@ try
                     change_made |= imgui::MenuItem("Debug Log", nullptr, &win_opts.show_debug_log);
                     change_made |= imgui::MenuItem("ImGui Demo", nullptr, &win_opts.show_demo);
                     change_made |= imgui::MenuItem("Show FA Icons", nullptr, &win_opts.show_fa_icons);
+                    change_made |= imgui::MenuItem("Show CI Icons", nullptr, &win_opts.show_ci_icons);
+                    change_made |= imgui::MenuItem("Show MD Icons", nullptr, &win_opts.show_md_icons);
                 #endif
 
                     imgui::EndMenu();
@@ -379,14 +397,14 @@ try
                         bool changed_dotdot_dir = imgui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir);
                         if (changed_dotdot_dir) {
                             for (auto &expl : explorers) {
-                                update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+                                // update_cwd_entries(full_refresh, &expl, expl.cwd.data());
+                                expl.refresh_notif_time.store(current_time(), std::memory_order::seq_cst);
                             }
                         }
                         change_made |= changed_dotdot_dir;
                     }
 
-                    change_made |= imgui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
-                    change_made |= imgui::MenuItem("Binary size system (1024 instead of 1000)", nullptr, &expl_opts.binary_size_system);
+                    change_made |= imgui::MenuItem("Base2 size system, 1024 > 1000", nullptr, &expl_opts.binary_size_system);
 
                     {
                         bool changed_dir_separator = imgui::MenuItem("Unix directory separators", nullptr, &expl_opts.unix_directory_separator);
@@ -400,6 +418,11 @@ try
                         }
                         change_made |= changed_dir_separator;
                     }
+
+                    change_made |= imgui::MenuItem("Alternating table rows", nullptr, &expl_opts.cwd_entries_table_alt_row_bg);
+                    change_made |= imgui::MenuItem("Borders in table body", nullptr, &expl_opts.cwd_entries_table_borders_in_body);
+                    change_made |= imgui::MenuItem("Show cwd length", nullptr, &expl_opts.show_cwd_len);
+                    change_made |= imgui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
 
                     if (imgui::BeginMenu("Refreshing")) {
                         char const *refresh_modes[] = {
@@ -425,8 +448,6 @@ try
                         imgui::EndMenu();
                     }
 
-                    change_made |= imgui::MenuItem("Show debug info", nullptr, &expl_opts.show_debug_info);
-
                     imgui::EndMenu();
 
                     if (change_made) {
@@ -434,49 +455,9 @@ try
                         debug_log("explorer_options::save_to_disk result: %d", result);
                     }
                 }
-            #if 0
-                if (imgui::BeginMenu("[Misc Options]")) {
-                    bool change_made = false;
-                    static_assert((false | false) == false);
-                    static_assert((false | true) == true);
-                    static_assert((true | true) == true);
 
-                    if (imgui::BeginMenu("Style")) {
-                        char const *styleheets[] = {
-                            // "Default Light",
-                            "Default Dark",
-                            "Unreal",
-                            "Visual Studio",
-                            "Rounded Visual Studio",
-                            "Material Flat",
-                            "Photoshop",
-                            "Deep Dark",
-                            "Darcula",
-                            "Discord Dark",
-                            "Future Dark",
-                        };
-
-                        static_assert(lengthof(styleheets) == (u64)imgui_stylesheet::count);
-
-                        imgui::SeparatorText("Style");
-                        change_made |= imgui::Combo("##stylesheet", (s32 *)&misc_opts.stylesheet, styleheets, lengthof(styleheets));
-
-                        imgui::EndMenu();
-                    }
-
-                    imgui::EndMenu();
-
-                    if (change_made) {
-                        bool result = misc_opts.save_to_disk();
-                        debug_log("misc_options::save_to_disk result: %d", result);
-                        // apply_imgui_stylesheet(misc_opts.stylesheet);
-                    }
-                }
-            #endif
                 imgui::EndMainMenuBar();
             }
-
-            style.FramePadding.y = original_padding;
         }
 
         if (win_opts.show_pins_mgr) {
@@ -488,26 +469,37 @@ try
         }
 
         if (win_opts.show_explorer_0) {
-            swan_render_window_explorer(explorers[0], win_opts.show_explorer_0);
+            swan_render_window_explorer(explorers[0], win_opts, win_opts.show_explorer_0);
         }
         if (win_opts.show_explorer_1) {
-            swan_render_window_explorer(explorers[1], win_opts.show_explorer_1);
+            swan_render_window_explorer(explorers[1], win_opts, win_opts.show_explorer_1);
         }
         if (win_opts.show_explorer_2) {
-            swan_render_window_explorer(explorers[2], win_opts.show_explorer_2);
+            swan_render_window_explorer(explorers[2], win_opts, win_opts.show_explorer_2);
         }
         if (win_opts.show_explorer_3) {
-            swan_render_window_explorer(explorers[3], win_opts.show_explorer_3);
+            swan_render_window_explorer(explorers[3], win_opts, win_opts.show_explorer_3);
         }
 
     #if !defined(NDEBUG)
         if (win_opts.show_debug_log) {
             swan_render_window_debug_log(win_opts.show_debug_log);
         }
+    {
+        static icon_browser fa_browser = { {}, 10, get_font_awesome_icons() };
+        static icon_browser ci_browser = { {}, 10, get_codicon_icons() };
+        static icon_browser md_browser = { {}, 10, get_material_design_icons() };
 
         if (win_opts.show_fa_icons) {
-            swan_render_window_fa_icons(win_opts.show_fa_icons);
+            swan_render_window_icon_browser(fa_browser, win_opts.show_fa_icons, "Font Awesome", "ICON_FA_", get_font_awesome_icons);
         }
+        if (win_opts.show_ci_icons) {
+            swan_render_window_icon_browser(ci_browser, win_opts.show_ci_icons, "Codicons", "ICON_CI_", get_codicon_icons);
+        }
+        if (win_opts.show_md_icons) {
+            swan_render_window_icon_browser(md_browser, win_opts.show_md_icons, "Material Design", "ICON_MD_", get_material_design_icons);
+        }
+    }
     #endif
 
         if (swan_is_popup_modal_open_single_rename()) {
@@ -527,7 +519,7 @@ try
         }
 
         if (win_opts.show_analytics) {
-            if (imgui::Begin(" " ICON_FA_LIGHTBULB " Analytics ", &win_opts.show_analytics)) {
+            if (imgui::Begin(" Analytics ", &win_opts.show_analytics)) {
             #if !defined(NDEBUG)
                 char const *build_mode = "debug";
             #else

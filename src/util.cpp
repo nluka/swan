@@ -363,3 +363,42 @@ bool set_thread_priority(s32 priority_relative_to_normal) noexcept
     auto result = SetThreadPriority(handle, priority_relative_to_normal);
     return result;
 }
+
+char *rtrim(char *szX) noexcept
+{
+    auto i = (s64)strlen(szX);
+
+    while(szX[--i] == ' ')
+        szX[i] = '\0';
+
+    return szX;
+}
+
+bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept
+{
+    if (str == NULL || test_str == NULL || len == 0) {
+        // Handle invalid input
+        return false;
+    }
+
+    s64 last_index = len - 1;
+
+    // Find the index of the last non-whitespace character
+    while (last_index >= 0 && isspace(str[last_index])) {
+        last_index--;
+    }
+
+    // Check if the last non-whitespace character is one of the characters in test_str
+    if (last_index >= 0) {
+        const char last_char = str[last_index];
+
+        while (*test_str != '\0') {
+            if (*test_str == last_char) {
+                return true;
+            }
+            test_str++;
+        }
+    }
+
+    return false;
+}

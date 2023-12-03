@@ -75,23 +75,10 @@ void swan_render_popup_modal_error() noexcept
     else {
         imgui::TextUnformatted("Failed:");
         imgui::TextColored(orange(), "%s", s_error_action.c_str());
-        imgui::Spacing();
-        imgui::Spacing();
         imgui::TextUnformatted("Reason:");
         imgui::TextColored(red(), "%s", s_error_failure.c_str());
     }
     imgui::PopTextWrapPos();
-
-#if 0
-    imgui::Spacing();
-    imgui::Spacing();
-    imgui::Separator();
-    imgui::Spacing();
-
-    if (imgui::Button("OK")) {
-        cleanup_and_close_popup();
-    }
-#endif
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
         cleanup_and_close_popup();
