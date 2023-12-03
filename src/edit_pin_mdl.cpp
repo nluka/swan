@@ -56,8 +56,6 @@ void swan_render_popup_modal_edit_pin() noexcept
     imgui::SameLine();
     imgui::TextColored(color_input, "Color");
 
-    imgui::Spacing();
-
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
         // set initial focus on label input
         imgui::SetKeyboardFocusHere(0);
@@ -77,8 +75,6 @@ void swan_render_popup_modal_edit_pin() noexcept
     imgui::SameLine();
     imgui::Text("%zu/%zu", strlen(label_input), pinned_path::LABEL_MAX_LEN);
 
-    imgui::Spacing();
-
     {
         [[maybe_unused]] imgui_scoped_avail_width width = {};
 
@@ -88,9 +84,6 @@ void swan_render_popup_modal_edit_pin() noexcept
             err_msg.clear();
         }
     }
-
-    imgui::Spacing();
-    imgui::Spacing();
 
     if (imgui::Button("Save##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
         swan_path_t path = path_squish_adjacent_separators(path_input);
@@ -113,7 +106,6 @@ void swan_render_popup_modal_edit_pin() noexcept
     }
 
     if (!err_msg.empty()) {
-        imgui::Spacing();
         imgui::TextColored(red(), "Error: %s", err_msg.c_str());
     }
 

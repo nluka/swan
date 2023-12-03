@@ -66,15 +66,9 @@ void swan_render_popup_modal_single_rename() noexcept
         imgui::CloseCurrentPopup();
     };
 
-    if (imgui::SmallButton("Use##use_current_name")) {
-        new_name_utf8 = path_create(s_single_rename_entry_to_be_renamed->basic.path.data());
-    }
-    imgui::SameLine();
     imgui::TextUnformatted("Current name:");
     imgui::SameLine();
     imgui::TextColored(get_color(s_single_rename_entry_to_be_renamed->basic.type), s_single_rename_entry_to_be_renamed->basic.path.data());
-
-    imgui::Spacing();
 
     // set initial focus on input text below
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
@@ -91,8 +85,6 @@ void swan_render_popup_modal_single_rename() noexcept
             err_msg.clear();
         }
     }
-
-    imgui::Spacing();
 
     if (imgui::Button("Rename##single") && !strempty(new_name_utf8.data())) {
         wchar_t buffer_cwd_utf16[MAX_PATH] = {};
@@ -160,12 +152,17 @@ void swan_render_popup_modal_single_rename() noexcept
 
     imgui::SameLine();
 
+    if (imgui::Button("Restore##restore_current_name")) {
+        new_name_utf8 = path_create(s_single_rename_entry_to_be_renamed->basic.path.data());
+    }
+
+    imgui::SameLine();
+
     if (imgui::Button("Cancel")) {
         cleanup_and_close_popup();
     }
 
     if (!err_msg.empty()) {
-        imgui::Spacing();
         imgui::TextColored(red(), "Error: %s", err_msg.c_str());
     }
 

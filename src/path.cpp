@@ -60,6 +60,18 @@ bool path_pop_back_if(swan_path_t &path, char if_ch) noexcept
     }
 }
 
+bool path_pop_back_if(swan_path_t &path, char const *chs) noexcept
+{
+    u64 len = path_length(path);
+
+    if (len > 0 && strchr(chs, path[len - 1])) {
+        path[len - 1] = '\0';
+        return true;
+    } else {
+        return false;
+    }
+}
+
 bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept
 {
     u64 len = path_length(path);

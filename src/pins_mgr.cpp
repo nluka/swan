@@ -10,7 +10,7 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
 {
     if (elem_idx >= vec.size() || new_elem_idx >= vec.size()) {
         return false;
-}
+    }
     else if (new_elem_idx == elem_idx) {
         return true;
     }
@@ -31,7 +31,7 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
 {
     namespace imgui = ImGui;
 
-    if (imgui::Begin(" " ICON_FA_MAP_PIN " Pinned ", &open)) {
+    if (imgui::Begin(" Pinned ", &open)) {
         std::vector<pinned_path> &pins = get_pins();
 
         u64 const npos = u64(-1);
@@ -53,7 +53,7 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
 
             {
                 char buffer[32];
-                snprintf(buffer, lengthof(buffer), " Edit ##%zu", i);
+                snprintf(buffer, lengthof(buffer), ICON_CI_EDIT "##pin%zu", i);
                 if (imgui::Button(buffer)) {
                     swan_open_popup_modal_edit_pin(&pin);
                 }
@@ -63,17 +63,17 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
 
             {
                 char buffer[32];
-                snprintf(buffer, lengthof(buffer), " Delete ##%zu", i);
+                snprintf(buffer, lengthof(buffer), ICON_CI_TRASH "##pin%zu", i);
                 if (imgui::Button(buffer)) {
                     pin_to_delete_idx = i;
                 }
             }
 
-            imgui_sameline_spacing(1);
+            imgui_sameline_spacing(0);
 
             imgui::Text("%zu.", i+1);
 
-            imgui_sameline_spacing(1);
+            imgui_sameline_spacing(0);
 
             {
                 char buffer[pinned_path::LABEL_MAX_LEN + 16];
@@ -114,9 +114,9 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
             }
         }
 
-        imgui_spacing(2);
+        imgui_spacing(1);
 
-        if (imgui::Button("Create Pin From Scratch")) {
+        if (imgui::Button(ICON_CI_REPO_CREATE " Create Pin")) {
             swan_open_popup_modal_new_pin({}, true);
         }
 

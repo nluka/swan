@@ -1,8 +1,5 @@
 #pragma once
 
-#include "imgui/imgui.h"
-#include "libs/thread_pool.hpp"
-
 #include "stdafx.hpp"
 #include "path.hpp"
 #include "util.hpp"
@@ -10,24 +7,7 @@
 s32 get_page_size() noexcept;
 void set_page_size(s32) noexcept;
 
-enum class imgui_stylesheet : s32
-{
-    // default_light,
-    default_dark,
-    unreal,
-    visual_studio,
-    rounded_visual_studio,
-    material_flat,
-    photoshop,
-    deep_dark, // https://github.com/ocornut/imgui/issues/707#issuecomment-917151020
-    darcula,
-    discord_dark,
-    future_dark,
-    count,
-};
-
-void apply_imgui_stylesheet(imgui_stylesheet which) noexcept;
-void apply_swan_stylesheet() noexcept;
+void apply_swan_style_overrides() noexcept;
 
 bool explorer_init_windows_shell_com_garbage() noexcept;
 void explorer_cleanup_windows_shell_com_garbage() noexcept;
@@ -88,6 +68,8 @@ struct windows_options
     bool show_demo;
     bool show_debug_log;
     bool show_fa_icons;
+    bool show_ci_icons;
+    bool show_md_icons;
 #endif
 
     bool save_to_disk() const noexcept;
@@ -113,6 +95,8 @@ struct explorer_options
     bool automatic_refresh;
     bool show_dotdot_dir;
     bool unix_directory_separator;
+    bool cwd_entries_table_alt_row_bg;
+    bool cwd_entries_table_borders_in_body;
 
     bool save_to_disk() const noexcept;
     bool load_from_disk() noexcept;
@@ -123,8 +107,6 @@ struct explorer_options
 
 struct misc_options
 {
-    imgui_stylesheet stylesheet;
-
     bool save_to_disk() const noexcept;
     bool load_from_disk() noexcept;
 };
@@ -155,6 +137,7 @@ struct explorer_window
     bool load_from_disk(char dir_separator) noexcept;
     void select_all_cwd_entries(bool select_dotdot_dir = false) noexcept;
     void deselect_all_cwd_entries() noexcept;
+    void invert_selected_cwd_entries() noexcept;
     void set_latest_valid_cwd_then_notify(swan_path_t const &new_val) noexcept;
 
     // 80 byte alignment members
@@ -166,6 +149,16 @@ struct explorer_window
     std::condition_variable latest_valid_cwd_cond = {};
 
     // 40 byte alignment members
+
+    /* TODO:
+        add time_departed, but seralizing time_point_t is not easy: https://stackoverflow.com/questions/22291506/persisting-stdchrono-time-point-instances
+        might have to use system time instead
+    */
+    // struct history_item
+    // {
+    //     time_point_t? time_departed;
+    //     swan_path_t path;
+    // };
 
     // history for working directories, persisted in file
     circular_buffer<swan_path_t> wd_history = circular_buffer<swan_path_t>(MAX_WD_HISTORY_SIZE);
@@ -365,7 +358,7 @@ std::vector<bulk_rename_collision> bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> const &renames) noexcept;
 
-void swan_render_window_explorer(explorer_window &, bool &open) noexcept;
+void swan_render_window_explorer(explorer_window &, windows_options &, bool &open) noexcept;
 
 void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, bool &open) noexcept;
 
@@ -373,7 +366,29 @@ void swan_render_window_debug_log(bool &open) noexcept;
 
 void swan_render_window_file_operations() noexcept;
 
-void swan_render_window_fa_icons(bool &open) noexcept;
+struct icon
+{
+    char const *name;
+    char const *content;
+};
+
+std::vector<icon> const &get_font_awesome_icons() noexcept;
+std::vector<icon> const &get_codicon_icons() noexcept;
+std::vector<icon> const &get_material_design_icons() noexcept;
+
+struct icon_browser
+{
+    char search_input[256];
+    s32 grid_width;
+    std::vector<icon> matches;
+};
+
+void swan_render_window_icon_browser(
+    icon_browser &browser,
+    bool &open,
+    char const *icon_lib_name,
+    char const *icon_prefix,
+    std::vector<icon> const &(*get_all_icons)() noexcept) noexcept;
 
 void swan_open_popup_modal_bulk_rename(
     explorer_window &,

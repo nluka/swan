@@ -38,6 +38,7 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/font_awesome.h"
 #include "imgui/material_design.h"
+#include "imgui/codicons.h"
 
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers

@@ -9,7 +9,7 @@ void swan_render_window_debug_log(bool &open) noexcept
 {
     namespace imgui = ImGui;
 
-    if (imgui::Begin(" " ICON_FA_BARS " Debug Log ", &open)) {
+    if (imgui::Begin(" Debug Log ", &open)) {
         static bool auto_scroll = true;
 
         // first line
@@ -41,9 +41,10 @@ void swan_render_window_debug_log(bool &open) noexcept
 
         imgui::Checkbox("Auto-scroll at bottom", &auto_scroll);
 
+        imgui::Separator();
+
         // second line
 
-        imgui_spacing(2);
         imgui::Text("%-5s %10s %18s:%-5s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
         imgui::Separator();
 

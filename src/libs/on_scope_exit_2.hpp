@@ -22,8 +22,10 @@ namespace detail {
 
 #ifdef __COUNTER__
 #define ANONYMOUS_VARIABLE(str) CONCATENATE(str, __COUNTER__)
+#define ANON_VAR(str) CONCATENATE(str, __COUNTER__)
 #else
 #define ANONYMOUS_VARIABLE(str) CONCATENATE(str, __LINE__)
+#define ANON_VAR(str) CONCATENATE(str, __LINE__)
 #endif
 
 #define SCOPE_EXIT \

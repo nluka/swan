@@ -20,6 +20,8 @@ bool windows_options::save_to_disk() const noexcept
         out << "show_demo " << this->show_demo << '\n';
         out << "show_debug_log " << this->show_debug_log << '\n';
         out << "show_fa_icons " << this->show_fa_icons << '\n';
+        out << "show_ci_icons " << this->show_ci_icons << '\n';
+        out << "show_md_icons " << this->show_md_icons << '\n';
     #endif
 
         return true;
@@ -105,6 +107,18 @@ bool windows_options::load_from_disk() noexcept
             assert(what == "show_fa_icons");
             in >> bit_ch;
             this->show_fa_icons = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_ci_icons");
+            in >> bit_ch;
+            this->show_ci_icons = bit_ch == '1' ? 1 : 0;
+        }
+        {
+            in >> what;
+            assert(what == "show_md_icons");
+            in >> bit_ch;
+            this->show_md_icons = bit_ch == '1' ? 1 : 0;
         }
     #endif
 

@@ -22,6 +22,7 @@ void path_force_separator(swan_path_t &path, char dir_separator) noexcept;
 char path_pop_back(swan_path_t &path) noexcept;
 
 bool path_pop_back_if(swan_path_t &path, char if_ch) noexcept;
+bool path_pop_back_if(swan_path_t &path, char const *chs) noexcept;
 
 bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept;
 
