@@ -2,8 +2,13 @@
 
 #include "stdafx.hpp"
 
+// TODO:
+/*
+  Requirements for the underlying data type which will replace std::array for swan_path_t:
+  - has a .data() member function which returns a non-const char *
+  - can easily be visualized as a string in the debugger
+*/
 typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> swan_path_t;
-// typedef std::span<char> swan_path_t;
 
 [[nodiscard]] swan_path_t path_create(char const *data) noexcept;
 
