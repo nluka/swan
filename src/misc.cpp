@@ -52,7 +52,12 @@ char const *basic_dirent::kind_cstr() const noexcept
 
 char const *basic_dirent::kind_icon() const noexcept
 {
-    switch (this->type) {
+    return get_icon(this->type);
+}
+
+char const *get_icon(basic_dirent::kind t) noexcept
+{
+    switch (t) {
         case basic_dirent::kind::directory: return ICON_FA_FOLDER;
         case basic_dirent::kind::file: return ICON_FA_FILE;
         case basic_dirent::kind::symlink: return ICON_FA_EXTERNAL_LINK_ALT;

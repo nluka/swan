@@ -337,6 +337,7 @@ try
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         imgui::NewFrame();
+        SCOPE_EXIT { render(window); };
 
         imgui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
@@ -460,64 +461,6 @@ try
             }
         }
 
-        if (win_opts.show_pins_mgr) {
-            swan_render_window_pinned_directories(explorers, win_opts.show_pins_mgr);
-        }
-
-        if (win_opts.show_file_operations) {
-            swan_render_window_file_operations();
-        }
-
-        if (win_opts.show_explorer_0) {
-            swan_render_window_explorer(explorers[0], win_opts, win_opts.show_explorer_0);
-        }
-        if (win_opts.show_explorer_1) {
-            swan_render_window_explorer(explorers[1], win_opts, win_opts.show_explorer_1);
-        }
-        if (win_opts.show_explorer_2) {
-            swan_render_window_explorer(explorers[2], win_opts, win_opts.show_explorer_2);
-        }
-        if (win_opts.show_explorer_3) {
-            swan_render_window_explorer(explorers[3], win_opts, win_opts.show_explorer_3);
-        }
-
-    #if !defined(NDEBUG)
-        if (win_opts.show_debug_log) {
-            swan_render_window_debug_log(win_opts.show_debug_log);
-        }
-    {
-        static icon_browser fa_browser = { {}, 10, get_font_awesome_icons() };
-        static icon_browser ci_browser = { {}, 10, get_codicon_icons() };
-        static icon_browser md_browser = { {}, 10, get_material_design_icons() };
-
-        if (win_opts.show_fa_icons) {
-            swan_render_window_icon_browser(fa_browser, win_opts.show_fa_icons, "Font Awesome", "ICON_FA_", get_font_awesome_icons);
-        }
-        if (win_opts.show_ci_icons) {
-            swan_render_window_icon_browser(ci_browser, win_opts.show_ci_icons, "Codicons", "ICON_CI_", get_codicon_icons);
-        }
-        if (win_opts.show_md_icons) {
-            swan_render_window_icon_browser(md_browser, win_opts.show_md_icons, "Material Design", "ICON_MD_", get_material_design_icons);
-        }
-    }
-    #endif
-
-        if (swan_is_popup_modal_open_single_rename()) {
-            swan_render_popup_modal_single_rename();
-        }
-        if (swan_is_popup_modal_open_bulk_rename()) {
-            swan_render_popup_modal_bulk_rename();
-        }
-        if (swan_is_popup_modal_open_new_pin()) {
-            swan_render_popup_modal_new_pin();
-        }
-        if (swan_is_popup_modal_open_edit_pin()) {
-            swan_render_popup_modal_edit_pin();
-        }
-        if (swan_is_popup_modal_open_error()) {
-            swan_render_popup_modal_error();
-        }
-
         if (win_opts.show_analytics) {
             if (imgui::Begin(" Analytics ", &win_opts.show_analytics)) {
             #if !defined(NDEBUG)
@@ -536,9 +479,62 @@ try
         if (win_opts.show_demo) {
             imgui::ShowDemoWindow(&win_opts.show_demo);
         }
+    {
+        static icon_browser fa_browser = { {}, 10, get_font_awesome_icons() };
+        static icon_browser ci_browser = { {}, 10, get_codicon_icons() };
+        static icon_browser md_browser = { {}, 10, get_material_design_icons() };
+
+        if (win_opts.show_fa_icons) {
+            swan_render_window_icon_browser(fa_browser, win_opts.show_fa_icons, "Font Awesome", "ICON_FA_", get_font_awesome_icons);
+        }
+        if (win_opts.show_ci_icons) {
+            swan_render_window_icon_browser(ci_browser, win_opts.show_ci_icons, "Codicons", "ICON_CI_", get_codicon_icons);
+        }
+        if (win_opts.show_md_icons) {
+            swan_render_window_icon_browser(md_browser, win_opts.show_md_icons, "Material Design", "ICON_MD_", get_material_design_icons);
+        }
+    }
+        if (win_opts.show_debug_log) {
+            swan_render_window_debug_log(win_opts.show_debug_log);
+        }
     #endif
 
-        render(window);
+        if (win_opts.show_pins_mgr) {
+            swan_render_window_pinned_directories(explorers, win_opts.show_pins_mgr);
+        }
+
+        if (win_opts.show_file_operations) {
+            swan_render_window_file_operations();
+        }
+
+        if (win_opts.show_explorer_3) {
+            swan_render_window_explorer(explorers[3], win_opts, win_opts.show_explorer_3);
+        }
+        if (win_opts.show_explorer_2) {
+            swan_render_window_explorer(explorers[2], win_opts, win_opts.show_explorer_2);
+        }
+        if (win_opts.show_explorer_1) {
+            swan_render_window_explorer(explorers[1], win_opts, win_opts.show_explorer_1);
+        }
+        if (win_opts.show_explorer_0) {
+            swan_render_window_explorer(explorers[0], win_opts, win_opts.show_explorer_0);
+        }
+
+        if (swan_is_popup_modal_open_single_rename()) {
+            swan_render_popup_modal_single_rename();
+        }
+        if (swan_is_popup_modal_open_bulk_rename()) {
+            swan_render_popup_modal_bulk_rename();
+        }
+        if (swan_is_popup_modal_open_new_pin()) {
+            swan_render_popup_modal_new_pin();
+        }
+        if (swan_is_popup_modal_open_edit_pin()) {
+            swan_render_popup_modal_edit_pin();
+        }
+        if (swan_is_popup_modal_open_error()) {
+            swan_render_popup_modal_error();
+        }
     }
 
     //? I don't know if this is safe to do, would be good to look into it,
@@ -549,17 +545,17 @@ try
 }
 catch (std::exception const &except) {
     fprintf(stderr, "fatal: %s\n", except.what());
-    // std::cout << boost::stacktrace::stacktrace();
+    std::cout << boost::stacktrace::stacktrace();
 }
 catch (std::string const &err) {
     fprintf(stderr, "fatal: %s\n", err.c_str());
-    // std::cout << boost::stacktrace::stacktrace();
+    std::cout << boost::stacktrace::stacktrace();
 }
 catch (char const *err) {
     fprintf(stderr, "fatal: %s\n", err);
-    // std::cout << boost::stacktrace::stacktrace();
+    std::cout << boost::stacktrace::stacktrace();
 }
 catch (...) {
     fprintf(stderr, "fatal: unknown error, catch(...)\n");
-    // std::cout << boost::stacktrace::stacktrace();
+    std::cout << boost::stacktrace::stacktrace();
 }

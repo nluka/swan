@@ -42,6 +42,8 @@ struct basic_dirent
     char const *kind_icon() const noexcept;
 };
 
+char const *get_icon(basic_dirent::kind t) noexcept;
+
 struct drive_info
 {
     u64 total_bytes;
