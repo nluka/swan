@@ -15,43 +15,42 @@ static IShellLinkW *s_shell_link = nullptr;
 static IPersistFile *s_persist_file_interface = nullptr;
 static explorer_options s_explorer_options = {};
 static BS::thread_pool s_change_notif_thread_pool(1);
+static std::array<explorer_window, num_explorers> s_explorers = {};
+static file_operation_command_buf s_file_op_payload = {};
 
-struct generic_result
-{
-    bool success;
-    std::string error_or_utf8_path;
-};
+std::array<explorer_window, num_explorers> &get_explorers() noexcept { return s_explorers; }
+
+explorer_options &get_explorer_options() noexcept { return s_explorer_options; }
 
 bool explorer_init_windows_shell_com_garbage() noexcept
+try
 {
-    try {
-        // Initialize COM library
-        HRESULT com_handle = CoInitialize(nullptr);
-        if (FAILED(com_handle)) {
-            debug_log("CoInitialize failed");
-            return false;
-        }
-
-        com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&s_shell_link);
-        if (FAILED(com_handle)) {
-            debug_log("CoCreateInstance failed");
-            CoUninitialize();
-            return false;
-        }
-
-        com_handle = s_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&s_persist_file_interface);
-        if (FAILED(com_handle)) {
-            debug_log("failed to query IPersistFile interface");
-            s_persist_file_interface->Release();
-            CoUninitialize();
-            return false;
-        }
-
-        return true;
-    }
-    catch (...) {
+    // Initialize COM library
+    HRESULT com_handle = CoInitialize(nullptr);
+    if (FAILED(com_handle)) {
+        debug_log("CoInitialize failed");
+        CoUninitialize();
         return false;
     }
+
+    com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&s_shell_link);
+    if (FAILED(com_handle)) {
+        debug_log("CoCreateInstance failed");
+        return false;
+    }
+
+    com_handle = s_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&s_persist_file_interface);
+    if (FAILED(com_handle)) {
+        debug_log("failed to query IPersistFile interface");
+        s_persist_file_interface->Release();
+        CoUninitialize();
+        return false;
+    }
+
+    return true;
+}
+catch (...) {
+    return false;
 }
 
 struct progress_sink : public IFileOperationProgressSink {
@@ -85,11 +84,6 @@ struct progress_sink : public IFileOperationProgressSink {
         return E_NOINTERFACE;
     }
 };
-
-explorer_options &get_explorer_options() noexcept
-{
-    return s_explorer_options;
-}
 
 bool explorer_options::save_to_disk() const noexcept
 {
@@ -250,248 +244,6 @@ void explorer_cleanup_windows_shell_com_garbage() noexcept
     catch (...) {}
 }
 
-struct file_operation_payload
-{
-    struct item
-    {
-        char const *operation;
-        char operation_code;
-        basic_dirent::kind type;
-        swan_path_t path;
-    };
-
-    std::vector<item> items = {};
-
-    generic_result execute(explorer_window &expl) noexcept
-    {
-        auto file_operation_task = [](
-            std::wstring working_directory_utf16,
-            std::wstring paths_to_execute_utf16,
-            std::vector<char> operations_to_execute,
-            std::mutex *init_done_mutex,
-            std::condition_variable *init_done_cond,
-            bool *init_done,
-            std::string *init_error
-        ) {
-            {
-                assert(!working_directory_utf16.empty());
-                if (!StrChrW(L"\\/", working_directory_utf16.back())) {
-                    working_directory_utf16 += L'\\';
-                }
-            }
-
-            auto set_init_error_and_notify = [&](char const *err) {
-                std::unique_lock lock(*init_done_mutex);
-                *init_done = true;
-                *init_error = err;
-                init_done_cond->notify_one();
-            };
-
-            HRESULT result = {};
-
-            result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-            if (FAILED(result)) {
-                return set_init_error_and_notify("CoInitializeEx(COINIT_APARTMENTTHREADED)");
-            }
-            SCOPE_EXIT { CoUninitialize(); };
-
-            IFileOperation *file_op = nullptr;
-
-            result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
-            if (FAILED(result)) {
-                return set_init_error_and_notify("CoCreateInstance(CLSID_FileOperation)");
-            }
-            SCOPE_EXIT { file_op->Release(); };
-
-            result = file_op->SetOperationFlags(FOF_RENAMEONCOLLISION | FOF_NOCONFIRMATION | FOF_ALLOWUNDO);
-            if (FAILED(result)) {
-                return set_init_error_and_notify("IFileOperation::SetOperationFlags");
-            }
-
-            IShellItem *destination = nullptr;
-            {
-                swan_path_t destination_utf8 = path_create("");
-
-                result = SHCreateItemFromParsingName(working_directory_utf16.c_str(), nullptr, IID_PPV_ARGS(&destination));
-
-                if (FAILED(result)) {
-                    WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << working_directory_utf16.c_str() << "]\n");
-                    s32 written = utf16_to_utf8(working_directory_utf16.data(), destination_utf8.data(), destination_utf8.size());
-                    std::string error = {};
-                    if (written == 0) {
-                        error = "SHCreateItemFromParsingName and conversion of destination path from UTF-16 to UTF-8";
-                    } else {
-                        error.append("SHCreateItemFromParsingName [").append(destination_utf8.data()).append("]");
-                    }
-                    return set_init_error_and_notify(error.c_str());
-                }
-            }
-
-            // attach items (IShellItem) for deletion to IFileOperation
-            {
-                auto items_to_execute = std::wstring_view(paths_to_execute_utf16.data()) | std::ranges::views::split('\n');
-                std::stringstream err = {};
-                std::wstring full_path_to_exec_utf16 = {};
-
-                full_path_to_exec_utf16.reserve(get_page_size());
-
-                u64 i = 0;
-                for (auto item_utf16 : items_to_execute) {
-                    SCOPE_EXIT { ++i; };
-                    char operation_code = operations_to_execute[i];
-
-                    // full_path_to_exec_utf16.clear();
-                    // full_path_to_exec_utf16.append(working_directory_utf16);
-                    std::wstring_view view(item_utf16.begin(), item_utf16.end());
-                    // full_path_to_exec_utf16 += view;
-                    full_path_to_exec_utf16 = view;
-
-                    // shlwapi doesn't like '/', force them all to '\'
-                    std::replace(full_path_to_exec_utf16.begin(), full_path_to_exec_utf16.end(), L'/', L'\\');
-
-                    swan_path_t item_path_utf8 = path_create("");
-                    s32 written = 0;
-
-                    IShellItem *to_exec = nullptr;
-                    result = SHCreateItemFromParsingName(full_path_to_exec_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_exec));
-                    if (FAILED(result)) {
-                        WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_exec_utf16.c_str() << "]\n");
-                        written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                        if (written == 0) {
-                            err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8\n";
-                        } else {
-                            err << "SHCreateItemFromParsingName [" << item_path_utf8.data() << "]\n";
-                        }
-                        continue;
-                    }
-
-                    SCOPE_EXIT { to_exec->Release(); };
-
-                    char const *function = nullptr;
-                    switch (operation_code) {
-                        case 'C':
-                            result = file_op->CopyItem(to_exec, destination, nullptr, nullptr);
-                            function = "CopyItem";
-                            break;
-                        case 'X':
-                            result = file_op->MoveItem(to_exec, destination, nullptr, nullptr);
-                            function = "MoveItem";
-                            break;
-                        case 'D':
-                            result = file_op->DeleteItem(to_exec, nullptr);
-                            function = "DeleteItem";
-                            break;
-                    }
-
-                    if (FAILED(result)) {
-                        WCOUT_IF_DEBUG("FAILED: IFileOperation::" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
-                        written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                        if (written == 0) {
-                            err << "IFileOperation::" << function << " and conversion of delete path from UTF-16 to UTF-8\n";
-                        } else {
-                            err << "IFileOperation::" << function << " [" << item_path_utf8.data() << "]";
-                        }
-                    } else {
-                        WCOUT_IF_DEBUG("file_op->" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
-                    }
-                }
-
-                std::string errors = err.str();
-                if (!errors.empty()) {
-                    errors.pop_back(); // remove trailing '\n'
-                    return set_init_error_and_notify(errors.c_str());
-                }
-            }
-
-            progress_sink prog_sink;
-            DWORD cookie = {};
-
-            result = file_op->Advise(&prog_sink, &cookie);
-            if (FAILED(result)) {
-                return set_init_error_and_notify("IFileOperation::Advise(IFileOperationProgressSink *pfops, DWORD *pdwCookie)");
-            }
-            debug_log("IFileOperation::Advise(%d)", cookie);
-
-            set_init_error_and_notify(""); // init succeeded, no error
-
-            result = file_op->PerformOperations();
-            if (FAILED(result)) {
-                debug_log("FAILED IFileOperation::PerformOperations()");
-            }
-
-            file_op->Unadvise(cookie);
-            if (FAILED(result)) {
-                debug_log("FAILED IFileOperation::Unadvise(%d)", cookie);
-            }
-        };
-
-        wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
-        s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-        if (written == 0) {
-            debug_log("FAILED utf8_to_utf16(expl.cwd -> cwd_utf16)");
-            return { false, "conversion of current working directory path from UTF-8 to UTF-16" };
-        }
-
-        std::wstring packed_paths_to_exec_utf16 = {};
-        std::vector<char> operations_to_exec = {};
-        {
-            wchar_t item_utf16[MAX_PATH];
-            std::stringstream err = {};
-
-            operations_to_exec.reserve(this->items.size());
-
-            for (auto const &item : this->items) {
-                init_empty_cstr(item_utf16);
-                written = utf8_to_utf16(item.path.data(), item_utf16, lengthof(item_utf16));
-
-                if (written == 0) {
-                    debug_log("FAILED utf8_to_utf16(item.path -> item_utf16)");
-                    err << "conversion of [" << item.path.data() << "] from UTF-8 to UTF-16\n";
-                }
-
-                packed_paths_to_exec_utf16.append(item_utf16).append(L"\n");
-                operations_to_exec.push_back(item.operation_code);
-            }
-
-            WCOUT_IF_DEBUG("packed_paths_to_exec_utf16:\n" << packed_paths_to_exec_utf16);
-
-            if (!packed_paths_to_exec_utf16.empty()) {
-                packed_paths_to_exec_utf16.pop_back(); // remove trailing \n
-            }
-
-            std::string errors = err.str();
-            if (!errors.empty()) {
-                return { false, errors };
-            }
-        }
-
-        bool initialization_done = false;
-        std::string initialization_error = {};
-
-        get_thread_pool().push_task(file_operation_task,
-            cwd_utf16,
-            std::move(packed_paths_to_exec_utf16),
-            std::move(operations_to_exec),
-            &expl.shlwapi_task_initialization_mutex,
-            &expl.shlwapi_task_initialization_cond,
-            &initialization_done,
-            &initialization_error);
-
-        {
-            std::unique_lock lock(expl.shlwapi_task_initialization_mutex);
-            expl.shlwapi_task_initialization_cond.wait(lock, [&]() { return initialization_done; });
-        }
-
-        if (initialization_error.empty()) {
-            this->items.clear();
-        }
-
-        return { initialization_error.empty(), initialization_error };
-    }
-};
-
-static file_operation_payload s_file_op_payload = {};
-
 void explorer_window::deselect_all_cwd_entries() noexcept
 {
     for (auto &dirent : this->cwd_entries) {
@@ -529,6 +281,13 @@ void explorer_window::set_latest_valid_cwd_then_notify(swan_path_t const &new_va
         while (path_pop_back_if(this->latest_valid_cwd, "\\/ "));
     }
     this->latest_valid_cwd_cond.notify_one();
+}
+
+void explorer_window::uncut() noexcept
+{
+    for (auto &dirent : this->cwd_entries) {
+        dirent.is_cut = false;
+    }
 }
 
 static
@@ -578,8 +337,23 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
 {
     std::stringstream err = {};
 
-    for (auto const &dirent : expl.cwd_entries) {
+    for (auto &dirent : expl.cwd_entries) {
         if (!dirent.is_selected || dirent.basic.is_dotdot()) {
+            continue;
+        }
+
+        if (operation_code == 'X') {
+            if (dirent.is_cut) {
+                continue; // prevent same dirent from being cut multiple times
+                          // (although multiple copy commands of the same dirent are permitted, intentionally)
+            } else {
+                dirent.is_cut = true;
+            }
+        }
+
+        if (operation_code == 'C' && dirent.is_cut) {
+            // this situation wouldn't make sense, because you can't CopyItem after MoveItem since there's nothing left to copy
+            // TODO: maybe indicate something to the user rather than ignoring their request?
             continue;
         }
 
@@ -609,11 +383,9 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
         bool *init_done,
         std::string *init_error
     ) {
-        {
-            assert(!working_directory_utf16.empty());
-            if (!StrChrW(L"\\/", working_directory_utf16.back())) {
-                working_directory_utf16 += L'\\';
-            }
+        assert(!working_directory_utf16.empty());
+        if (!StrChrW(L"\\/", working_directory_utf16.back())) {
+            working_directory_utf16 += L'\\';
         }
 
         auto set_init_error_and_notify = [&](char const *err) {
@@ -1876,7 +1648,7 @@ void render_file_op_payload_hint() noexcept
         }
     }
     if (imgui::IsItemHovered() && imgui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        s_file_op_payload.items.clear();
+        s_file_op_payload.clear();
     }
     if (imgui::IsItemHovered()) {
         imgui::SetTooltip("File operation(s) ready\n""Left click to view\n""Right click to clear\n");
@@ -1889,7 +1661,7 @@ void render_file_op_payload_hint() noexcept
         imgui::Spacing();
         imgui::Separator();
 
-        if (imgui::BeginTable("file_operation_payload", 2)) {
+        if (imgui::BeginTable("file_operation_command_buf", 2)) {
             ImGuiListClipper clipper;
             {
                 u64 num_dirents_to_render = s_file_op_payload.items.size();
@@ -1907,7 +1679,17 @@ void render_file_op_payload_hint() noexcept
                 imgui::TableNextColumn();
                 imgui::TextColored(get_color(item.type), get_icon(item.type));
                 imgui::SameLine();
+                #if 1
                 imgui::TextUnformatted(item.path.data());
+                #else
+                {
+                    char buffer[2048]; init_empty_cstr(buffer);
+                    (void) snprintf(buffer, lengthof(buffer), "%s##file_operation_command_buf.items[%zu]", item.path.data(), i);
+                    if (imgui::Selectable(buffer)) {
+                        // TODO: jump to dirent in explorer
+                    }
+                }
+                #endif
             }
 
             imgui::EndTable();
@@ -2108,18 +1890,11 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
         imgui::CloseCurrentPopup();
     };
 
-    // set initial focus on input text below
-    if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
-        imgui::SetKeyboardFocusHere(0);
-    }
-    if (imgui::InputTextWithHint(
-        "##dir_name_input", "Directory name...", dir_name_utf8, lengthof(dir_name_utf8),
-        ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars())
-    ) {
-        err_msg.clear();
-    }
+    auto attempt_create = [&]() {
+        if (strempty(dir_name_utf8)) {
+            return;
+        }
 
-    if (imgui::Button("Create") && dir_name_utf8[0] != '\0') {
         wchar_t cwd_utf16[MAX_PATH];        init_empty_cstr(cwd_utf16);
         wchar_t dir_name_utf16[MAX_PATH];   init_empty_cstr(dir_name_utf16);
         std::wstring create_path = {};
@@ -2130,14 +1905,14 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
         if (utf_written == 0) {
             debug_log("[ %d ] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.id);
             cleanup_and_close_popup();
-            goto end_create_dir;
+            return;
         }
 
         utf_written = utf8_to_utf16(dir_name_utf8, dir_name_utf16, lengthof(dir_name_utf16));
         if (utf_written == 0) {
             debug_log("[ %d ] utf8_to_utf16 failed: dir_name_utf8 -> dir_name_utf16", expl.id);
             cleanup_and_close_popup();
-            goto end_create_dir;
+            return;
         }
 
         create_path.reserve(1024);
@@ -2163,8 +1938,24 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
             cleanup_and_close_popup();
             (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
         }
+    };
 
-        end_create_dir:;
+    // set initial focus on input text below
+    if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
+        imgui::SetKeyboardFocusHere(0);
+    }
+    if (imgui::InputTextWithHint(
+        "##dir_name_input", "Directory name...", dir_name_utf8, lengthof(dir_name_utf8),
+        ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars())
+    ) {
+        err_msg.clear();
+    }
+    if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
+        attempt_create();
+    }
+
+    if (imgui::Button("Create")) {
+        attempt_create();
     }
 
     imgui::SameLine();
@@ -2387,18 +2178,11 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
         imgui::CloseCurrentPopup();
     };
 
-    // set initial focus on input text below
-    if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
-        imgui::SetKeyboardFocusHere(0);
-    }
-    if (imgui::InputTextWithHint(
-        "##file_name_input", "File name...", file_name_utf8, lengthof(file_name_utf8),
-        ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars())
-    ) {
-        err_msg.clear();
-    }
+    auto attempt_create = [&]() {
+        if (strempty(file_name_utf8)) {
+            return;
+        }
 
-    if (imgui::Button("Create") && file_name_utf8[0] != '\0') {
         wchar_t cwd_utf16[MAX_PATH];        init_empty_cstr(cwd_utf16);
         wchar_t file_name_utf16[MAX_PATH];  init_empty_cstr(file_name_utf16);
         std::wstring create_path = {};
@@ -2409,14 +2193,14 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
         if (utf_written == 0) {
             debug_log("[ %d ] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.id);
             cleanup_and_close_popup();
-            goto end_create_file;
+            return;
         }
 
         utf_written = utf8_to_utf16(file_name_utf8, file_name_utf16, lengthof(file_name_utf16));
         if (utf_written == 0) {
             debug_log("[ %d ] utf8_to_utf16 failed: file_name_utf8 -> file_name_utf16", expl.id);
             cleanup_and_close_popup();
-            goto end_create_file;
+            return;
         }
 
         create_path.reserve(1024);
@@ -2450,8 +2234,24 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
             cleanup_and_close_popup();
             (void) update_cwd_entries(full_refresh, &expl, expl.cwd.data());
         }
+    };
 
-        end_create_file:;
+    // set initial focus on input text below
+    if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
+        imgui::SetKeyboardFocusHere(0);
+    }
+    if (imgui::InputTextWithHint(
+        "##file_name_input", "File name...", file_name_utf8, lengthof(file_name_utf8),
+        ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars())
+    ) {
+        err_msg.clear();
+    }
+    if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
+        attempt_create();
+    }
+
+    if (imgui::Button("Create")) {
+        attempt_create();
     }
 
     imgui::SameLine();
@@ -2523,7 +2323,7 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
             auto cwd_len = path_length(expl.cwd);
 
             if ( (cwd_len == 2 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':') ||
-                    (cwd_len == 3 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':' && strchr("\\/", expl.cwd[2])) )
+                 (cwd_len == 3 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':' && strchr("\\/", expl.cwd[2])) )
             {
                 path_clear(expl.cwd);
             }
@@ -2713,6 +2513,10 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
         expl.is_window_visible.notify_one();
     }
 
+    // if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+    //     debug_log("%s focused", expl.name);
+    // }
+
     auto &io = imgui::GetIO();
     auto &style = imgui::GetStyle();
     bool any_window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
@@ -2733,21 +2537,42 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
     static std::string error_popup_action = {};
     static std::string error_popup_failure = {};
 
-    // if (window_focused) {
-    //     save_focused_window(expl.id);
-    // }
-
     static explorer_window::dirent const *dirent_to_be_renamed = nullptr;
 
-    // handle [F2] pressed on cwd entry
-    if (any_window_focused && !any_popups_open && imgui::IsKeyPressed(ImGuiKey_F2)) {
-        if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
-            swan_open_popup_modal_error("[F2] was pressed (function: rename)", "nothing is selected");
-        } else {
-            auto &dirent_which_f2_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
-            debug_log("[ %d ] pressed F2 on [%s]", expl.id, dirent_which_f2_was_pressed_on.basic.path.data());
-            open_single_rename_popup = true;
-            dirent_to_be_renamed = &dirent_which_f2_was_pressed_on;
+    // handle [F2], [Ctrl-X], [Ctrl-C], [Ctrl-V]
+    if (any_window_focused && !any_popups_open && io.KeyCtrl) {
+        if (imgui::IsKeyPressed(ImGuiKey_F2)) {
+            if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
+                swan_open_popup_modal_error("[F2] was pressed (function: rename)", "nothing is selected");
+            } else {
+                auto &dirent_which_f2_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
+                debug_log("[ %d ] pressed F2 on [%s]", expl.id, dirent_which_f2_was_pressed_on.basic.path.data());
+                open_single_rename_popup = true;
+                dirent_to_be_renamed = &dirent_which_f2_was_pressed_on;
+            }
+        }
+
+        auto handle_failure = [](char const *operation, generic_result const &result) {
+            if (!result.success) {
+                u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
+                std::stringstream action;
+                action << operation << ' ' << num_failed << " items";
+                swan_open_popup_modal_error(action.str().c_str(), result.error_or_utf8_path.c_str());
+            }
+        };
+
+        if (imgui::IsKeyPressed(ImGuiKey_X)) {
+            s_file_op_payload.clear();
+            auto result = add_selected_entries_to_file_op_payload(expl, "Cut", 'X');
+            handle_failure("cut", result);
+        }
+        if (imgui::IsKeyPressed(ImGuiKey_C)) {
+            s_file_op_payload.clear();
+            auto result = add_selected_entries_to_file_op_payload(expl, "Copy", 'C');
+            handle_failure("copy", result);
+        }
+        if (imgui::IsKeyPressed(ImGuiKey_V) && !s_file_op_payload.items.empty()) {
+            s_file_op_payload.execute(expl);
         }
     }
 
@@ -2916,117 +2741,6 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
         imgui::EndTable();
     }
 
-    // paste payload description start
-#if 0
-    if (!s_file_op_payload.items.empty()) {
-        imgui_spacing(3);
-
-        if (imgui::Button("Paste")) {
-            bool keep_src = s_file_op_payload.keep_src;
-
-            // TODO: setup IFileOperation
-
-            for (auto const &paste_item : s_file_op_payload.items) {
-                if (paste_item.type == basic_dirent::kind::directory) {
-                    if (keep_src) {
-                        // copy directory
-                    }
-                    else {
-                        // move directory
-                    }
-                }
-                else {
-                    if (keep_src) {
-                        // copy file
-                    }
-                    else {
-                        // move file
-                    }
-                }
-            }
-
-            // TODO: cleanup IFileOperation
-        }
-
-        imgui::SameLine();
-
-        if (imgui::Button("X##Cancel")) {
-            s_file_op_payload.items.clear();
-        }
-
-        imgui_sameline_spacing(1);
-
-        u64 num_dirs = 0, num_symlinks = 0, num_files = 0;
-        for (auto const &item : s_file_op_payload.items) {
-            num_dirs     += u64(item.type == basic_dirent::kind::directory);
-            num_symlinks += u64(item.type == basic_dirent::kind::symlink);
-            num_files    += u64(item.type == basic_dirent::kind::file);
-        }
-
-        if (num_dirs > 0) {
-            imgui::SameLine();
-            imgui::TextColored(get_color(basic_dirent::kind::directory), "%zud", num_dirs);
-        }
-        if (num_symlinks > 0) {
-            imgui::SameLine();
-            imgui::TextColored(get_color(basic_dirent::kind::symlink), "%zus", num_symlinks);
-        }
-        if (num_files > 0) {
-            imgui::SameLine();
-            imgui::TextColored(get_color(basic_dirent::kind::file), "%zuf", num_files);
-        }
-
-        imgui::SameLine();
-        imgui::Text("ready to be %s from %s", (s_file_op_payload.keep_src ? "copied" : "cut"), s_file_op_payload.window_name);
-
-        if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
-            imgui::TextUnformatted("from");
-            imgui::SameLine();
-            {
-                std::string_view parent_path_view = get_everything_minus_file_name(s_file_op_payload.items.front().path.data());
-                char parent_path_utf8[2048]; init_empty_cstr(parent_path_utf8);
-                strncat(parent_path_utf8, parent_path_view.data(), parent_path_view.size());
-                imgui::TextColored(dir_color(), parent_path_utf8);
-            }
-
-            imgui::Spacing();
-            imgui::Separator();
-            imgui::Spacing();
-
-            {
-                char pretty_size[32]; init_empty_cstr(pretty_size);
-                format_file_size(s_file_op_payload.bytes, pretty_size, lengthof(pretty_size), size_unit_multiplier);
-                if (s_file_op_payload.has_directories) {
-                    imgui::Text(">= %s", pretty_size);
-                } else {
-                    imgui::TextUnformatted(pretty_size);
-                }
-            }
-
-            imgui::Spacing();
-            imgui::Separator();
-            imgui::Spacing();
-
-            for (auto const &item : s_file_op_payload.items) {
-                ImVec4 color;
-                switch (item.type) {
-                    case basic_dirent::kind::directory: color = dir_color();     break;
-                    case basic_dirent::kind::symlink:   color = symlink_color(); break;
-                    case basic_dirent::kind::file:      color = file_color();    break;
-                    default:
-                        ImVec4 white(1.0, 1.0, 1.0, 1.0);
-                        color = white;
-                        break;
-                }
-                imgui::TextColored(color, cget_file_name(item.path.data()));
-            }
-
-            imgui::EndTooltip();
-        }
-    }
-#endif
-    // paste payload description end
-
     if (expl.filter_error != "") {
         imgui::PushTextWrapPos(imgui::GetColumnWidth());
         imgui::TextColored(red(), "%s", expl.filter_error.c_str());
@@ -3148,7 +2862,12 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
                             char buffer[2048]; init_empty_cstr(buffer);
                             snprintf(buffer, lengthof(buffer), "%s##dirent%zu", path, i);
 
-                            imgui::TextColored(get_color(dirent.basic.type), "%s", dirent.basic.kind_icon());
+                            {
+                                ImVec4 color = get_color(dirent.basic.type);
+                                f32 &alpha = color.w;
+                                alpha = 1.0f - (f32(dirent.is_cut) * 0.75f);
+                                imgui::TextColored(color, "%s", dirent.basic.kind_icon());
+                            }
 
                             imgui::SameLine();
 
@@ -3409,7 +3128,7 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
 
                         if (imgui::Selectable("Cut##single")) {
                             if (!io.KeyShift) {
-                                s_file_op_payload.items.clear();
+                                s_file_op_payload.clear();
                             }
                             expl.deselect_all_cwd_entries();
                             right_clicked_ent->is_selected = true;
@@ -3418,7 +3137,7 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
                         }
                         if (imgui::Selectable("Copy##single")) {
                             if (!io.KeyShift) {
-                                s_file_op_payload.items.clear();
+                                s_file_op_payload.clear();
                             }
                             expl.deselect_all_cwd_entries();
                             right_clicked_ent->is_selected = true;
@@ -3451,14 +3170,14 @@ void swan_render_window_explorer(explorer_window &expl, windows_options &win_opt
 
                         if (imgui::Selectable("Cut##multi")) {
                             if (!io.KeyShift) {
-                                s_file_op_payload.items.clear();
+                                s_file_op_payload.clear();
                             }
                             auto result = add_selected_entries_to_file_op_payload(expl, "Cut", 'X');
                             handle_failure("cut", result);
                         }
                         if (imgui::Selectable("Copy##multi")) {
                             if (!io.KeyShift) {
-                                s_file_op_payload.items.clear();
+                                s_file_op_payload.clear();
                             }
                             auto result = add_selected_entries_to_file_op_payload(expl, "Copy", 'C');
                             handle_failure("copy", result);
@@ -3674,6 +3393,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
             }
             else {
                 switch (wait_status) {
+                    // TODO: investigate why this is being called so many times when changes are happening, maybe this is a bug?
                     case WAIT_OBJECT_0: {
                         debug_log("[ %d ] WAIT_OBJECT_0 h=%d target=[%s]", expl.id, watch_handle, watch_target_utf8.data());
 
@@ -3709,4 +3429,236 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
 
     BOOL closed = FindCloseChangeNotification(watch_handle);
     assert(closed && "FindCloseChangeNotification failed at program exit");
+}
+
+void file_operation_command_buf::clear() noexcept
+{
+    s_file_op_payload.items.clear();
+
+    auto &all_explorers = get_explorers();
+    for (auto &expl : all_explorers) {
+        expl.uncut();
+    }
+}
+
+generic_result file_operation_command_buf::execute(explorer_window &expl) noexcept
+{
+    auto file_operation_task = [](
+        std::wstring working_directory_utf16,
+        std::wstring paths_to_execute_utf16,
+        std::vector<char> operations_to_execute,
+        std::mutex *init_done_mutex,
+        std::condition_variable *init_done_cond,
+        bool *init_done,
+        std::string *init_error
+    ) {
+        assert(!working_directory_utf16.empty());
+        if (!StrChrW(L"\\/", working_directory_utf16.back())) {
+            working_directory_utf16 += L'\\';
+        }
+
+        auto set_init_error_and_notify = [&](char const *err) {
+            std::unique_lock lock(*init_done_mutex);
+            *init_done = true;
+            *init_error = err;
+            init_done_cond->notify_one();
+        };
+
+        HRESULT result = {};
+
+        result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        if (FAILED(result)) {
+            return set_init_error_and_notify("CoInitializeEx(COINIT_APARTMENTTHREADED)");
+        }
+        SCOPE_EXIT { CoUninitialize(); };
+
+        IFileOperation *file_op = nullptr;
+
+        result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
+        if (FAILED(result)) {
+            return set_init_error_and_notify("CoCreateInstance(CLSID_FileOperation)");
+        }
+        SCOPE_EXIT { file_op->Release(); };
+
+        result = file_op->SetOperationFlags(FOF_RENAMEONCOLLISION | FOF_NOCONFIRMATION | FOF_ALLOWUNDO);
+        if (FAILED(result)) {
+            return set_init_error_and_notify("IFileOperation::SetOperationFlags");
+        }
+
+        IShellItem *destination = nullptr;
+        {
+            swan_path_t destination_utf8 = path_create("");
+
+            result = SHCreateItemFromParsingName(working_directory_utf16.c_str(), nullptr, IID_PPV_ARGS(&destination));
+
+            if (FAILED(result)) {
+                WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << working_directory_utf16.c_str() << "]\n");
+                s32 written = utf16_to_utf8(working_directory_utf16.data(), destination_utf8.data(), destination_utf8.size());
+                std::string error = {};
+                if (written == 0) {
+                    error = "SHCreateItemFromParsingName and conversion of destination path from UTF-16 to UTF-8";
+                } else {
+                    error.append("SHCreateItemFromParsingName [").append(destination_utf8.data()).append("]");
+                }
+                return set_init_error_and_notify(error.c_str());
+            }
+        }
+
+        // attach items (IShellItem) for deletion to IFileOperation
+        {
+            auto items_to_execute = std::wstring_view(paths_to_execute_utf16.data()) | std::ranges::views::split('\n');
+            std::stringstream err = {};
+            std::wstring full_path_to_exec_utf16 = {};
+
+            full_path_to_exec_utf16.reserve(get_page_size());
+
+            u64 i = 0;
+            for (auto item_utf16 : items_to_execute) {
+                SCOPE_EXIT { ++i; };
+                char operation_code = operations_to_execute[i];
+
+                std::wstring_view view(item_utf16.begin(), item_utf16.end());
+                full_path_to_exec_utf16 = view;
+
+                // shlwapi doesn't like '/', force them all to '\'
+                std::replace(full_path_to_exec_utf16.begin(), full_path_to_exec_utf16.end(), L'/', L'\\');
+
+                swan_path_t item_path_utf8 = path_create("");
+                s32 written = 0;
+
+                IShellItem *to_exec = nullptr;
+                result = SHCreateItemFromParsingName(full_path_to_exec_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_exec));
+                if (FAILED(result)) {
+                    WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_exec_utf16.c_str() << "]\n");
+                    written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
+                    if (written == 0) {
+                        err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8\n";
+                    } else {
+                        err << "SHCreateItemFromParsingName [" << item_path_utf8.data() << "]\n";
+                    }
+                    continue;
+                }
+
+                SCOPE_EXIT { to_exec->Release(); };
+
+                char const *function = nullptr;
+                switch (operation_code) {
+                    case 'C':
+                        result = file_op->CopyItem(to_exec, destination, nullptr, nullptr);
+                        function = "CopyItem";
+                        break;
+                    case 'X':
+                        result = file_op->MoveItem(to_exec, destination, nullptr, nullptr);
+                        function = "MoveItem";
+                        break;
+                    case 'D':
+                        result = file_op->DeleteItem(to_exec, nullptr);
+                        function = "DeleteItem";
+                        break;
+                }
+
+                if (FAILED(result)) {
+                    WCOUT_IF_DEBUG("FAILED: IFileOperation::" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
+                    written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
+                    if (written == 0) {
+                        err << "IFileOperation::" << function << " and conversion of delete path from UTF-16 to UTF-8\n";
+                    } else {
+                        err << "IFileOperation::" << function << " [" << item_path_utf8.data() << "]";
+                    }
+                } else {
+                    WCOUT_IF_DEBUG("file_op->" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
+                }
+            }
+
+            std::string errors = err.str();
+            if (!errors.empty()) {
+                errors.pop_back(); // remove trailing '\n'
+                return set_init_error_and_notify(errors.c_str());
+            }
+        }
+
+        progress_sink prog_sink;
+        DWORD cookie = {};
+
+        result = file_op->Advise(&prog_sink, &cookie);
+        if (FAILED(result)) {
+            return set_init_error_and_notify("IFileOperation::Advise(IFileOperationProgressSink *pfops, DWORD *pdwCookie)");
+        }
+        debug_log("IFileOperation::Advise(%d)", cookie);
+
+        set_init_error_and_notify(""); // init succeeded, no error
+
+        result = file_op->PerformOperations();
+        if (FAILED(result)) {
+            debug_log("FAILED IFileOperation::PerformOperations()");
+        }
+
+        file_op->Unadvise(cookie);
+        if (FAILED(result)) {
+            debug_log("FAILED IFileOperation::Unadvise(%d)", cookie);
+        }
+    };
+
+    wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
+    s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
+    if (written == 0) {
+        debug_log("FAILED utf8_to_utf16(expl.cwd -> cwd_utf16)");
+        return { false, "conversion of current working directory path from UTF-8 to UTF-16" };
+    }
+
+    std::wstring packed_paths_to_exec_utf16 = {};
+    std::vector<char> operations_to_exec = {};
+    {
+        wchar_t item_utf16[MAX_PATH];
+        std::stringstream err = {};
+
+        operations_to_exec.reserve(this->items.size());
+
+        for (auto const &item : this->items) {
+            init_empty_cstr(item_utf16);
+            written = utf8_to_utf16(item.path.data(), item_utf16, lengthof(item_utf16));
+
+            if (written == 0) {
+                debug_log("FAILED utf8_to_utf16(item.path -> item_utf16)");
+                err << "conversion of [" << item.path.data() << "] from UTF-8 to UTF-16\n";
+            }
+
+            packed_paths_to_exec_utf16.append(item_utf16).append(L"\n");
+            operations_to_exec.push_back(item.operation_code);
+        }
+
+        WCOUT_IF_DEBUG("packed_paths_to_exec_utf16:\n" << packed_paths_to_exec_utf16);
+
+        if (!packed_paths_to_exec_utf16.empty()) {
+            packed_paths_to_exec_utf16.pop_back(); // remove trailing \n
+        }
+
+        std::string errors = err.str();
+        if (!errors.empty()) {
+            return { false, errors };
+        }
+    }
+
+    bool initialization_done = false;
+    std::string initialization_error = {};
+
+    get_thread_pool().push_task(file_operation_task,
+        cwd_utf16,
+        std::move(packed_paths_to_exec_utf16),
+        std::move(operations_to_exec),
+        &expl.shlwapi_task_initialization_mutex,
+        &expl.shlwapi_task_initialization_cond,
+        &initialization_done,
+        &initialization_error);
+
+    {
+        std::unique_lock lock(expl.shlwapi_task_initialization_mutex);
+        expl.shlwapi_task_initialization_cond.wait(lock, [&]() { return initialization_done; });
+    }
+
+    if (initialization_error.empty()) {
+        this->items.clear();
+    }
+
+    return { initialization_error.empty(), initialization_error };
 }
