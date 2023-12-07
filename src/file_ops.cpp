@@ -1,10 +1,10 @@
 #include "imgui/imgui.h"
 
-#include "common.hpp"
+#include "common_fns.hpp"
 
 static circular_buffer<file_operation> s_file_ops_buffer(100);
 
-circular_buffer<file_operation> const &get_file_ops_buffer() noexcept
+circular_buffer<file_operation> const &global_state::file_ops_buffer() noexcept
 {
     return s_file_ops_buffer;
 }
@@ -49,18 +49,20 @@ file_operation &file_operation::operator=(file_operation const &other) noexcept 
     return *this;
 }
 
-void swan_render_window_file_operations() noexcept
+void swan_windows::render_file_operations() noexcept
 {
-    namespace imgui = ImGui;
-
     if (!imgui::Begin("File Operations")) {
         imgui::End();
         return;
     }
 
+    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+        global_state::save_focused_window(swan_windows::file_operations);
+    }
+
     [[maybe_unused]] auto &io = imgui::GetIO();
 
-    auto const &file_ops_buffer = get_file_ops_buffer();
+    auto const &file_ops_buffer = global_state::file_ops_buffer();
 
     enum file_ops_table_col : s32
     {

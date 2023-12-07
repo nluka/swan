@@ -1,22 +1,15 @@
 #include "imgui/imgui.h"
 
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
 #include "scoped_timer.hpp"
-
-namespace imgui = ImGui;
 
 static bool s_bulk_rename_open = false;
 static explorer_window *s_bulk_rename_expl = nullptr;
 static std::vector<explorer_window::dirent *> s_bulk_rename_selection = {};
 static std::function<void ()> s_bulk_rename_on_rename_finish_callback = {};
 
-char const *swan_id_bulk_rename_popup_modal() noexcept
-{
-    return "Bulk Rename";
-}
-
-void swan_open_popup_modal_bulk_rename(
+void swan_popup_modals::open_bulk_rename(
     explorer_window &expl,
     std::function<void ()> on_rename_finish_callback) noexcept
 {
@@ -35,17 +28,17 @@ void swan_open_popup_modal_bulk_rename(
     s_bulk_rename_on_rename_finish_callback = on_rename_finish_callback;
 }
 
-bool swan_is_popup_modal_open_bulk_rename() noexcept
+bool swan_popup_modals::is_open_bulk_rename() noexcept
 {
     return s_bulk_rename_open;
 }
 
-void swan_render_popup_modal_bulk_rename() noexcept
+void swan_popup_modals::render_bulk_rename() noexcept
 {
     if (s_bulk_rename_open) {
-        imgui::OpenPopup(swan_id_bulk_rename_popup_modal());
+        imgui::OpenPopup(swan_popup_modals::bulk_rename);
     }
-    if (!imgui::BeginPopupModal(swan_id_bulk_rename_popup_modal(), nullptr)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::bulk_rename, nullptr)) {
         return;
     }
 
@@ -55,7 +48,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
     auto &expl = *s_bulk_rename_expl;
     auto &selection = s_bulk_rename_selection;
 
-    wchar_t dir_sep_utf16 = get_explorer_options().dir_separator_utf16();
+    wchar_t dir_sep_utf16 = global_state::explorer_options_().dir_separator_utf16();
 
     static char pattern_utf8[512] = "<name><dotext>";
     static s32 counter_start = 1;
@@ -139,7 +132,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
     u64 num_transform_errors = 0;
 
     if (!initial_computed || recompute) {
-        debug_log("[%s] recomputing pattern, renames, collisions", expl.name);
+        print_debug_log("[%s] recomputing pattern, renames, collisions", expl.name);
 
         renames.reserve(selection.size());
         renames.clear();
@@ -241,7 +234,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
 
     imgui::Separator();
 
-    if (get_explorer_options().show_debug_info) {
+    if (global_state::explorer_options_().show_debug_info) {
         imgui::Text("transform_us: %.2lf", transform_us);
         imgui::Text("collisions_us: %.2lf", collisions_us);
     }
@@ -302,12 +295,13 @@ void swan_render_popup_modal_bulk_rename() noexcept
         }
     }
     else if (!pattern_compile_res.success) {
-        auto &error = pattern_compile_res.error;
-        error.front() = (char)toupper(error.front());
+        auto &compile_error = pattern_compile_res.error;
+        compile_error.front() = (char)toupper(compile_error.front());
 
         imgui::PushTextWrapPos(imgui::GetColumnWidth());
-        imgui::TextColored(red(), error.data());
-        imgui::PopTextWrapPos();
+        SCOPE_EXIT { imgui::PopTextWrapPos(); };
+
+        imgui::TextColored(red(), compile_error.data());
     }
     else { // show preview
         if (imgui::BeginChild("bulk_rename_child")) {
@@ -376,7 +370,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(expl_cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
 
                     if (utf_written == 0) {
-                        debug_log("utf8_to_utf16 failed (expl_cwd -> buffer_cwd_utf16)");
+                        print_debug_log("utf8_to_utf16 failed (expl_cwd -> buffer_cwd_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -385,7 +379,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(rename.before->path.data(), buffer_before_utf16, lengthof(buffer_before_utf16));
 
                     if (utf_written == 0) {
-                        debug_log("utf8_to_utf16 failed (rename.before.path -> buffer_before_utf16)");
+                        print_debug_log("utf8_to_utf16 failed (rename.before.path -> buffer_before_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -399,7 +393,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(rename.after.data(), buffer_after_utf16, lengthof(buffer_after_utf16));
 
                     if (utf_written == 0) {
-                        debug_log("utf8_to_utf16 failed (rename.after -> buffer_after_utf16)");
+                        print_debug_log("utf8_to_utf16 failed (rename.after -> buffer_after_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -427,7 +421,7 @@ void swan_render_popup_modal_bulk_rename() noexcept
             // TODO: change assert into proper error handling
             assert(num_transform_errors == 0);
 
-            get_thread_pool().push_task(bulk_rename_task, renames, expl.cwd, dir_sep_utf16);
+            global_state::thread_pool().push_task(bulk_rename_task, renames, expl.cwd, dir_sep_utf16);
         }
     }
 

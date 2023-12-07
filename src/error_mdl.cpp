@@ -1,20 +1,13 @@
 #include "imgui/imgui.h"
 
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
-
-namespace imgui = ImGui;
 
 static bool s_error_open = false;
 static std::string s_error_action = {};
 static std::string s_error_failure = {};
 
-char const *swan_id_error_popup_modal() noexcept
-{
-    return "Error";
-}
-
-void swan_open_popup_modal_error(char const *action, char const *failure) noexcept
+void swan_popup_modals::open_error(char const *action, char const *failure) noexcept
 {
     s_error_open = true;
 
@@ -44,17 +37,17 @@ void swan_open_popup_modal_error(char const *action, char const *failure) noexce
     }
 }
 
-bool swan_is_popup_modal_open_error() noexcept
+bool swan_popup_modals::is_open_error() noexcept
 {
     return s_error_open;
 }
 
-void swan_render_popup_modal_error() noexcept
+void swan_popup_modals::render_error() noexcept
 {
     if (s_error_open) {
-        imgui::OpenPopup(swan_id_error_popup_modal());
+        imgui::OpenPopup(swan_popup_modals::error);
     }
-    if (!imgui::BeginPopupModal(swan_id_error_popup_modal(), &s_error_open)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::error, &s_error_open)) {
         return;
     }
 
@@ -68,17 +61,20 @@ void swan_render_popup_modal_error() noexcept
         imgui::CloseCurrentPopup();
     };
 
-    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 75.0f);
-    if (s_error_action.empty()) {
-        imgui::TextColored(red(), "%s", s_error_failure.c_str());
+    {
+        ImGui::PushTextWrapPos(ImGui::GetContentRegionAvail().x);
+        SCOPE_EXIT { imgui::PopTextWrapPos(); };
+
+        if (s_error_action.empty()) {
+            imgui::TextColored(red(), "%s", s_error_failure.c_str());
+        }
+        else {
+            imgui::TextUnformatted("Failed:");
+            imgui::TextColored(orange(), "%s", s_error_action.c_str());
+            imgui::TextUnformatted("Reason:");
+            imgui::TextColored(red(), "%s", s_error_failure.c_str());
+        }
     }
-    else {
-        imgui::TextUnformatted("Failed:");
-        imgui::TextColored(orange(), "%s", s_error_action.c_str());
-        imgui::TextUnformatted("Reason:");
-        imgui::TextColored(red(), "%s", s_error_failure.c_str());
-    }
-    imgui::PopTextWrapPos();
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
         cleanup_and_close_popup();

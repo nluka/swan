@@ -3,7 +3,7 @@
 #include "imgui/imgui.h"
 
 #include "stdafx.hpp"
-#include "common.hpp"
+#include "common_fns.hpp"
 
 ImVec4 orange() noexcept;
 ImVec4 red() noexcept;
@@ -97,7 +97,7 @@ struct debug_log_package
 
 // https://stackoverflow.com/questions/57547273/how-to-use-source-location-in-a-variadic-template-function
 template <typename... Args>
-void debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args) noexcept
+void print_debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args) noexcept
 {
     if (!debug_log_package::s_logging_enabled) {
         return;

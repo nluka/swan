@@ -1,15 +1,17 @@
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
 bool debug_log_package::s_logging_enabled = true;
 ImGuiTextBuffer debug_log_package::s_buffer = {};
 std::mutex debug_log_package::s_mutex = {};
 
-void swan_render_window_debug_log(bool &open) noexcept
+void swan_windows::render_debug_log(bool &open) noexcept
 {
-    namespace imgui = ImGui;
-
     if (imgui::Begin(" Debug Log ", &open)) {
+        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+            global_state::save_focused_window(swan_windows::debug_log);
+        }
+
         static bool auto_scroll = true;
 
         // first line

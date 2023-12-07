@@ -1,4 +1,4 @@
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "path.hpp"
 
 bool bulk_rename_op::operator!=(bulk_rename_op const &other) const noexcept // for ntest

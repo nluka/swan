@@ -1,5 +1,5 @@
 #include "stdafx.hpp"
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
 #include "util.hpp"
 
@@ -27,12 +27,14 @@ struct reorder_pin_payload
     u64 src_index;
 };
 
-void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_window, 4> &explorers, bool &open) noexcept
+void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_window, global_state::num_explorers> &explorers, bool &open) noexcept
 {
-    namespace imgui = ImGui;
-
     if (imgui::Begin(" Pinned ", &open)) {
-        std::vector<pinned_path> &pins = get_pins();
+        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+            global_state::save_focused_window(swan_windows::pin_manager);
+        }
+
+        std::vector<pinned_path> &pins = global_state::pins();
 
         u64 const npos = u64(-1);
         u64 pin_to_delete_idx = npos;
@@ -44,8 +46,8 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
                 char buffer[32];
                 snprintf(buffer, lengthof(buffer), "Color##%zu", i);
                 if (imgui::ColorEdit4(buffer, &pin.color.x, ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_NoLabel/*|ImGuiColorEditFlags_NoBorder*/)) {
-                    bool save_success = save_pins_to_disk();
-                    debug_log("save_pins_to_disk: %d", save_success);
+                    bool save_success = global_state::save_pins_to_disk();
+                    print_debug_log("global_state::save_pins_to_disk: %d", save_success);
                 }
             }
 
@@ -55,7 +57,7 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
                 char buffer[32];
                 snprintf(buffer, lengthof(buffer), ICON_CI_EDIT "##pin%zu", i);
                 if (imgui::Button(buffer)) {
-                    swan_open_popup_modal_edit_pin(&pin);
+                    swan_popup_modals::open_edit_pin(&pin);
                 }
             }
 
@@ -102,11 +104,11 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
                     u64 to = i;
 
                     bool reorder_success = change_element_position(pins, from, to);
-                    debug_log("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
+                    print_debug_log("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
 
                     if (reorder_success) {
-                        bool save_success = save_pins_to_disk();
-                        debug_log("save_pins_to_disk: %d", save_success);
+                        bool save_success = global_state::save_pins_to_disk();
+                        print_debug_log("global_state::save_pins_to_disk: %d", save_success);
                     }
                 }
 
@@ -117,29 +119,25 @@ void swan_render_window_pinned_directories([[maybe_unused]] std::array<explorer_
         imgui_spacing(1);
 
         if (imgui::Button(ICON_CI_REPO_CREATE " Create Pin")) {
-            swan_open_popup_modal_new_pin({}, true);
+            swan_popup_modals::open_new_pin({}, true);
         }
-
-        // if (imgui::Button("Reload Pins")) {
-        //     (void) load_pins_from_disk(get_explorer_options().dir_separator_utf8());
-        // }
 
         if (pin_to_delete_idx != npos) {
             pins.erase(pins.begin() + pin_to_delete_idx);
-            bool success = save_pins_to_disk();
-            debug_log("delete pins[%zu], save_pins_to_disk: %d", pin_to_delete_idx, success);
+            bool success = global_state::save_pins_to_disk();
+            print_debug_log("delete pins[%zu], global_state::save_pins_to_disk: %d", pin_to_delete_idx, success);
         }
     }
 
     imgui::End();
 }
 
-std::vector<pinned_path> &get_pins() noexcept
+std::vector<pinned_path> &global_state::pins() noexcept
 {
     return s_pins;
 }
 
-bool pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept
+bool global_state::add_pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept
 {
     path_force_separator(path, dir_separator);
 
@@ -151,7 +149,7 @@ bool pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator)
     }
 }
 
-void unpin(u64 pin_idx) noexcept
+void global_state::remove_pin(u64 pin_idx) noexcept
 {
     [[maybe_unused]] u64 last_idx = s_pins.size() - 1;
 
@@ -160,7 +158,7 @@ void unpin(u64 pin_idx) noexcept
     s_pins.erase(s_pins.begin() + pin_idx);
 }
 
-void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
+void global_state::swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
 {
     assert(pin1_idx != pin2_idx);
 
@@ -173,7 +171,7 @@ void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
     std::swap(*(s_pins.begin() + pin1_idx), *(s_pins.begin() + pin2_idx));
 }
 
-u64 find_pin_idx(swan_path_t const &path) noexcept
+u64 global_state::find_pin_idx(swan_path_t const &path) noexcept
 {
     for (u64 i = 0; i < s_pins.size(); ++i) {
         if (path_loosely_same(s_pins[i].path, path)) {
@@ -183,7 +181,7 @@ u64 find_pin_idx(swan_path_t const &path) noexcept
     return std::string::npos;
 }
 
-bool save_pins_to_disk() noexcept
+bool global_state::save_pins_to_disk() noexcept
 {
     try {
         std::ofstream out("data/pins.txt");
@@ -191,7 +189,7 @@ bool save_pins_to_disk() noexcept
             return false;
         }
 
-        auto const &pins = get_pins();
+        auto const &pins = global_state::pins();
         for (auto const &pin : pins) {
             out
                 << pin.color.x << ' '
@@ -211,14 +209,14 @@ bool save_pins_to_disk() noexcept
     }
 }
 
-void update_pin_dir_separators(char new_dir_separator) noexcept
+void global_state::update_pin_dir_separators(char new_dir_separator) noexcept
 {
     for (auto &pin : s_pins) {
         path_force_separator(pin.path, new_dir_separator);
     }
 }
 
-std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept
+std::pair<bool, u64> global_state::load_pins_from_disk(char dir_separator) noexcept
 {
     try {
         std::ifstream in("data/pins.txt");
@@ -229,7 +227,7 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept
         s_pins.clear();
 
         std::string line = {};
-        line.reserve(get_page_size() - 1);
+        line.reserve(global_state::page_size() - 1);
 
         u64 num_loaded_successfully = 0;
 
@@ -256,7 +254,7 @@ std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept
                 out.ignore(1);
                 out.read(path.data(), path_len);
 
-                pin(color, label, path, dir_separator);
+                global_state::add_pin(color, label, path, dir_separator);
                 ++num_loaded_successfully;
 
                 line.clear();

@@ -1,16 +1,15 @@
 #include "stdafx.hpp"
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
-void swan_render_window_icon_browser(
-    icon_browser &browser,
+void swan_windows::render_icon_font_browser(
+    s32 window_code,
+    icon_font_browser_state &browser,
     bool &open,
     char const *icon_lib_name,
     char const *icon_prefix,
-    std::vector<icon> const &(*get_all_icons)() noexcept) noexcept
+    std::vector<icon_font_glyph> const &(*get_all_icons)() noexcept) noexcept
 {
-    namespace imgui = ImGui;
-
     {
         char buffer[256]; init_empty_cstr(buffer);
         snprintf(buffer, lengthof(buffer), " %s Icons ", icon_lib_name);
@@ -18,6 +17,10 @@ void swan_render_window_icon_browser(
             imgui::End();
             return;
         }
+    }
+
+    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+        global_state::save_focused_window(window_code);
     }
 
     bool update_list = false;

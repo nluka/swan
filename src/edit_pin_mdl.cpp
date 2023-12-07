@@ -1,18 +1,11 @@
 #include "stdafx.hpp"
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
-
-namespace imgui = ImGui;
 
 static bool s_edit_pin_open = false;
 static pinned_path *s_edit_pin = nullptr;
 
-char const *swan_id_edit_pin_popup_modal() noexcept
-{
-    return "Edit Pin";
-}
-
-void swan_open_popup_modal_edit_pin(pinned_path *pin) noexcept
+void swan_popup_modals::open_edit_pin(pinned_path *pin) noexcept
 {
     s_edit_pin_open = true;
 
@@ -20,17 +13,17 @@ void swan_open_popup_modal_edit_pin(pinned_path *pin) noexcept
     s_edit_pin = pin;
 }
 
-bool swan_is_popup_modal_open_edit_pin() noexcept
+bool swan_popup_modals::is_open_edit_pin() noexcept
 {
     return s_edit_pin_open;
 }
 
-void swan_render_popup_modal_edit_pin() noexcept
+void swan_popup_modals::render_edit_pin() noexcept
 {
     if (s_edit_pin_open) {
-        imgui::OpenPopup(swan_id_edit_pin_popup_modal());
+        imgui::OpenPopup(swan_popup_modals::edit_pin);
     }
-    if (!imgui::BeginPopupModal(swan_id_edit_pin_popup_modal(), nullptr)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::edit_pin, nullptr)) {
         return;
     }
 
@@ -87,14 +80,14 @@ void swan_render_popup_modal_edit_pin() noexcept
 
     if (imgui::Button("Save##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
         swan_path_t path = path_squish_adjacent_separators(path_input);
-        path_force_separator(path, get_explorer_options().dir_separator_utf8());
+        path_force_separator(path, global_state::explorer_options_().dir_separator_utf8());
 
         s_edit_pin->color = color_input;
         s_edit_pin->label = label_input;
         s_edit_pin->path = path;
 
-        bool success = save_pins_to_disk();
-        debug_log("save_pins_to_disk: %d", success);
+        bool success = global_state::save_pins_to_disk();
+        print_debug_log("save_pins_to_disk: %d", success);
 
         cleanup_and_close_popup();
     }
