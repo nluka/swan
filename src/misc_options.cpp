@@ -1,5 +1,5 @@
 #include "stdafx.hpp"
-#include "common.hpp"
+#include "common_fns.hpp"
 
 bool misc_options::save_to_disk() const noexcept
 {

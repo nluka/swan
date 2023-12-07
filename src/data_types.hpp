@@ -4,22 +4,27 @@
 #include "path.hpp"
 #include "util.hpp"
 
-s32 get_page_size() noexcept;
-void set_page_size(s32) noexcept;
+template <typename ElemTy>
+using circular_buffer = boost::circular_buffer<ElemTy>;
 
-void apply_swan_style_overrides() noexcept;
-
-bool explorer_init_windows_shell_com_garbage() noexcept;
-void explorer_cleanup_windows_shell_com_garbage() noexcept;
+template <typename ElemTy, size_t Size>
+using static_vector = boost::container::static_vector<ElemTy, Size>;
 
 typedef BS::thread_pool swan_thread_pool_t;
-swan_thread_pool_t &get_thread_pool() noexcept;
 
 struct generic_result
 {
     bool success;
     std::string error_or_utf8_path;
 };
+
+// TODO:
+/*
+  Requirements for the underlying data type which will replace std::array for swan_path_t:
+  - has a .data() member function which returns a non-const char *
+  - can easily be visualized as a string in the debugger
+*/
+typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> swan_path_t;
 
 struct basic_dirent
 {
@@ -48,8 +53,6 @@ struct basic_dirent
     char const *kind_icon() const noexcept;
 };
 
-char const *get_icon(basic_dirent::kind t) noexcept;
-
 struct drive_info
 {
     u64 total_bytes;
@@ -59,25 +62,23 @@ struct drive_info
     char letter;
 };
 
-typedef boost::container::static_vector<drive_info, 26> drive_list_t;
+typedef static_vector<drive_info, 26> drive_list_t;
 
-drive_list_t query_drive_list() noexcept;
-
-struct windows_options
+struct window_visibilities
 {
-    bool show_pins_mgr;
-    bool show_file_operations;
-    bool show_explorer_0;
-    bool show_explorer_1;
-    bool show_explorer_2;
-    bool show_explorer_3;
-    bool show_analytics;
+    bool pin_manager;
+    bool file_operations;
+    bool explorer_0;
+    bool explorer_1;
+    bool explorer_2;
+    bool explorer_3;
+    bool analytics;
 #if !defined(NDEBUG)
-    bool show_demo;
-    bool show_debug_log;
-    bool show_fa_icons;
-    bool show_ci_icons;
-    bool show_md_icons;
+    bool imgui_demo;
+    bool debug_log;
+    bool fa_icons;
+    bool ci_icons;
+    bool md_icons;
 #endif
 
     bool save_to_disk() const noexcept;
@@ -105,6 +106,7 @@ struct explorer_options
     bool unix_directory_separator;
     bool cwd_entries_table_alt_row_bg;
     bool cwd_entries_table_borders_in_body;
+    bool clear_filter_on_cwd_change;
 
     bool save_to_disk() const noexcept;
     bool load_from_disk() noexcept;
@@ -113,16 +115,18 @@ struct explorer_options
     u16 size_unit_multiplier() const noexcept;
 };
 
-explorer_options &get_explorer_options() noexcept;
-
 struct misc_options
 {
     bool save_to_disk() const noexcept;
     bool load_from_disk() noexcept;
 };
 
-template<typename T>
-using circular_buffer = boost::circular_buffer<T>;
+enum update_cwd_entries_actions : u8
+{
+    query_filesystem = 0b01, // 1
+    filter           = 0b10, // 2
+    full_refresh     = 0b11, // 3
+};
 
 struct explorer_window
 {
@@ -151,6 +155,13 @@ struct explorer_window
     void invert_selected_visible_cwd_entries() noexcept;
     void set_latest_valid_cwd_then_notify(swan_path_t const &new_val) noexcept;
     void uncut() noexcept;
+
+    bool update_cwd_entries(
+        update_cwd_entries_actions actions,
+        std::string_view parent_dir,
+        std::source_location sloc = std::source_location::current()) noexcept;
+
+    void push_history_item(swan_path_t const &new_latest_entry) noexcept;
 
     // 80 byte alignment members
 
@@ -188,7 +199,6 @@ struct explorer_window
     // 8 byte alignment members
 
     char const *name = nullptr;
-    s64 id = -1;
     filter_mode filter_mode = filter_mode::contains; // persisted in file
     time_point_t last_refresh_time = {};
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
@@ -208,21 +218,23 @@ struct explorer_window
     mutable f64 update_cwd_entries_filter_us = 0;
     mutable f64 update_cwd_entries_regex_ctor_us = 0;
     mutable f64 save_to_disk_us = 0;
+    //? mutable because they are debug counters
+
+    // 4 byte alignment members
+
+    s32 id = -1;
 
     // 1 byte alignment members
 
     std::atomic<bool> is_window_visible = false;
     swan_path_t latest_valid_cwd = {};
     swan_path_t cwd = {}; // current working directory, persisted in file
-    std::array<char, 256> filter = {}; // persisted in file
+    std::array<char, 256> filter_text = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool filter_polarity = true; // persisted in file
 
     mutable s8 latest_save_to_disk_result = -1;
 };
-
-constexpr u64 num_explorers = 4;
-std::array<explorer_window, num_explorers> &get_explorers() noexcept;
 
 struct file_operation_command_buf
 {
@@ -267,23 +279,6 @@ struct file_operation
     file_operation &operator=(file_operation const &other) noexcept; // for boost::circular_buffer
 };
 
-boost::circular_buffer<file_operation> const &get_file_ops_buffer() noexcept;
-
-enum update_cwd_entries_actions : u8
-{
-    query_filesystem = 0b01, // 1
-    filter           = 0b10, // 2
-    full_refresh     = 0b11, // 3
-};
-
-bool update_cwd_entries(
-    update_cwd_entries_actions actions,
-    explorer_window *,
-    std::string_view parent_dir,
-    std::source_location sloc = std::source_location::current()) noexcept;
-
-void new_history_from(explorer_window &expl, swan_path_t const &new_latest_entry);
-
 struct pinned_path
 {
     static u64 const LABEL_MAX_LEN = 64;
@@ -292,28 +287,6 @@ struct pinned_path
     boost::static_string<LABEL_MAX_LEN> label;
     swan_path_t path;
 };
-
-std::vector<pinned_path> &get_pins() noexcept;
-
-bool pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept;
-
-void unpin(u64 pin_idx) noexcept;
-
-void update_pin_dir_separators(char new_dir_separator) noexcept;
-
-bool save_pins_to_disk() noexcept;
-
-std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
-
-u64 find_pin_idx(swan_path_t const &) noexcept;
-
-std::string get_last_error_string() noexcept;
-
-bool save_focused_window(char const *window_name) noexcept;
-
-bool load_focused_window_from_disk(char const *out) noexcept;
-
-void imgui_sameline_spacing(u64 num_spacing_calls) noexcept;
 
 struct bulk_rename_compiled_pattern
 {
@@ -347,21 +320,11 @@ struct bulk_rename_compile_pattern_result
     std::array<char, 256> error;
 };
 
-bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *pattern, bool squish_adjacent_spaces) noexcept;
-
 struct bulk_rename_transform_result
 {
     bool success;
     std::array<char, 256> error;
 };
-
-bulk_rename_transform_result bulk_rename_transform(
-    bulk_rename_compiled_pattern compiled_pattern,
-    swan_path_t &after,
-    char const *name,
-    char const *ext,
-    s32 counter,
-    u64 bytes) noexcept;
 
 struct bulk_rename_op
 {
@@ -382,75 +345,15 @@ struct bulk_rename_collision
     friend std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c); // for ntest
 };
 
-void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> &renames) noexcept;
-
-// Slow function which allocates & deallocates memory. Cache the result, don't call this function every frame.
-std::vector<bulk_rename_collision> bulk_rename_find_collisions(
-    std::vector<explorer_window::dirent> &dest,
-    std::vector<bulk_rename_op> const &renames) noexcept;
-
-void swan_render_window_explorer(explorer_window &, windows_options &, bool &open) noexcept;
-
-void swan_render_window_pinned_directories(std::array<explorer_window, 4> &, bool &open) noexcept;
-
-void swan_render_window_debug_log(bool &open) noexcept;
-
-void swan_render_window_file_operations() noexcept;
-
-struct icon
+struct icon_font_glyph
 {
     char const *name;
     char const *content;
 };
 
-std::vector<icon> const &get_font_awesome_icons() noexcept;
-std::vector<icon> const &get_codicon_icons() noexcept;
-std::vector<icon> const &get_material_design_icons() noexcept;
-
-struct icon_browser
+struct icon_font_browser_state
 {
     char search_input[256];
     s32 grid_width;
-    std::vector<icon> matches;
+    std::vector<icon_font_glyph> matches;
 };
-
-void swan_render_window_icon_browser(
-    icon_browser &browser,
-    bool &open,
-    char const *icon_lib_name,
-    char const *icon_prefix,
-    std::vector<icon> const &(*get_all_icons)() noexcept) noexcept;
-
-void swan_open_popup_modal_bulk_rename(
-    explorer_window &,
-    std::function<void ()> on_rename_finish_callback) noexcept;
-
-char const *swan_id_bulk_rename_popup_modal() noexcept;
-bool swan_is_popup_modal_open_bulk_rename() noexcept;
-void swan_render_popup_modal_bulk_rename() noexcept;
-
-void swan_open_popup_modal_error(char const *action, char const *failure) noexcept;
-char const *swan_id_error_popup_modal() noexcept;
-bool swan_is_popup_modal_open_error() noexcept;
-void swan_render_popup_modal_error() noexcept;
-
-void swan_open_popup_modal_single_rename(
-    explorer_window &expl,
-    explorer_window::dirent const &entry_to_be_renamed,
-    std::function<void ()> on_rename_finish_callback) noexcept;
-
-char const *swan_id_single_rename_popup_modal() noexcept;
-bool swan_is_popup_modal_open_single_rename() noexcept;
-void swan_render_popup_modal_single_rename() noexcept;
-
-void swan_open_popup_modal_new_pin(swan_path_t const &init_path, bool mutable_path) noexcept;
-char const *swan_id_new_pin_popup_modal() noexcept;
-bool swan_is_popup_modal_open_new_pin() noexcept;
-void swan_render_popup_modal_new_pin() noexcept;
-
-char const *swan_id_edit_pin_popup_modal() noexcept;
-void swan_open_popup_modal_edit_pin(pinned_path *pin) noexcept;
-bool swan_is_popup_modal_open_edit_pin() noexcept;
-void swan_render_popup_modal_edit_pin() noexcept;
-
-void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> const &window_close_flag) noexcept;

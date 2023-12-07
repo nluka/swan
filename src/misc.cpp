@@ -1,16 +1,15 @@
 #include "imgui/imgui.h"
 #include "libs/thread_pool.hpp"
 
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
 #include "path.hpp"
 
 static s32 s_page_size = 0;
-s32 get_page_size() noexcept { return s_page_size <= 0 ? 4096 : s_page_size; }
-void set_page_size(s32 size) noexcept { s_page_size = size; }
+s32 &global_state::page_size() noexcept { return s_page_size; }
 
 static swan_thread_pool_t s_thread_pool(1);
-swan_thread_pool_t &get_thread_pool() noexcept { return s_thread_pool; }
+swan_thread_pool_t &global_state::thread_pool() noexcept { return s_thread_pool; }
 
 ImVec4 orange() noexcept { return ImVec4(1, 0.5f, 0, 1); }
 ImVec4 red() noexcept { return ImVec4(1, 0.2f, 0, 1); }

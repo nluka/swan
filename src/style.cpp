@@ -1,5 +1,5 @@
 #include "stdafx.hpp"
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
 // https://github.com/ocornut/imgui/issues/5102
@@ -24,9 +24,9 @@ void apply_swan_style_overrides() noexcept
     ImGuiStyle &style = ImGui::GetStyle();
 
     style.WindowPadding = ImVec2(12.0f, 12.0f);
-    style.FramePadding = ImVec2(5.0f, 5.0f);
-    style.CellPadding = ImVec2(8.0f, 5.0f);
-    style.ItemSpacing = ImVec2(10.0f, 10.0f);
+    style.FramePadding  = ImVec2(5.0f, 5.0f);
+    style.CellPadding   = ImVec2(8.0f, 5.0f);
+    style.ItemSpacing   = ImVec2(10.0f, 10.0f);
     style.ScrollbarRounding = 0;
 
     style.Colors[ImGuiCol_FrameBg] = RGBA_to_ImVec4(35,40,45, 255);

@@ -1,37 +1,30 @@
 #include "imgui/imgui.h"
 
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
-
-namespace imgui = ImGui;
 
 static bool s_new_pin_open = false;
 static bool s_new_pin_enable_path_input = true;
 static swan_path_t s_new_pin_init_path = {};
 
-char const *swan_id_new_pin_popup_modal() noexcept
-{
-    return "Create Pin";
-}
-
-void swan_open_popup_modal_new_pin(swan_path_t const &init_path, bool mutable_path) noexcept
+void swan_popup_modals::open_new_pin(swan_path_t const &init_path, bool mutable_path) noexcept
 {
     s_new_pin_open = true;
     s_new_pin_enable_path_input = mutable_path;
     s_new_pin_init_path = init_path;
 }
 
-bool swan_is_popup_modal_open_new_pin() noexcept
+bool swan_popup_modals::is_open_new_pin() noexcept
 {
     return s_new_pin_open;
 }
 
-void swan_render_popup_modal_new_pin() noexcept
+void swan_popup_modals::render_new_pin() noexcept
 {
     if (s_new_pin_open) {
-        imgui::OpenPopup(swan_id_new_pin_popup_modal());
+        imgui::OpenPopup(swan_popup_modals::new_pin);
     }
-    if (!imgui::BeginPopupModal(swan_id_new_pin_popup_modal(), nullptr)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::new_pin, nullptr)) {
         return;
     }
 
@@ -97,12 +90,12 @@ void swan_render_popup_modal_new_pin() noexcept
 
     if (imgui::Button("Create##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
         swan_path_t path = path_squish_adjacent_separators(path_input);
-        path_force_separator(path, get_explorer_options().dir_separator_utf8());
+        path_force_separator(path, global_state::explorer_options_().dir_separator_utf8());
 
-        pin(color_input, label_input, path, '\\');
+        global_state::add_pin(color_input, label_input, path, '\\');
 
-        bool success = save_pins_to_disk();
-        debug_log("save_pins_to_disk: %d", success);
+        bool success = global_state::save_pins_to_disk();
+        print_debug_log("save_pins_to_disk: %d", success);
 
         cleanup_and_close_popup();
     }

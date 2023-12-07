@@ -1,30 +1,32 @@
 #include "stdafx.hpp"
-#include "common.hpp"
+#include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
-static std::string s_focused_window_name = "";
+static s32 s_focused_window = -1;
 
-bool save_focused_window(char const *window_name) noexcept
+s32 global_state::focused_window() noexcept { return s_focused_window; };
+
+bool global_state::save_focused_window(s32 window_code) noexcept
 {
     bool success;
-    char const *file_path = "data/focused_window.txt";
-    bool same_window_as_before = s_focused_window_name == window_name;
+    bool same_window_as_before = s_focused_window == window_code;
 
     if (same_window_as_before) {
         success = true;
     }
     else {
-        s_focused_window_name = window_name;
+        s_focused_window = window_code;
+
+        char const *file_path = "data/focused_window.txt";
 
         // the currently focused window has changed, save new state to disk
-
         try {
             std::ofstream out(file_path);
             if (!out) {
                 success = false;
             }
             else {
-                out << window_name;
+                out << window_code;
                 success = true;
             }
         }
@@ -32,13 +34,13 @@ bool save_focused_window(char const *window_name) noexcept
             success = false;
         }
 
-        debug_log("[%s] save_focused_window disk: %d", file_path, success);
+        print_debug_log("[%s] global_state::save_focused_window disk: %d (new code: %d)", file_path, success, window_code);
     }
 
     return success;
 }
 
-bool load_focused_window_from_disk(char const *out) noexcept
+bool global_state::load_focused_window_from_disk(s32 &out) noexcept
 {
     bool success;
     char const *file_path = "data/focused_window.txt";
@@ -49,8 +51,8 @@ bool load_focused_window_from_disk(char const *out) noexcept
             success = false;
         }
         else {
-            in >> s_focused_window_name;
-            out = s_focused_window_name.c_str();
+            in >> s_focused_window;
+            out = s_focused_window;
             success = true;
         }
     }
@@ -58,6 +60,6 @@ bool load_focused_window_from_disk(char const *out) noexcept
         success = false;
     }
 
-    debug_log("[%s] load_focused_window_from_disk: %d", file_path, success);
+    print_debug_log("[%s] global_state::load_focused_window_from_disk: %d", file_path, success);
     return success;
 }

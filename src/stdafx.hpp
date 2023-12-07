@@ -49,3 +49,5 @@
 // #pragma warning(disable: 4459)
 #include "libs/stb_image.h"
 #pragma warning(pop)
+
+namespace imgui = ImGui;
