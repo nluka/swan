@@ -15,6 +15,12 @@ void explorer_cleanup_windows_shell_com_garbage() noexcept;
 typedef BS::thread_pool swan_thread_pool_t;
 swan_thread_pool_t &get_thread_pool() noexcept;
 
+struct generic_result
+{
+    bool success;
+    std::string error_or_utf8_path;
+};
+
 struct basic_dirent
 {
     enum class kind : u8 {
@@ -125,6 +131,7 @@ struct explorer_window
         basic_dirent basic;
         bool is_filtered_out = false;
         bool is_selected = false;
+        bool is_cut = false;
     };
 
     enum filter_mode : u64
@@ -143,6 +150,7 @@ struct explorer_window
     void deselect_all_cwd_entries() noexcept;
     void invert_selected_visible_cwd_entries() noexcept;
     void set_latest_valid_cwd_then_notify(swan_path_t const &new_val) noexcept;
+    void uncut() noexcept;
 
     // 80 byte alignment members
 
@@ -211,6 +219,25 @@ struct explorer_window
     bool filter_polarity = true; // persisted in file
 
     mutable s8 latest_save_to_disk_result = -1;
+};
+
+constexpr u64 num_explorers = 4;
+std::array<explorer_window, num_explorers> &get_explorers() noexcept;
+
+struct file_operation_command_buf
+{
+    struct item
+    {
+        char const *operation;
+        char operation_code;
+        basic_dirent::kind type;
+        swan_path_t path;
+    };
+
+    std::vector<item> items = {};
+
+    void clear() noexcept;
+    generic_result execute(explorer_window &expl) noexcept;
 };
 
 struct file_operation

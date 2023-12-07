@@ -184,9 +184,7 @@ void render(GLFWwindow *window) noexcept
 s32 main(s32, char**)
 try
 {
-    std::atexit([]() {
-        std::cout << boost::stacktrace::stacktrace();
-    });
+    SCOPE_EXIT { std::cout << boost::stacktrace::stacktrace(); };
 
     GLFWwindow *window = init_glfw_and_imgui();
     if (window == nullptr) {
@@ -196,7 +194,7 @@ try
     debug_log("Initializing...");
 
     if (!explorer_init_windows_shell_com_garbage()) {
-        return 1;
+        return 2;
     }
 
     SCOPE_EXIT {
@@ -207,14 +205,6 @@ try
         glfwTerminate();
         explorer_cleanup_windows_shell_com_garbage();
     };
-    // auto cleanup_routine = make_on_scope_exit([window]() {
-    //     ImGui_ImplOpenGL3_Shutdown();
-    //     ImGui_ImplGlfw_Shutdown();
-    //     imgui::DestroyContext();
-    //     glfwDestroyWindow(window);
-    //     glfwTerminate();
-    //     explorer_cleanup_windows_shell_com_garbage();
-    // });
 
     set_window_icon(window);
 
@@ -280,8 +270,7 @@ try
         }
     }
 
-    constexpr u64 num_explorers = 4;
-    std::array<explorer_window, num_explorers> explorers = {};
+    auto &explorers = get_explorers();
     // init explorers
     {
         char const *names[] = {
