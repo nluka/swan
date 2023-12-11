@@ -39,12 +39,24 @@ s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept
 
 char const *basic_dirent::kind_cstr() const noexcept
 {
-    assert(this->type >= basic_dirent::kind::directory && this->type <= basic_dirent::kind::symlink);
+    assert(this->type >= basic_dirent::kind::nil && this->type <= basic_dirent::kind::count);
 
     switch (this->type) {
         case basic_dirent::kind::directory: return "directory";
         case basic_dirent::kind::file: return "file";
         case basic_dirent::kind::symlink: return "symlink";
+        default: return "";
+    }
+}
+
+char const *basic_dirent::kind_short_cstr() const noexcept
+{
+    assert(this->type >= basic_dirent::kind::nil && this->type <= basic_dirent::kind::count);
+
+    switch (this->type) {
+        case basic_dirent::kind::directory: return "dir";
+        case basic_dirent::kind::file: return "file";
+        case basic_dirent::kind::symlink: return "link";
         default: return "";
     }
 }
@@ -76,7 +88,7 @@ ImVec4 get_color(basic_dirent::kind t) noexcept
         return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
 }
 
-void imgui_spacing(u64 n) noexcept
+void imgui::Spacing(u64 n) noexcept
 {
     for (u64 i = 0; i < n; ++i) {
         ImGui::Spacing();
@@ -120,7 +132,7 @@ std::string get_last_error_string() noexcept
     return error_message;
 }
 
-void imgui_sameline_spacing(u64 num_spacing_calls) noexcept
+void imgui::SameLineSpaced(u64 num_spacing_calls) noexcept
 {
     ImGui::SameLine();
     for (u64 i = 0; i < num_spacing_calls; ++i) {

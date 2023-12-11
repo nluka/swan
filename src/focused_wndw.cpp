@@ -34,7 +34,7 @@ bool global_state::save_focused_window(s32 window_code) noexcept
             success = false;
         }
 
-        print_debug_log("[%s] global_state::save_focused_window disk: %d (new code: %d)", file_path, success, window_code);
+        print_debug_msg("[%s] global_state::save_focused_window disk: %d (new code: %d)", file_path, success, window_code);
     }
 
     return success;
@@ -60,6 +60,6 @@ bool global_state::load_focused_window_from_disk(s32 &out) noexcept
         success = false;
     }
 
-    print_debug_log("[%s] global_state::load_focused_window_from_disk: %d", file_path, success);
+    print_debug_msg("[%s] global_state::load_focused_window_from_disk: %d", file_path, success);
     return success;
 }

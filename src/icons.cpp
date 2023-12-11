@@ -3786,6 +3786,6 @@ static std::vector<icon_font_glyph> s_material_design_icons = {
     { "ICON_MD_ZOOM_OUT_MAP", "\xee\x95\xab" }, // U+e56b
 };
 
-std::vector<icon_font_glyph> const &icon_font_glyphs_font_awesome() noexcept { return s_font_awesome_icons; }
-std::vector<icon_font_glyph> const &icon_font_glyphs_codicon() noexcept { return s_codicon_icons; }
-std::vector<icon_font_glyph> const &icon_font_glyphs_material_design() noexcept { return s_material_design_icons; }
+std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_font_awesome() noexcept { return s_font_awesome_icons; }
+std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_codicon() noexcept { return s_codicon_icons; }
+std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_material_design() noexcept { return s_material_design_icons; }

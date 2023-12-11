@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include <stdint.h>
 
 static_assert(sizeof(int8_t) == 1);
 typedef int8_t s8;

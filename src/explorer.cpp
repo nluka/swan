@@ -13,10 +13,13 @@ static IShellLinkW *s_shell_link = nullptr;
 static IPersistFile *s_persist_file_interface = nullptr;
 static explorer_options s_explorer_options = {};
 static BS::thread_pool s_change_notif_thread_pool(1);
-static std::array<explorer_window, global_state::num_explorers> s_explorers = {};
+static std::array<explorer_window, global_constants::num_explorers> s_explorers = {};
 static file_operation_command_buf s_file_op_payload = {};
+static bool s_move_dirents_payload_set = false;
 
-std::array<explorer_window, global_state::num_explorers> &global_state::explorers() noexcept { return s_explorers; }
+bool &global_state::move_dirents_payload_set() noexcept { return s_move_dirents_payload_set; }
+
+std::array<explorer_window, global_constants::num_explorers> &global_state::explorers() noexcept { return s_explorers; }
 
 explorer_options &global_state::explorer_options_() noexcept { return s_explorer_options; }
 
@@ -26,20 +29,20 @@ try
     // Initialize COM library
     HRESULT com_handle = CoInitialize(nullptr);
     if (FAILED(com_handle)) {
-        print_debug_log("CoInitialize failed");
+        print_debug_msg("CoInitialize failed");
         CoUninitialize();
         return false;
     }
 
     com_handle = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&s_shell_link);
     if (FAILED(com_handle)) {
-        print_debug_log("CoCreateInstance failed");
+        print_debug_msg("CoCreateInstance failed");
         return false;
     }
 
     com_handle = s_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&s_persist_file_interface);
     if (FAILED(com_handle)) {
-        print_debug_log("failed to query IPersistFile interface");
+        print_debug_msg("failed to query IPersistFile interface");
         s_persist_file_interface->Release();
         CoUninitialize();
         return false;
@@ -50,39 +53,6 @@ try
 catch (...) {
     return false;
 }
-
-struct progress_sink : public IFileOperationProgressSink
-{
-    HRESULT FinishOperations(HRESULT) override { print_debug_log("FinishOperations"); return S_OK; }
-    HRESULT PauseTimer() override { print_debug_log("PauseTimer"); return S_OK; }
-    HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { print_debug_log("PostCopyItem"); return S_OK; }
-    HRESULT PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) override { print_debug_log("PostDeleteItem"); return S_OK; }
-    HRESULT PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { print_debug_log("PostMoveItem"); return S_OK; }
-    HRESULT PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override { print_debug_log("PostNewItem"); return S_OK; }
-    HRESULT PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { print_debug_log("PostRenameItem"); return S_OK; }
-    HRESULT PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { print_debug_log("PreCopyItem"); return S_OK; }
-    HRESULT PreDeleteItem(DWORD, IShellItem *) override { print_debug_log("PreDeleteItem"); return S_OK; }
-    HRESULT PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { print_debug_log("PreMoveItem"); return S_OK; }
-    HRESULT PreNewItem(DWORD, IShellItem *, LPCWSTR) override { print_debug_log("PreNewItem"); return S_OK; }
-    HRESULT PreRenameItem(DWORD, IShellItem *, LPCWSTR) override { print_debug_log("PreRenameItem"); return S_OK; }
-    HRESULT ResetTimer() override { print_debug_log("ResetTimer"); return S_OK; }
-    HRESULT ResumeTimer() override { print_debug_log("ResumeTimer"); return S_OK; }
-    HRESULT StartOperations() override { print_debug_log("StartOperations"); return S_OK; }
-    HRESULT UpdateProgress(UINT work_total, UINT work_so_far) override { print_debug_log("UpdateProgress %zu/%zu", work_so_far, work_total); return S_OK; }
-
-    ULONG AddRef() { return 1; }
-    ULONG Release() { return 1; }
-
-    HRESULT QueryInterface(const IID &riid, void **ppv)
-    {
-        if (riid == IID_IUnknown || riid == IID_IFileOperationProgressSink) {
-            *ppv = static_cast<IFileOperationProgressSink*>(this);
-            return S_OK;
-        }
-        *ppv = nullptr;
-        return E_NOINTERFACE;
-    }
-};
 
 bool explorer_options::save_to_disk() const noexcept
 {
@@ -380,7 +350,6 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
     return { errors.empty(), errors };
 }
 
-#if 1
 static
 generic_result delete_selected_entries(explorer_window &expl) noexcept
 {
@@ -420,7 +389,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
         }
         SCOPE_EXIT { file_op->Release(); };
 
-        result = file_op->SetOperationFlags(FOF_NOCONFIRMATION | FOF_ALLOWUNDO);
+        result = file_op->SetOperationFlags(/*FOF_NOCONFIRMATION | */FOF_ALLOWUNDO);
         if (FAILED(result)) {
             return set_init_error_and_notify("IFileOperation::SetOperationFlags");
         }
@@ -488,29 +457,30 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
         if (FAILED(result)) {
             return set_init_error_and_notify("IFileOperation::Advise(IFileOperationProgressSink *pfops, DWORD *pdwCookie)");
         }
-        print_debug_log("IFileOperation::Advise(%d)", cookie);
+        print_debug_msg("IFileOperation::Advise(%d)", cookie);
 
         set_init_error_and_notify(""); // init succeeded, no error
 
         result = file_op->PerformOperations();
         if (FAILED(result)) {
-            print_debug_log("FAILED IFileOperation::PerformOperations()");
+            print_debug_msg("FAILED IFileOperation::PerformOperations()");
         }
 
         file_op->Unadvise(cookie);
         if (FAILED(result)) {
-            print_debug_log("FAILED IFileOperation::Unadvise(%d)", cookie);
+            print_debug_msg("FAILED IFileOperation::Unadvise(%d)", cookie);
         }
     };
 
     wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
     s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
     if (written == 0) {
-        print_debug_log("FAILED utf8_to_utf16(expl.cwd -> cwd_utf16)");
+        print_debug_msg("FAILED utf8_to_utf16(expl.cwd -> cwd_utf16)");
         return { false, "conversion of current working directory path from UTF-8 to UTF-16" };
     }
 
     std::wstring packed_paths_to_delete_utf16 = {};
+    u64 item_count = 0;
     {
         wchar_t item_utf16[MAX_PATH];
         std::stringstream err = {};
@@ -521,15 +491,16 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                 written = utf8_to_utf16(item.basic.path.data(), item_utf16, lengthof(item_utf16));
 
                 if (written == 0) {
-                    print_debug_log("FAILED utf8_to_utf16(item.basic.path -> item_utf16)");
+                    print_debug_msg("FAILED utf8_to_utf16(item.basic.path -> item_utf16)");
                     err << "conversion of [" << item.basic.path.data() << "] from UTF-8 to UTF-16\n";
                 }
 
                 packed_paths_to_delete_utf16.append(item_utf16).append(L"\n");
+                ++item_count;
             }
         }
 
-        WCOUT_IF_DEBUG("packed_paths_to_delete_utf16:\n" << packed_paths_to_delete_utf16);
+        WCOUT_IF_DEBUG("packed_paths_to_delete_utf16:\n" << packed_paths_to_delete_utf16 << '\n');
 
         if (!packed_paths_to_delete_utf16.empty()) {
             packed_paths_to_delete_utf16.pop_back(); // remove trailing \n
@@ -559,7 +530,64 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
 
     return { initialization_error.empty(), initialization_error };
 }
-#endif
+
+generic_result move_files_into(swan_path_t destination_utf8, explorer_window &expl, move_dirents_drag_drop_payload &payload) noexcept
+{
+    SCOPE_EXIT { delete[] payload.absolute_paths_delimited_by_newlines; };
+
+    wchar_t destination_utf16[2048]; init_empty_cstr(destination_utf16);
+    s32 written = utf8_to_utf16(destination_utf8.data(), destination_utf16, lengthof(destination_utf16));
+    if (written == 0) {
+        print_debug_msg("FAILED utf8_to_utf16(destination)");
+        return { false, "conversion of destination directory path from UTF-8 to UTF-16" };
+    }
+
+    bool initialization_done = false;
+    std::string initialization_error = {};
+
+    global_state::thread_pool().push_task(perform_file_operations,
+        destination_utf16,
+        std::wstring(payload.absolute_paths_delimited_by_newlines),
+        std::vector<char>(payload.num_items, 'X'),
+        &expl.shlwapi_task_initialization_mutex,
+        &expl.shlwapi_task_initialization_cond,
+        &initialization_done,
+        &initialization_error);
+
+    {
+        std::unique_lock lock(expl.shlwapi_task_initialization_mutex);
+        expl.shlwapi_task_initialization_cond.wait(lock, [&]() { return initialization_done; });
+    }
+
+    return { initialization_error.empty(), initialization_error };
+}
+
+static
+generic_result handle_drag_drop_onto_dirent(
+    explorer_window &expl,
+    explorer_window::dirent const &target_dirent,
+    ImGuiPayload const *payload_wrapper,
+    char dir_sep_utf8) noexcept
+{
+    auto payload_data = (move_dirents_drag_drop_payload *)payload_wrapper->Data;
+    assert(payload_data != nullptr);
+    swan_path_t destination_utf8 = expl.cwd;
+
+    if (target_dirent.basic.is_dotdot_dir()) {
+        // we cannot simply append ".." to `destination_utf8` and give that to `move_files_into`,
+        // because shlwapi does not accept a path like "C:/some/path/../"
+        while (path_pop_back_if_not(destination_utf8, dir_sep_utf8));
+
+        return move_files_into(destination_utf8, expl, *payload_data);
+    }
+    else {
+        if (!path_append(destination_utf8, target_dirent.basic.path.data(), dir_sep_utf8, true)) {
+            return { false,  };
+        } else {
+            return move_files_into(destination_utf8, expl, *payload_data);
+        }
+    }
+}
 
 generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, explorer_window &expl, const wchar_t dir_sep_utf16) noexcept
 {
@@ -573,7 +601,7 @@ generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, exp
     utf_written = utf8_to_utf16(expl.cwd.data(), select_path_cwd_buffer_utf16, lengthof(select_path_cwd_buffer_utf16));
 
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf8_to_utf16 failed (expl.cwd -> select_path_cwd_buffer_utf16)", expl.id);
+        print_debug_msg("[ %d ] utf8_to_utf16 failed (expl.cwd -> select_path_cwd_buffer_utf16)", expl.id);
         return { false, "conversion of cwd path from UTF-8 to UTF-16" };
     }
 
@@ -587,7 +615,7 @@ generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, exp
     utf_written = utf8_to_utf16(entry.basic.path.data(), select_path_dirent_buffer_utf16, lengthof(select_path_dirent_buffer_utf16));
 
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf8_to_utf16 failed (entry.basic.path -> select_path_dirent_buffer_utf16)", expl.id);
+        print_debug_msg("[ %d ] utf8_to_utf16 failed (entry.basic.path -> select_path_dirent_buffer_utf16)", expl.id);
         return { false, "conversion of selected entry's path from UTF-8 to UTF-16" };
     }
 
@@ -610,7 +638,7 @@ generic_result open_file(explorer_window::dirent const &file, explorer_window &e
     swan_path_t target_full_path_utf8 = expl.cwd;
 
     if (!path_append(target_full_path_utf8, file.basic.path.data(), dir_sep_utf8, true)) {
-        print_debug_log("[ %d ] path_append failed, cwd = [%s], append data = [\\%s]", expl.id, expl.cwd.data(), file.basic.path.data());
+        print_debug_msg("[ %d ] path_append failed, cwd = [%s], append data = [\\%s]", expl.id, expl.cwd.data(), file.basic.path.data());
         return { false, "max path length exceeded when appending target name to cwd" };
     }
 
@@ -619,32 +647,32 @@ generic_result open_file(explorer_window::dirent const &file, explorer_window &e
     s32 utf_written = utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16));
 
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf8_to_utf16 failed: target_full_path_utf8 -> target_full_path_utf16", expl.id);
+        print_debug_msg("[ %d ] utf8_to_utf16 failed: target_full_path_utf8 -> target_full_path_utf16", expl.id);
         return { false, "conversion of target's full path from UTF-8 to UTF-16" };
     }
 
-    print_debug_log("[ %d ] utf8_to_utf16 wrote %d characters (target_full_path_utf8 -> target_full_path_utf16)", expl.id, utf_written);
-    print_debug_log("[ %d ] target_full_path = [%s]", expl.id, target_full_path_utf8.data());
+    print_debug_msg("[ %d ] utf8_to_utf16 wrote %d characters (target_full_path_utf8 -> target_full_path_utf16)", expl.id, utf_written);
+    print_debug_msg("[ %d ] target_full_path = [%s]", expl.id, target_full_path_utf8.data());
 
     HINSTANCE result = ShellExecuteW(nullptr, L"open", target_full_path_utf16, nullptr, nullptr, SW_SHOWNORMAL);
 
     auto ec = (intptr_t)result;
 
     if (ec > HINSTANCE_ERROR) {
-        print_debug_log("[ %d ] ShellExecuteW success", expl.id);
+        print_debug_msg("[ %d ] ShellExecuteW success", expl.id);
         return { true, "" };
     }
     else if (ec == SE_ERR_NOASSOC) {
-        print_debug_log("[ %d ] ShellExecuteW: SE_ERR_NOASSOC", expl.id);
+        print_debug_msg("[ %d ] ShellExecuteW: SE_ERR_NOASSOC", expl.id);
         return { false, "no association between file type and program (ShellExecuteW: SE_ERR_NOASSOC)" };
     }
     else if (ec == SE_ERR_FNF) {
-        print_debug_log("[ %d ] ShellExecuteW: SE_ERR_FNF", expl.id);
+        print_debug_msg("[ %d ] ShellExecuteW: SE_ERR_FNF", expl.id);
         return { false, "file not found (ShellExecuteW: SE_ERR_FNF)" };
     }
     else {
         auto err = get_last_error_string();
-        print_debug_log("[ %d ] ShellExecuteW: %s", expl.id, err.c_str());
+        print_debug_msg("[ %d ] ShellExecuteW: %s", expl.id, err.c_str());
         return { false, err };
     }
 }
@@ -663,26 +691,26 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
     s32 utf_written = {};
 
     if (!path_append(symlink_self_path_utf8, dirent.basic.path.data(), dir_sep_utf8, true)) {
-        print_debug_log("[ %d ] path_append(symlink_self_path_utf8, dir_ent.basic.path.data() failed", expl.id);
+        print_debug_msg("[ %d ] path_append(symlink_self_path_utf8, dir_ent.basic.path.data() failed", expl.id);
         return { false, "max path length exceeded when appending symlink name to cwd" };
     }
 
-    print_debug_log("[ %d ] double clicked link [%s]", expl.id, symlink_self_path_utf8);
+    print_debug_msg("[ %d ] double clicked link [%s]", expl.id, symlink_self_path_utf8);
 
     utf_written = utf8_to_utf16(symlink_self_path_utf8.data(), symlink_self_path_utf16, lengthof(symlink_self_path_utf16));
 
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf8_to_utf16 failed: symlink_self_path_utf8 -> symlink_self_path_utf16", expl.id);
+        print_debug_msg("[ %d ] utf8_to_utf16 failed: symlink_self_path_utf8 -> symlink_self_path_utf16", expl.id);
         return { false, "conversion of symlink path from UTF-8 to UTF-16" };
     } else {
-        print_debug_log("[ %d ] utf8_to_utf16 wrote %d characters", expl.id, utf_written);
+        print_debug_msg("[ %d ] utf8_to_utf16 wrote %d characters", expl.id, utf_written);
         WCOUT_IF_DEBUG("symlink_self_path_utf16 = [" << symlink_self_path_utf16 << "]\n");
     }
 
     com_handle = s_persist_file_interface->Load(symlink_self_path_utf16, STGM_READ);
 
     if (com_handle != S_OK) {
-        print_debug_log("[ %d ] s_persist_file_interface->Load [%s] failed: %s", expl.id, symlink_self_path_utf8, get_last_error_string().c_str());
+        print_debug_msg("[ %d ] s_persist_file_interface->Load [%s] failed: %s", expl.id, symlink_self_path_utf8, get_last_error_string().c_str());
         return { false, "conversion of symlink path from UTF-8 to UTF-16" };
     } else {
         WCOUT_IF_DEBUG("s_persist_file_interface->Load [" << symlink_self_path_utf16 << "]\n");
@@ -692,13 +720,13 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
 
     if (com_handle != S_OK) {
         auto err = get_last_error_string();
-        print_debug_log("[ %d ] s_shell_link->GetIDList failed: %s", expl.id, err.c_str());
+        print_debug_msg("[ %d ] s_shell_link->GetIDList failed: %s", expl.id, err.c_str());
         return { false, err + " (IShellLinkW::GetIDList)" };
     }
 
     if (!SHGetPathFromIDListW(item_id_list, symlink_target_path_utf16)) {
         auto err = get_last_error_string();
-        print_debug_log("[ %d ] SHGetPathFromIDListW failed: %s", expl.id, err.c_str());
+        print_debug_msg("[ %d ] SHGetPathFromIDListW failed: %s", expl.id, err.c_str());
         return { false, err + " (SHGetPathFromIDListW)" };
     } else {
         WCOUT_IF_DEBUG("symlink_target_path_utf16 = [" << symlink_target_path_utf16 << "]\n");
@@ -706,18 +734,18 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
 
     if (com_handle != S_OK) {
         auto err = get_last_error_string();
-        print_debug_log("[ %d ] s_shell_link->GetPath failed: %s", expl.id, err.c_str());
+        print_debug_msg("[ %d ] s_shell_link->GetPath failed: %s", expl.id, err.c_str());
         return { false, err + " (IShellLinkW::GetWorkingDirectory)" };
     }
 
     utf_written = utf16_to_utf8(symlink_target_path_utf16, symlink_target_path_utf8.data(), symlink_target_path_utf8.size());
 
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf16_to_utf8 failed: symlink_target_path_utf16 -> symlink_target_path_utf8", expl.id);
+        print_debug_msg("[ %d ] utf16_to_utf8 failed: symlink_target_path_utf16 -> symlink_target_path_utf8", expl.id);
         return { false, "conversion of symlink target path from UTF-16 to UTF-8" };
     } else {
-        print_debug_log("[ %d ] utf16_to_utf8 wrote %d characters", expl.id, utf_written);
-        print_debug_log("[ %d ] symlink_target_path_utf8 = [%s]", expl.id, symlink_target_path_utf8.data());
+        print_debug_msg("[ %d ] utf16_to_utf8 wrote %d characters", expl.id, utf_written);
+        print_debug_msg("[ %d ] symlink_target_path_utf8 = [%s]", expl.id, symlink_target_path_utf8.data());
     }
 
     if (directory_exists(symlink_target_path_utf8.data())) {
@@ -731,7 +759,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
 
         if (com_handle != S_OK) {
             auto err = get_last_error_string();
-            print_debug_log("[ %d ] s_shell_link->GetWorkingDirectory failed: %s", expl.id, err.c_str());
+            print_debug_msg("[ %d ] s_shell_link->GetWorkingDirectory failed: %s", expl.id, err.c_str());
             return { false, err + " (IShellLinkW::GetWorkingDirectory)" };
         } else {
             WCOUT_IF_DEBUG("s_shell_link->GetWorkingDirectory [" << working_dir_utf16 << "]\n");
@@ -741,7 +769,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
 
         if (com_handle != S_OK) {
             auto err = get_last_error_string();
-            print_debug_log("[ %d ] s_shell_link->GetArguments failed: %s", expl.id, err.c_str());
+            print_debug_msg("[ %d ] s_shell_link->GetArguments failed: %s", expl.id, err.c_str());
             return { false, err + " (IShellLinkW::GetArguments)" };
         } else {
             WCOUT_IF_DEBUG("s_shell_link->GetArguments [" << command_line_utf16 << "]\n");
@@ -751,7 +779,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
 
         if (com_handle != S_OK) {
             auto err = get_last_error_string();
-            print_debug_log("[ %d ] s_shell_link->GetShowCmd failed: %s", expl.id, err.c_str());
+            print_debug_msg("[ %d ] s_shell_link->GetShowCmd failed: %s", expl.id, err.c_str());
             return { false, err + " (IShellLinkW::GetShowCmd)" };
         } else {
             WCOUT_IF_DEBUG("s_shell_link->GetShowCmd [" << show_command << "]\n");
@@ -763,20 +791,20 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
         intptr_t err_code = (intptr_t)result;
 
         if (err_code > HINSTANCE_ERROR) {
-            print_debug_log("[ %d ] ShellExecuteW success", expl.id);
+            print_debug_msg("[ %d ] ShellExecuteW success", expl.id);
             return { true, "" };
         }
         else if (err_code == SE_ERR_NOASSOC) {
-            print_debug_log("[ %d ] ShellExecuteW error: SE_ERR_NOASSOC", expl.id);
+            print_debug_msg("[ %d ] ShellExecuteW error: SE_ERR_NOASSOC", expl.id);
             return { false, "no association between file type and program (ShellExecuteW: SE_ERR_NOASSOC)" };
         }
         else if (err_code == SE_ERR_FNF) {
-            print_debug_log("[ %d ] ShellExecuteW error: SE_ERR_FNF", expl.id);
+            print_debug_msg("[ %d ] ShellExecuteW error: SE_ERR_FNF", expl.id);
             return { false, "file not found (ShellExecuteW: SE_ERR_FNF)" };
         }
         else {
             auto err = get_last_error_string();
-            print_debug_log("[ %d ] ShellExecuteW error: unexpected error", expl.id);
+            print_debug_msg("[ %d ] ShellExecuteW error: unexpected error", expl.id);
             return { false, err };
         }
     }
@@ -808,7 +836,7 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
 
     auto &cwd_entries = expl.cwd_entries;
 
-    print_debug_log("[ %d ] sort_cwd_entries() called from [%s:%d]", expl.id, cget_file_name(sloc.file_name()), sloc.line());
+    print_debug_msg("[ %d ] sort_cwd_entries() called from [%s:%d]", expl.id, cget_file_name(sloc.file_name()), sloc.line());
 
     using dir_ent_t = explorer_window::dirent;
 
@@ -824,7 +852,6 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
     // preliminary sort to ensure deterministic behaviour regardless of initial state.
     // necessary or else auto refresh can cause unexpected reordering of directory entries.
     std::sort(cwd_entries.begin(), first_filtered_dirent, [](dir_ent_t const &left, dir_ent_t const &right) {
-        // return lstrcmpiA(left.basic.path.data(), right.basic.path.data()) < 0;
         return left.basic.id < right.basic.id;
     });
 
@@ -902,7 +929,7 @@ bool explorer_window::update_cwd_entries(
     std::string_view parent_dir,
     std::source_location sloc) noexcept
 {
-    print_debug_log("[ %d ] expl.update_cwd_entries(%d) called from [%s:%d]", this->id, actions, cget_file_name(sloc.file_name()), sloc.line());
+    print_debug_msg("[ %d ] expl.update_cwd_entries(%d) called from [%s:%d]", this->id, actions, cget_file_name(sloc.file_name()), sloc.line());
 
     SCOPE_EXIT {
         if (actions & query_filesystem) {
@@ -964,11 +991,11 @@ bool explorer_window::update_cwd_entries(
                 u64 utf_written = utf16_to_utf8(search_path_utf16, utf8_buffer, lengthof(utf8_buffer));
 
                 if (utf_written == 0) {
-                    print_debug_log("[ %d ] utf16_to_utf8 failed (search_path_utf16 -> utf8_buffer)", this->id);
+                    print_debug_msg("[ %d ] utf16_to_utf8 failed (search_path_utf16 -> utf8_buffer)", this->id);
                     return parent_dir_exists;
                 }
 
-                print_debug_log("[ %d ] querying filesystem, search_path = [%s]", this->id, utf8_buffer);
+                print_debug_msg("[ %d ] querying filesystem, search_path = [%s]", this->id, utf8_buffer);
             }
 
             scoped_timer<timer_unit::MICROSECONDS> filesystem_timer(&this->update_cwd_entries_filesystem_us);
@@ -978,7 +1005,7 @@ bool explorer_window::update_cwd_entries(
             SCOPE_EXIT { FindClose(find_handle); };
 
             if (find_handle == INVALID_HANDLE_VALUE) {
-                print_debug_log("[ %d ] find_handle == INVALID_HANDLE_VALUE", this->id);
+                print_debug_msg("[ %d ] find_handle == INVALID_HANDLE_VALUE", this->id);
                 parent_dir_exists = false;
                 return parent_dir_exists;
             } else {
@@ -998,7 +1025,7 @@ bool explorer_window::update_cwd_entries(
                     u64 utf_written = utf16_to_utf8(find_data.cFileName, entry.basic.path.data(), entry.basic.path.size());
 
                     if (utf_written == 0) {
-                        print_debug_log("[ %d ] utf16_to_utf8 failed (find_data.cFileName -> entry.basic.path)", this->id);
+                        print_debug_msg("[ %d ] utf16_to_utf8 failed (find_data.cFileName -> entry.basic.path)", this->id);
                         continue;
                     }
                 }
@@ -1079,7 +1106,7 @@ bool explorer_window::update_cwd_entries(
                         filter_regex = this->filter_text.data();
                     }
                     catch (std::exception const &except) {
-                        print_debug_log("[ %d ] error constructing std::regex, %s", this->id, except.what());
+                        print_debug_msg("[ %d ] error constructing std::regex, %s", this->id, except.what());
                         this->filter_error = except.what();
                         break;
                     }
@@ -1149,7 +1176,7 @@ bool explorer_window::save_to_disk() const noexcept
         result = false;
     }
 
-    print_debug_log("[%s] save attempted, result: %d", file_name, result);
+    print_debug_msg("[%s] save attempted, result: %d", file_name, result);
     this->latest_save_to_disk_result = (s8)result;
 
     return result;
@@ -1166,7 +1193,7 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
     try {
         std::ifstream in(file_name);
         if (!in) {
-            print_debug_log("failed to open file [%s]", file_name);
+            print_debug_msg("failed to open file [%s]", file_name);
             return false;
         }
 
@@ -1180,13 +1207,13 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
 
             u64 cwd_len = 0;
             in >> cwd_len;
-            print_debug_log("[%s] cwd_len = %zu", file_name, cwd_len);
+            print_debug_msg("[%s] cwd_len = %zu", file_name, cwd_len);
 
             in.read(&whitespace, 1);
 
             in.read(cwd.data(), cwd_len);
             path_force_separator(cwd, dir_separator);
-            print_debug_log("[%s] cwd = [%s]", file_name, cwd.data());
+            print_debug_msg("[%s] cwd = [%s]", file_name, cwd.data());
         }
         {
             in >> what;
@@ -1194,19 +1221,19 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
 
             u64 filter_len = 0;
             in >> filter_len;
-            print_debug_log("[%s] filter_len = %zu", file_name, filter_len);
+            print_debug_msg("[%s] filter_len = %zu", file_name, filter_len);
 
             in.read(&whitespace, 1);
 
             in.read(filter_text.data(), filter_len);
-            print_debug_log("[%s] filter = [%s]", file_name, filter_text.data());
+            print_debug_msg("[%s] filter = [%s]", file_name, filter_text.data());
         }
         {
             in >> what;
             assert(what == "filter_mode");
 
             in >> (s32 &)filter_mode;
-            print_debug_log("[%s] filter_mode = %d", file_name, filter_mode);
+            print_debug_msg("[%s] filter_mode = %d", file_name, filter_mode);
         }
         {
             in >> what;
@@ -1216,7 +1243,7 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
             in >> val;
 
             filter_case_sensitive = (bool)val;
-            print_debug_log("[%s] filter_case_sensitive = %d", file_name, filter_case_sensitive);
+            print_debug_msg("[%s] filter_case_sensitive = %d", file_name, filter_case_sensitive);
         }
         {
             in >> what;
@@ -1226,14 +1253,14 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
             in >> val;
 
             filter_polarity = (bool)val;
-            print_debug_log("[%s] filter_polarity = %d", file_name, filter_polarity);
+            print_debug_msg("[%s] filter_polarity = %d", file_name, filter_polarity);
         }
         {
             in >> what;
             assert(what == "wd_history_pos");
 
             in >> wd_history_pos;
-            print_debug_log("[%s] wd_history_pos = %zu", file_name, wd_history_pos);
+            print_debug_msg("[%s] wd_history_pos = %zu", file_name, wd_history_pos);
         }
 
         u64 wd_history_size = 0;
@@ -1242,7 +1269,7 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
             assert(what == "wd_history.size()");
 
             in >> wd_history_size;
-            print_debug_log("[%s] wd_history_size = %zu", file_name, wd_history_size);
+            print_debug_msg("[%s] wd_history_size = %zu", file_name, wd_history_size);
         }
 
         wd_history.resize(wd_history_size);
@@ -1254,7 +1281,7 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
 
             in.read(wd_history[i].data(), item_len);
             path_force_separator(wd_history[i], dir_separator);
-            print_debug_log("[%s] history[%zu] = [%s]", file_name, i, wd_history[i].data());
+            print_debug_msg("[%s] history[%zu] = [%s]", file_name, i, wd_history[i].data());
         }
     }
     catch (...) {
@@ -1311,7 +1338,7 @@ ascend_result try_ascend_directory(explorer_window &expl) noexcept
 
     bool parent_dir_exists = expl.update_cwd_entries(full_refresh, res.parent_dir.data());
     res.success = parent_dir_exists;
-    print_debug_log("[ %d ] try_ascend_directory parent_dir=[%s] res.success=%d", expl.id, res.parent_dir.data(), res.success);
+    print_debug_msg("[ %d ] try_ascend_directory parent_dir=[%s] res.success=%d", expl.id, res.parent_dir.data(), res.success);
 
     if (parent_dir_exists) {
         if (!path_is_empty(expl.cwd)) {
@@ -1342,7 +1369,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
     swan_path_t new_cwd_utf8 = expl.cwd;
 
     if (!path_append(new_cwd_utf8, target_utf8, dir_sep_utf8, true)) {
-        print_debug_log("[ %d ] path_append failed, new_cwd_utf8 = [%s], append data = [%c%s]", expl.id, new_cwd_utf8.data(), dir_sep_utf8, target_utf8);
+        print_debug_msg("[ %d ] path_append failed, new_cwd_utf8 = [%s], append data = [%c%s]", expl.id, new_cwd_utf8.data(), dir_sep_utf8, target_utf8);
         descend_result res;
         res.success = false;
         res.err_msg = "max path length exceeded when trying to append descend target to current working directory path";
@@ -1354,7 +1381,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
     s32 utf_written = utf8_to_utf16(new_cwd_utf8.data(), new_cwd_utf16, lengthof(new_cwd_utf16));
 
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf8_to_utf16 failed: new_cwd_utf8 -> new_cwd_utf16", expl.id);
+        print_debug_msg("[ %d ] utf8_to_utf16 failed: new_cwd_utf8 -> new_cwd_utf16", expl.id);
         descend_result res;
         res.success = false;
         res.err_msg = "conversion of new cwd path from UTF-8 to UTF-16";
@@ -1382,7 +1409,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
     utf_written = utf16_to_utf8(new_cwd_canonical_utf16, new_cwd_canoncial_utf8.data(), new_cwd_canoncial_utf8.size());
 
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf16_to_utf8 failed: new_cwd_canonical_utf16 -> new_cwd_canoncial_utf8", expl.id);
+        print_debug_msg("[ %d ] utf16_to_utf8 failed: new_cwd_canonical_utf16 -> new_cwd_canoncial_utf8", expl.id);
         descend_result res;
         res.success = false;
         res.err_msg = "conversion of new canonical cwd path from UTF-8 to UTF-16";
@@ -1392,7 +1419,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
     bool cwd_exists = expl.update_cwd_entries(full_refresh, new_cwd_canoncial_utf8.data());
 
     if (!cwd_exists) {
-        print_debug_log("[ %d ] descend target directory not found", expl.id);
+        print_debug_msg("[ %d ] descend target directory not found", expl.id);
         descend_result res;
         res.success = false;
         res.err_msg = std::string("descend target directory [") + target_utf8 + "] not found";
@@ -1435,7 +1462,7 @@ s32 cwd_text_input_callback(ImGuiInputTextCallbackData *data) noexcept
         }
     }
     else if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
-        print_debug_log("[ %d ] ImGuiInputTextFlags_CallbackEdit Buf:[%s]", user_data->expl_id, data->Buf);
+        print_debug_msg("[ %d ] ImGuiInputTextFlags_CallbackEdit Buf:[%s]", user_data->expl_id, data->Buf);
         user_data->edit_occurred = true;
     }
 
@@ -1689,11 +1716,11 @@ void render_back_to_prev_valid_cwd_button(explorer_window &expl) noexcept
 {
     auto io = imgui::GetIO();
 
-    imgui_scoped_disabled disabled(expl.wd_history_pos == 0);
+    imgui::ScopedDisable disabled(expl.wd_history_pos == 0);
 
     // if (imgui::ArrowButton("Back", ImGuiDir_Left)) {
     if (imgui::Button(ICON_CI_CHEVRON_LEFT "##back")) {
-        print_debug_log("[ %d ] back arrow button triggered", expl.id);
+        print_debug_msg("[ %d ] back arrow button triggered", expl.id);
 
         if (io.KeyShift || io.KeyCtrl) {
             expl.wd_history_pos = 0;
@@ -1713,11 +1740,11 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
     u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
     auto io = imgui::GetIO();
 
-    imgui_scoped_disabled disabled(expl.wd_history_pos == wd_history_last_idx);
+    imgui::ScopedDisable disabled(expl.wd_history_pos == wd_history_last_idx);
 
     // if (imgui::ArrowButton("Forward", ImGuiDir_Right)) {
     if (imgui::Button(ICON_CI_CHEVRON_RIGHT "##forward")) {
-        print_debug_log("[ %d ] forward arrow button triggered", expl.id);
+        print_debug_msg("[ %d ] forward arrow button triggered", expl.id);
 
         if (io.KeyShift || io.KeyCtrl) {
             expl.wd_history_pos = wd_history_last_idx;
@@ -1790,7 +1817,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists_before_
 
                 bool pressed;
                 {
-                    imgui_scoped_text_color tc(dir_color());
+                    imgui::ScopedTextColor tc(dir_color());
                     pressed = imgui::Selectable(buffer, false, ImGuiSelectableFlags_SpanAllColumns);
                 }
 
@@ -1837,7 +1864,7 @@ void render_pins_popup(explorer_window &expl, window_visibilities &win_opts) noe
     else {
         for (auto const &pin : pins) {
             {
-                imgui_scoped_text_color tc(pin.color);
+                imgui::ScopedTextColor tc(pin.color);
                 bool selected = false;
 
                 if (imgui::Selectable(pin.label.c_str(), &selected)) {
@@ -1888,14 +1915,14 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
 
         utf_written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
         if (utf_written == 0) {
-            print_debug_log("[ %d ] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.id);
+            print_debug_msg("[ %d ] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.id);
             cleanup_and_close_popup();
             return;
         }
 
         utf_written = utf8_to_utf16(dir_name_utf8, dir_name_utf16, lengthof(dir_name_utf16));
         if (utf_written == 0) {
-            print_debug_log("[ %d ] utf8_to_utf16 failed: dir_name_utf8 -> dir_name_utf16", expl.id);
+            print_debug_msg("[ %d ] utf8_to_utf16 failed: dir_name_utf8 -> dir_name_utf16", expl.id);
             cleanup_and_close_popup();
             return;
         }
@@ -1918,7 +1945,7 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
                 case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist; probably a bug. Sorry!"; break;
                 default: err_msg = get_last_error_string(); break;
             }
-            print_debug_log("[ %d ] CreateDirectoryW failed: %d, %s", expl.id, result, err_msg.c_str());
+            print_debug_msg("[ %d ] CreateDirectoryW failed: %d, %s", expl.id, result, err_msg.c_str());
         } else {
             cleanup_and_close_popup();
             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
@@ -1963,7 +1990,7 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
 static
 void render_clear_filter_button(explorer_window &expl) noexcept
 {
-    imgui_scoped_disabled disabled(strempty(expl.filter_text.data()));
+    imgui::ScopedDisable disabled(strempty(expl.filter_text.data()));
 
     if (imgui::Button(ICON_CI_CLOSE "##clear_filter")) {
         init_empty_cstr(expl.filter_text.data());
@@ -2069,7 +2096,7 @@ void render_filter_text_input(explorer_window &expl) noexcept
         imgui::CalcTextSize("123456789012345").x
     );
 
-    imgui_scoped_item_width iw(width);
+    imgui::ScopedItemWidth iw(width);
 
     if (imgui::InputTextWithHint("##filter", ICON_CI_FILTER_FILLED, expl.filter_text.data(), expl.filter_text.size())) {
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -2176,14 +2203,14 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
 
         utf_written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
         if (utf_written == 0) {
-            print_debug_log("[ %d ] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.id);
+            print_debug_msg("[ %d ] utf8_to_utf16 failed: expl.cwd -> cwd_utf16", expl.id);
             cleanup_and_close_popup();
             return;
         }
 
         utf_written = utf8_to_utf16(file_name_utf8, file_name_utf16, lengthof(file_name_utf16));
         if (utf_written == 0) {
-            print_debug_log("[ %d ] utf8_to_utf16 failed: file_name_utf8 -> file_name_utf16", expl.id);
+            print_debug_msg("[ %d ] utf8_to_utf16 failed: file_name_utf8 -> file_name_utf16", expl.id);
             cleanup_and_close_popup();
             return;
         }
@@ -2214,7 +2241,7 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
                 case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist; probably a bug. Sorry!"; break;
                 default: err_msg = get_last_error_string(); break;
             }
-            print_debug_log("[ %d ] CreateFileW failed: %d, %s", expl.id, result, err_msg.c_str());
+            print_debug_msg("[ %d ] CreateFileW failed: %d, %s", expl.id, result, err_msg.c_str());
         } else {
             cleanup_and_close_popup();
             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
@@ -2275,11 +2302,11 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
         assert(written < lengthof(buffer));
     }
 
-    imgui_scoped_disabled disabled(!cwd_exists_before_edit && !already_pinned);
+    imgui::ScopedDisable disabled(!cwd_exists_before_edit && !already_pinned);
 
     if (imgui::Button(buffer)) {
         if (already_pinned) {
-            print_debug_log("[ %d ] pin_idx = %zu", expl.id, pin_idx);
+            print_debug_msg("[ %d ] pin_idx = %zu", expl.id, pin_idx);
             scoped_timer<timer_unit::MICROSECONDS> unpin_timer(&expl.unpin_us);
             global_state::remove_pin(pin_idx);
         }
@@ -2287,7 +2314,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
             swan_popup_modals::open_new_pin(expl.cwd, false);
         }
         bool result = global_state::save_pins_to_disk();
-        print_debug_log("save_pins_to_disk: %d", result);
+        print_debug_msg("save_pins_to_disk: %d", result);
     }
     if (imgui::IsItemHovered()) {
         imgui::SetTooltip("%s current working directory", already_pinned ? "Unpin" : "Pin");
@@ -2296,11 +2323,11 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
 
 void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_before_edit) noexcept
 {
-    imgui_scoped_disabled disabled(!cwd_exists_before_edit);
+    imgui::ScopedDisable disabled(!cwd_exists_before_edit);
 
     if (imgui::Button(ICON_CI_ARROW_UP "##up")) {
     // if (imgui::ArrowButton("..##up", ImGuiDir_Up)) {
-        print_debug_log("[ %d ] (..) button triggered", expl.id);
+        print_debug_msg("[ %d ] (..) button triggered", expl.id);
 
         auto result = try_ascend_directory(expl);
 
@@ -2380,7 +2407,7 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
         u64 len = slice_end - sliced_path.data();
 
         if (len == path_length(expl.cwd)) {
-            print_debug_log("[ %d ] cd_to_slice: slice == cwd, not updating cwd|history", expl.id);
+            print_debug_msg("[ %d ] cd_to_slice: slice == cwd, not updating cwd|history", expl.id);
         }
         else {
             expl.cwd[len] = '\0';
@@ -2394,9 +2421,11 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
 
         (void) expl.save_to_disk();
         expl.set_latest_valid_cwd_then_notify(expl.cwd);
+
+        imgui::CloseCurrentPopup();
     };
 
-    f32 original_spacing = imgui::GetStyle().ItemSpacing.x;
+    imgui::ScopedStyle<f32> s(imgui::GetStyle().ItemSpacing.x, 2);
 
     {
         u64 i = 0;
@@ -2405,25 +2434,17 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
             snprintf(buffer, lengthof(buffer), "%s##slice%zu", *slice_it, i);
 
             if (imgui::Button(buffer)) {
-                print_debug_log("[ %d ] clicked slice [%s]", expl.id, *slice_it);
+                print_debug_msg("[ %d ] clicked slice [%s]", expl.id, *slice_it);
                 cd_to_slice(*slice_it);
             }
 
-            imgui::GetStyle().ItemSpacing.x = 2;
             imgui::SameLine();
             imgui::Text("%c", dir_sep_utf8);
             imgui::SameLine();
         }
     }
 
-    if (imgui::Button(slices.back())) {
-        print_debug_log("[ %d ] clicked slice [%s]", expl.id, slices.back());
-        // cd_to_slice(slices.back());
-    }
-
-    if (slices.size() > 1) {
-        imgui::GetStyle().ItemSpacing.x = original_spacing;
-    }
+    imgui::Text("%s", slices.back());
 }
 
 void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, char dir_sep_utf8, wchar_t dir_sep_utf16) noexcept
@@ -2536,7 +2557,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                 swan_popup_modals::open_error("[F2] was pressed (function: rename)", "nothing is selected");
             } else {
                 auto &dirent_which_f2_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
-                print_debug_log("[ %d ] pressed F2 on [%s]", expl.id, dirent_which_f2_was_pressed_on.basic.path.data());
+                print_debug_msg("[ %d ] pressed F2 on [%s]", expl.id, dirent_which_f2_was_pressed_on.basic.path.data());
                 open_single_rename_popup = true;
                 dirent_to_be_renamed = &dirent_which_f2_was_pressed_on;
             }
@@ -2577,7 +2598,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
         };
 
         if (any_window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
-            print_debug_log("[ %d ] Ctrl-R, refresh triggered", expl.id);
+            print_debug_msg("[ %d ] Ctrl-R, refresh triggered", expl.id);
             refresh();
         }
         else if (cwd_exists_before_edit) {
@@ -2588,7 +2609,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
             if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms.load())) {
                 auto refresh_notif_time = expl.refresh_notif_time.load(std::memory_order::seq_cst);
                 if (expl.last_refresh_time.time_since_epoch().count() < refresh_notif_time.time_since_epoch().count()) {
-                    print_debug_log("[ %d ] refresh notif RECV", expl.id);
+                    print_debug_msg("[ %d ] refresh notif RECV", expl.id);
                     refresh();
                 }
             }
@@ -2640,8 +2661,8 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                 imgui::SetTooltip("Up to parent directory");
             }
 
-            imgui_sameline_spacing(1);
-            imgui_spacing(1);
+            imgui::SameLineSpaced(1);
+            imgui::Spacing(1);
 
             if (imgui::Button(ICON_CI_BOOKMARK "##pins")) {
                 imgui::OpenPopup("pins_popup");
@@ -2652,6 +2673,15 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
             if (imgui::BeginPopup("pins_popup")) {
                 render_pins_popup(expl, win_opts);
                 imgui::EndPopup();
+            }
+
+            imgui::SameLine();
+
+            if (imgui::Button(ICON_CI_SYMBOL_NULL "##invert_selection")) {
+                expl.invert_selected_visible_cwd_entries();
+            }
+            if (imgui::IsItemHovered()) {
+                imgui::SetTooltip("Invert selection");
             }
 
             imgui::SameLine();
@@ -2677,15 +2707,6 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
             if (imgui::BeginPopupModal("Create file##from_header", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                 render_create_file_popup(expl, dir_sep_utf16);
             }
-
-            imgui::SameLine();
-
-            if (imgui::Button(ICON_CI_SYMBOL_NULL "##invert_selection")) {
-                expl.invert_selected_visible_cwd_entries();
-            }
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Invert selection");
-            }
         }
 
         imgui::TableNextColumn();
@@ -2695,7 +2716,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
             imgui::SameLine();
 
             {
-                imgui_scoped_disabled d(!cwd_exists_before_edit);
+                imgui::ScopedDisable d(!cwd_exists_before_edit);
                 if (imgui::Button(ICON_CI_DEBUG_LINE_BY_LINE "##clicknav")) {
                     imgui::OpenPopup("Click Navigation");
                 }
@@ -2738,7 +2759,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
         imgui::PushTextWrapPos(imgui::GetColumnWidth());
         imgui::TextColored(red(), "%s", expl.filter_error.c_str());
         imgui::PopTextWrapPos();
-        imgui_spacing(1);
+        imgui::Spacing(1);
     }
 
     // imgui::Separator();
@@ -2865,7 +2886,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                             imgui::SameLine();
 
                             if (imgui::Selectable(buffer, dirent.is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
-                                print_debug_log("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
+                                print_debug_msg("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
 
                                 if (!io.KeyCtrl && !io.KeyShift) {
                                     // entry was selected but Ctrl was not held, so deselect everything
@@ -2894,7 +2915,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                                         last_idx = i;
                                     }
 
-                                    print_debug_log("[ %d ] shift click, [%zu, %zu]", expl.id, first_idx, last_idx);
+                                    print_debug_msg("[ %d ] shift click, [%zu, %zu]", expl.id, first_idx, last_idx);
 
                                     for (u64 j = first_idx; j <= last_idx; ++j) {
                                         auto &dirent_ = expl.cwd_entries[j];
@@ -2913,7 +2934,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
 
                                 if (seconds_between_clicks <= double_click_window_sec && path_equals_exactly(current_click_path, last_click_path)) {
                                     if (dirent.basic.is_directory()) {
-                                        print_debug_log("[ %d ] double clicked directory [%s]", expl.id, dirent.basic.path.data());
+                                        print_debug_msg("[ %d ] double clicked directory [%s]", expl.id, dirent.basic.path.data());
 
                                         if (dirent.basic.is_dotdot()) {
                                             auto result = try_ascend_directory(expl);
@@ -2948,7 +2969,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                                         }
                                     }
                                     else if (dirent.basic.is_symlink()) {
-                                        print_debug_log("[ %d ] double clicked symlink [%s]", expl.id, dirent.basic.path.data());
+                                        print_debug_msg("[ %d ] double clicked symlink [%s]", expl.id, dirent.basic.path.data());
 
                                         auto res = open_symlink(dirent, expl, dir_sep_utf8);
 
@@ -2970,7 +2991,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                                         }
                                     }
                                     else {
-                                        print_debug_log("[ %d ] double clicked file [%s]", expl.id, dirent.basic.path.data());
+                                        print_debug_msg("[ %d ] double clicked file [%s]", expl.id, dirent.basic.path.data());
 
                                         auto res = open_file(dirent, expl, dir_sep_utf8);
 
@@ -2988,7 +3009,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                                     }
                                 }
                                 else if (dirent.basic.is_dotdot()) {
-                                    print_debug_log("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
+                                    print_debug_msg("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
                                 }
 
                                 last_click_time = current_time;
@@ -3002,35 +3023,120 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                             }
 
                             if (imgui::IsItemClicked(ImGuiMouseButton_Right) && !dirent.basic.is_dotdot()) {
-                                print_debug_log("[ %d ] right clicked [%s]", expl.id, dirent.basic.path.data());
+                                print_debug_msg("[ %d ] right clicked [%s]", expl.id, dirent.basic.path.data());
                                 imgui::OpenPopup("Context");
                                 right_clicked_ent = &dirent;
                             }
 
                         } // path column
 
-                        // if (imgui::BeginDragDropSource()) {
-                        //     imgui::SetDragDropPayload("cwd_entries", dirent.basic.path.data(), dirent.basic.path.size());
-                        //     imgui::EndDragDropSource();
-                        // }
+                        if (!dirent.basic.is_dotdot() && imgui::BeginDragDropSource()) {
+                            auto cwd_to_utf16 = [&]() {
+                                std::wstring retval;
+
+                                wchar_t cwd_utf16[MAX_PATH];
+                                s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
+                                if (written == 0) {
+                                    // TODO: handle error
+                                    retval = {};
+                                } else {
+                                    retval = cwd_utf16;
+                                }
+
+                                return retval;
+                            };
+
+                            auto add_payload_item = [&](
+                                move_dirents_drag_drop_payload &payload,
+                                std::wstring &paths,
+                                std::wstring const &cwd_utf16,
+                                char const *item_utf8)
+                            {
+                                ++payload.num_items;
+
+                                paths += cwd_utf16;
+                                if (paths.back() != dir_sep_utf16) {
+                                    paths += dir_sep_utf16;
+                                }
+
+                                wchar_t item_utf16[MAX_PATH];
+                                s32 written = utf8_to_utf16(item_utf8, item_utf16, lengthof(item_utf16));
+
+                                if (written == 0) {
+                                    // TODO: handle error
+                                }
+                                else {
+                                    paths += item_utf16;
+                                    paths += L'\n';
+                                }
+                            };
+
+                            auto compute_and_submit_drag_drop_payload = [&]() {
+                                std::wstring cwd_utf16 = cwd_to_utf16();
+                                assert(!cwd_utf16.empty());
+                                move_dirents_drag_drop_payload payload = {};
+                                std::wstring paths = {};
+                                // std::wstring &paths = payload.absolute_paths_delimited_by_newlines;
+
+                                payload.src_explorer_id = expl.id;
+
+                                if (dirent.is_selected) {
+                                    for (auto const &dirent_ : expl.cwd_entries) {
+                                        if (!dirent_.is_filtered_out && dirent_.is_selected) {
+                                            add_payload_item(payload, paths, cwd_utf16, dirent_.basic.path.data());
+                                        }
+                                    }
+                                }
+                                else {
+                                    add_payload_item(payload, paths, cwd_utf16, dirent.basic.path.data());
+                                    global_state::move_dirents_payload_set() = true;
+                                }
+
+                                wchar_t *paths_data = new wchar_t[paths.size() + 1];
+                                StrCpyNW(paths_data, paths.c_str(), s32(paths.size() + 1));
+                                payload.absolute_paths_delimited_by_newlines = paths_data;
+
+                                imgui::SetDragDropPayload("move_dirents_drag_drop_payload", (void *)&payload, sizeof(payload), ImGuiCond_Once);
+                                global_state::move_dirents_payload_set() = true;
+                                WCOUT_IF_DEBUG("payload.src_explorer_id = " << payload.src_explorer_id << '\n');
+                                WCOUT_IF_DEBUG("payload.absolute_paths_delimited_by_newlines:\n" << payload.absolute_paths_delimited_by_newlines << '\n');
+                            };
+
+                            if (!global_state::move_dirents_payload_set()) {
+                                compute_and_submit_drag_drop_payload();
+                            } else {
+                                // don't recompute payload until someone accepts or it gets dropped
+                            }
+
+                            auto payload_wrapper = imgui::GetDragDropPayload();
+                            if (payload_wrapper != nullptr && streq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
+                                auto payload_data = reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data);
+                                u64 num_items = payload_data->num_items;
+                                imgui::Text("Move %zu item%s", num_items, num_items == 1 ? "" : "s");
+                            }
+
+                            imgui::EndDragDropSource();
+                        }
+
+                        if (!dirent.basic.is_file() && imgui::BeginDragDropTarget()) {
+                            auto payload_wrapper = imgui::GetDragDropPayload();
+
+                            if (payload_wrapper != nullptr && streq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
+                                payload_wrapper = imgui::AcceptDragDropPayload("move_dirents_drag_drop_payload");
+                                if (payload_wrapper != nullptr) {
+                                    handle_drag_drop_onto_dirent(expl, dirent, payload_wrapper, dir_sep_utf8);
+                                }
+                            }
+
+                            imgui::EndDragDropTarget();
+                        }
 
                         if (imgui::TableSetColumnIndex(cwd_entries_table_col_type)) {
-                            if (dirent.basic.is_directory()) {
-                                imgui::TextUnformatted("dir");
-                            }
-                            else if (dirent.basic.is_symlink()) {
-                                imgui::TextUnformatted("link");
-                            }
-                            else {
-                                imgui::TextUnformatted("file");
-                            }
+                            imgui::TextUnformatted(dirent.basic.kind_short_cstr());
                         }
 
                         if (imgui::TableSetColumnIndex(cwd_entries_table_col_size_pretty)) {
-                            if (dirent.basic.is_directory()) {
-                                imgui::TextUnformatted("");
-                            }
-                            else {
+                            if (!dirent.basic.is_directory()) {
                                 std::array<char, 32> pretty_size = {};
                                 format_file_size(dirent.basic.size, pretty_size.data(), pretty_size.size(), size_unit_multiplier);
                                 imgui::TextUnformatted(pretty_size.data());
@@ -3038,10 +3144,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                         }
 
                         if (imgui::TableSetColumnIndex(cwd_entries_table_col_size_bytes)) {
-                            if (dirent.basic.is_directory()) {
-                                imgui::TextUnformatted("");
-                            }
-                            else {
+                            if (!dirent.basic.is_directory()) {
                                 imgui::Text("%zu", dirent.basic.size);
                             }
                         }
@@ -3201,9 +3304,33 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
             cwd_entries_table_max = imgui::GetItemRectMax();
         }
 
-        imgui_scoped_style<f32> s2(style.ItemSpacing.y, 0);
+        imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 0);
 
         imgui::EndChild();
+
+        if (imgui::BeginDragDropTarget()) {
+            auto payload_wrapper = imgui::GetDragDropPayload();
+
+            if (payload_wrapper != nullptr &&
+                streq(payload_wrapper->DataType, "move_dirents_drag_drop_payload") &&
+                reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data)->src_explorer_id != expl.id)
+            {
+                payload_wrapper = imgui::AcceptDragDropPayload("move_dirents_drag_drop_payload");
+                if (payload_wrapper != nullptr) {
+                    auto payload_data = (move_dirents_drag_drop_payload *)payload_wrapper->Data;
+                    assert(payload_data != nullptr);
+                    s32 src_explorer_id = payload_data->src_explorer_id;
+                    if (src_explorer_id != expl.id) {
+                        auto result = move_files_into(expl.cwd, expl, *payload_data);
+                        if (!result.success) {
+                            // TODO: handle error
+                        }
+                    }
+                }
+            }
+
+            imgui::EndDragDropTarget();
+        }
     }
     ImVec2 cwd_entries_child_size = imgui::GetItemRectSize();
     ImVec2 cwd_entries_child_min = imgui::GetItemRectMin();
@@ -3245,37 +3372,44 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
     // }
 
     // {
-    //     imgui_scoped_style<f32> s2(style.ItemSpacing.y, 0);
+    //     imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 0);
     //     imgui::Separator();
     // }
 
     {
-        // imgui_scoped_style<f32> s1(style.FramePadding.y, 0);
-        // imgui_scoped_color c1(ImGuiCol_ChildBg, orange());
+        // imgui::ScopedStyle<f32> s1(style.FramePadding.y, 0);
+        // imgui::ScopedColor c1(ImGuiCol_ChildBg, orange());
 
         if (imgui::BeginChild("explorer_footer", { 0, imgui::CalcTextSize("1").y + imgui::GetStyle().WindowPadding.y + 5 })) {
-            imgui_scoped_style<f32> s2(style.ItemSpacing.y, 5);
+            imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 5);
             imgui::Spacing();
             imgui::AlignTextToFramePadding();
 
             render_num_cwd_items(cnt);
 
             if (expl.filter_error == "" && cnt.filtered_dirents > 0) {
-                imgui_sameline_spacing(1);
+                imgui::SameLineSpaced(1);
                 render_num_cwd_items_filtered(cnt);
             }
 
             if (cnt.selected_dirents > 0) {
-                imgui_sameline_spacing(1);
+                imgui::SameLineSpaced(1);
                 render_num_cwd_items_selected(cnt);
             }
 
             if (!s_file_op_payload.items.empty()) {
-                imgui_sameline_spacing(1);
+                imgui::SameLineSpaced(1);
                 render_file_op_payload_hint();
             }
         }
         imgui::EndChild();
+        imgui::OpenPopupOnItemClick("##explorer_footer_context", ImGuiPopupFlags_MouseButtonRight);
+        if (!s_file_op_payload.items.empty() && imgui::BeginPopup("##explorer_footer_context")) {
+            if (imgui::Selectable("Paste")) {
+                auto result = s_file_op_payload.execute(expl);
+            }
+            imgui::EndPopup();
+        }
     }
 
     if (open_single_rename_popup) {
@@ -3318,14 +3452,14 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
 
     s32 utf_written = utf8_to_utf16(watch_target_utf8.data(), watch_target_utf16, 2048);
     if (utf_written == 0) {
-        print_debug_log("[ %d ] utf8_to_utf16 failed during setup: watch_target_utf8 -> watch_target_utf16", expl.id);
+        print_debug_msg("[ %d ] utf8_to_utf16 failed during setup: watch_target_utf8 -> watch_target_utf16", expl.id);
     }
 
     watch_handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
     if (watch_handle == INVALID_HANDLE_VALUE) {
-        print_debug_log("[ %d ] FindFirstChangeNotificationW failed during setup: INVALID_HANDLE_VALUE", expl.id);
+        print_debug_msg("[ %d ] FindFirstChangeNotificationW failed during setup: INVALID_HANDLE_VALUE", expl.id);
     } else {
-        print_debug_log("[ %d ] FindFirstChangeNotificationW initial setup success for [%s]", expl.id, watch_target_utf8.data());
+        print_debug_msg("[ %d ] FindFirstChangeNotificationW initial setup success for [%s]", expl.id, watch_target_utf8.data());
     }
 
     while (!window_close_flag.load()) {
@@ -3345,7 +3479,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
                 FindCloseChangeNotification(watch_handle);
             }
 
-            print_debug_log("[ %d ] watch target changed, now: [%s]", expl.id, latest_valid_cwd.data());
+            print_debug_msg("[ %d ] watch target changed, now: [%s]", expl.id, latest_valid_cwd.data());
 
             if (path_is_empty(latest_valid_cwd)) {
                 watch_handle = INVALID_HANDLE_VALUE;
@@ -3353,11 +3487,11 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
             else {
                 utf_written = utf8_to_utf16(latest_valid_cwd.data(), watch_target_utf16, 2048);
                 if (utf_written == 0) {
-                    print_debug_log("[ %d ] utf8_to_utf16 failed: latest_valid_cwd -> watch_target_utf16", expl.id);
+                    print_debug_msg("[ %d ] utf8_to_utf16 failed: latest_valid_cwd -> watch_target_utf16", expl.id);
                 } else {
                     watch_handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
                     if (watch_handle == INVALID_HANDLE_VALUE) {
-                        print_debug_log("[ %d ] FindFirstChangeNotificationW failed: INVALID_HANDLE_VALUE", expl.id);
+                        print_debug_msg("[ %d ] FindFirstChangeNotificationW failed: INVALID_HANDLE_VALUE", expl.id);
                     }
                 }
             }
@@ -3388,19 +3522,19 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
                 switch (wait_status) {
                     // TODO: investigate why this is being called so many times when changes are happening, maybe this is a bug?
                     case WAIT_OBJECT_0: {
-                        print_debug_log("[ %d ] WAIT_OBJECT_0 h=%d target=[%s]", expl.id, watch_handle, watch_target_utf8.data());
+                        print_debug_msg("[ %d ] WAIT_OBJECT_0 h=%d target=[%s]", expl.id, watch_handle, watch_target_utf8.data());
 
                         if (expl.is_window_visible.load()) {
                             time_point_t now = current_time();
 
                             if (compute_diff_ms(last_refresh_notif_sent, now) >= global_state::explorer_options_().min_tolerable_refresh_interval_ms) {
-                                print_debug_log("[ %d ] refresh notif SEND", expl.id);
+                                print_debug_msg("[ %d ] refresh notif SEND", expl.id);
 
                                 expl.refresh_notif_time.store(now, std::memory_order::seq_cst);
                                 last_refresh_notif_sent = now;
 
                                 if (!FindNextChangeNotification(watch_handle)) {
-                                    print_debug_log("[ %d ] FindNextChangeNotification failed", expl.id);
+                                    print_debug_msg("[ %d ] FindNextChangeNotification failed", expl.id);
                                 }
                             }
                         }
@@ -3410,7 +3544,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
                     case WAIT_TIMEOUT:
                         break;
                     case WAIT_FAILED:
-                        print_debug_log("[ %d ] WAIT_FAILED h=%d target=[%s]", expl.id, watch_handle, watch_target_utf8.data());
+                        print_debug_msg("[ %d ] WAIT_FAILED h=%d target=[%s]", expl.id, watch_handle, watch_target_utf8.data());
                         break;
                     default:
                         assert(false && "Unhandled wait_status");
@@ -3436,166 +3570,10 @@ void file_operation_command_buf::clear() noexcept
 
 generic_result file_operation_command_buf::execute(explorer_window &expl) noexcept
 {
-    auto file_operation_task = [](
-        std::wstring working_directory_utf16,
-        std::wstring paths_to_execute_utf16,
-        std::vector<char> operations_to_execute,
-        std::mutex *init_done_mutex,
-        std::condition_variable *init_done_cond,
-        bool *init_done,
-        std::string *init_error
-    ) {
-        assert(!working_directory_utf16.empty());
-        if (!StrChrW(L"\\/", working_directory_utf16.back())) {
-            working_directory_utf16 += L'\\';
-        }
-
-        auto set_init_error_and_notify = [&](char const *err) {
-            std::unique_lock lock(*init_done_mutex);
-            *init_done = true;
-            *init_error = err;
-            init_done_cond->notify_one();
-        };
-
-        HRESULT result = {};
-
-        result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-        if (FAILED(result)) {
-            return set_init_error_and_notify("CoInitializeEx(COINIT_APARTMENTTHREADED)");
-        }
-        SCOPE_EXIT { CoUninitialize(); };
-
-        IFileOperation *file_op = nullptr;
-
-        result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
-        if (FAILED(result)) {
-            return set_init_error_and_notify("CoCreateInstance(CLSID_FileOperation)");
-        }
-        SCOPE_EXIT { file_op->Release(); };
-
-        result = file_op->SetOperationFlags(FOF_RENAMEONCOLLISION | FOF_NOCONFIRMATION | FOF_ALLOWUNDO);
-        if (FAILED(result)) {
-            return set_init_error_and_notify("IFileOperation::SetOperationFlags");
-        }
-
-        IShellItem *destination = nullptr;
-        {
-            swan_path_t destination_utf8 = path_create("");
-
-            result = SHCreateItemFromParsingName(working_directory_utf16.c_str(), nullptr, IID_PPV_ARGS(&destination));
-
-            if (FAILED(result)) {
-                WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << working_directory_utf16.c_str() << "]\n");
-                s32 written = utf16_to_utf8(working_directory_utf16.data(), destination_utf8.data(), destination_utf8.size());
-                std::string error = {};
-                if (written == 0) {
-                    error = "SHCreateItemFromParsingName and conversion of destination path from UTF-16 to UTF-8";
-                } else {
-                    error.append("SHCreateItemFromParsingName [").append(destination_utf8.data()).append("]");
-                }
-                return set_init_error_and_notify(error.c_str());
-            }
-        }
-
-        // attach items (IShellItem) for deletion to IFileOperation
-        {
-            auto items_to_execute = std::wstring_view(paths_to_execute_utf16.data()) | std::ranges::views::split('\n');
-            std::stringstream err = {};
-            std::wstring full_path_to_exec_utf16 = {};
-
-            full_path_to_exec_utf16.reserve(global_state::page_size() / 2);
-
-            u64 i = 0;
-            for (auto item_utf16 : items_to_execute) {
-                SCOPE_EXIT { ++i; };
-                char operation_code = operations_to_execute[i];
-
-                std::wstring_view view(item_utf16.begin(), item_utf16.end());
-                full_path_to_exec_utf16 = view;
-
-                // shlwapi doesn't like '/', force them all to '\'
-                std::replace(full_path_to_exec_utf16.begin(), full_path_to_exec_utf16.end(), L'/', L'\\');
-
-                swan_path_t item_path_utf8 = path_create("");
-                s32 written = 0;
-
-                IShellItem *to_exec = nullptr;
-                result = SHCreateItemFromParsingName(full_path_to_exec_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_exec));
-                if (FAILED(result)) {
-                    WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_exec_utf16.c_str() << "]\n");
-                    written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                    if (written == 0) {
-                        err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8\n";
-                    } else {
-                        err << "SHCreateItemFromParsingName [" << item_path_utf8.data() << "]\n";
-                    }
-                    continue;
-                }
-
-                SCOPE_EXIT { to_exec->Release(); };
-
-                char const *function = nullptr;
-                switch (operation_code) {
-                    case 'C':
-                        result = file_op->CopyItem(to_exec, destination, nullptr, nullptr);
-                        function = "CopyItem";
-                        break;
-                    case 'X':
-                        result = file_op->MoveItem(to_exec, destination, nullptr, nullptr);
-                        function = "MoveItem";
-                        break;
-                    case 'D':
-                        result = file_op->DeleteItem(to_exec, nullptr);
-                        function = "DeleteItem";
-                        break;
-                }
-
-                if (FAILED(result)) {
-                    WCOUT_IF_DEBUG("FAILED: IFileOperation::" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
-                    written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                    if (written == 0) {
-                        err << "IFileOperation::" << function << " and conversion of delete path from UTF-16 to UTF-8\n";
-                    } else {
-                        err << "IFileOperation::" << function << " [" << item_path_utf8.data() << "]";
-                    }
-                } else {
-                    WCOUT_IF_DEBUG("file_op->" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
-                }
-            }
-
-            std::string errors = err.str();
-            if (!errors.empty()) {
-                errors.pop_back(); // remove trailing '\n'
-                return set_init_error_and_notify(errors.c_str());
-            }
-        }
-
-        progress_sink prog_sink;
-        DWORD cookie = {};
-
-        result = file_op->Advise(&prog_sink, &cookie);
-        if (FAILED(result)) {
-            return set_init_error_and_notify("IFileOperation::Advise(IFileOperationProgressSink *pfops, DWORD *pdwCookie)");
-        }
-        print_debug_log("IFileOperation::Advise(%d)", cookie);
-
-        set_init_error_and_notify(""); // init succeeded, no error
-
-        result = file_op->PerformOperations();
-        if (FAILED(result)) {
-            print_debug_log("FAILED IFileOperation::PerformOperations()");
-        }
-
-        file_op->Unadvise(cookie);
-        if (FAILED(result)) {
-            print_debug_log("FAILED IFileOperation::Unadvise(%d)", cookie);
-        }
-    };
-
     wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
     s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
     if (written == 0) {
-        print_debug_log("FAILED utf8_to_utf16(expl.cwd -> cwd_utf16)");
+        print_debug_msg("FAILED utf8_to_utf16(expl.cwd -> cwd_utf16)");
         return { false, "conversion of current working directory path from UTF-8 to UTF-16" };
     }
 
@@ -3612,7 +3590,7 @@ generic_result file_operation_command_buf::execute(explorer_window &expl) noexce
             written = utf8_to_utf16(item.path.data(), item_utf16, lengthof(item_utf16));
 
             if (written == 0) {
-                print_debug_log("FAILED utf8_to_utf16(item.path -> item_utf16)");
+                print_debug_msg("FAILED utf8_to_utf16(item.path -> item_utf16)");
                 err << "conversion of [" << item.path.data() << "] from UTF-8 to UTF-16\n";
             }
 
@@ -3620,11 +3598,7 @@ generic_result file_operation_command_buf::execute(explorer_window &expl) noexce
             operations_to_exec.push_back(item.operation_code);
         }
 
-        WCOUT_IF_DEBUG("packed_paths_to_exec_utf16:\n" << packed_paths_to_exec_utf16);
-
-        if (!packed_paths_to_exec_utf16.empty()) {
-            packed_paths_to_exec_utf16.pop_back(); // remove trailing \n
-        }
+        WCOUT_IF_DEBUG("packed_paths_to_exec_utf16:\n" << packed_paths_to_exec_utf16 << '\n');
 
         std::string errors = err.str();
         if (!errors.empty()) {
@@ -3635,7 +3609,7 @@ generic_result file_operation_command_buf::execute(explorer_window &expl) noexce
     bool initialization_done = false;
     std::string initialization_error = {};
 
-    global_state::thread_pool().push_task(file_operation_task,
+    global_state::thread_pool().push_task(perform_file_operations,
         cwd_utf16,
         std::move(packed_paths_to_exec_utf16),
         std::move(operations_to_exec),

@@ -20,7 +20,7 @@ void swan_windows::render_debug_log(bool &open) noexcept
         imgui::SameLine();
         bool jump_to_bottom = imgui::ArrowButton("Bottom", ImGuiDir_Down);
 
-        imgui_sameline_spacing(1);
+        imgui::SameLineSpaced(1);
 
         if (imgui::Button("Clear")) {
             debug_log_package::clear_buffer();
@@ -35,11 +35,11 @@ void swan_windows::render_debug_log(bool &open) noexcept
         imgui::EndDisabled();
     #endif
 
-        imgui_sameline_spacing(1);
+        imgui::SameLineSpaced(1);
 
         imgui::Checkbox("Logging Enabled", &debug_log_package::s_logging_enabled);
 
-        imgui_sameline_spacing(1);
+        imgui::SameLineSpaced(1);
 
         imgui::Checkbox("Auto-scroll at bottom", &auto_scroll);
 

@@ -27,7 +27,7 @@ struct reorder_pin_payload
     u64 src_index;
 };
 
-void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_window, global_state::num_explorers> &explorers, bool &open) noexcept
+void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_window, global_constants::num_explorers> &explorers, bool &open) noexcept
 {
     if (imgui::Begin(" Pinned ", &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
@@ -47,7 +47,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                 snprintf(buffer, lengthof(buffer), "Color##%zu", i);
                 if (imgui::ColorEdit4(buffer, &pin.color.x, ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_NoLabel/*|ImGuiColorEditFlags_NoBorder*/)) {
                     bool save_success = global_state::save_pins_to_disk();
-                    print_debug_log("global_state::save_pins_to_disk: %d", save_success);
+                    print_debug_msg("global_state::save_pins_to_disk: %d", save_success);
                 }
             }
 
@@ -71,22 +71,22 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                 }
             }
 
-            imgui_sameline_spacing(0);
+            imgui::SameLineSpaced(0);
 
             imgui::Text("%zu.", i+1);
 
-            imgui_sameline_spacing(0);
+            imgui::SameLineSpaced(0);
 
             {
                 char buffer[pinned_path::LABEL_MAX_LEN + 16];
                 snprintf(buffer, lengthof(buffer), "%s##%zu", pin.label.c_str(), i);
 
-                imgui_scoped_text_color tc(pin.color);
+                imgui::ScopedTextColor tc(pin.color);
                 imgui::Selectable(buffer, false/*, ImGuiSelectableFlags_SpanAllColumns*/);
             }
             if (imgui::BeginDragDropSource()) {
                 imgui::Text("%zu.", i+1);
-                imgui_sameline_spacing(1);
+                imgui::SameLineSpaced(1);
                 imgui::TextColored(pin.color, pin.label.c_str());
 
                 reorder_pin_payload payload = { i };
@@ -104,11 +104,11 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                     u64 to = i;
 
                     bool reorder_success = change_element_position(pins, from, to);
-                    print_debug_log("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
+                    print_debug_msg("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
 
                     if (reorder_success) {
                         bool save_success = global_state::save_pins_to_disk();
-                        print_debug_log("global_state::save_pins_to_disk: %d", save_success);
+                        print_debug_msg("global_state::save_pins_to_disk: %d", save_success);
                     }
                 }
 
@@ -116,7 +116,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
             }
         }
 
-        imgui_spacing(1);
+        imgui::Spacing(1);
 
         if (imgui::Button(ICON_CI_REPO_CREATE " Create Pin")) {
             swan_popup_modals::open_new_pin({}, true);
@@ -125,7 +125,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
         if (pin_to_delete_idx != npos) {
             pins.erase(pins.begin() + pin_to_delete_idx);
             bool success = global_state::save_pins_to_disk();
-            print_debug_log("delete pins[%zu], global_state::save_pins_to_disk: %d", pin_to_delete_idx, success);
+            print_debug_msg("delete pins[%zu], global_state::save_pins_to_disk: %d", pin_to_delete_idx, success);
         }
     }
 

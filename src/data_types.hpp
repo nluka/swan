@@ -50,6 +50,7 @@ struct basic_dirent
     bool is_file() const noexcept;
     bool is_non_symlink_file() const noexcept;
     char const *kind_cstr() const noexcept;
+    char const *kind_short_cstr() const noexcept;
     char const *kind_icon() const noexcept;
 };
 
@@ -263,12 +264,12 @@ struct file_operation
         count
     };
 
-    std::atomic<u64> total_file_size          = { 0 };
-    std::atomic<u64> total_bytes_transferred  = { 0 };
-    std::atomic<u64> stream_size              = { 0 };
-    std::atomic<u64> stream_bytes_transferred = { 0 };
-    std::atomic<time_point_t> start_time      = {   };
-    std::atomic<time_point_t> end_time        = {   };
+    std::atomic<u64> total_file_size          = {};
+    std::atomic<u64> total_bytes_transferred  = {};
+    std::atomic<u64> stream_size              = {};
+    std::atomic<u64> stream_bytes_transferred = {};
+    std::atomic<time_point_t> start_time      = {};
+    std::atomic<time_point_t> end_time        = {};
     type op_type = type::nil;
     bool success = false;
     swan_path_t src_path = {};
@@ -278,6 +279,47 @@ struct file_operation
     file_operation(file_operation const &other) noexcept; // for boost::circular_buffer
     file_operation &operator=(file_operation const &other) noexcept; // for boost::circular_buffer
 };
+
+struct progress_sink : public IFileOperationProgressSink
+{
+    HRESULT FinishOperations(HRESULT) override;
+    HRESULT PauseTimer() override;
+    HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
+    HRESULT PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) override;
+    HRESULT PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
+    HRESULT PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override;
+    HRESULT PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
+    HRESULT PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
+    HRESULT PreDeleteItem(DWORD, IShellItem *) override;
+    HRESULT PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
+    HRESULT PreNewItem(DWORD, IShellItem *, LPCWSTR) override;
+    HRESULT PreRenameItem(DWORD, IShellItem *, LPCWSTR) override;
+    HRESULT ResetTimer() override;
+    HRESULT ResumeTimer() override;
+    HRESULT StartOperations() override;
+    HRESULT UpdateProgress(UINT work_total, UINT work_so_far) override;
+
+    ULONG AddRef();
+    ULONG Release();
+
+    HRESULT QueryInterface(const IID &riid, void **ppv);
+};
+
+struct move_dirents_drag_drop_payload
+{
+    s32 src_explorer_id;
+    u64 num_items;
+    wchar_t *absolute_paths_delimited_by_newlines;
+};
+
+void perform_file_operations(
+    std::wstring working_directory_utf16,
+    std::wstring paths_to_execute_utf16,
+    std::vector<char> operations_to_execute,
+    std::mutex *init_done_mutex,
+    std::condition_variable *init_done_cond,
+    bool *init_done,
+    std::string *init_error) noexcept;
 
 struct pinned_path
 {

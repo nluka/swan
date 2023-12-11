@@ -1,5 +1,4 @@
-#include "imgui/imgui.h"
-
+#include "stdafx.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 #include "scoped_timer.hpp"
@@ -132,7 +131,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     u64 num_transform_errors = 0;
 
     if (!initial_computed || recompute) {
-        print_debug_log("[%s] recomputing pattern, renames, collisions", expl.name);
+        print_debug_msg("[%s] recomputing pattern, renames, collisions", expl.name);
 
         renames.reserve(selection.size());
         renames.clear();
@@ -370,7 +369,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(expl_cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
 
                     if (utf_written == 0) {
-                        print_debug_log("utf8_to_utf16 failed (expl_cwd -> buffer_cwd_utf16)");
+                        print_debug_msg("utf8_to_utf16 failed (expl_cwd -> buffer_cwd_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -379,7 +378,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(rename.before->path.data(), buffer_before_utf16, lengthof(buffer_before_utf16));
 
                     if (utf_written == 0) {
-                        print_debug_log("utf8_to_utf16 failed (rename.before.path -> buffer_before_utf16)");
+                        print_debug_msg("utf8_to_utf16 failed (rename.before.path -> buffer_before_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -393,7 +392,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(rename.after.data(), buffer_after_utf16, lengthof(buffer_after_utf16));
 
                     if (utf_written == 0) {
-                        print_debug_log("utf8_to_utf16 failed (rename.after -> buffer_after_utf16)");
+                        print_debug_msg("utf8_to_utf16 failed (rename.after -> buffer_after_utf16)");
                         ++num_renames_fail;
                         continue;
                     }

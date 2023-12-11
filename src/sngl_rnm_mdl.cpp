@@ -71,7 +71,7 @@ void swan_popup_modals::render_single_rename() noexcept
         utf_written = utf8_to_utf16(s_single_rename_expl->cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
 
         if (utf_written == 0) {
-            print_debug_log("[%s] utf8_to_utf16 failed (expl.cwd -> buffer_cwd_utf16)", s_single_rename_expl->name);
+            print_debug_msg("[%s] utf8_to_utf16 failed (expl.cwd -> buffer_cwd_utf16)", s_single_rename_expl->name);
             cleanup_and_close_popup();
             return;
         }
@@ -79,7 +79,7 @@ void swan_popup_modals::render_single_rename() noexcept
         utf_written = utf8_to_utf16(s_single_rename_entry_to_be_renamed->basic.path.data(), buffer_old_name_utf16, lengthof(buffer_old_name_utf16));
 
         if (utf_written == 0) {
-            print_debug_log("[%s] utf8_to_utf16 failed (s_entry_to_be_renamed.basic.path -> buffer_old_name_utf16)", s_single_rename_expl->name);
+            print_debug_msg("[%s] utf8_to_utf16 failed (s_entry_to_be_renamed.basic.path -> buffer_old_name_utf16)", s_single_rename_expl->name);
             cleanup_and_close_popup();
             return;
         }
@@ -87,7 +87,7 @@ void swan_popup_modals::render_single_rename() noexcept
         utf_written = utf8_to_utf16(new_name_utf8.data(), buffer_new_name_utf16, lengthof(buffer_new_name_utf16));
 
         if (utf_written == 0) {
-            print_debug_log("[%s] utf8_to_utf16 failed (new_name_utf8 -> buffer_new_name_utf16)", s_single_rename_expl->name);
+            print_debug_msg("[%s] utf8_to_utf16 failed (new_name_utf8 -> buffer_new_name_utf16)", s_single_rename_expl->name);
             cleanup_and_close_popup();
             return;
         }
@@ -131,7 +131,7 @@ void swan_popup_modals::render_single_rename() noexcept
         new_name_utf8 = s_single_rename_entry_to_be_renamed->basic.path;
     }
     {
-        [[maybe_unused]] imgui_scoped_avail_width width = {};
+        [[maybe_unused]] imgui::ScopedAvailWidth width = {};
 
         if (imgui::InputTextWithHint(
             "##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(),

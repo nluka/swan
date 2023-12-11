@@ -27,8 +27,17 @@ void apply_swan_style_overrides() noexcept
     style.FramePadding  = ImVec2(5.0f, 5.0f);
     style.CellPadding   = ImVec2(8.0f, 5.0f);
     style.ItemSpacing   = ImVec2(10.0f, 10.0f);
-    style.ScrollbarRounding = 0;
 
+    style.TabBorderSize           = 0;
+    style.ChildBorderSize         = 0;
+    style.FrameBorderSize         = 0;
+    style.PopupBorderSize         = 0;
+    style.WindowBorderSize        = 1;
+    style.SeparatorTextBorderSize = 0;
+    style.ScrollbarRounding       = 0;
+    style.FrameRounding           = 3;
+
+    style.Colors[ImGuiCol_FrameBg] = RGBA_to_ImVec4(35,40,45, 255);
     style.Colors[ImGuiCol_FrameBg] = RGBA_to_ImVec4(35,40,45, 255);
 
     style.Colors[ImGuiCol_TableHeaderBg] = RGBA_to_ImVec4(0,0,0,0);

@@ -68,7 +68,7 @@ void swan_popup_modals::render_new_pin() noexcept
     }
 
     {
-        [[maybe_unused]] imgui_scoped_avail_width width(imgui::CalcTextSize(" 00/64").x);
+        [[maybe_unused]] imgui::ScopedAvailWidth width(imgui::CalcTextSize(" 00/64").x);
 
         if (imgui::InputTextWithHint("##pin_label", "Label...", label_input, lengthof(label_input))) {
             err_msg.clear();
@@ -78,8 +78,8 @@ void swan_popup_modals::render_new_pin() noexcept
     imgui::Text("%zu/%zu", strlen(label_input), pinned_path::LABEL_MAX_LEN);
 
     {
-        [[maybe_unused]] imgui_scoped_disabled disabled(!s_new_pin_enable_path_input);
-        [[maybe_unused]] imgui_scoped_avail_width width = {};
+        [[maybe_unused]] imgui::ScopedDisable disabled(!s_new_pin_enable_path_input);
+        [[maybe_unused]] imgui::ScopedAvailWidth width = {};
 
         if (imgui::InputTextWithHint("##pin_path", "Path...", path_input.data(), path_input.size(),
                                      ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_path_chars()))
@@ -95,7 +95,7 @@ void swan_popup_modals::render_new_pin() noexcept
         global_state::add_pin(color_input, label_input, path, '\\');
 
         bool success = global_state::save_pins_to_disk();
-        print_debug_log("save_pins_to_disk: %d", success);
+        print_debug_msg("save_pins_to_disk: %d", success);
 
         cleanup_and_close_popup();
     }
