@@ -1,79 +1,22 @@
-#pragma once
+/*
+    Functions and structures coupled to the existence of ImGui.
+*/
 
-#include "imgui/imgui.h"
+#pragma once
 
 #include "stdafx.hpp"
 #include "common_fns.hpp"
+#include "imgui_ext.hpp"
 
 ImVec4 orange() noexcept;
 ImVec4 red() noexcept;
 ImVec4 dir_color() noexcept;
 ImVec4 symlink_color() noexcept;
 ImVec4 file_color() noexcept;
-
 ImVec4 get_color(basic_dirent::kind t) noexcept;
-
-void imgui_spacing(u64 n) noexcept;
 
 typedef wchar_t* filter_chars_callback_user_data_t;
 s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept;
-
-ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;
-
-struct imgui_scoped_avail_width
-{
-    imgui_scoped_avail_width(f32 subtract_amt = 0) noexcept
-    {
-        f32 avail_width = ImGui::GetContentRegionAvail().x;
-        ImGui::PushItemWidth(max(avail_width - subtract_amt, 0.f));
-    }
-    ~imgui_scoped_avail_width() noexcept { ImGui::PopItemWidth(); }
-};
-
-struct imgui_scoped_item_width
-{
-    imgui_scoped_item_width(f32 width) noexcept { ImGui::PushItemWidth(width); }
-    ~imgui_scoped_item_width()         noexcept { ImGui::PopItemWidth(); }
-};
-
-struct imgui_scoped_disabled
-{
-    imgui_scoped_disabled(bool disabled) noexcept { ImGui::BeginDisabled(disabled); }
-    ~imgui_scoped_disabled()             noexcept { ImGui::EndDisabled(); }
-};
-
-struct imgui_scoped_text_color
-{
-    imgui_scoped_text_color(ImVec4 const &color) noexcept { ImGui::PushStyleColor(ImGuiCol_Text, color); }
-    ~imgui_scoped_text_color()                   noexcept { ImGui::PopStyleColor(); }
-};
-
-struct imgui_scoped_color
-{
-    imgui_scoped_color(ImGuiCol which, ImVec4 const &color) noexcept { ImGui::PushStyleColor(which, color); }
-    ~imgui_scoped_color()                                   noexcept { ImGui::PopStyleColor(); }
-};
-
-template <typename Ty>
-struct imgui_scoped_style
-{
-    Ty &m_attr;
-    Ty m_original_value;
-
-    imgui_scoped_style() = delete;
-
-    imgui_scoped_style(Ty &attr, Ty const &override_value) noexcept
-        : m_attr(attr)
-        , m_original_value(attr)
-    {
-        attr = override_value;
-    }
-
-    ~imgui_scoped_style() noexcept
-    {
-        m_attr = m_original_value;
-    }
-};
 
 struct debug_log_package
 {
@@ -97,14 +40,14 @@ struct debug_log_package
 
 // https://stackoverflow.com/questions/57547273/how-to-use-source-location-in-a-variadic-template-function
 template <typename... Args>
-void print_debug_log([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args) noexcept
+void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args) noexcept
 {
     if (!debug_log_package::s_logging_enabled) {
         return;
     }
 
     f64 current_time = ImGui::GetTime();
-    u64 const max_size = 1024 * 1024 * 50;
+    u64 const max_size = 1024 * 1024 * 10;
     char const *just_the_file_name = cget_file_name(pack.loc.file_name());
     s32 thread_id = GetCurrentThreadId();
 

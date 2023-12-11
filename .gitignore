@@ -12,3 +12,4 @@ swan_tests.md
 *.actual
 *.expected
 *.pch
+*.dmp

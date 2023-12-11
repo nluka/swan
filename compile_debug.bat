@@ -9,7 +9,6 @@ obj_debug/imgui_widgets.obj ^
 obj_debug/imgui.obj ^
 obj_debug/stb_image.obj ^
 obj_debug/stdafx.obj ^
-resource/.res ^
 /Fo:obj_debug\ ^
 /Fe:bin\swan_debug.exe ^
 /Fd:bin\vc140_debug.pdb ^
@@ -39,4 +38,5 @@ kernel32.lib ^
 msvcrt.lib ^
 ole32.lib ^
 shlwapi.lib ^
-Pathcch.lib
+Pathcch.lib ^
+Dbghelp.lib

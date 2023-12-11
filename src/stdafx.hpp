@@ -1,3 +1,7 @@
+/*
+    Bunch of headers to precompile - things that aren't touched when developing swan: STL, STB libs, Boost, ImGui itself, etc.
+*/
+
 #include "primitives.hpp"
 #include "libs/thread_pool.hpp"
 #include "libs/on_scope_exit.hpp"
@@ -12,6 +16,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstring>
+#include <dbghelp.h>
 #include <fileapi.h>
 #include <fstream>
 #include <iostream>
@@ -27,18 +32,20 @@
 #include <sstream>
 #include <span>
 #include <string_view>
-#include <string.h>
 #include <string>
 #include <stringapiset.h>
+#include <tchar.h>
 #include <vector>
 #include <windows.h>
 
 #define IMGUI_DEFINE_MATH_OPERATORS 1
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/font_awesome.h"
 #include "imgui/material_design.h"
+#include "imgui/codicons.h"
 #include "imgui/codicons.h"
 
 #define GL_SILENCE_DEPRECATION

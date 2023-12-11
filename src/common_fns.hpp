@@ -1,5 +1,5 @@
 /*
-    Functions which are used in multiple places, usually.
+    A common place for functions which are not tied to the existence of ImGui.
 */
 
 #pragma once
@@ -53,6 +53,8 @@ namespace global_state
 
     bool load_focused_window_from_disk(s32 &window_code) noexcept;
 
+    bool &move_dirents_payload_set() noexcept;
+
 } // namespace global_state
 
 namespace swan_windows
@@ -66,10 +68,10 @@ namespace swan_windows
         file_operations,
         analytics,
         debug_log,
-        imgui_demo,
-        icon_font_browser_fontawe,
+        icon_font_browser_font_awesome,
         icon_font_browser_codicon,
-        icon_font_browser_matdes,
+        icon_font_browser_material_design,
+        imgui_demo,
         count
     };
 
@@ -130,8 +132,6 @@ char const *get_icon(basic_dirent::kind t) noexcept;
 drive_list_t query_drive_list() noexcept;
 
 std::string get_last_error_string() noexcept;
-
-void imgui_sameline_spacing(u64 num_spacing_calls) noexcept;
 
 bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *pattern, bool squish_adjacent_spaces) noexcept;
 
