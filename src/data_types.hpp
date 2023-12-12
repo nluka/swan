@@ -312,6 +312,11 @@ struct move_dirents_drag_drop_payload
     wchar_t *absolute_paths_delimited_by_newlines;
 };
 
+struct pin_drag_drop_payload
+{
+    u64 pin_idx;
+};
+
 void perform_file_operations(
     std::wstring working_directory_utf16,
     std::wstring paths_to_execute_utf16,

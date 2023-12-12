@@ -22,17 +22,23 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
     }
 }
 
-struct reorder_pin_payload
-{
-    u64 src_index;
-};
-
 void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_window, global_constants::num_explorers> &explorers, bool &open) noexcept
 {
     if (imgui::Begin(" Pinned ", &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
             global_state::save_focused_window(swan_windows::pin_manager);
         }
+
+        if (imgui::Button(ICON_CI_REPO_CREATE "##Create Pin")) {
+            swan_popup_modals::open_new_pin({}, true);
+        }
+        imgui::SameLine();
+        if (imgui::Button(ICON_FA_EDIT "##Enable Edit")) {
+
+        }
+
+        // imgui::Spacing(1);
+        imgui::Separator();
 
         std::vector<pinned_path> &pins = global_state::pins();
 
@@ -89,18 +95,18 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                 imgui::SameLineSpaced(1);
                 imgui::TextColored(pin.color, pin.label.c_str());
 
-                reorder_pin_payload payload = { i };
-                imgui::SetDragDropPayload("REORDER_PINS", &payload, sizeof(payload), ImGuiCond_Once);
+                pin_drag_drop_payload payload = { i };
+                imgui::SetDragDropPayload(typeid(pin_drag_drop_payload).name(), &payload, sizeof(payload), ImGuiCond_Once);
                 imgui::EndDragDropSource();
             }
             if (imgui::BeginDragDropTarget()) {
-                auto imgui_payload = imgui::AcceptDragDropPayload("REORDER_PINS");
+                auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name());
 
-                if (imgui_payload != nullptr) {
-                    assert(imgui_payload->DataSize == sizeof(reorder_pin_payload));
-                    auto actual_payload = (reorder_pin_payload *)imgui_payload->Data;
+                if (payload_wrapper != nullptr) {
+                    assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
+                    auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
 
-                    u64 from = actual_payload->src_index;
+                    u64 from = payload_data->pin_idx;
                     u64 to = i;
 
                     bool reorder_success = change_element_position(pins, from, to);
@@ -114,12 +120,6 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
 
                 imgui::EndDragDropTarget();
             }
-        }
-
-        imgui::Spacing(1);
-
-        if (imgui::Button(ICON_CI_REPO_CREATE " Create Pin")) {
-            swan_popup_modals::open_new_pin({}, true);
         }
 
         if (pin_to_delete_idx != npos) {

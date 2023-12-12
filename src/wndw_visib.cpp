@@ -1,33 +1,39 @@
 #include "stdafx.hpp"
 #include "common_fns.hpp"
+#include "imgui_specific.hpp"
 
 // TODO: maybe switch to boost.property_tree?
 bool window_visibilities::save_to_disk() const noexcept
-try {
-    std::ofstream out("data/window_visibilities.txt", std::ios::binary);
-    if (!out) {
-        return false;
+{
+    bool success;
+    try {
+        std::ofstream out("data/window_visibilities.txt", std::ios::binary);
+        if (!out) {
+            success = false;
+        } else {
+            out << "pin_manager " << this->pin_manager << '\n';
+            out << "file_operations " << this->file_operations << '\n';
+            out << "explorer_0 " << this->explorer_0 << '\n';
+            out << "explorer_1 " << this->explorer_1 << '\n';
+            out << "explorer_2 " << this->explorer_2 << '\n';
+            out << "explorer_3 " << this->explorer_3 << '\n';
+            out << "analytics " << this->analytics << '\n';
+        #if !defined(NDEBUG)
+            out << "imgui_demo " << this->imgui_demo << '\n';
+            out << "debug_log " << this->debug_log << '\n';
+            out << "fa_icons " << this->fa_icons << '\n';
+            out << "ci_icons " << this->ci_icons << '\n';
+            out << "md_icons " << this->md_icons << '\n';
+        #endif
+            success = true;
+        }
+    }
+    catch (...) {
+        success = false;
     }
 
-    out << "pin_manager " << this->pin_manager << '\n';
-    out << "file_operations " << this->file_operations << '\n';
-    out << "explorer_0 " << this->explorer_0 << '\n';
-    out << "explorer_1 " << this->explorer_1 << '\n';
-    out << "explorer_2 " << this->explorer_2 << '\n';
-    out << "explorer_3 " << this->explorer_3 << '\n';
-    out << "analytics " << this->analytics << '\n';
-#if !defined(NDEBUG)
-    out << "imgui_demo " << this->imgui_demo << '\n';
-    out << "debug_log " << this->debug_log << '\n';
-    out << "fa_icons " << this->fa_icons << '\n';
-    out << "ci_icons " << this->ci_icons << '\n';
-    out << "md_icons " << this->md_icons << '\n';
-#endif
-
-    return true;
-}
-catch (...) {
-    return false;
+    print_debug_msg("window_visibilities::save_to_disk: %d", success);
+    return success;
 }
 
 // TODO: maybe switch to boost.property_tree?

@@ -55,6 +55,8 @@ namespace global_state
 
     bool &move_dirents_payload_set() noexcept;
 
+    s32 &debug_log_text_limit_megabytes() noexcept;
+
 } // namespace global_state
 
 namespace swan_windows

@@ -4,6 +4,9 @@
 bool debug_log_package::s_logging_enabled = true;
 ImGuiTextBuffer debug_log_package::s_buffer = {};
 std::mutex debug_log_package::s_mutex = {};
+static s32 s_debug_log_text_limit_megabytes = 5;
+
+s32 &global_state::debug_log_text_limit_megabytes() noexcept { return s_debug_log_text_limit_megabytes; }
 
 void swan_windows::render_debug_log(bool &open) noexcept
 {
@@ -28,6 +31,12 @@ void swan_windows::render_debug_log(bool &open) noexcept
 
         imgui::SameLine();
 
+        if (imgui::Button("Save")) {
+            // TODO
+        }
+
+        imgui::SameLine();
+
     #if 0
         imgui::BeginDisabled(true);
         if (imgui::Button("Save to file")) {
@@ -42,6 +51,16 @@ void swan_windows::render_debug_log(bool &open) noexcept
         imgui::SameLineSpaced(1);
 
         imgui::Checkbox("Auto-scroll at bottom", &auto_scroll);
+
+        imgui::SameLineSpaced(1);
+
+        {
+            imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_12345").x);
+            s32 &size_limit = global_state::debug_log_text_limit_megabytes();
+            if (imgui::InputInt("MB limit", &size_limit, 1, 10)) {
+                size_limit = std::clamp(size_limit, 1, 50);
+            }
+        }
 
         imgui::Separator();
 
