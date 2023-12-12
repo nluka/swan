@@ -47,7 +47,7 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
     }
 
     f64 current_time = ImGui::GetTime();
-    u64 const max_size = 1024 * 1024 * 10;
+    s32 max_size = global_state::debug_log_text_limit_megabytes() * 1024 * 1024;
     char const *just_the_file_name = cget_file_name(pack.loc.file_name());
     s32 thread_id = GetCurrentThreadId();
 

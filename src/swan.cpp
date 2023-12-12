@@ -184,7 +184,7 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exceptionInfo) noexcept
     _tprintf(_T("Unhandled exception. Generating crash dump...\n"));
 
     // Create a crash dump file
-    HANDLE dumpFile = CreateFile(
+    HANDLE dump_file = CreateFile(
         _T("CrashDump.dmp"),
         GENERIC_WRITE,
         0,
@@ -194,24 +194,24 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exceptionInfo) noexcept
         NULL
     );
 
-    if (dumpFile != INVALID_HANDLE_VALUE) {
-        MINIDUMP_EXCEPTION_INFORMATION dumpInfo;
-        dumpInfo.ThreadId = GetCurrentThreadId();
-        dumpInfo.ExceptionPointers = exceptionInfo;
-        dumpInfo.ClientPointers = TRUE;
+    if (dump_file != INVALID_HANDLE_VALUE) {
+        MINIDUMP_EXCEPTION_INFORMATION dump_info;
+        dump_info.ThreadId = GetCurrentThreadId();
+        dump_info.ExceptionPointers = exceptionInfo;
+        dump_info.ClientPointers = TRUE;
 
         // Write the crash dump
         MiniDumpWriteDump(
             GetCurrentProcess(),
             GetCurrentProcessId(),
-            dumpFile,
+            dump_file,
             MiniDumpNormal,
-            &dumpInfo,
+            &dump_info,
             NULL,
             NULL
         );
 
-        CloseHandle(dumpFile);
+        CloseHandle(dump_file);
         _tprintf(_T("Crash dump generated successfully.\n"));
     } else {
         _tprintf(_T("Error creating crash dump file: %d\n"), GetLastError());
@@ -512,8 +512,15 @@ try
         ImGui_ImplGlfw_NewFrame();
         imgui::NewFrame();
 
+        window_visibilities visib_at_frame_start = window_visib;
+
         SCOPE_EXIT {
             render(window);
+
+            bool window_visibilities_changed = memcmp(&window_visib, &visib_at_frame_start, sizeof(window_visibilities)) != 0;
+            if (window_visibilities_changed) {
+                window_visib.save_to_disk();
+            }
 
             if (!imgui::IsMouseDown(ImGuiMouseButton_Left)) {
                 global_state::move_dirents_payload_set() = false;

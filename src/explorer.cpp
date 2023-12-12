@@ -1065,11 +1065,6 @@ bool explorer_window::update_cwd_entries(
                 ++entry_id;
             }
             while (FindNextFileW(find_handle, &find_data));
-
-            if (this->sort_specs != nullptr) {
-                scoped_timer<timer_unit::MICROSECONDS> sort_timer(&this->sort_us);
-                (void) sort_cwd_entries(*this);
-            }
         }
     }
 
@@ -1129,10 +1124,11 @@ bool explorer_window::update_cwd_entries(
                 }
             }
         }
+    }
 
-        if (this->sort_specs != nullptr) {
-            sort_cwd_entries(*this);
-        }
+    if (this->sort_specs != nullptr) {
+        scoped_timer<timer_unit::MICROSECONDS> sort_timer(&this->sort_us);
+        (void) sort_cwd_entries(*this);
     }
 
     return parent_dir_exists;
@@ -1368,11 +1364,12 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
 
     swan_path_t new_cwd_utf8 = expl.cwd;
 
-    if (!path_append(new_cwd_utf8, target_utf8, dir_sep_utf8, true)) {
+    bool prepend_separator = path_length(expl.cwd) > 0;
+    if (!path_append(new_cwd_utf8, target_utf8, dir_sep_utf8, prepend_separator)) {
         print_debug_msg("[ %d ] path_append failed, new_cwd_utf8 = [%s], append data = [%c%s]", expl.id, new_cwd_utf8.data(), dir_sep_utf8, target_utf8);
         descend_result res;
         res.success = false;
-        res.err_msg = "max path length exceeded when trying to append descend target to current working directory path";
+        res.err_msg = "max path length exceeded when trying to append target to current working directory path";
         return res;
     }
 
@@ -1419,10 +1416,10 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
     bool cwd_exists = expl.update_cwd_entries(full_refresh, new_cwd_canoncial_utf8.data());
 
     if (!cwd_exists) {
-        print_debug_msg("[ %d ] descend target directory not found", expl.id);
+        print_debug_msg("[ %d ] target directory not found", expl.id);
         descend_result res;
         res.success = false;
-        res.err_msg = std::string("descend target directory [") + target_utf8 + "] not found";
+        res.err_msg = std::string("target directory [") + new_cwd_canoncial_utf8.data() + "] not found";
         return res;
     }
 
@@ -1584,7 +1581,9 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
     imgui::Text("Items(%zu)", cnt.child_dirents);
 
     if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
-        imgui::SeparatorText("Items");
+        imgui::AlignTextToFramePadding();
+        imgui::TextUnformatted("Items");
+        imgui::Separator();
 
         if (cnt.child_dirents == 0) {
             imgui::TextUnformatted("(none)");
@@ -1611,7 +1610,9 @@ void render_num_cwd_items_filtered(cwd_count_info const &cnt) noexcept
     imgui::Text("Filtered(%zu)", cnt.filtered_dirents);
 
     if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
-        imgui::SeparatorText("Filtered");
+        imgui::AlignTextToFramePadding();
+        imgui::TextUnformatted("Filtered");
+        imgui::Separator();
 
         if (cnt.filtered_directories > 0) {
             imgui::TextColored(dir_color(), "%zu director%s", cnt.filtered_directories, cnt.filtered_directories == 1 ? "y" : "ies");
@@ -1633,7 +1634,9 @@ void render_num_cwd_items_selected(cwd_count_info const &cnt) noexcept
     imgui::Text("Selected(%zu)", cnt.selected_dirents);
 
     if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
-        imgui::SeparatorText("Selected");
+        imgui::AlignTextToFramePadding();
+        imgui::TextUnformatted("Selected");
+        imgui::Separator();
 
         if (cnt.selected_directories > 0) {
             imgui::TextColored(dir_color(), "%zu director%s", cnt.selected_directories, cnt.selected_directories == 1 ? "y" : "ies");
@@ -1718,7 +1721,6 @@ void render_back_to_prev_valid_cwd_button(explorer_window &expl) noexcept
 
     imgui::ScopedDisable disabled(expl.wd_history_pos == 0);
 
-    // if (imgui::ArrowButton("Back", ImGuiDir_Left)) {
     if (imgui::Button(ICON_CI_CHEVRON_LEFT "##back")) {
         print_debug_msg("[ %d ] back arrow button triggered", expl.id);
 
@@ -1742,7 +1744,6 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
 
     imgui::ScopedDisable disabled(expl.wd_history_pos == wd_history_last_idx);
 
-    // if (imgui::ArrowButton("Forward", ImGuiDir_Right)) {
     if (imgui::Button(ICON_CI_CHEVRON_RIGHT "##forward")) {
         print_debug_msg("[ %d ] forward arrow button triggered", expl.id);
 
@@ -1840,7 +1841,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists_before_
 }
 
 static
-void render_pins_popup(explorer_window &expl, window_visibilities &win_opts) noexcept
+void render_pins_popup(explorer_window &expl, window_visibilities &window_visib) noexcept
 {
     auto cleanup_and_close_popup = []() {
         imgui::CloseCurrentPopup();
@@ -1849,8 +1850,8 @@ void render_pins_popup(explorer_window &expl, window_visibilities &win_opts) noe
     imgui::TextUnformatted("Pins");
     imgui::SameLine();
     if (imgui::SmallButton("Manage")) {
-        win_opts.pin_manager = true;
-        (void) win_opts.save_to_disk();
+        window_visib.pin_manager = true;
+        (void) window_visib.save_to_disk();
         ImGui::SetWindowFocus(" Pinned ");
     }
 
@@ -2026,7 +2027,9 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         drive_table_col_id_count,
     };
 
-    if (imgui::BeginTable("drives", drive_table_col_id_count, ImGuiTableFlags_SizingStretchSame|ImGuiTableFlags_BordersInnerV)) {
+    if (imgui::BeginTable("drives", drive_table_col_id_count, ImGuiTableFlags_SizingStretchSame|ImGuiTableFlags_BordersInnerV|
+                                                              ImGuiTableFlags_Reorderable|ImGuiTableFlags_Resizable))
+    {
         imgui::TableSetupColumn("Drive", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_letter);
         imgui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_name);
         imgui::TableSetupColumn("Filesystem", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_filesystem);
@@ -2069,18 +2072,22 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
                 imgui::TextUnformatted(buffer);
             }
 
-            if (imgui::TableSetColumnIndex(drive_table_col_id_used_percent)) {
-                u64 used_bytes = drive.total_bytes - drive.available_bytes;
-                f64 percent_used = ( f64(used_bytes) / f64(drive.total_bytes) ) * 100.0;
-                imgui::Text("%3.0lf%%", percent_used);
-                imgui::SameLine();
-                imgui::ProgressBar(f32(used_bytes) / f32(drive.total_bytes), ImVec2(-1, imgui::CalcTextSize("1").y), "");
-            }
-
             if (imgui::TableSetColumnIndex(drive_table_col_id_free_space)) {
                 char buffer[32]; init_empty_cstr(buffer);
                 format_file_size(drive.available_bytes, buffer, lengthof(buffer), size_unit_multiplier);
                 imgui::TextUnformatted(buffer);
+            }
+
+            if (imgui::TableSetColumnIndex(drive_table_col_id_used_percent)) {
+                u64 used_bytes = drive.total_bytes - drive.available_bytes;
+                f32 fraction_used = ( f32(used_bytes) / f32(drive.total_bytes) );
+                f32 percent_used = fraction_used * 100.0f;
+                imgui::Text("%3.0lf%%", percent_used);
+                imgui::SameLine();
+                {
+                    imgui::ScopedColor c(ImGuiCol_PlotHistogram, ImVec4(fraction_used - 0.1f, 1.0f - fraction_used, 0, 0.8f));
+                    imgui::ProgressBar(f32(used_bytes) / f32(drive.total_bytes), ImVec2(-1, imgui::CalcTextSize("1").y), "");
+                }
             }
         }
 
@@ -2142,7 +2149,6 @@ void render_filter_mode_toggle(explorer_window &expl) noexcept
 static
 void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
 {
-    // if (imgui::Button(expl.filter_case_sensitive ? "s" : "i")) {
     if (imgui::Button(expl.filter_case_sensitive ? ICON_CI_CASE_SENSITIVE : ICON_CI_BLANK)) {
         flip_bool(expl.filter_case_sensitive);
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -2283,6 +2289,7 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
     imgui::EndPopup();
 }
 
+static
 void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) noexcept
 {
     u64 pin_idx;
@@ -2321,6 +2328,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
     }
 }
 
+static
 void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_before_edit) noexcept
 {
     imgui::ScopedDisable disabled(!cwd_exists_before_edit);
@@ -2357,30 +2365,7 @@ enum cwd_mode : s32
     cwd_mode_count
 };
 
-void render_button_cwd_mode_toggle(explorer_window &expl, cwd_mode &mode) noexcept
-{
-    static char const *cwd_modes[] = {
-        ICON_CI_SYMBOL_TEXT,
-        ICON_CI_DEBUG_LINE_BY_LINE,
-    };
-
-    static_assert(lengthof(cwd_modes) == cwd_mode_count);
-
-    static char const *current_mode = cwd_modes[mode];
-
-    char buffer[64]; init_empty_cstr(buffer);
-    snprintf(buffer, lengthof(buffer), "%s##%zu", current_mode, expl.filter_mode);
-
-    if (imgui::Button(buffer)) {
-        if (mode == cwd_mode_count - 1) {
-            mode = cwd_mode(0);
-        } else {
-            mode = cwd_mode(mode + 1);
-        }
-        current_mode = cwd_modes[mode];
-    }
-}
-
+static
 void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_utf8) noexcept
 {
     if (!cwd_exists || path_is_empty(expl.cwd)) {
@@ -2447,6 +2432,7 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
     imgui::Text("%s", slices.back());
 }
 
+static
 void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, char dir_sep_utf8, wchar_t dir_sep_utf16) noexcept
 {
     imgui::PushItemWidth(
@@ -2753,6 +2739,33 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
         }
 
         imgui::EndTable();
+    }
+    if (imgui::BeginDragDropTarget()) {
+        auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name());
+
+        if (payload_wrapper != nullptr) {
+            assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
+            auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
+            auto const &pin = global_state::pins()[payload_data->pin_idx];
+
+            swan_path_t initial_cwd = expl.cwd;
+            expl.cwd = path_create("");
+
+            auto result = try_descend_to_directory(expl, pin.path.data());
+
+            if (!result.success) {
+                expl.cwd = initial_cwd;
+                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
+
+                char action[2048]; init_empty_cstr(action);
+                s32 written = snprintf(action, lengthof(action), "open pin [%s] in %s", pin.path.data(), expl.name);
+                assert(written < lengthof(action));
+
+                swan_popup_modals::open_error(action, result.err_msg.c_str());
+            }
+        }
+
+        imgui::EndDragDropTarget();
     }
 
     if (expl.filter_error != "") {
@@ -3244,8 +3257,6 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                         imgui::Separator();
 
                         if (imgui::Selectable("Delete##single")) {
-                            // right_clicked_ent->is_selected = true;
-                            // auto result = add_selected_entries_to_file_op_payload(expl, "Delete", 'D');
                             auto result = delete_selected_entries(expl);
                             handle_failure("delete", result);
                         }
@@ -3282,7 +3293,6 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                         imgui::Separator();
 
                         if (imgui::Selectable("Delete##multi")) {
-                            // auto result = add_selected_entries_to_file_op_payload(expl, "Delete", 'D');
                             auto result = delete_selected_entries(expl);
                             handle_failure("delete", result);
                         }
@@ -3470,8 +3480,9 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
             std::scoped_lock lock(expl.latest_valid_cwd_mutex);
             latest_valid_cwd = expl.latest_valid_cwd;
         }
+
+        // check if watch target change, if yes then close previous watch_handle and reset it to new target
         if (!path_loosely_same(latest_valid_cwd, watch_target_utf8)) {
-            // new watch target
             watch_target_utf8 = latest_valid_cwd;
 
             if (watch_handle != INVALID_HANDLE_VALUE) {
@@ -3520,6 +3531,8 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
             }
             else {
                 switch (wait_status) {
+                    //? I believe the reason this code gets hit super frequently when a file operation is happening (e.g. copy big file)
+                    //? is explained here: https://stackoverflow.com/a/14040978/16471560
                     // TODO: investigate why this is being called so many times when changes are happening, maybe this is a bug?
                     case WAIT_OBJECT_0: {
                         print_debug_msg("[ %d ] WAIT_OBJECT_0 h=%d target=[%s]", expl.id, watch_handle, watch_target_utf8.data());
