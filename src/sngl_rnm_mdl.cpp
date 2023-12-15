@@ -34,7 +34,7 @@ void swan_popup_modals::render_single_rename() noexcept
     if (s_single_rename_open) {
         imgui::OpenPopup(swan_popup_modals::single_rename);
     }
-    if (!imgui::BeginPopupModal(swan_popup_modals::single_rename, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::single_rename, nullptr)) {
         return;
     }
 
@@ -71,7 +71,7 @@ void swan_popup_modals::render_single_rename() noexcept
         utf_written = utf8_to_utf16(s_single_rename_expl->cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
 
         if (utf_written == 0) {
-            print_debug_msg("[%s] utf8_to_utf16 failed (expl.cwd -> buffer_cwd_utf16)", s_single_rename_expl->name);
+            print_debug_msg("[%s] FAILED utf8_to_utf16(expl.cwd)", s_single_rename_expl->name);
             cleanup_and_close_popup();
             return;
         }
@@ -79,7 +79,7 @@ void swan_popup_modals::render_single_rename() noexcept
         utf_written = utf8_to_utf16(s_single_rename_entry_to_be_renamed->basic.path.data(), buffer_old_name_utf16, lengthof(buffer_old_name_utf16));
 
         if (utf_written == 0) {
-            print_debug_msg("[%s] utf8_to_utf16 failed (s_entry_to_be_renamed.basic.path -> buffer_old_name_utf16)", s_single_rename_expl->name);
+            print_debug_msg("[%s] FAILED utf8_to_utf16(s_entry_to_be_renamed.basic.path)", s_single_rename_expl->name);
             cleanup_and_close_popup();
             return;
         }
@@ -87,7 +87,7 @@ void swan_popup_modals::render_single_rename() noexcept
         utf_written = utf8_to_utf16(new_name_utf8.data(), buffer_new_name_utf16, lengthof(buffer_new_name_utf16));
 
         if (utf_written == 0) {
-            print_debug_msg("[%s] utf8_to_utf16 failed (new_name_utf8 -> buffer_new_name_utf16)", s_single_rename_expl->name);
+            print_debug_msg("[%s] FAILED utf8_to_utf16(new_name)", s_single_rename_expl->name);
             cleanup_and_close_popup();
             return;
         }
@@ -131,7 +131,7 @@ void swan_popup_modals::render_single_rename() noexcept
         new_name_utf8 = s_single_rename_entry_to_be_renamed->basic.path;
     }
     {
-        [[maybe_unused]] imgui::ScopedAvailWidth width = {};
+        imgui::ScopedAvailWidth w = {};
 
         if (imgui::InputTextWithHint(
             "##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(),

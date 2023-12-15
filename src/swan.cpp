@@ -311,6 +311,7 @@ void render_main_menu_bar(
             if (imgui::BeginMenu("Refreshing")) {
                 char const *refresh_modes[] = {
                     "Automatic",
+                    "Notify",
                     "Manual",
                 };
 
@@ -389,7 +390,7 @@ try
     auto &expl_opts = global_state::explorer_options_();
     // init explorer options
     if (!expl_opts.load_from_disk()) {
-        print_debug_msg("explorer_options::load_from_disk failed, setting defaults");
+        print_debug_msg("FAILED explorer_options::load_from_disk, using default values");
         expl_opts.auto_refresh_interval_ms = 1000;
         expl_opts.ref_mode = explorer_options::refresh_mode::automatic;
         expl_opts.show_dotdot_dir = true;
@@ -400,9 +401,8 @@ try
     }
 
     window_visibilities window_visib = {};
-    // init window options
     if (!window_visib.load_from_disk()) {
-        print_debug_msg("windows_options::load_from_disk failed, setting defaults");
+        print_debug_msg("FAILED windows_options::load_from_disk, using default values");
         window_visib.explorer_1 = true;
         window_visib.pin_manager = true;
     #if !defined(NDEBUG)
@@ -413,7 +413,7 @@ try
     misc_options misc_opts = {};
     // init misc. options
     if (!misc_opts.load_from_disk()) {
-        print_debug_msg("misc_options::load_from_disk failed, setting defaults");
+        print_debug_msg("FAILED misc_options::load_from_disk, using default values");
     }
 
     imgui::StyleColorsDark();
@@ -423,7 +423,7 @@ try
     {
         auto [success, num_pins_loaded] = global_state::load_pins_from_disk(expl_opts.dir_separator_utf8());
         if (!success) {
-            print_debug_msg("global_state::load_pins_from_disk failed");
+            print_debug_msg("FAILED global_state::load_pins_from_disk");
         } else {
             print_debug_msg("global_state::load_pins_from_disk success, loaded %zu pins", num_pins_loaded);
         }
@@ -457,21 +457,15 @@ try
                 print_debug_msg("[%s] save_to_disk: %d", expl.name, save_result);
             }
 
-            bool starting_dir_exists = expl.update_cwd_entries(full_refresh, expl.cwd.data());
+            bool starting_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
             if (starting_dir_exists) {
-                expl.set_latest_valid_cwd_then_notify(expl.cwd);
+                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                (void) expl.update_cwd_entries(filter, expl.cwd.data());
             }
         }
     }
 
     std::atomic<s32> window_close_flag = glfwWindowShouldClose(window);
-
-    std::jthread expl_change_notif_thread_0([&]() { explorer_change_notif_thread_func(explorers[0], window_close_flag); });
-    std::jthread expl_change_notif_thread_1([&]() { explorer_change_notif_thread_func(explorers[1], window_close_flag); });
-    std::jthread expl_change_notif_thread_2([&]() { explorer_change_notif_thread_func(explorers[2], window_close_flag); });
-    std::jthread expl_change_notif_thread_3([&]() { explorer_change_notif_thread_func(explorers[3], window_close_flag); });
-
-    // (void) set_thread_priority(THREAD_PRIORITY_HIGHEST);
 
     std::array<s32, swan_windows::count> window_render_order = {
         swan_windows::explorer_0,
@@ -511,6 +505,12 @@ try
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         imgui::NewFrame();
+
+        // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing escape
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            // Do not allow ImGui to give focus to any window when Escape is pressed
+            ImGui::SetWindowFocus(nullptr);
+        }
 
         window_visibilities visib_at_frame_start = window_visib;
 
@@ -635,7 +635,7 @@ try
                             window_visib.ci_icons,
                             "Codicons",
                             "ICON_CI_",
-                            global_constants::icon_font_glyphs_font_awesome);
+                            global_constants::icon_font_glyphs_codicon);
                     }
                     break;
                 }
@@ -648,7 +648,7 @@ try
                             window_visib.md_icons,
                             "Material Design",
                             "ICON_MD_",
-                            global_constants::icon_font_glyphs_font_awesome);
+                            global_constants::icon_font_glyphs_material_design);
                     }
                     break;
                 }

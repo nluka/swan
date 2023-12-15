@@ -24,20 +24,26 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
 
 void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_window, global_constants::num_explorers> &explorers, bool &open) noexcept
 {
+    static bool edit_enabled = false;
+    static bool numbered_list = false;
+
     if (imgui::Begin(" Pinned ", &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
             global_state::save_focused_window(swan_windows::pin_manager);
         }
 
-        if (imgui::Button(ICON_CI_REPO_CREATE "##Create Pin")) {
-            swan_popup_modals::open_new_pin({}, true);
+        if (imgui::Button(ICON_CI_SYMBOL_NUMBER "##Numbered List")) {
+            flip_bool(numbered_list);
         }
         imgui::SameLine();
         if (imgui::Button(ICON_FA_EDIT "##Enable Edit")) {
-
+            flip_bool(edit_enabled);
+        }
+        imgui::SameLine();
+        if (imgui::Button(ICON_CI_REPO_CREATE "##Create Pin")) {
+            swan_popup_modals::open_new_pin({}, true);
         }
 
-        // imgui::Spacing(1);
         imgui::Separator();
 
         std::vector<pinned_path> &pins = global_state::pins();
@@ -48,40 +54,38 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
         for (u64 i = 0; i < pins.size(); ++i) {
             auto &pin = pins[i];
 
-            {
-                char buffer[32];
-                snprintf(buffer, lengthof(buffer), "Color##%zu", i);
-                if (imgui::ColorEdit4(buffer, &pin.color.x, ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_NoLabel/*|ImGuiColorEditFlags_NoBorder*/)) {
-                    bool save_success = global_state::save_pins_to_disk();
-                    print_debug_msg("global_state::save_pins_to_disk: %d", save_success);
+            if (edit_enabled) {
+                {
+                    char buffer[32];
+                    snprintf(buffer, lengthof(buffer), "Color##%zu", i);
+                    if (imgui::ColorEdit4(buffer, &pin.color.x, ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_NoLabel/*|ImGuiColorEditFlags_NoBorder*/)) {
+                        bool save_success = global_state::save_pins_to_disk();
+                        print_debug_msg("global_state::save_pins_to_disk: %d", save_success);
+                    }
                 }
+                imgui::SameLine();
+                {
+                    char buffer[32];
+                    snprintf(buffer, lengthof(buffer), ICON_CI_EDIT "##pin%zu", i);
+                    if (imgui::Button(buffer)) {
+                        swan_popup_modals::open_edit_pin(&pin);
+                    }
+                }
+                imgui::SameLine();
+                {
+                    char buffer[32];
+                    snprintf(buffer, lengthof(buffer), ICON_CI_TRASH "##pin%zu", i);
+                    if (imgui::Button(buffer)) {
+                        pin_to_delete_idx = i;
+                    }
+                }
+                imgui::SameLine();
             }
 
-            imgui::SameLine();
-
-            {
-                char buffer[32];
-                snprintf(buffer, lengthof(buffer), ICON_CI_EDIT "##pin%zu", i);
-                if (imgui::Button(buffer)) {
-                    swan_popup_modals::open_edit_pin(&pin);
-                }
+            if (numbered_list) {
+                imgui::Text("%zu.", i+1);
+                imgui::SameLine();
             }
-
-            imgui::SameLine();
-
-            {
-                char buffer[32];
-                snprintf(buffer, lengthof(buffer), ICON_CI_TRASH "##pin%zu", i);
-                if (imgui::Button(buffer)) {
-                    pin_to_delete_idx = i;
-                }
-            }
-
-            imgui::SameLineSpaced(0);
-
-            imgui::Text("%zu.", i+1);
-
-            imgui::SameLineSpaced(0);
 
             {
                 char buffer[pinned_path::LABEL_MAX_LEN + 16];
@@ -91,8 +95,10 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                 imgui::Selectable(buffer, false/*, ImGuiSelectableFlags_SpanAllColumns*/);
             }
             if (imgui::BeginDragDropSource()) {
-                imgui::Text("%zu.", i+1);
-                imgui::SameLineSpaced(1);
+                if (numbered_list) {
+                    imgui::Text("%zu.", i+1);
+                    imgui::SameLineSpaced(1);
+                }
                 imgui::TextColored(pin.color, pin.label.c_str());
 
                 pin_drag_drop_payload payload = { i };

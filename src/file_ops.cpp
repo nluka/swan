@@ -267,13 +267,25 @@ void perform_file_operations(
         result = SHCreateItemFromParsingName(destination_directory_utf16.c_str(), nullptr, IID_PPV_ARGS(&destination));
 
         if (FAILED(result)) {
+            HANDLE accessible = CreateFileW(
+                destination_directory_utf16.c_str(),
+                FILE_LIST_DIRECTORY,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                NULL,
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS,
+                NULL);
+
             WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << destination_directory_utf16.c_str() << "]\n");
             s32 written = utf16_to_utf8(destination_directory_utf16.data(), destination_utf8.data(), destination_utf8.size());
             std::string error = {};
             if (written == 0) {
                 error = "SHCreateItemFromParsingName and conversion of destination path from UTF-16 to UTF-8";
             } else {
-                error.append("SHCreateItemFromParsingName [").append(destination_utf8.data()).append("]");
+                if (accessible == INVALID_HANDLE_VALUE) {
+                    error.append("file or directory is not accessible, maybe it is locked or has been moved/deleted? ");
+                }
+                error.append("SHCreateItemFromParsingName failed for [").append(destination_utf8.data()).append("]");
             }
             return set_init_error_and_notify(error.c_str());
         }
@@ -308,12 +320,24 @@ void perform_file_operations(
             IShellItem *to_exec = nullptr;
             result = SHCreateItemFromParsingName(full_path_to_exec_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_exec));
             if (FAILED(result)) {
+                HANDLE accessible = CreateFileW(
+                    destination_directory_utf16.c_str(),
+                    FILE_LIST_DIRECTORY,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL,
+                    OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS,
+                    NULL);
+
                 WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_exec_utf16.c_str() << "]\n");
                 written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
                 if (written == 0) {
-                    err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8\n";
+                    err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8.\n";
                 } else {
-                    err << "SHCreateItemFromParsingName [" << item_path_utf8.data() << "]\n";
+                    if (accessible == INVALID_HANDLE_VALUE) {
+                        err << "File or directory is not accessible, maybe it is locked or has been moved/deleted? ";
+                    }
+                    err << "SHCreateItemFromParsingName failed for [" << item_path_utf8.data() << "].\n";
                 }
                 continue;
             }
@@ -340,9 +364,9 @@ void perform_file_operations(
                 WCOUT_IF_DEBUG("FAILED: IFileOperation::" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
                 written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
                 if (written == 0) {
-                    err << "IFileOperation::" << function << " and conversion of delete path from UTF-16 to UTF-8\n";
+                    err << "IFileOperation::" << function << " and conversion of delete path from UTF-16 to UTF-8.\n";
                 } else {
-                    err << "IFileOperation::" << function << " [" << item_path_utf8.data() << "]";
+                    err << "IFileOperation::" << function << " [" << item_path_utf8.data() << "].";
                 }
             } else {
                 WCOUT_IF_DEBUG("file_op->" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");

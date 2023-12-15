@@ -402,3 +402,18 @@ bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_st
 
     return false;
 }
+
+std::string make_str(char const *fmt, ...) noexcept
+{
+    s32 const buf_len = 1024;
+    static char buffer[buf_len];
+
+    va_list args;
+    va_start(args, fmt);
+    [[maybe_unused]] s32 cnt = vsnprintf(buffer, sizeof(buffer), fmt, args);
+    assert(cnt > 0);
+    assert(cnt < buf_len);
+    va_end(args);
+
+    return std::string(buffer);
+}

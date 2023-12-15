@@ -15,6 +15,7 @@ typedef BS::thread_pool swan_thread_pool_t;
 struct generic_result
 {
     bool success;
+    // TODO: bool wrap_error;
     std::string error_or_utf8_path;
 };
 
@@ -91,6 +92,7 @@ struct explorer_options
     enum class refresh_mode : s32
     {
         automatic,
+        notify,
         manual,
         count
     };
@@ -154,7 +156,7 @@ struct explorer_window
     void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
     void deselect_all_cwd_entries() noexcept;
     void invert_selected_visible_cwd_entries() noexcept;
-    void set_latest_valid_cwd_then_notify(swan_path_t const &new_val) noexcept;
+    void set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept;
     void uncut() noexcept;
 
     bool update_cwd_entries(
@@ -166,12 +168,12 @@ struct explorer_window
 
     // 80 byte alignment members
 
-    std::mutex latest_valid_cwd_mutex = {};
+    // std::mutex latest_valid_cwd_mutex = {};
     std::mutex shlwapi_task_initialization_mutex = {};
 
     // 72 byte alignment members
 
-    std::condition_variable latest_valid_cwd_cond = {};
+    // std::condition_variable latest_valid_cwd_cond = {};
     std::condition_variable shlwapi_task_initialization_cond = {};
 
     // 40 byte alignment members
@@ -192,6 +194,8 @@ struct explorer_window
     // 32 byte alignment members
 
     std::string filter_error = "";
+    std::string refresh_message = "";
+    OVERLAPPED read_dir_changes_overlapped;
 
     // 24 byte alignment members
 
@@ -201,11 +205,12 @@ struct explorer_window
 
     char const *name = nullptr;
     filter_mode filter_mode = filter_mode::contains; // persisted in file
-    time_point_t last_refresh_time = {};
+    // time_point_t last_refresh_time = {};
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
     // u64 num_selected_cwd_entries = 0;
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
     ImGuiTableSortSpecs *sort_specs = nullptr;
+    HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
 
     std::atomic<time_point_t> refresh_notif_time = {};
 
@@ -224,12 +229,15 @@ struct explorer_window
     // 4 byte alignment members
 
     s32 id = -1;
+    DWORD read_dir_changes_buffer_bytes_written = 0;
+    std::array<std::byte, 64*1024> read_dir_changes_buffer = {};
 
     // 1 byte alignment members
 
     std::atomic<bool> is_window_visible = false;
     swan_path_t latest_valid_cwd = {};
     swan_path_t cwd = {}; // current working directory, persisted in file
+    swan_path_t read_dir_changes_target = {}; // value of current working directory when ReadDirectoryChangesW was called
     std::array<char, 256> filter_text = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool filter_polarity = true; // persisted in file

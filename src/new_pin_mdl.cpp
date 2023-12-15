@@ -68,7 +68,7 @@ void swan_popup_modals::render_new_pin() noexcept
     }
 
     {
-        [[maybe_unused]] imgui::ScopedAvailWidth width(imgui::CalcTextSize(" 00/64").x);
+        imgui::ScopedAvailWidth width(imgui::CalcTextSize(" 00/64").x);
 
         if (imgui::InputTextWithHint("##pin_label", "Label...", label_input, lengthof(label_input))) {
             err_msg.clear();

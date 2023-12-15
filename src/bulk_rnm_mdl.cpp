@@ -131,7 +131,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     u64 num_transform_errors = 0;
 
     if (!initial_computed || recompute) {
-        print_debug_msg("[%s] recomputing pattern, renames, collisions", expl.name);
+        print_debug_msg("[ %d ] recomputing pattern, renames, collisions", expl.id);
 
         renames.reserve(selection.size());
         renames.clear();

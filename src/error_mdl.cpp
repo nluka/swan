@@ -18,6 +18,7 @@ void swan_popup_modals::open_error(char const *action, char const *failure) noex
     assert(strlen(failure) > 0);
     s_error_failure = failure;
 
+#if 0
     if (!s_error_action.empty()) {
         // capitalize first letter
         s_error_action.front() = (char)toupper(s_error_action.front());
@@ -35,6 +36,7 @@ void swan_popup_modals::open_error(char const *action, char const *failure) noex
     if (s_error_failure.back() != '.') {
         s_error_failure.push_back('.');
     }
+#endif
 }
 
 bool swan_popup_modals::is_open_error() noexcept
