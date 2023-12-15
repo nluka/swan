@@ -23,7 +23,7 @@ void swan_popup_modals::render_edit_pin() noexcept
     if (s_edit_pin_open) {
         imgui::OpenPopup(swan_popup_modals::edit_pin);
     }
-    if (!imgui::BeginPopupModal(swan_popup_modals::edit_pin, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::edit_pin, nullptr)) {
         return;
     }
 
@@ -59,7 +59,7 @@ void swan_popup_modals::render_edit_pin() noexcept
         strncpy(label_input, s_edit_pin->label.c_str(), lengthof(label_input));
     }
     {
-        [[maybe_unused]] imgui::ScopedAvailWidth width(imgui::CalcTextSize(" 00/64").x);
+        imgui::ScopedAvailWidth width(imgui::CalcTextSize(" 00/64").x);
 
         if (imgui::InputTextWithHint("##pin_label", "Label...", label_input, lengthof(label_input))) {
             err_msg.clear();

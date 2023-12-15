@@ -86,3 +86,5 @@ bool set_thread_priority(s32 priority_relative_to_normal) noexcept;
 char *rtrim(char *szX) noexcept;
 
 bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept;
+
+std::string make_str(char const *fmt, ...) noexcept;
