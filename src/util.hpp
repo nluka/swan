@@ -88,3 +88,25 @@ char *rtrim(char *szX) noexcept;
 bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept;
 
 std::string make_str(char const *fmt, ...) noexcept;
+
+template <typename Ty>
+bool one_of(Ty const &test_val, std::initializer_list<Ty> const &possible_values) noexcept
+{
+    for (auto const &val : possible_values) {
+        if (val == test_val) {
+            return true;
+        }
+    }
+    return false;
+}
+
+template <typename Ty>
+Ty &inc_or_wrap(Ty &val, Ty const &min, Ty const &max) noexcept
+{
+    if (val == max) {
+        val = min; // wrap around
+    } else {
+        ++val;
+    }
+    return val;
+}

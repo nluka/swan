@@ -740,12 +740,6 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
         WCOUT_IF_DEBUG("symlink_target_path_utf16 = [" << symlink_target_path_utf16 << "]\n");
     }
 
-    if (com_handle != S_OK) {
-        auto err = get_last_error_string();
-        print_debug_msg("[ %d ] s_shell_link->GetPath FAILED: %s", expl.id, err.c_str());
-        return { false, err + " (IShellLinkW::GetWorkingDirectory)" };
-    }
-
     utf_written = utf16_to_utf8(symlink_target_path_utf16, symlink_target_path_utf8.data(), symlink_target_path_utf8.size());
 
     if (utf_written == 0) {
@@ -888,13 +882,19 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
                         enum class precedence : u32
                         {
                             everything_else,
-                            symlink,
+                            symlink_invalid,
+                            symlink_file,
+                            file,
+                            symlink_directory,
                             directory,
                         };
 
-                        if      (ent.basic.is_directory()) return (u32)precedence::directory;
-                        else if (ent.basic.is_symlink())   return (u32)precedence::symlink;
-                        else                               return (u32)precedence::everything_else;
+                        if      (ent.basic.is_directory())            return (u32)precedence::directory;
+                        else if (ent.basic.is_file())                 return (u32)precedence::file;
+                        else if (ent.basic.is_symlink_to_directory()) return (u32)precedence::symlink_directory;
+                        else if (ent.basic.is_symlink_to_file())      return (u32)precedence::symlink_file;
+                        else if (ent.basic.is_symlink())              return (u32)precedence::symlink_invalid;
+                        else                                          return (u32)precedence::everything_else;
                     };
 
                     u32 left_precedence = compute_precedence(left);
@@ -1029,7 +1029,7 @@ bool explorer_window::update_cwd_entries(
                 entry.basic.last_write_time_raw = find_data.ftLastWriteTime;
 
                 {
-                    u64 utf_written = utf16_to_utf8(find_data.cFileName, entry.basic.path.data(), entry.basic.path.size());
+                    s32 utf_written = utf16_to_utf8(find_data.cFileName, entry.basic.path.data(), entry.basic.path.size());
 
                     if (utf_written == 0) {
                         print_debug_msg("[ %d ] FAILED utf16_to_utf8(find_data.cFileName)", this->id);
@@ -1037,18 +1037,45 @@ bool explorer_window::update_cwd_entries(
                     }
                 }
 
+                if (path_equals_exactly(entry.basic.path, ".")) {
+                    continue;
+                }
+
                 if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                     entry.basic.type = basic_dirent::kind::directory;
                 }
                 else if (path_ends_with(entry.basic.path, ".lnk")) {
-                    entry.basic.type = basic_dirent::kind::symlink;
+                    // TODO: this branch is quite slow, there should probably be an option to opt out of checking the type and validity of symlinks
+
+                    entry.basic.type = basic_dirent::kind::invalid_symlink; // default value, if something fails below
+
+                    static std::wstring full_path_utf16 = {};
+                    full_path_utf16.clear();
+                    full_path_utf16.append(search_path_utf16);
+                    full_path_utf16.pop_back(); // remove '*'
+                    full_path_utf16.append(find_data.cFileName);
+
+                    // Load the shortcut
+                    HRESULT com_handle = s_persist_file_interface->Load(full_path_utf16.c_str(), STGM_READ);
+                    if (FAILED(com_handle)) {
+                        WCOUT_IF_DEBUG("FAILED IPersistFile::Load [" << full_path_utf16.c_str() << "]\n");
+                    }
+                    else {
+                        // Get the target path
+                        wchar_t target_path_utf16[MAX_PATH];
+                        com_handle = s_shell_link->GetPath(target_path_utf16, lengthof(target_path_utf16), NULL, SLGP_RAWPATH);
+                        if (FAILED(com_handle)) {
+                            WCOUT_IF_DEBUG("FAILED IShellLinkW::GetPath [" << full_path_utf16.c_str() << "]\n");
+                        }
+                        else {
+                            if      (PathIsDirectoryW(target_path_utf16)) entry.basic.type = basic_dirent::kind::symlink_to_directory;
+                            else if (PathFileExistsW(target_path_utf16))  entry.basic.type = basic_dirent::kind::symlink_to_file;
+                            else                                          entry.basic.type = basic_dirent::kind::invalid_symlink;
+                        }
+                    }
                 }
                 else {
                     entry.basic.type = basic_dirent::kind::file;
-                }
-
-                if (path_equals_exactly(entry.basic.path, ".")) {
-                    continue;
                 }
 
                 if (entry.basic.is_dotdot()) {
@@ -1084,12 +1111,15 @@ bool explorer_window::update_cwd_entries(
 
         for (auto &dirent : this->cwd_entries) {
             dirent.is_filtered_out = false;
+            dirent.highlight_start_idx = 0;
+            dirent.highlight_len = 0;
         }
 
-        bool filter_is_blank = this->filter_text.data()[0] == '\0';
+        bool filter_is_blank = strempty(this->filter_text.data());
 
         if (!filter_is_blank) {
             static std::regex filter_regex;
+            u64 filter_len = strlen(this->filter_text.data());
 
             switch (this->filter_mode) {
                 default:
@@ -1098,13 +1128,19 @@ bool explorer_window::update_cwd_entries(
 
                     for (auto &dirent : this->cwd_entries) {
                         char const *path = dirent.basic.path.data();
-                        bool filtered_out = this->filter_polarity != (bool)matcher(path, this->filter_text.data());
+                        char const *match_start = matcher(path, this->filter_text.data());;
+                        bool filtered_out = this->filter_polarity != (bool)match_start;
                         dirent.is_filtered_out = filtered_out;
+                        if (!filtered_out) {
+                            // highlight just the substring
+                            dirent.highlight_start_idx = std::distance(path, match_start);
+                            dirent.highlight_len = filter_len;
+                        }
                     }
                     break;
                 }
 
-                case explorer_window::filter_mode::regex: {
+                case explorer_window::filter_mode::regex_match: {
                     try {
                         scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(&this->update_cwd_entries_regex_ctor_us);
                         filter_regex = this->filter_text.data();
@@ -1115,18 +1151,18 @@ bool explorer_window::update_cwd_entries(
                         break;
                     }
 
-                    auto match_flags = std::regex_constants::match_default | (
-                        std::regex_constants::icase * (this->filter_case_sensitive == 0)
-                    );
+                    auto match_flags = std::regex_constants::match_default |
+                                       (std::regex_constants::icase * (this->filter_case_sensitive == 0));
 
                     for (auto &dirent : this->cwd_entries) {
                         char const *path = dirent.basic.path.data();
-                        bool filtered_out = this->filter_polarity != std::regex_match(
-                            path,
-                            filter_regex,
-                            (std::regex_constants::match_flag_type)match_flags
-                        );
+                        bool filtered_out = this->filter_polarity != std::regex_match(path, filter_regex, (std::regex_constants::match_flag_type)match_flags);
                         dirent.is_filtered_out = filtered_out;
+                        if (!filtered_out) {
+                            // highlight the whole path since we are using std::regex_match
+                            dirent.highlight_start_idx = 0;
+                            dirent.highlight_len = path_length(dirent.basic.path);
+                        }
                     }
 
                     break;
@@ -2125,7 +2161,7 @@ void render_filter_text_input(explorer_window &expl) noexcept
 {
     auto width = max(
         imgui::CalcTextSize(expl.filter_text.data()).x + (imgui::GetStyle().FramePadding.x * 2) + 10.f,
-        imgui::CalcTextSize("123456789012345").x
+        imgui::CalcTextSize("1").x * 20.75f
     );
 
     imgui::ScopedItemWidth iw(width);
@@ -2140,33 +2176,34 @@ static
 void render_filter_mode_toggle(explorer_window &expl) noexcept
 {
     static char const *filter_modes[] = {
-        ICON_CI_WHOLE_WORD, // "Contains",
-        ICON_CI_REGEX, // "RegExp  ",
+        ICON_CI_WHOLE_WORD,
+        ICON_CI_REGEX,
+        // "(" ICON_CI_REGEX ")",
     };
 
     static_assert(lengthof(filter_modes) == (u64)explorer_window::filter_mode::count);
 
-    static char const *current_mode = filter_modes[expl.filter_mode];
+    static char const *current_mode = nullptr;
+    current_mode = filter_modes[expl.filter_mode];
 
     char buffer[64]; init_empty_cstr(buffer);
     snprintf(buffer, lengthof(buffer), "%s##%zu", current_mode, expl.filter_mode);
+
     if (imgui::Button(buffer)) {
-        if ((u64)expl.filter_mode == (u64)explorer_window::filter_mode::count - (u64)1) {
-            (u64 &)expl.filter_mode = 0; // wrap around
-        } else {
-            (u64 &)expl.filter_mode = (u64)expl.filter_mode + 1;
-        }
-        current_mode = filter_modes[expl.filter_mode];
+        inc_or_wrap<u64>((u64 &)expl.filter_mode, 0, u64(explorer_window::filter_mode::count) - 1);
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
         (void) expl.save_to_disk();
     }
+
     if (imgui::IsItemHovered()) {
         imgui::SetTooltip(
             "Filter mode:\n"
-            "%s contains \n"
-            "%s regexp   ",
-             expl.filter_mode == explorer_window::filter_mode::contains ? ">>" : "  ",
-             expl.filter_mode == explorer_window::filter_mode::regex    ? ">>" : "  "
+            "%s Contains substring \n"
+            "%s RegExp match       \n",
+            // "%s RegExp find          ",
+            expl.filter_mode == explorer_window::filter_mode::contains    ? ">>" : "  ",
+            expl.filter_mode == explorer_window::filter_mode::regex_match ? ">>" : "  "//,
+            // expl.filter_mode == explorer_window::filter_mode::regex_find  ? ">>" : "  "
         );
     }
 }
@@ -2329,7 +2366,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
 #if 0
         s32 written = snprintf(buffer, lengthof(buffer), "[%c]", (already_pinned ? '*' : ' '));
 #else
-        s32 written = snprintf(buffer, lengthof(buffer), "%s", already_pinned ? ICON_CI_PINNED_DIRTY : ICON_CI_PINNED);
+        s32 written = snprintf(buffer, lengthof(buffer), "%s", already_pinned ? ICON_CI_STAR_FULL : ICON_CI_STAR_EMPTY);
 #endif
         assert(written < lengthof(buffer));
     }
@@ -2611,14 +2648,18 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
 
     // refresh logic start
     {
-        auto refresh = [&](std::source_location sloc = std::source_location::current()) {
-            cwd_exists_before_edit = expl.update_cwd_entries(full_refresh, expl.cwd.data(), sloc);
+        auto refresh = [&](update_cwd_entries_actions actions, std::source_location sloc = std::source_location::current()) {
+            cwd_exists_before_edit = expl.update_cwd_entries(actions, expl.cwd.data(), sloc);
             cwd_exists_after_edit = cwd_exists_before_edit;
         };
 
-        if (window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
+        if (expl.update_request_from_outside != nil) {
+            refresh(expl.update_request_from_outside);
+            expl.update_request_from_outside = nil;
+        }
+        else if (window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
             print_debug_msg("[ %d ] Ctrl-R, refresh triggered", expl.id);
-            refresh();
+            refresh(full_refresh);
         }
         else if (global_state::explorer_options_().ref_mode != explorer_options::refresh_mode::manual && cwd_exists_before_edit) {
             auto issue_read_dir_changes = [&]() {
@@ -2649,20 +2690,17 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                         &expl.read_dir_changes_buffer_bytes_written,
                         &expl.read_dir_changes_overlapped,
                         nullptr);
-                        // read_dir_changes_callback);
 
                     expl.read_dir_changes_target = expl.cwd;
 
                     if (success) {
                         print_debug_msg("[ %d ] ReadDirectoryChangesW(%s) succeeded", expl.id, expl.cwd.data());
-                        // expl.read_dir_changes_in_flight.store(true);
                     } else {
                         print_debug_msg("[ %d ] ReadDirectoryChangesW FAILED: %s", expl.id, get_last_error_string().c_str());
                     }
                 }
             };
 
-            // if (expl.read_dir_changes_in_flight.load()) {
             if (expl.read_dir_changes_handle != INVALID_HANDLE_VALUE && !path_loosely_same(expl.cwd, expl.read_dir_changes_target)) {
                 // cwd changed while waiting for signal from ReadDirectoryChangesW,
                 // therefore need to reissue ReadDirectoryChangesW (will be done on next frame)
@@ -2684,7 +2722,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                 } else {
                     if (global_state::explorer_options_().ref_mode == explorer_options::refresh_mode::automatic) {
                         print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == automatic, refreshing...");
-                        refresh();
+                        refresh(full_refresh);
                     } else { // explorer_options::refresh_mode::notify
                         print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == notify, notifying...");
                         expl.refresh_message =  ICON_FA_EXCLAMATION_TRIANGLE " Outdated" ;
@@ -2875,19 +2913,19 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
 
                 bool is_dotdot = dirent.basic.is_dotdot();
 
-                cnt.filtered_directories += u64(dirent.is_filtered_out && dirent.basic.is_directory() && !is_dotdot);
+                cnt.filtered_directories += u64(dirent.is_filtered_out && dirent.basic.is_directory());
                 cnt.filtered_symlinks    += u64(dirent.is_filtered_out && dirent.basic.is_symlink());
-                cnt.filtered_files       += u64(dirent.is_filtered_out && dirent.basic.is_non_symlink_file());
+                cnt.filtered_files       += u64(dirent.is_filtered_out && dirent.basic.is_file());
 
                 cnt.child_dirents     += u64(!is_dotdot);
-                cnt.child_directories += u64(dirent.basic.is_directory() && !is_dotdot);
+                cnt.child_directories += u64(dirent.basic.is_directory() && !is_dotdot); //! !is_dotdot might be incorrect
                 cnt.child_symlinks    += u64(dirent.basic.is_symlink());
-                cnt.child_files       += u64(dirent.basic.is_non_symlink_file());
+                cnt.child_files       += u64(dirent.basic.is_file());
 
                 if (!dirent.is_filtered_out && dirent.is_selected) {
                     cnt.selected_directories += u64(dirent.is_selected && dirent.basic.is_directory() && !is_dotdot);
                     cnt.selected_symlinks    += u64(dirent.is_selected && dirent.basic.is_symlink());
-                    cnt.selected_files       += u64(dirent.is_selected && dirent.basic.is_non_symlink_file());
+                    cnt.selected_files       += u64(dirent.is_selected && dirent.basic.is_file());
                 }
             }
 
@@ -2968,6 +3006,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                             char buffer[2048]; init_empty_cstr(buffer);
                             snprintf(buffer, lengthof(buffer), "%s##dirent%zu", path, i);
 
+                            // render colored icon
                             {
                                 ImVec4 color = get_color(dirent.basic.type);
                                 f32 &alpha = color.w;
@@ -3092,6 +3131,29 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
 
                             } // imgui::Selectable
 
+                            // draw rectangle to highlight filter match
+                            if (dirent.highlight_len > 0) {
+                                ImVec2 min = ImGui::GetItemRectMin();
+                                min.x += imgui::CalcTextSize(dirent.basic.kind_icon()).x;
+                                min.x += imgui::GetStyle().CellPadding.x;
+                                min.x += style.ItemSpacing.x;
+
+                                ImVec2 max = ImGui::GetItemRectMax();
+                                max.x = min.x + imgui::CalcTextSize(dirent.basic.path.data()).x;
+                                max.x += style.ItemSpacing.x;
+
+                                // at this point min & max draw a rectangle around the entire path
+
+                                // move forward min.x to skip characters before highlight begins
+                                min.x += imgui::CalcTextSize(dirent.basic.path.data(),
+                                                             dirent.basic.path.data() + dirent.highlight_start_idx).x;
+
+                                // move backward max.x to eliminate characters after the highlight ends
+                                max.x -= imgui::CalcTextSize(dirent.basic.path.data() + dirent.highlight_start_idx + dirent.highlight_len - 1).x;
+
+                                ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 255, 0, 50));
+                            }
+
                             if (dirent.basic.is_dotdot()) {
                                 dirent.is_selected = false; // do no allow [..] to be selected
                             }
@@ -3203,6 +3265,22 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                             }
 
                             imgui::EndDragDropTarget();
+                        }
+
+                        // free memory if the payload was not accepted and the user dropped it
+                        if (imgui::IsMouseReleased(ImGuiMouseButton_Left) && !imgui::IsDragDropPayloadBeingAccepted()) {
+                            global_state::move_dirents_payload_set() = false;
+
+                            auto payload_wrapper = imgui::GetDragDropPayload();
+
+                            if (payload_wrapper != nullptr && streq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
+                                payload_wrapper = imgui::AcceptDragDropPayload("move_dirents_drag_drop_payload");
+                                if (payload_wrapper != nullptr) {
+                                    auto payload_data = reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data);
+                                    assert(payload_data != nullptr);
+                                    delete[] payload_data->absolute_paths_delimited_by_newlines;
+                                }
+                            }
                         }
 
                         if (imgui::TableSetColumnIndex(cwd_entries_table_col_type)) {
