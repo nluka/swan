@@ -32,8 +32,10 @@ struct basic_dirent
     enum class kind : u8 {
         nil = 0,
         directory,
-        symlink,
         file,
+        symlink_to_file,
+        symlink_to_directory,
+        invalid_symlink,
         count
     };
 
@@ -48,8 +50,9 @@ struct basic_dirent
     bool is_dotdot_dir() const noexcept;
     bool is_directory() const noexcept;
     bool is_symlink() const noexcept;
+    bool is_symlink_to_file() const noexcept;
+    bool is_symlink_to_directory() const noexcept;
     bool is_file() const noexcept;
-    bool is_non_symlink_file() const noexcept;
     char const *kind_cstr() const noexcept;
     char const *kind_short_cstr() const noexcept;
     char const *kind_icon() const noexcept;
@@ -65,6 +68,44 @@ struct drive_info
 };
 
 typedef static_vector<drive_info, 26> drive_list_t;
+
+// TODO:
+// struct swan_settings
+// {
+//     enum explorer_refresh_mode : s32
+//     {
+//         explorer_refresh_mode_automatic,
+//         explorer_refresh_mode_notify,
+//         explorer_refresh_mode_manual,
+//         explorer_refresh_mode_count
+//     };
+
+//     bool show_pin_manager;
+//     bool show_file_operations;
+//     bool show_explorer_0;
+//     bool show_explorer_1;
+//     bool show_explorer_2;
+//     bool show_explorer_3;
+//     bool show_analytics;
+// #if !defined(NDEBUG)
+//     bool show_imgui_demo;
+//     bool show_debug_log;
+//     bool show_fa_icons;
+//     bool show_ci_icons;
+//     bool show_md_icons;
+// #endif
+
+//     bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
+//     bool show_cwd_len;
+//     bool show_debug_info;
+//     bool automatic_refresh;
+//     bool show_dotdot_dir;
+//     bool unix_directory_separator;
+//     bool cwd_entries_table_alt_row_bg;
+//     bool cwd_entries_table_borders_in_body;
+//     bool clear_filter_on_cwd_change;
+//     explorer_refresh_mode expl_refresh_mode;
+// };
 
 struct window_visibilities
 {
@@ -97,8 +138,6 @@ struct explorer_options
         count
     };
 
-    static s32 const min_tolerable_refresh_interval_ms = 100;
-
     std::atomic<s32> auto_refresh_interval_ms;
     refresh_mode ref_mode;
     bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
@@ -126,6 +165,7 @@ struct misc_options
 
 enum update_cwd_entries_actions : u8
 {
+    nil              = 0b00, // 0
     query_filesystem = 0b01, // 1
     filter           = 0b10, // 2
     full_refresh     = 0b11, // 3
@@ -136,6 +176,8 @@ struct explorer_window
     struct dirent
     {
         basic_dirent basic;
+        ptrdiff_t highlight_start_idx = 0;
+        u64 highlight_len = 0;
         bool is_filtered_out = false;
         bool is_selected = false;
         bool is_cut = false;
@@ -144,7 +186,7 @@ struct explorer_window
     enum filter_mode : u64
     {
         contains = 0,
-        regex,
+        regex_match,
         // glob,
         count,
     };
@@ -168,12 +210,10 @@ struct explorer_window
 
     // 80 byte alignment members
 
-    // std::mutex latest_valid_cwd_mutex = {};
     std::mutex shlwapi_task_initialization_mutex = {};
 
     // 72 byte alignment members
 
-    // std::condition_variable latest_valid_cwd_cond = {};
     std::condition_variable shlwapi_task_initialization_cond = {};
 
     // 40 byte alignment members
@@ -205,9 +245,7 @@ struct explorer_window
 
     char const *name = nullptr;
     filter_mode filter_mode = filter_mode::contains; // persisted in file
-    // time_point_t last_refresh_time = {};
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
-    // u64 num_selected_cwd_entries = 0;
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
     ImGuiTableSortSpecs *sort_specs = nullptr;
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
@@ -241,6 +279,8 @@ struct explorer_window
     std::array<char, 256> filter_text = {}; // persisted in file
     bool filter_case_sensitive = false; // persisted in file
     bool filter_polarity = true; // persisted in file
+    update_cwd_entries_actions update_request_from_outside = nil; // how code from outside the Begin()/End() of the explorer window
+                                                                  // tells this explorer to update its cwd_entries
 
     mutable s8 latest_save_to_disk_result = -1;
 };

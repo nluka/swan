@@ -179,7 +179,7 @@ void render(GLFWwindow *window) noexcept
 }
 
 // SEH handler function
-LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exceptionInfo) noexcept
+LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcept
 {
     _tprintf(_T("Unhandled exception. Generating crash dump...\n"));
 
@@ -197,7 +197,7 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exceptionInfo) noexcept
     if (dump_file != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION dump_info;
         dump_info.ThreadId = GetCurrentThreadId();
-        dump_info.ExceptionPointers = exceptionInfo;
+        dump_info.ExceptionPointers = exception_info;
         dump_info.ClientPointers = TRUE;
 
         // Write the crash dump
@@ -205,7 +205,7 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exceptionInfo) noexcept
             GetCurrentProcess(),
             GetCurrentProcessId(),
             dump_file,
-            MiniDumpNormal,
+            MiniDumpWithFullMemory,
             &dump_info,
             NULL,
             NULL
@@ -214,7 +214,7 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exceptionInfo) noexcept
         CloseHandle(dump_file);
         _tprintf(_T("Crash dump generated successfully.\n"));
     } else {
-        _tprintf(_T("Error creating crash dump file: %d\n"), GetLastError());
+        _tprintf(_T("Error creating crash dump file: %d - %s\n"), GetLastError(), get_last_error_string().c_str());
     }
 
     // Allow the default exception handling to continue (e.g., generate an error report)
@@ -281,7 +281,8 @@ void render_main_menu_bar(
                 bool changed_dotdot_dir = imgui::MenuItem("Show '..' directory", nullptr, &expl_opts.show_dotdot_dir);
                 if (changed_dotdot_dir) {
                     for (auto &expl : explorers) {
-                        expl.refresh_notif_time.store(current_time(), std::memory_order::seq_cst);
+                        // expl.update_cwd_entries(full_refresh, expl.cwd.data()); //! can't do this because ImGui SortSpecs will be NULL for whatever internal ImGui reason...
+                        expl.update_request_from_outside = full_refresh;
                     }
                 }
                 change_made |= changed_dotdot_dir;
@@ -520,10 +521,6 @@ try
             bool window_visibilities_changed = memcmp(&window_visib, &visib_at_frame_start, sizeof(window_visibilities)) != 0;
             if (window_visibilities_changed) {
                 window_visib.save_to_disk();
-            }
-
-            if (!imgui::IsMouseDown(ImGuiMouseButton_Left)) {
-                global_state::move_dirents_payload_set() = false;
             }
         };
 

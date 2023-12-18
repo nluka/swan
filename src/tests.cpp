@@ -903,6 +903,14 @@ try
   }
   #endif
 
+  // one_of
+  #if 1
+  {
+    ntest::assert_bool(true, one_of(21, { 0, 21, 22 }));
+    ntest::assert_bool(false, one_of(21, { 0, 1, 2 }));
+  }
+  #endif
+
   //
   #if 1
   {
