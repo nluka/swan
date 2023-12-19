@@ -191,6 +191,19 @@ struct explorer_window
         count,
     };
 
+    enum cwd_entries_table_col : ImGuiID
+    {
+        cwd_entries_table_col_number,
+        cwd_entries_table_col_id,
+        cwd_entries_table_col_path,
+        cwd_entries_table_col_type,
+        cwd_entries_table_col_size_pretty,
+        cwd_entries_table_col_size_bytes,
+        cwd_entries_table_col_creation_time,
+        cwd_entries_table_col_last_write_time,
+        cwd_entries_table_col_count
+    };
+
     static u64 const NO_SELECTION = UINT64_MAX;
     static u64 const MAX_WD_HISTORY_SIZE = 15;
     bool save_to_disk() const noexcept;
@@ -208,6 +221,9 @@ struct explorer_window
         std::source_location sloc = std::source_location::current()) noexcept;
 
     void push_history_item(swan_path_t const &new_latest_entry) noexcept;
+
+    // 104 byte alignment members
+    static_vector<ImGuiTableColumnSortSpecs, cwd_entries_table_col_count> column_sort_specs;
 
     // 80 byte alignment members
 
@@ -248,7 +264,7 @@ struct explorer_window
     filter_mode filter_mode = filter_mode::contains; // persisted in file
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
-    ImGuiTableSortSpecs *sort_specs = nullptr;
+    // ImGuiTableSortSpecs *sort_specs = nullptr;
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
 
     std::atomic<time_point_t> refresh_notif_time = {};
@@ -269,6 +285,7 @@ struct explorer_window
 
     s32 id = -1;
     DWORD read_dir_changes_buffer_bytes_written = 0;
+    s32 frame_count_when_cwd_entries_updated = -1;
     std::array<std::byte, 64*1024> read_dir_changes_buffer = {};
 
     // 1 byte alignment members
@@ -285,6 +302,7 @@ struct explorer_window
     bool filter_show_symlink_directories = true;    // persisted in file
     bool filter_show_symlink_files = true;          // persisted in file
     bool filter_show_invalid_symlinks = true;       // persisted in file
+    // bool table_sort_specs_dirty = true;
     update_cwd_entries_actions update_request_from_outside = nil; // how code from outside the Begin()/End() of the explorer window
                                                                   // tells this explorer to update its cwd_entries
 
