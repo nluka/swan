@@ -49,9 +49,9 @@ GLFWwindow *init_glfw_and_imgui() noexcept
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigDockingWithShift = true;
-    imgui::SetNextWindowPos(ImVec2(0, 0));
-    imgui::SetNextWindowSize(io.DisplaySize);
-    imgui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
+    // imgui::SetNextWindowPos(ImVec2(0, 0));
+    // imgui::SetNextWindowSize(io.DisplaySize);
+    // imgui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
 
     // Setup Platform/Renderer backends
     {
@@ -508,7 +508,7 @@ try
         imgui::NewFrame();
 
         // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing tab or escape
-        if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE), glfwGetKey(window, GLFW_KEY_TAB) })) {
+        if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE), /* glfwGetKey(window, GLFW_KEY_TAB) */ })) {
             ImGui::SetWindowFocus(nullptr);
         }
 
