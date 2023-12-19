@@ -15,6 +15,7 @@ obj_debug/stdafx.obj ^
 /MT ^
 /Zi ^
 /link ^
+/NATVIS:swan.natvis ^
 /DEBUG:FULL ^
 kernel32.lib ^
 user32.lib ^

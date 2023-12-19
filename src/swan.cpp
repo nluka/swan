@@ -507,9 +507,8 @@ try
         ImGui_ImplGlfw_NewFrame();
         imgui::NewFrame();
 
-        // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing escape
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-            // Do not allow ImGui to give focus to any window when Escape is pressed
+        // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing tab or escape
+        if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE), glfwGetKey(window, GLFW_KEY_TAB) })) {
             ImGui::SetWindowFocus(nullptr);
         }
 

@@ -681,9 +681,6 @@ try
       return ent;
     };
 
-    bool selected = true;
-    bool not_selected = false;
-
     {
       std::vector<explorer_window::dirent> dest = {};
       std::vector<bulk_rename_op> input_renames = {};
@@ -696,10 +693,10 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent("file1.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file2.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file3.cpp", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file4.cpp", ent_kind::file), false, not_selected },
+        { .basic = create_basic_dirent("file1.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+        { .basic = create_basic_dirent("file2.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+        { .basic = create_basic_dirent("file3.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+        { .basic = create_basic_dirent("file4.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
       };
       std::vector<bulk_rename_op> input_renames = {
         // none
@@ -715,10 +712,10 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent("file0", ent_kind::file), false, selected },
-        { create_basic_dirent("file1", ent_kind::file), false, selected },
-        { create_basic_dirent("file2", ent_kind::file), false, selected },
-        { create_basic_dirent("file3", ent_kind::file), false, selected },
+        { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
       };
       std::vector<bulk_rename_op> input_renames = {
         { &dest[0].basic, path_create("file1") },
@@ -737,10 +734,10 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent("file0", ent_kind::file), false, selected },
-        { create_basic_dirent("file1", ent_kind::file), false, selected },
-        { create_basic_dirent("file2", ent_kind::file), false, selected },
-        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
+        { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
       };
       std::vector<bulk_rename_op> input_renames = {
         { &dest[0].basic, path_create("file1") },
@@ -762,10 +759,10 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent("file0", ent_kind::file), false, selected },
-        { create_basic_dirent("file1", ent_kind::file), false, selected },
-        { create_basic_dirent("file2", ent_kind::file), false, selected },
-        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
+        { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
       };
       std::vector<bulk_rename_op> input_renames = {
         { &dest[0].basic, path_create("file3") },
@@ -783,10 +780,10 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent(".cpp", ent_kind::file), false, selected },
-        { create_basic_dirent(".cpp", ent_kind::file), false, selected },
-        { create_basic_dirent(".cpp", ent_kind::file), false, selected },
-        { create_basic_dirent(".cpp", ent_kind::file), false, not_selected },
+        { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
       };
       std::vector<bulk_rename_op> input_renames = {
         { &dest[0].basic, path_create("file5") },
@@ -804,12 +801,12 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent("file0", ent_kind::file), false, selected },
-        { create_basic_dirent("file1", ent_kind::file), false, selected },
-        { create_basic_dirent("file2", ent_kind::file), false, selected },
-        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file4", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file5", ent_kind::file), false, not_selected },
+        { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+        { .basic = create_basic_dirent("file4", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+        { .basic = create_basic_dirent("file5", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
       };
       std::vector<bulk_rename_op> input_renames = {
         { &dest[0].basic, path_create("file3") },
@@ -833,9 +830,9 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent("file0", ent_kind::file), false, selected },
-        { create_basic_dirent("file1", ent_kind::file), false, selected },
-        { create_basic_dirent("file2", ent_kind::file), false, not_selected },
+        { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
       };
       std::vector<bulk_rename_op> input_renames = {
         { &dest[0].basic, path_create("file2") },
@@ -852,11 +849,11 @@ try
 
     {
       std::vector<explorer_window::dirent> dest = {
-        { create_basic_dirent("file0", ent_kind::file), false, selected },
-        { create_basic_dirent("file1", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file2", ent_kind::file), false, selected },
-        { create_basic_dirent("file3", ent_kind::file), false, not_selected },
-        { create_basic_dirent("file4", ent_kind::file), false, selected },
+        { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+        { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+        { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+        { .basic = create_basic_dirent("file4", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
       };
       std::vector<bulk_rename_op> input_renames = {
         { &dest[0].basic, path_create("file1") },
