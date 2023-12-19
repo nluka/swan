@@ -29,12 +29,12 @@ typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> swan_path_t;
 
 struct basic_dirent
 {
-    enum class kind : u8 {
-        nil = 0,
+    enum class kind : s8 {
+        nil = -1,
         directory,
         file,
-        symlink_to_file,
         symlink_to_directory,
+        symlink_to_file,
         invalid_symlink,
         count
     };
@@ -200,6 +200,7 @@ struct explorer_window
     void invert_selected_visible_cwd_entries() noexcept;
     void set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept;
     void uncut() noexcept;
+    void reset_filter() noexcept;
 
     bool update_cwd_entries(
         update_cwd_entries_actions actions,
@@ -273,12 +274,17 @@ struct explorer_window
     // 1 byte alignment members
 
     std::atomic<bool> is_window_visible = false;
-    swan_path_t latest_valid_cwd = {};
-    swan_path_t cwd = {}; // current working directory, persisted in file
-    swan_path_t read_dir_changes_target = {}; // value of current working directory when ReadDirectoryChangesW was called
-    std::array<char, 256> filter_text = {}; // persisted in file
-    bool filter_case_sensitive = false; // persisted in file
-    bool filter_polarity = true; // persisted in file
+    swan_path_t latest_valid_cwd = {};              // latest value of cwd which was a valid directory
+    swan_path_t cwd = {};                           // current working directory, persisted in file
+    swan_path_t read_dir_changes_target = {};       // value of current working directory when ReadDirectoryChangesW was called
+    std::array<char, 256> filter_text = {};         // persisted in file
+    bool filter_case_sensitive = false;             // persisted in file
+    bool filter_polarity = true;                    // persisted in file
+    bool filter_show_directories = true;            // persisted in file
+    bool filter_show_files = true;                  // persisted in file
+    bool filter_show_symlink_directories = true;    // persisted in file
+    bool filter_show_symlink_files = true;          // persisted in file
+    bool filter_show_invalid_symlinks = true;       // persisted in file
     update_cwd_entries_actions update_request_from_outside = nil; // how code from outside the Begin()/End() of the explorer window
                                                                   // tells this explorer to update its cwd_entries
 

@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Precompile",
+      "type": "shell",
+      "command": "cls; ptime.exe .\\precompile_debug",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Build Swan",
+      "type": "shell",
+      "command": "cls; ptime.exe .\\compile_debug",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
