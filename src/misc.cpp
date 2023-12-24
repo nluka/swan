@@ -1,6 +1,5 @@
-#include "imgui/imgui.h"
-#include "libs/thread_pool.hpp"
-
+#include "stdafx.hpp"
+#include "data_types.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 #include "path.hpp"
@@ -11,12 +10,8 @@ s32 &global_state::page_size() noexcept { return s_page_size; }
 static swan_thread_pool_t s_thread_pool(1);
 swan_thread_pool_t &global_state::thread_pool() noexcept { return s_thread_pool; }
 
-ImVec4 orange()                noexcept { return ImVec4(1, 0.5f, 0, 1); }
-ImVec4 red()                   noexcept { return ImVec4(1, 0.2f, 0, 1); }
-ImVec4 dir_color()             noexcept { return get_color(basic_dirent::kind::directory); }
-ImVec4 symlink_color()         noexcept { return get_color(basic_dirent::kind::symlink_to_directory); }
-ImVec4 invalid_symlink_color() noexcept { return get_color(basic_dirent::kind::invalid_symlink); }
-ImVec4 file_color()            noexcept { return get_color(basic_dirent::kind::file); }
+static bool s_move_dirents_payload_set = false;
+bool &global_state::move_dirents_payload_set() noexcept { return s_move_dirents_payload_set; }
 
 bool basic_dirent::is_dotdot()               const noexcept { return path_equals_exactly(path, ".."); }
 bool basic_dirent::is_dotdot_dir()           const noexcept { return type == basic_dirent::kind::directory && path_equals_exactly(path, ".."); }
@@ -25,19 +20,6 @@ bool basic_dirent::is_symlink()              const noexcept { return one_of(type
 bool basic_dirent::is_symlink_to_file()      const noexcept { return type == basic_dirent::kind::symlink_to_file; }
 bool basic_dirent::is_symlink_to_directory() const noexcept { return type == basic_dirent::kind::symlink_to_directory; }
 bool basic_dirent::is_file()                 const noexcept { return type == basic_dirent::kind::file; }
-
-s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept
-{
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter) {
-        wchar_t *chars_to_filter = (filter_chars_callback_user_data_t)data->UserData;
-        bool is_forbidden = StrChrW(chars_to_filter, data->EventChar);
-        if (is_forbidden) {
-            data->EventChar = L'\0';
-        }
-    }
-
-    return 0;
-}
 
 char const *basic_dirent::kind_cstr() const noexcept
 {
@@ -85,29 +67,6 @@ char const *get_icon(basic_dirent::kind t) noexcept
     return ICON_MD_ERROR;
 }
 
-ImVec4 get_color(basic_dirent::kind t) noexcept
-{
-    switch (t) {
-        case basic_dirent::kind::directory:            return ImVec4(1, 1, 0, 1);         // yellow
-        case basic_dirent::kind::file:                 return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
-        case basic_dirent::kind::symlink_to_directory: return ImVec4(1, 1, 0, 1);         // yellow
-        case basic_dirent::kind::symlink_to_file:      return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
-        case basic_dirent::kind::invalid_symlink:      return ImVec4(1, 0, 0, 1);         // red
-        default:                                       return ImVec4(1, 1, 1, 1);         // white
-    }
-}
-
-void imgui::Spacing(u64 n) noexcept
-{
-    for (u64 i = 0; i < n; ++i) {
-        ImGui::Spacing();
-    }
-}
-
-char explorer_options::dir_separator_utf8() const noexcept { return unix_directory_separator ? '/' : '\\'; }
-wchar_t explorer_options::dir_separator_utf16() const noexcept { return unix_directory_separator ? L'/' : L'\\'; }
-u16 explorer_options::size_unit_multiplier() const noexcept { return binary_size_system ? 1024 : 1000; }
-
 std::string get_last_error_string() noexcept
 {
     DWORD error_code = GetLastError();
@@ -139,13 +98,4 @@ std::string get_last_error_string() noexcept
     }
 
     return error_message;
-}
-
-void imgui::SameLineSpaced(u64 num_spacing_calls) noexcept
-{
-    ImGui::SameLine();
-    for (u64 i = 0; i < num_spacing_calls; ++i) {
-        ImGui::Spacing();
-        ImGui::SameLine();
-    }
 }

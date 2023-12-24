@@ -27,7 +27,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
     static bool edit_enabled = false;
     static bool numbered_list = false;
 
-    if (imgui::Begin(" Pinned ", &open)) {
+    if (imgui::Begin(swan_windows::get_name(swan_windows::pin_manager), &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
             global_state::save_focused_window(swan_windows::pin_manager);
         }
@@ -188,31 +188,31 @@ u64 global_state::find_pin_idx(swan_path_t const &path) noexcept
 }
 
 bool global_state::save_pins_to_disk() noexcept
-{
-    try {
-        std::ofstream out("data/pins.txt");
-        if (!out) {
-            return false;
-        }
-
-        auto const &pins = global_state::pins();
-        for (auto const &pin : pins) {
-            out
-                << pin.color.x << ' '
-                << pin.color.y << ' '
-                << pin.color.z << ' '
-                << pin.color.w << ' '
-                << pin.label.length() << ' '
-                << pin.label.c_str() << ' '
-                << path_length(pin.path) << ' '
-                << pin.path.data() << '\n';
-        }
-
-        return true;
-    }
-    catch (...) {
+try {
+    std::ofstream out("data/pins.txt");
+    if (!out) {
         return false;
     }
+
+    auto const &pins = global_state::pins();
+    for (auto const &pin : pins) {
+        out
+            << pin.color.x << ' '
+            << pin.color.y << ' '
+            << pin.color.z << ' '
+            << pin.color.w << ' '
+            << pin.label.length() << ' '
+            << pin.label.c_str() << ' '
+            << path_length(pin.path) << ' '
+            << pin.path.data() << '\n';
+    }
+
+    print_debug_msg("SUCCESS global_state::save_pins_to_disk");
+    return true;
+}
+catch (...) {
+    print_debug_msg("FAILED global_state::save_pins_to_disk");
+    return false;
 }
 
 void global_state::update_pin_dir_separators(char new_dir_separator) noexcept
@@ -223,54 +223,51 @@ void global_state::update_pin_dir_separators(char new_dir_separator) noexcept
 }
 
 std::pair<bool, u64> global_state::load_pins_from_disk(char dir_separator) noexcept
-{
-    try {
-        std::ifstream in("data/pins.txt");
-        if (!in) {
-            return { false, 0 };
-        }
-
-        s_pins.clear();
-
-        std::string line = {};
-        line.reserve(global_state::page_size() - 1);
-
-        u64 num_loaded_successfully = 0;
-
-        while (std::getline(in, line)) {
-            try {
-                std::istringstream out(line);
-
-                ImVec4 color;
-                char label[pinned_path::LABEL_MAX_LEN + 1] = {};
-                u64 label_len = 0;
-                swan_path_t path = {};
-                u64 path_len = 0;
-
-                out >> (f32 &)color.x;
-                out >> (f32 &)color.y;
-                out >> (f32 &)color.z;
-                out >> (f32 &)color.w;
-
-                out >> (u64 &)label_len;
-                out.ignore(1);
-                out.read(label, label_len);
-
-                out >> (u64 &)path_len;
-                out.ignore(1);
-                out.read(path.data(), path_len);
-
-                global_state::add_pin(color, label, path, dir_separator);
-                ++num_loaded_successfully;
-
-                line.clear();
-            }
-            catch (...) {}
-        }
-
-        return { true, num_loaded_successfully };
-    }
-    catch (...) {
+try {
+    std::ifstream in("data/pins.txt");
+    if (!in) {
         return { false, 0 };
     }
+
+    s_pins.clear();
+
+    std::string line = {};
+    line.reserve(global_state::page_size() - 1);
+
+    u64 num_loaded_successfully = 0;
+
+    while (std::getline(in, line)) {
+        std::istringstream out(line);
+
+        ImVec4 color;
+        char label[pinned_path::LABEL_MAX_LEN + 1] = {};
+        u64 label_len = 0;
+        swan_path_t path = {};
+        u64 path_len = 0;
+
+        out >> (f32 &)color.x;
+        out >> (f32 &)color.y;
+        out >> (f32 &)color.z;
+        out >> (f32 &)color.w;
+
+        out >> (u64 &)label_len;
+        out.ignore(1);
+        out.read(label, label_len);
+
+        out >> (u64 &)path_len;
+        out.ignore(1);
+        out.read(path.data(), path_len);
+
+        global_state::add_pin(color, label, path, dir_separator);
+        ++num_loaded_successfully;
+
+        line.clear();
+    }
+
+    print_debug_msg("SUCCESS global_state::load_pins_from_disk, loaded %zu pins", num_loaded_successfully);
+    return { true, num_loaded_successfully };
+}
+catch (...) {
+    print_debug_msg("FAILED global_state::load_pins_from_disk");
+    return { false, 0 };
 }

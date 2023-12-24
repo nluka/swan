@@ -47,7 +47,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     auto &expl = *s_bulk_rename_expl;
     auto &selection = s_bulk_rename_selection;
 
-    wchar_t dir_sep_utf16 = global_state::explorer_options_().dir_separator_utf16();
+    wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
 
     static char pattern_utf8[512] = "<name><dotext>";
     static s32 counter_start = 1;
@@ -233,7 +233,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
     imgui::Separator();
 
-    if (global_state::explorer_options_().show_debug_info) {
+    if (global_state::settings().show_debug_info) {
         imgui::Text("transform_us: %.2lf", transform_us);
         imgui::Text("collisions_us: %.2lf", collisions_us);
     }

@@ -52,7 +52,7 @@ file_operation &file_operation::operator=(file_operation const &other) noexcept 
 
 void swan_windows::render_file_operations() noexcept
 {
-    if (!imgui::Begin("File Operations")) {
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::file_operations))) {
         imgui::End();
         return;
     }
@@ -301,7 +301,7 @@ void perform_file_operations(
         std::stringstream err = {};
         std::wstring full_path_to_exec_utf16 = {};
 
-        full_path_to_exec_utf16.reserve(global_state::page_size() / 2);
+        full_path_to_exec_utf16.reserve((global_state::page_size() / 2) - 1);
 
         u64 i = 0;
         for (auto item_utf16 : items_to_execute) {

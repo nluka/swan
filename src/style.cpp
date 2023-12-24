@@ -36,7 +36,7 @@ void apply_swan_style_overrides() noexcept
     style.WindowBorderSize        = 1;
     style.SeparatorTextBorderSize = 0;
     style.ScrollbarRounding       = 0;
-    style.FrameRounding           = 3;
+    style.FrameRounding           = 2;
 
     style.Colors[ImGuiCol_FrameBg] = RGBA_to_ImVec4(35,40,45, 255);
     style.Colors[ImGuiCol_FrameBg] = RGBA_to_ImVec4(35,40,45, 255);

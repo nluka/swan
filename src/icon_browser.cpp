@@ -10,13 +10,9 @@ void swan_windows::render_icon_font_browser(
     char const *icon_prefix,
     std::vector<icon_font_glyph> const &(*get_all_icons)() noexcept) noexcept
 {
-    {
-        char buffer[256]; init_empty_cstr(buffer);
-        snprintf(buffer, lengthof(buffer), " %s Icons ", icon_lib_name);
-        if (!imgui::Begin(buffer, &open)) {
-            imgui::End();
-            return;
-        }
+    if (!imgui::Begin(swan_windows::get_name(window_code), &open)) {
+        imgui::End();
+        return;
     }
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
