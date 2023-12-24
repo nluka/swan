@@ -41,6 +41,7 @@ std::ostream& operator<<(std::ostream &os, bulk_rename_compiled_pattern::op cons
         case op_type::insert_ext:     op_str = "insert_ext";     break;
         case op_type::insert_size:    op_str = "insert_size";    break;
         case op_type::insert_counter: op_str = "insert_counter"; break;
+        case op_type::insert_slice:   op_str = "insert_slice";   break;
         default:                      op_str = "unknown_op";     break;
     }
 
@@ -106,6 +107,7 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
             if (inside_chevrons) {
                 closing_chevron_pos = i;
                 u64 expr_len = closing_chevron_pos - opening_chevron_pos - 1;
+                char const *expr = pattern + opening_chevron_pos + 1;
 
                 if (expr_len == 0) {
                     success = false;
@@ -115,38 +117,77 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
                 }
 
                 auto expr_equals = [&](char const *known_expr) {
-                    return StrCmpNIA(pattern + opening_chevron_pos + 1, known_expr, (s32)expr_len) == 0;
+                    return StrCmpNIA(expr, known_expr, (s32)expr_len) == 0;
+                };
+                auto expr_begins_with = [&](char const *text) {
+                    return StrCmpNIA(expr, text, (s32)strlen(text)) == 0;
                 };
 
                 bool known_expression = true;
+                bulk_rename_compiled_pattern::op op = {};
 
                 if (expr_equals("name")) {
-                    bulk_rename_compiled_pattern::op op = {};
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_name;
-                    compiled.ops.push_back(op);
                 }
                 else if (expr_equals("dotext")) {
-                    bulk_rename_compiled_pattern::op op = {};
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_dotext;
-                    compiled.ops.push_back(op);
                 }
                 else if (expr_equals("ext")) {
-                    bulk_rename_compiled_pattern::op op = {};
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_ext;
-                    compiled.ops.push_back(op);
                 }
                 else if (expr_equals("counter")) {
-                    bulk_rename_compiled_pattern::op op = {};
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_counter;
-                    compiled.ops.push_back(op);
                 }
                 else if (expr_equals("bytes")) {
-                    bulk_rename_compiled_pattern::op op = {};
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_size;
-                    compiled.ops.push_back(op);
                 }
                 else {
-                    known_expression = false;
+                    static std::regex valid_slice_with_start_end ("^[0-9]{1,5}, *[0-9]{1,5}$");
+                    static std::regex valid_slice_with_start     ("^[0-9]{1,5}, *$");
+                    static std::regex valid_slice_with_end                 ("^, *[0-9]{1,5}$");
+
+                    std::string_view expr_view(expr, expr_len);
+                    static std::string expr_str(100, '\0');
+                    expr_str.clear();
+                    expr_str.append(expr_view);
+
+                    std::istringstream iss(expr_str);
+
+                    op.kind = bulk_rename_compiled_pattern::op::type::insert_slice;
+
+                    if (std::regex_match(expr_str, valid_slice_with_start_end)) {
+                        op.explicit_first = true;
+                        op.explicit_last = true;
+                    }
+                    else if (std::regex_match(expr_str, valid_slice_with_start)) {
+                        op.explicit_first = true;
+                    }
+                    else if (std::regex_match(expr_str, valid_slice_with_end)) {
+                        op.explicit_last = true;
+                    }
+                    else {
+                        known_expression = false;
+                    }
+
+                    if (known_expression) {
+                        if (op.explicit_first) {
+                            iss >> op.slice_first;
+                        }
+                        while (strchr(", ", iss.peek())) {
+                            char dummy = 0;
+                            iss.read(&dummy, 1);
+                        }
+                        if (op.explicit_last) {
+                            iss >> op.slice_last;
+                        }
+                    }
+
+                    if (op.slice_first > op.slice_last) {
+                        success = false;
+                        compiled = {};
+                        snprintf(error.data(), error.size(), "slice expression starting at position %zu is malformed, first is greater than last", opening_chevron_pos);
+                        return result;
+                    }
                 }
 
                 if (!known_expression) {
@@ -154,6 +195,8 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
                     compiled = {};
                     snprintf(error.data(), error.size(), "unknown expression starting at position %zu", opening_chevron_pos);
                     return result;
+                } else {
+                    compiled.ops.push_back(op);
                 }
 
                 // reset
@@ -219,7 +262,7 @@ bulk_rename_transform_result bulk_rename_transform(
                     after[after_insert_idx++] = op.ch;
                 } else {
                     result.success = false;
-                    strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
                     return result;
                 }
                 break;
@@ -235,7 +278,7 @@ bulk_rename_transform_result bulk_rename_transform(
                     after_insert_idx += len - spaces_removed;
                 } else {
                     result.success = false;
-                    strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
                     return result;
                 }
                 break;
@@ -248,7 +291,7 @@ bulk_rename_transform_result bulk_rename_transform(
                         after_insert_idx += len;
                     } else {
                         result.success = false;
-                        strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                        (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
                         return result;
                     }
                 }
@@ -260,7 +303,7 @@ bulk_rename_transform_result bulk_rename_transform(
                         after[after_insert_idx++] = '.';
                     } else {
                         result.success = false;
-                        strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                        (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
                         return result;
                     }
 
@@ -270,7 +313,7 @@ bulk_rename_transform_result bulk_rename_transform(
                         after_insert_idx += len;
                     } else {
                         result.success = false;
-                        strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                        (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
                         return result;
                     }
                 }
@@ -284,7 +327,7 @@ bulk_rename_transform_result bulk_rename_transform(
                     after_insert_idx += written;
                 } else {
                     result.success = false;
-                    strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
                     return result;
                 }
                 break;
@@ -297,7 +340,52 @@ bulk_rename_transform_result bulk_rename_transform(
                     after_insert_idx += written;
                 } else {
                     result.success = false;
-                    strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
+                    return result;
+                }
+                break;
+            }
+            case op_type::insert_slice: {
+                swan_path_t full = path_create(name);
+
+                if (ext != nullptr) {
+                    auto success1 = path_append(full, ".");
+                    assert(success1);
+
+                    auto success2 = path_append(full, ext);
+                    assert(success2);
+                }
+
+                u64 full_len = path_length(full);
+
+                u64 actual_slice_last = op.slice_last;
+
+                if (!op.explicit_first) {
+                    // don't do anything because op.slice_first is already 0 as it should be in this case
+                }
+                if (!op.explicit_last) {
+                    actual_slice_last = full_len - 1;
+                }
+
+                u64 len = actual_slice_last - op.slice_first + 1;
+                assert(len > 0);
+
+                if (op.slice_first >= full_len || actual_slice_last >= full_len) {
+                    result.success = false;
+                    (void) strncpy(result.error.data(), "slice goes out of bounds", result.error.max_size());
+                    return result;
+                }
+
+                if (len <= space_left) {
+                    strncat(out, full.data() + op.slice_first, len);
+                    u64 spaces_removed = 0;
+                    if (compiled_pattern.squish_adjacent_spaces) {
+                        spaces_removed = remove_adjacent_spaces(out, len);
+                    }
+                    after_insert_idx += len - spaces_removed;
+                } else {
+                    result.success = false;
+                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
                     return result;
                 }
                 break;
