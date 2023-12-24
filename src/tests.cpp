@@ -345,204 +345,145 @@ try
   // bulk_rename_compile_pattern, bulk_rename_transform;
   #if 1
   {
-    bool squish_adjacent_spaces = false;
+    // bool squish_adjacent_spaces = false;
     swan_path_t after = {};
 
+    auto assert_failed_compile = [](char const *pattern, char const *expected_error, std::source_location sloc = std::source_location::current()) {
+      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, false);
+      ntest::assert_bool(false, success, sloc);
+      ntest::assert_cstr(expected_error, err_msg.data(), ntest::default_str_opts(), sloc);
+      ntest::assert_stdvec({}, compiled.ops, sloc);
+    };
+
+    assert_failed_compile("", "empty pattern");
+    assert_failed_compile("asdf\t", "illegal filename character 9 at position 4");
+    assert_failed_compile("data<<", "unexpected '<' at position 5, unclosed '<' at position 4");
+    assert_failed_compile("<", "unclosed '<' at position 0");
+    assert_failed_compile(">", "unexpected '>' at position 0 - no preceding '<' found");
+    assert_failed_compile("<>", "empty expression starting at position 0");
+    assert_failed_compile("data_<bogus>", "unknown expression starting at position 5");
+    assert_failed_compile("<,>", "unknown expression starting at position 0");
+    assert_failed_compile("<0>", "unknown expression starting at position 0");
+    assert_failed_compile("<  >", "unknown expression starting at position 0");
+    assert_failed_compile("<123456,>", "unknown expression starting at position 0");
+    assert_failed_compile("<1,0>", "slice expression starting at position 0 is malformed, first is greater than last");
+
+    struct compile_and_transform_test_args
     {
-      char const *pattern = "";
-      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(false, success);
-      ntest::assert_cstr("empty pattern", err_msg.data());
-      ntest::assert_stdvec({}, compiled.ops);
-    }
-    {
-      char const *pattern = "asdf\t";
-      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(false, success);
-      ntest::assert_cstr("illegal filename character 9 at position 4", err_msg.data());
-      ntest::assert_stdvec({}, compiled.ops);
-    }
-    {
-      char const *pattern = "data<<";
-      auto [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(false, success);
-      ntest::assert_cstr("unexpected '<' at position 5, unclosed '<' at position 4", err_msg.data());
-      ntest::assert_stdvec({}, compiled.ops);
-    }
-    {
-      char const *pattern = "<";
-      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(false, success);
-      ntest::assert_cstr("unclosed '<' at position 0", err_msg.data());
-      ntest::assert_stdvec({}, compiled.ops);
-    }
-    {
-      char const *pattern = ">";
-      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(false, success);
-      ntest::assert_cstr("unexpected '>' at position 0 - no preceding '<' found", err_msg.data());
-      ntest::assert_stdvec({}, compiled.ops);
-    }
-    {
-      char const *pattern = "<>";
-      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(false, success);
-      ntest::assert_cstr("empty expression starting at position 0", err_msg.data());
-      ntest::assert_stdvec({}, compiled.ops);
-    }
-    {
-      char const *pattern = "data_<bogus>";
-      auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(false, success);
-      ntest::assert_cstr("unknown expression starting at position 5", err_msg.data());
-      ntest::assert_stdvec({}, compiled.ops);
-    }
+      char const *name;
+      char const *ext;
+      char const *pattern;
+      u64 size;
+      s32 counter;
+      bool squish_adjacent_spaces;
+      char const *expected_after;
+    };
 
-    {
-      char const *pattern = "<counter>";
+    auto assert_successful_compile_and_transform = [](compile_and_transform_test_args args, std::source_location sloc = std::source_location::current()) {
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(args.pattern, args.squish_adjacent_spaces);
+      ntest::assert_bool(true, success_compile, sloc);
+      ntest::assert_cstr("", err_msg_compile.data(), ntest::default_str_opts(), sloc);
+      ntest::assert_bool(args.squish_adjacent_spaces, compiled.squish_adjacent_spaces, sloc);
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+      swan_path_t after = {};
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = 0;
-      u64 size = {};
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, args.name, args.ext, args.counter, args.size);
+      ntest::assert_bool(true, success_transform, sloc);
+      ntest::assert_cstr(args.expected_after, after.data(), ntest::default_str_opts(), sloc);
+      ntest::assert_cstr("", err_msg_transform.data(), ntest::default_str_opts(), sloc);
+    };
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("0", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
-    {
-      char const *pattern = "<CoUnTeR>";
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<counter>", .size={}, .counter=0, .squish_adjacent_spaces={},
+                                              .expected_after="0" });
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<counter>", .size={}, .counter=100, .squish_adjacent_spaces={},
+                                              .expected_after="100" });
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = 100;
-      u64 size = {};
+    assert_successful_compile_and_transform({ .name="BEFORE", .ext="txt",
+                                              .pattern="something_<name>_bla", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="something_BEFORE_bla" });
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("100", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
-    {
-      char const *pattern = "something_<name>_bla";
+    assert_successful_compile_and_transform({ .name="BEFORE", .ext="TXT",
+                                              .pattern="<name>  <bytes>.<ext>", .size=42, .counter={}, .squish_adjacent_spaces=false,
+                                              .expected_after="BEFORE  42.TXT" });
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+    assert_successful_compile_and_transform({ .name="BEFORE", .ext="TXT",
+                                              .pattern="<name>  <bytes>.<ext>", .size=42, .counter={}, .squish_adjacent_spaces=true,
+                                              .expected_after="BEFORE 42.TXT" });
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = {};
-      u64 size = {};
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="29.  Gladiator Boss", .size={}, .counter={}, .squish_adjacent_spaces=false,
+                                              .expected_after="29.  Gladiator Boss" });
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("something_before_bla", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
-    {
-      char const *pattern = "<name>.<name>.<name>";
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="29.  Gladiator Boss", .size={}, .counter={}, .squish_adjacent_spaces=true,
+                                              .expected_after="29. Gladiator Boss" });
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<0,>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="before.txt" });
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = {};
-      u64 size = {};
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<,3>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="befo" });
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("before.before.before", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
-    {
-      char const *pattern = "<name>  <bytes>.<ext>";
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<0,0>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="b" });
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<0,5>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="before" });
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = {};
-      u64 size = 42;
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<0,6>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="before." });
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("before  42.ext", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
-    {
-      char const *pattern = "<name>   <bytes>.<ext>";
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<0,7>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="before.t" });
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = true);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<0,9>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="before.txt" });
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = {};
-      u64 size = 42;
+    assert_successful_compile_and_transform({ .name="before", .ext="txt",
+                                              .pattern="<9,9>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                              .expected_after="t" });
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("before 42.ext", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
-    {
-      char const *pattern = "29.  Gladiator Boss";
+    auto assert_successful_compile_but_failed_transform = [](compile_and_transform_test_args args, std::source_location sloc = std::source_location::current()) {
+      // using args.expected_after for expected error
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = false);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(args.pattern, args.squish_adjacent_spaces);
+      ntest::assert_bool(true, success_compile, sloc);
+      ntest::assert_cstr("", err_msg_compile.data(), ntest::default_str_opts(), sloc);
+      ntest::assert_bool(args.squish_adjacent_spaces, compiled.squish_adjacent_spaces, sloc);
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = {};
-      u64 size = 42;
+      swan_path_t after = {};
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("29.  Gladiator Boss", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
-    {
-      char const *pattern = "29.  Gladiator Boss";
+      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, args.name, args.ext, args.counter, args.size);
+      ntest::assert_bool(false, success_transform, sloc);
+      // ntest::assert_cstr(args.expected_after, after.data(), ntest::default_str_opts(), sloc);
+      ntest::assert_cstr(args.expected_after, err_msg_transform.data(), ntest::default_str_opts(), sloc);
+    };
 
-      auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(pattern, squish_adjacent_spaces = true);
-      ntest::assert_bool(true, success_compile);
-      ntest::assert_cstr("", err_msg_compile.data());
-      ntest::assert_bool(squish_adjacent_spaces, compiled.squish_adjacent_spaces);
+    assert_successful_compile_but_failed_transform({ .name="before", .ext="txt",
+                                                     .pattern="<0,10>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                                     .expected_after="slice goes out of bounds" });
 
-      char const *name = "before";
-      char const *ext = "ext";
-      s32 counter = {};
-      u64 size = 42;
+    assert_successful_compile_but_failed_transform({ .name="before", .ext="txt",
+                                                     .pattern="<10,10>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                                     .expected_after="slice goes out of bounds" });
 
-      auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, name, ext, counter, size);
-      ntest::assert_bool(true, success_transform);
-      ntest::assert_cstr("29. Gladiator Boss", after.data());
-      ntest::assert_cstr("", err_msg_transform.data());
-    }
+    assert_successful_compile_but_failed_transform({ .name="before", .ext="txt",
+                                                     .pattern="<5,10>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                                     .expected_after="slice goes out of bounds" });
 
+    assert_successful_compile_but_failed_transform({ .name="before", .ext="txt",
+                                                     .pattern="<10,20>", .size={}, .counter={}, .squish_adjacent_spaces={},
+                                                     .expected_after="slice goes out of bounds" });
   }
   #endif
 

@@ -11,9 +11,18 @@
       }
     },
     {
-      "label": "Build Swan",
+      "label": "Build Swan (Debug)",
       "type": "shell",
       "command": "cls; ptime.exe .\\compile_debug",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Build Swan Tests (Debug)",
+      "type": "shell",
+      "command": "cls; ptime.exe .\\compile_tests_debug",
       "group": {
         "kind": "build",
         "isDefault": true

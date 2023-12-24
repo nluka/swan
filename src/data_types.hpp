@@ -375,10 +375,15 @@ struct bulk_rename_compiled_pattern
             insert_dotext,
             insert_size,
             insert_counter,
+            insert_slice,
         };
 
         type kind;
         char ch = 0;
+        bool explicit_first = false;
+        bool explicit_last = false;
+        u16 slice_first = 0;
+        u16 slice_last = 0;
 
         bool operator!=(op const &other) const noexcept; // for ntest
         friend std::ostream& operator<<(std::ostream &os, op const &r); // for ntest
