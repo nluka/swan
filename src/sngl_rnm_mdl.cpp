@@ -41,8 +41,7 @@ void swan_popup_modals::render_single_rename() noexcept
     assert(s_single_rename_expl != nullptr);
     assert(s_single_rename_entry_to_be_renamed != nullptr);
 
-
-    wchar_t dir_sep_utf16 = global_state::explorer_options_().dir_separator_utf16();
+    wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
 
     static swan_path_t new_name_utf8 = {};
     static std::string err_msg = {};

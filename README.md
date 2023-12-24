@@ -4,7 +4,7 @@
 
 Swan is a substitute to the Windows File Explorer (WFE), for those wanting to squash the WFE frustrations (e.g., myself).
 
-<img src="resource/demo1.gif" />
+<img src="resource/preview.gif" />
 
 ## What's not to love about the Windows File Explorer?
 
@@ -72,7 +72,8 @@ Demo coming soon.
 
 ## Attributions
 
-<a href="https://www.flaticon.com/free-icons/swan" title="swan icons">Swan icons created by Freepik - Flaticon</a>
-<a href="https://www.flaticon.com/free-icons/lightweight" title="lightweight icons">Lightweight icons created by Icongeek26 - Flaticon</a>
-<a href="https://www.flaticon.com/free-icons/origami" title="origami icons">Origami icons created by smalllikeart - Flaticon</a>
-<a href="https://www.flaticon.com/free-icons/bird" title="bird icons">Bird icons created by berkahicon - Flaticon</a>
+- <a href="https://ezgif.com/video-to-gif" title="site used for making GIFs">GIFs made using ezgif.com</a>
+- <a href="https://www.flaticon.com/free-icons/swan" title="swan icons">Swan icons created by Freepik - Flaticon</a>
+- <a href="https://www.flaticon.com/free-icons/lightweight" title="lightweight icons">Lightweight icons created by Icongeek26 - Flaticon</a>
+- <a href="https://www.flaticon.com/free-icons/origami" title="origami icons">Origami icons created by smalllikeart - Flaticon</a>
+- <a href="https://www.flaticon.com/free-icons/bird" title="bird icons">Bird icons created by berkahicon - Flaticon</a>

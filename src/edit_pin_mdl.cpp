@@ -80,7 +80,7 @@ void swan_popup_modals::render_edit_pin() noexcept
 
     if (imgui::Button("Save##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
         swan_path_t path = path_squish_adjacent_separators(path_input);
-        path_force_separator(path, global_state::explorer_options_().dir_separator_utf8());
+        path_force_separator(path, global_state::settings().dir_separator_utf8);
 
         s_edit_pin->color = color_input;
         s_edit_pin->label = label_input;

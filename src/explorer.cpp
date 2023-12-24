@@ -1,7 +1,4 @@
 
-#include "imgui/imgui.h"
-#include "libs/thread_pool.hpp"
-
 #include "stdafx.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
@@ -11,21 +8,13 @@
 
 static IShellLinkW *s_shell_link = nullptr;
 static IPersistFile *s_persist_file_interface = nullptr;
-static explorer_options s_explorer_options = {};
-static BS::thread_pool s_change_notif_thread_pool(1);
 static std::array<explorer_window, global_constants::num_explorers> s_explorers = {};
 static file_operation_command_buf s_file_op_payload = {};
-static bool s_move_dirents_payload_set = false;
-
-bool &global_state::move_dirents_payload_set() noexcept { return s_move_dirents_payload_set; }
 
 std::array<explorer_window, global_constants::num_explorers> &global_state::explorers() noexcept { return s_explorers; }
 
-explorer_options &global_state::explorer_options_() noexcept { return s_explorer_options; }
-
 bool explorer_init_windows_shell_com_garbage() noexcept
-try
-{
+try {
     // Initialize COM library
     HRESULT com_handle = CoInitialize(nullptr);
     if (FAILED(com_handle)) {
@@ -52,117 +41,6 @@ try
 }
 catch (...) {
     return false;
-}
-
-bool explorer_options::save_to_disk() const noexcept
-{
-    try {
-        std::ofstream out("data/explorer_options.txt", std::ios::binary);
-
-        if (!out) {
-            return false;
-        }
-
-        static_assert(s8(1) == s8(true));
-        static_assert(s8(0) == s8(false));
-
-        out << "auto_refresh_interval_ms " << this->auto_refresh_interval_ms << '\n';
-        out << "ref_mode " << (s32)this->ref_mode << '\n';
-        out << "binary_size_system " << (s32)this->binary_size_system << '\n';
-        out << "show_cwd_len " << (s32)this->show_cwd_len << '\n';
-        out << "show_debug_info " << (s32)this->show_debug_info << '\n';
-        out << "show_dotdot_dir " << (s32)this->show_dotdot_dir << '\n';
-        out << "unix_directory_separator " << (s32)this->unix_directory_separator << '\n';
-        out << "cwd_entries_table_alt_row_bg " << (s32)this->cwd_entries_table_alt_row_bg << '\n';
-        out << "cwd_entries_table_borders_in_body " << (s32)this->cwd_entries_table_borders_in_body << '\n';
-        out << "clear_filter_on_cwd_change " << (s32)this->clear_filter_on_cwd_change << '\n';
-
-        return true;
-    }
-    catch (...) {
-        return false;
-    }
-}
-
-bool explorer_options::load_from_disk() noexcept
-{
-    try {
-        std::ifstream in("data/explorer_options.txt", std::ios::binary);
-        if (!in) {
-            return false;
-        }
-
-        static_assert(s8(1) == s8(true));
-        static_assert(s8(0) == s8(false));
-
-        std::string what = {};
-        what.reserve(100);
-        char bit_ch = 0;
-
-        {
-            in >> what;
-            assert(what == "auto_refresh_interval_ms");
-            in >> (s32 &)this->auto_refresh_interval_ms;
-        }
-        {
-            in >> what;
-            assert(what == "ref_mode");
-            in >> (s32 &)this->ref_mode;
-        }
-        {
-            in >> what;
-            assert(what == "binary_size_system");
-            in >> bit_ch;
-            this->binary_size_system = bit_ch == '1' ? 1 : 0;
-        }
-        {
-            in >> what;
-            assert(what == "show_cwd_len");
-            in >> bit_ch;
-            this->show_cwd_len = bit_ch == '1' ? 1 : 0;
-        }
-        {
-            in >> what;
-            assert(what == "show_debug_info");
-            in >> bit_ch;
-            this->show_debug_info = bit_ch == '1' ? 1 : 0;
-        }
-        {
-            in >> what;
-            assert(what == "show_dotdot_dir");
-            in >> bit_ch;
-            this->show_dotdot_dir = bit_ch == '1' ? 1 : 0;
-        }
-        {
-            in >> what;
-            assert(what == "unix_directory_separator");
-            in >> bit_ch;
-            this->unix_directory_separator = bit_ch == '1' ? 1 : 0;
-        }
-        {
-            in >> what;
-            assert(what == "cwd_entries_table_alt_row_bg");
-            in >> bit_ch;
-            this->cwd_entries_table_alt_row_bg = bit_ch == '1' ? 1 : 0;
-        }
-        {
-            in >> what;
-            assert(what == "cwd_entries_table_borders_in_body");
-            in >> bit_ch;
-            this->cwd_entries_table_borders_in_body = bit_ch == '1' ? 1 : 0;
-        }
-        {
-            in >> what;
-            assert(what == "clear_filter_on_cwd_change");
-            in >> bit_ch;
-            this->clear_filter_on_cwd_change = bit_ch == '1' ? 1 : 0;
-        }
-
-        return true;
-    }
-    catch (...) {
-        return false;
-    }
 }
 
 drive_list_t query_drive_list() noexcept
@@ -251,7 +129,7 @@ void explorer_window::invert_selected_visible_cwd_entries() noexcept
 
 void explorer_window::set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept
 {
-    if (global_state::explorer_options_().clear_filter_on_cwd_change) {
+    if (global_state::settings().clear_filter_on_cwd_change) {
         init_empty_cstr(this->filter_text.data());
     }
     this->latest_valid_cwd = new_latest_valid_cwd;
@@ -349,7 +227,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
 
         swan_path_t src = expl.cwd;
 
-        if (path_append(src, dirent.basic.path.data(), global_state::explorer_options_().dir_separator_utf8(), true)) {
+        if (path_append(src, dirent.basic.path.data(), global_state::settings().dir_separator_utf8, true)) {
             s_file_op_payload.items.push_back({ operation, operation_code, dirent.basic.type, src });
         } else {
             err << "Current working directory path + [" << src.data() << "] exceeds max allowed path length.\n";
@@ -411,7 +289,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
             std::stringstream err = {};
             std::wstring full_path_to_delete_utf16 = {};
 
-            full_path_to_delete_utf16.reserve(global_state::page_size());
+            full_path_to_delete_utf16.reserve((global_state::page_size() / 2) - 1);
 
             for (auto item_utf16 : items_to_delete) {
                 full_path_to_delete_utf16.clear();
@@ -939,7 +817,7 @@ bool explorer_window::update_cwd_entries(
 
     bool parent_dir_exists = false; // retval
 
-    char dir_sep_utf8 = global_state::explorer_options_().dir_separator_utf8();
+    char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
 
     update_cwd_entries_total_us = 0;
     update_cwd_entries_searchpath_setup_us = 0;
@@ -1070,7 +948,7 @@ bool explorer_window::update_cwd_entries(
                 }
 
                 if (entry.basic.is_dotdot()) {
-                    if (global_state::explorer_options_().show_dotdot_dir) {
+                    if (global_state::settings().show_dotdot_dir) {
                         this->cwd_entries.emplace_back(entry);
                         std::swap(this->cwd_entries.back(), this->cwd_entries.front());
                     }
@@ -1181,7 +1059,7 @@ bool explorer_window::save_to_disk() const noexcept
     scoped_timer<timer_unit::MICROSECONDS> save_to_disk_timer(&(this->save_to_disk_us));
 
     char file_name[32]; init_empty_cstr(file_name);
-    s32 written = snprintf(file_name, lengthof(file_name), "data/Explorer_%c.txt", this->name[9]);
+    s32 written = snprintf(file_name, lengthof(file_name), "data/Explorer_%d.txt", this->id);
     assert(written < lengthof(file_name));
 
     bool result = true;
@@ -1227,7 +1105,7 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
     assert(this->name != nullptr);
 
     char file_name[32]; init_empty_cstr(file_name);
-    s32 written = snprintf(file_name, lengthof(file_name), "data/Explorer_%c.txt", this->name[9]);
+    s32 written = snprintf(file_name, lengthof(file_name), "data/Explorer_%d.txt", this->id);
     assert(written < lengthof(file_name));
 
     try {
@@ -1337,7 +1215,7 @@ void explorer_window::push_history_item(swan_path_t const &new_latest_entry) noe
 {
     swan_path_t new_latest_entry_clean;
     new_latest_entry_clean = new_latest_entry;
-    char dir_sep_utf8 = global_state::explorer_options_().dir_separator_utf8();
+    char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
     path_pop_back_if(new_latest_entry_clean, dir_sep_utf8);
 
     if (this->wd_history.empty()) {
@@ -1369,7 +1247,7 @@ struct ascend_result
 static
 ascend_result try_ascend_directory(explorer_window &expl) noexcept
 {
-    char dir_sep_utf8 = global_state::explorer_options_().dir_separator_utf8();
+    char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
     ascend_result res = {};
     res.parent_dir = expl.cwd;
 
@@ -1407,8 +1285,8 @@ struct descend_result
 static
 descend_result try_descend_to_directory(explorer_window &expl, char const *target_utf8) noexcept
 {
-    char dir_sep_utf8 = global_state::explorer_options_().dir_separator_utf8();
-    // wchar_t dir_sep_utf16 = global_state::explorer_options_().dir_separator_utf16();
+    char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
+    // wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
 
     swan_path_t new_cwd_utf8 = expl.cwd;
 
@@ -1896,7 +1774,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists_before_
 }
 
 static
-void render_pins_popup(explorer_window &expl, window_visibilities &window_visib) noexcept
+void render_pins_popup(explorer_window &expl) noexcept
 {
     auto cleanup_and_close_popup = []() {
         imgui::CloseCurrentPopup();
@@ -1908,8 +1786,8 @@ void render_pins_popup(explorer_window &expl, window_visibilities &window_visib)
     imgui::SameLine();
 
     if (imgui::Button("Manage")) {
-        window_visib.pin_manager = true;
-        (void) window_visib.save_to_disk();
+        global_state::settings().show.pin_manager = true;
+        (void) global_state::settings().save_to_disk();
         ImGui::SetWindowFocus(" Pinned ");
     }
 
@@ -2150,10 +2028,13 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
                 f32 percent_used = fraction_used * 100.0f;
                 imgui::Text("%3.0lf%%", percent_used);
                 imgui::SameLine();
-                {
-                    imgui::ScopedColor c(ImGuiCol_PlotHistogram, ImVec4(fraction_used - 0.1f, 1.0f - fraction_used, 0, 0.8f));
-                    imgui::ProgressBar(f32(used_bytes) / f32(drive.total_bytes), ImVec2(-1, imgui::CalcTextSize("1").y), "");
-                }
+
+                f32 red = fraction_used < 0.5f ? 0 : ( 4 * ((fraction_used - 0.5f) * (fraction_used - 0.5f)) );
+                f32 green = 1.5f - fraction_used;
+                f32 blue = 0;
+
+                imgui::ScopedColor c(ImGuiCol_PlotHistogram, ImVec4(red, green, blue, 1));
+                imgui::ProgressBar(f32(used_bytes) / f32(drive.total_bytes), ImVec2(-1, imgui::CalcTextSize("1").y), "");
             }
         }
 
@@ -2575,7 +2456,6 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
 static
 void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, char dir_sep_utf8, wchar_t dir_sep_utf16) noexcept
 {
-    // imgui::ScopedAvailWidth w = {};
     f32 button_space = imgui::CalcTextSize(ICON_CI_BLANK).x + imgui::GetStyle().ItemSpacing.x + (imgui::GetStyle().FramePadding.x * 2);
     imgui::ScopedAvailWidth w(button_space);
 
@@ -2605,46 +2485,22 @@ void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, c
         }
         (void) expl.save_to_disk();
     }
-
-    // imgui::PopItemWidth();
-
-    // label
-    // if (global_state::explorer_options_().show_cwd_len) {
-    //     imgui::SameLine();
-    //     imgui::Text("cwd(%3d)", path_length(expl.cwd));
-    // }
 }
 
-#if !defined(NDEBUG)
-struct natvis_sanity_check
+void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 {
-    u64 len;
-    char str[128];
-};
-#endif
-
-void swan_windows::render_explorer(explorer_window &expl, window_visibilities &win_opts, bool &open) noexcept
-{
-#if !defined(NDEBUG)
-    natvis_sanity_check nsc = { 13, "Sanity Check." };
-#endif
-
     {
-        char buffer[128];
-        snprintf(buffer, lengthof(buffer), " %s ", expl.name);
-
-        bool is_window_visible = imgui::Begin(buffer, &open);
-        expl.is_window_visible.store(is_window_visible);
-
-        if (!is_window_visible) {
+        bool is_explorer_visible = imgui::Begin(expl.name, &open);
+        if (!is_explorer_visible) {
             imgui::End();
             return;
         }
-
-        expl.is_window_visible.notify_one();
     }
 
-    if (imgui::BeginChild(expl.name)) {
+    char child_name[64];
+    (void) snprintf(child_name, lengthof(child_name), "%s##main_child", expl.name);
+
+    if (imgui::BeginChild(child_name)) {
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
         assert(expl.id >= 0);
@@ -2654,14 +2510,13 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
     auto &io = imgui::GetIO();
     auto &style = imgui::GetStyle();
     bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-    explorer_options const &opts = global_state::explorer_options_();
 
     bool cwd_exists_before_edit = directory_exists(expl.cwd.data());
     bool cwd_exists_after_edit = cwd_exists_before_edit;
 
-    char dir_sep_utf8 = opts.dir_separator_utf8();
-    wchar_t dir_sep_utf16 = opts.dir_separator_utf16();
-    u64 size_unit_multiplier = opts.size_unit_multiplier();
+    char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
+    wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
+    u64 size_unit_multiplier = global_state::settings().size_unit_multiplier;
 
     bool open_single_rename_popup = false;
     bool open_bulk_rename_popup = false;
@@ -2728,7 +2583,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
             print_debug_msg("[ %d ] Ctrl-R, refresh triggered", expl.id);
             refresh(full_refresh);
         }
-        else if (global_state::explorer_options_().ref_mode != explorer_options::refresh_mode::manual && cwd_exists_before_edit) {
+        else if (global_state::settings().expl_refresh_mode != swan_settings::explorer_refresh_mode_manual && cwd_exists_before_edit) {
             auto issue_read_dir_changes = [&]() {
                 wchar_t cwd_utf16[MAX_PATH];
                 s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
@@ -2787,7 +2642,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                     // ReadDirectoryChangesW in flight but not yet signalled, thus no changes and no refresh needed
                     // print_debug_msg("[ %d ] GetOverlappedResult FAILED: %d %s", expl.id, GetLastError(), get_last_error_string().c_str());
                 } else {
-                    if (global_state::explorer_options_().ref_mode == explorer_options::refresh_mode::automatic) {
+                    if (global_state::settings().expl_refresh_mode == swan_settings::explorer_refresh_mode_automatic) {
                         print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == automatic, refreshing...");
                         issue_read_dir_changes();
                         refresh(full_refresh);
@@ -2805,7 +2660,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
     }
     // refresh logic end
 
-    if (opts.show_debug_info) {
+    if (global_state::settings().show_debug_info) {
         render_debug_info(expl, size_unit_multiplier);
     }
 
@@ -2869,7 +2724,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
                 imgui::SetTooltip("Open pins");
             }
             if (imgui::BeginPopup("pins_popup")) {
-                render_pins_popup(expl, win_opts);
+                render_pins_popup(expl);
                 imgui::EndPopup();
             }
 
@@ -3042,8 +2897,8 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
             else if (cnt.filtered_dirents < expl.cwd_entries.size() && imgui::BeginTable("cwd_entries", explorer_window::cwd_entries_table_col_count,
                 ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|
                 ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable|ImGuiTableFlags_BordersV|
-                (global_state::explorer_options_().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
-                (global_state::explorer_options_().cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
+                (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+                (global_state::settings().cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
             )) {
                 imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, explorer_window::cwd_entries_table_col_number);
                 imgui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_id);
@@ -3672,7 +3527,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
     if (open_single_rename_popup) {
         swan_popup_modals::open_single_rename(expl, *dirent_to_be_renamed, [&expl]() {
             /* on rename finished: */
-            if (global_state::explorer_options_().ref_mode == explorer_options::refresh_mode::manual) {
+            if (global_state::settings().expl_refresh_mode == swan_settings::explorer_refresh_mode_manual) {
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
             }
         });
@@ -3680,7 +3535,7 @@ void swan_windows::render_explorer(explorer_window &expl, window_visibilities &w
     if (open_bulk_rename_popup) {
         swan_popup_modals::open_bulk_rename(expl, [&]() {
             /* on rename finished: */
-            if (global_state::explorer_options_().ref_mode == explorer_options::refresh_mode::manual) {
+            if (global_state::settings().expl_refresh_mode == swan_settings::explorer_refresh_mode_manual) {
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
             }
         });

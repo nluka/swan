@@ -69,98 +69,55 @@ struct drive_info
 
 typedef static_vector<drive_info, 26> drive_list_t;
 
-// TODO:
-// struct swan_settings
-// {
-//     enum explorer_refresh_mode : s32
-//     {
-//         explorer_refresh_mode_automatic,
-//         explorer_refresh_mode_notify,
-//         explorer_refresh_mode_manual,
-//         explorer_refresh_mode_count
-//     };
-
-//     bool show_pin_manager;
-//     bool show_file_operations;
-//     bool show_explorer_0;
-//     bool show_explorer_1;
-//     bool show_explorer_2;
-//     bool show_explorer_3;
-//     bool show_analytics;
-// #if !defined(NDEBUG)
-//     bool show_imgui_demo;
-//     bool show_debug_log;
-//     bool show_fa_icons;
-//     bool show_ci_icons;
-//     bool show_md_icons;
-// #endif
-
-//     bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
-//     bool show_cwd_len;
-//     bool show_debug_info;
-//     bool automatic_refresh;
-//     bool show_dotdot_dir;
-//     bool unix_directory_separator;
-//     bool cwd_entries_table_alt_row_bg;
-//     bool cwd_entries_table_borders_in_body;
-//     bool clear_filter_on_cwd_change;
-//     explorer_refresh_mode expl_refresh_mode;
-// };
-
-struct window_visibilities
+struct swan_settings
 {
-    bool pin_manager;
-    bool file_operations;
-    bool explorer_0;
-    bool explorer_1;
-    bool explorer_2;
-    bool explorer_3;
-    bool analytics;
-#if !defined(NDEBUG)
-    bool imgui_demo;
-    bool debug_log;
-    bool fa_icons;
-    bool ci_icons;
-    bool md_icons;
-#endif
-
     bool save_to_disk() const noexcept;
     bool load_from_disk() noexcept;
-};
 
-struct explorer_options
-{
-    enum class refresh_mode : s32
+    enum explorer_refresh_mode : s32
     {
-        automatic,
-        notify,
-        manual,
-        count
+        explorer_refresh_mode_automatic,
+        explorer_refresh_mode_notify,
+        explorer_refresh_mode_manual,
+        explorer_refresh_mode_count
     };
 
-    std::atomic<s32> auto_refresh_interval_ms;
-    refresh_mode ref_mode;
-    bool binary_size_system; // if true, value for Kilo/Mega/Giga/Tera = 1024, else 1000
-    bool show_cwd_len;
-    bool show_debug_info;
-    bool automatic_refresh;
-    bool show_dotdot_dir;
-    bool unix_directory_separator;
-    bool cwd_entries_table_alt_row_bg;
-    bool cwd_entries_table_borders_in_body;
-    bool clear_filter_on_cwd_change;
+    s32 window_x = 0, window_y = 0; //! must be adjacent, y must always come after x in memory
+    s32 window_w = 1280, window_h = 720; //! must be adjacent, h must always come after w in memory
+    s32 size_unit_multiplier = 1024;
+    explorer_refresh_mode expl_refresh_mode = explorer_refresh_mode_automatic;
+    wchar_t dir_separator_utf16 = L'\\';
+    char dir_separator_utf8 = '\\';
 
-    bool save_to_disk() const noexcept;
-    bool load_from_disk() noexcept;
-    char dir_separator_utf8() const noexcept;
-    wchar_t dir_separator_utf16() const noexcept;
-    u16 size_unit_multiplier() const noexcept;
-};
+    bool show_debug_info = false;
+    bool show_dotdot_dir = false;
+    bool cwd_entries_table_alt_row_bg = true;
+    bool cwd_entries_table_borders_in_body = true;
+    bool clear_filter_on_cwd_change = true;
 
-struct misc_options
-{
-    bool save_to_disk() const noexcept;
-    bool load_from_disk() noexcept;
+    bool start_with_window_maximized = true;
+    bool start_with_previous_window_pos_and_size = true;
+
+    struct window_visibility
+    {
+        bool pin_manager = false;
+        bool file_operations = false;
+        bool explorer_0 = true;
+        bool explorer_1 = false;
+        bool explorer_2 = false;
+        bool explorer_3 = false;
+        bool analytics = false;
+        bool debug_log = false;
+        bool settings = false;
+    #if !defined(NDEBUG)
+        bool imgui_demo = false;
+        bool fa_icons = false;
+        bool ci_icons = false;
+        bool md_icons = false;
+    #endif
+    };
+
+    window_visibility show;
 };
 
 enum update_cwd_entries_actions : u8
@@ -290,7 +247,6 @@ struct explorer_window
 
     // 1 byte alignment members
 
-    std::atomic<bool> is_window_visible = false;
     swan_path_t latest_valid_cwd = {};              // latest value of cwd which was a valid directory
     swan_path_t cwd = {};                           // current working directory, persisted in file
     swan_path_t read_dir_changes_target = {};       // value of current working directory when ReadDirectoryChangesW was called

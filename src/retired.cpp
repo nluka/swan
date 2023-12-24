@@ -104,7 +104,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
             // latest_valid_cwd is in fact a valid directory, so sit here and wait for a change notification.
             // there is a timeout because latest_valid_cwd may change while we wait, which invalidates the current watch_handle,
             // so we need to occasionally break and re-establish the watch_handle against the correct directory.
-            DWORD wait_status = WaitForSingleObject(watch_handle, global_state::explorer_options_().auto_refresh_interval_ms.load());
+            DWORD wait_status = WaitForSingleObject(watch_handle, global_state::settings().auto_refresh_interval_ms.load());
 
             swan_path_t latest_target_utf8;
             {
@@ -126,7 +126,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
                         if (expl.is_window_visible.load()) {
                             time_point_t now = current_time();
 
-                            if (compute_diff_ms(last_refresh_notif_sent, now) >= global_state::explorer_options_().min_tolerable_refresh_interval_ms) {
+                            if (compute_diff_ms(last_refresh_notif_sent, now) >= global_state::settings().min_tolerable_refresh_interval_ms) {
                                 print_debug_msg("[ %d ] refresh notif SEND", expl.id);
 
                                 expl.refresh_notif_time.store(now, std::memory_order::seq_cst);

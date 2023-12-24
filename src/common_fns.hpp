@@ -21,9 +21,9 @@ namespace global_constants
 
 namespace global_state
 {
-    std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
+    swan_settings &settings() noexcept;
 
-    explorer_options &explorer_options_() noexcept;
+    std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
 
     boost::circular_buffer<file_operation> const &file_ops_buffer() noexcept;
 
@@ -70,14 +70,39 @@ namespace swan_windows
         file_operations,
         analytics,
         debug_log,
+        settings,
+    #if !defined(NDEBUG)
         icon_font_browser_font_awesome,
         icon_font_browser_codicon,
         icon_font_browser_material_design,
         imgui_demo,
+    #endif
         count
     };
 
-    void render_explorer(explorer_window &, window_visibilities &, bool &open) noexcept;
+    char const *get_name(s32 id) noexcept
+    {
+        switch (id) {
+            case explorer_0: return " Explorer 1 ";
+            case explorer_1: return " Explorer 2 ";
+            case explorer_2: return " Explorer 3 ";
+            case explorer_3: return " Explorer 4 ";
+            case pin_manager: return " Pinned ";
+            case file_operations: return " File Operations ";
+            case analytics: return " Analytics ";
+            case debug_log: return " Debug Log ";
+            case settings: return " Settings ";
+        #if !defined(NDEBUG)
+            case icon_font_browser_font_awesome: return " Font Awesome Icons ";
+            case icon_font_browser_codicon: return " Codicon Icons ";
+            case icon_font_browser_material_design: return " Material Design Icons ";
+            case imgui_demo: return " ImGui Demo ";
+        #endif
+            default: assert(false && "Window has no name"); return nullptr;
+        }
+    }
+
+    void render_explorer(explorer_window &, bool &open) noexcept;
 
     void render_pin_manager(std::array<explorer_window, 4> &, bool &open) noexcept;
 
@@ -92,6 +117,8 @@ namespace swan_windows
         char const *icon_lib_name,
         char const *icon_prefix,
         std::vector<icon_font_glyph> const &(*get_all_icons)() noexcept) noexcept;
+
+    void render_settings(GLFWwindow *window) noexcept;
 
 } // namespace render_window
 

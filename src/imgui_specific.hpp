@@ -38,10 +38,14 @@ struct debug_log_package
     }
 };
 
-// https://stackoverflow.com/questions/57547273/how-to-use-source-location-in-a-variadic-template-function
+/// @brief Writes a message to the debug log window (not stdout!). Information such as time, thread id, source location are handled for you.
+/// Use this function like you would sprintf, pass it a format string followed by your variadic arguments. Operation is threadsafe, you can
+/// print messages from any thread at any time safely.
 template <typename... Args>
 void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args) noexcept
 {
+    // https://stackoverflow.com/questions/57547273/how-to-use-source-location-in-a-variadic-template-function
+
     if (!debug_log_package::s_logging_enabled) {
         return;
     }

@@ -42,24 +42,24 @@ bool global_state::save_focused_window(s32 window_code) noexcept
 
 bool global_state::load_focused_window_from_disk(s32 &out) noexcept
 {
-    bool success;
     char const *file_path = "data/focused_window.txt";
 
     try {
         std::ifstream in(file_path);
+
         if (!in) {
-            success = false;
+            print_debug_msg("[%s] FAILED global_state::load_focused_window_from_disk: !in", file_path);
+            return false;
         }
-        else {
-            in >> s_focused_window;
-            out = s_focused_window;
-            success = true;
-        }
+
+        in >> s_focused_window;
+        out = s_focused_window;
+
+        print_debug_msg("SUCCESS load_focused_window_from_disk [%s]", file_path);
+        return true;
     }
     catch (...) {
-        success = false;
+        print_debug_msg("FAILED load_focused_window_from_disk [%s]: catch(...)", file_path);
+        return false;
     }
-
-    print_debug_msg("[%s] global_state::load_focused_window_from_disk: %d", file_path, success);
-    return success;
 }

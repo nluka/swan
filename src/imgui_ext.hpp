@@ -15,6 +15,18 @@ namespace ImGui
 
     ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;
 
+    struct EnumButton
+    {
+    public:
+        EnumButton(char const *name) noexcept : name(name) {}
+        bool Render(s32 &enum_value, s32 enum_first, s32 enum_count, char const *labels[], u64 num_labels) noexcept;
+    private:
+        char const *name = nullptr;
+        char const *current_label = nullptr;
+        u64 rand_1 = {};
+        u64 rand_2 = {};
+    };
+
     struct ScopedAvailWidth
     {
         ScopedAvailWidth(f32 subtract_amt = 0) noexcept
