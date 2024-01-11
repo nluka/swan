@@ -25,7 +25,12 @@ struct generic_result
   - has a .data() member function which returns a non-const char *
   - can easily be visualized as a string in the debugger
 */
-typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> swan_path_t;
+// typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> swan_path_t;
+
+struct swan_path_t final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
+{
+    bool operator>(swan_path_t const &other) const noexcept { return lstrcmpiA(this->data(), other.data()) < 0; }
+};
 
 struct basic_dirent
 {
@@ -185,6 +190,7 @@ struct explorer_window
     // 80 byte alignment members
 
     std::mutex shlwapi_task_initialization_mutex = {};
+    std::mutex entries_to_select_mutex = {};
 
     // 72 byte alignment members
 
@@ -213,7 +219,8 @@ struct explorer_window
 
     // 24 byte alignment members
 
-    std::vector<dirent> cwd_entries = {}; // 24 bytes, all direct children of the cwd
+    std::vector<dirent> cwd_entries = {}; // all direct children of the cwd
+    std::vector<swan_path_t> entries_to_select = {}; // entries to select on the next update of cwd_entries
 
     // 8 byte alignment members
 
@@ -221,22 +228,33 @@ struct explorer_window
     filter_mode filter_mode = filter_mode::contains; // persisted in file
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
-    // ImGuiTableSortSpecs *sort_specs = nullptr;
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
+    time_point_t read_dir_changes_refresh_request_time = {};
+    time_point_t last_filesystem_query_time = {};
 
-    std::atomic<time_point_t> refresh_notif_time = {};
+    static u64 const num_timing_samples = 10;
+
+    struct update_cwd_entries_timers
+    {
+        f64 total_us = 0;
+        f64 searchpath_setup_us = 0;
+        f64 filesystem_us = 0;
+        f64 filter_us = 0;
+        f64 regex_ctor_us = 0;
+        f64 entries_to_select_sort = 0;
+        f64 entries_to_select_search = 0;
+    };
+
+    mutable circular_buffer<update_cwd_entries_timers> update_cwd_entries_timing_samples = circular_buffer<update_cwd_entries_timers>(num_timing_samples);
+    mutable circular_buffer<f64> sort_timing_samples                                     = circular_buffer<f64>(num_timing_samples);
+    mutable circular_buffer<f64> save_to_disk_timing_samples                             = circular_buffer<f64>(num_timing_samples);
+    mutable circular_buffer<f64> find_first_filtered_cwd_dirent_timing_samples           = circular_buffer<f64>(num_timing_samples);
 
     mutable u64 num_file_finds = 0;
-    mutable f64 sort_us = 0;
     mutable f64 check_if_pinned_us = 0;
     mutable f64 unpin_us = 0;
-    mutable f64 update_cwd_entries_total_us = 0;
-    mutable f64 update_cwd_entries_searchpath_setup_us = 0;
-    mutable f64 update_cwd_entries_filesystem_us = 0;
-    mutable f64 update_cwd_entries_filter_us = 0;
-    mutable f64 update_cwd_entries_regex_ctor_us = 0;
-    mutable f64 save_to_disk_us = 0;
-    //? mutable because they are debug counters
+
+    //? mutable because they are debug counters/timers
 
     // 4 byte alignment members
 
@@ -310,6 +328,9 @@ struct file_operation
 
 struct progress_sink : public IFileOperationProgressSink
 {
+    s32 dst_expl_id;
+    swan_path_t dst_expl_cwd_when_operation_started;
+
     HRESULT FinishOperations(HRESULT) override;
     HRESULT PauseTimer() override;
     HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
@@ -346,6 +367,7 @@ struct pin_drag_drop_payload
 };
 
 void perform_file_operations(
+    s32 dst_expl_id,
     std::wstring working_directory_utf16,
     std::wstring paths_to_execute_utf16,
     std::vector<char> operations_to_execute,

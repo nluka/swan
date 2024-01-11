@@ -13,6 +13,9 @@ swan_thread_pool_t &global_state::thread_pool() noexcept { return s_thread_pool;
 static bool s_move_dirents_payload_set = false;
 bool &global_state::move_dirents_payload_set() noexcept { return s_move_dirents_payload_set; }
 
+static std::filesystem::path s_execution_path = {};
+std::filesystem::path &global_state::execution_path() noexcept { return s_execution_path; }
+
 bool basic_dirent::is_dotdot()               const noexcept { return path_equals_exactly(path, ".."); }
 bool basic_dirent::is_dotdot_dir()           const noexcept { return type == basic_dirent::kind::directory && path_equals_exactly(path, ".."); }
 bool basic_dirent::is_directory()            const noexcept { return type == basic_dirent::kind::directory; }
@@ -76,7 +79,7 @@ std::string get_last_error_string() noexcept
 
     LPSTR buffer = nullptr;
     DWORD buffer_size = FormatMessageA(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
         nullptr,
         error_code,
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),

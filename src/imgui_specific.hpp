@@ -8,6 +8,9 @@
 #include "common_fns.hpp"
 #include "imgui_ext.hpp"
 
+void new_frame(char const *ini_file_path) noexcept;
+void render_frame(GLFWwindow *window) noexcept;
+
 ImVec4 orange() noexcept;
 ImVec4 red() noexcept;
 ImVec4 dir_color() noexcept;

@@ -73,7 +73,9 @@ void swan_windows::render_settings(GLFWwindow *window) noexcept
 
 bool swan_settings::save_to_disk() const noexcept
 try {
-    std::ofstream out("data/swan_settings.txt", std::ios::binary);
+    std::filesystem::path full_path = global_state::execution_path() / "data\\swan_settings.txt";
+
+    std::ofstream out(full_path);
 
     if (!out) {
         return false;
@@ -135,8 +137,9 @@ catch (...) {
 
 bool swan_settings::load_from_disk() noexcept
 try {
-    char const *file_path = "data/swan_settings.txt";
-    std::ifstream file(file_path);
+    std::filesystem::path full_path = global_state::execution_path() / "data\\swan_settings.txt";
+
+    std::ifstream file(full_path);
 
     if (!file) {
         print_debug_msg("FAILED global_state::settings::load_from_disk, !file");
@@ -266,7 +269,7 @@ try {
         }
     #endif
         else {
-            print_debug_msg("Unknown property [%s] in [%s]", property.c_str(), file_path);
+            print_debug_msg("Unknown property [%s] in [swan_settings.txt]", property.c_str());
         }
     }
 

@@ -270,12 +270,8 @@ bulk_rename_transform_result bulk_rename_transform(
             case op_type::insert_name: {
                 u64 len = strlen(name);
                 if (len <= space_left) {
-                    strcat(out, name);
-                    u64 spaces_removed = 0;
-                    if (compiled_pattern.squish_adjacent_spaces) {
-                        spaces_removed = remove_adjacent_spaces(out, len);
-                    }
-                    after_insert_idx += len - spaces_removed;
+                    (void) strcat(out, name);
+                    after_insert_idx += len;
                 } else {
                     result.success = false;
                     (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
@@ -287,7 +283,7 @@ bulk_rename_transform_result bulk_rename_transform(
                 if (ext != nullptr) {
                     u64 len = strlen(ext);
                     if (len <= space_left) {
-                        strcat(out, ext);
+                        (void) strcat(out, ext);
                         after_insert_idx += len;
                     } else {
                         result.success = false;
@@ -309,7 +305,7 @@ bulk_rename_transform_result bulk_rename_transform(
 
                     u64 len = strlen(ext);
                     if (len <= space_left) {
-                        strcat(out, ext);
+                        (void) strcat(out, ext);
                         after_insert_idx += len;
                     } else {
                         result.success = false;
@@ -323,7 +319,7 @@ bulk_rename_transform_result bulk_rename_transform(
                 char buffer[21]; init_empty_cstr(buffer);
                 written = snprintf(buffer, lengthof(buffer), "%zu", bytes);
                 if (written <= space_left) {
-                    strcat(out, buffer);
+                    (void) strcat(out, buffer);
                     after_insert_idx += written;
                 } else {
                     result.success = false;
@@ -336,7 +332,7 @@ bulk_rename_transform_result bulk_rename_transform(
                 char buffer[11]; init_empty_cstr(buffer);
                 written = snprintf(buffer, lengthof(buffer), "%d", counter);
                 if (written <= space_left) {
-                    strcat(out, buffer);
+                    (void) strcat(out, buffer);
                     after_insert_idx += written;
                 } else {
                     result.success = false;
@@ -349,10 +345,10 @@ bulk_rename_transform_result bulk_rename_transform(
                 swan_path_t full = path_create(name);
 
                 if (ext != nullptr) {
-                    auto success1 = path_append(full, ".");
+                    [[maybe_unused]] auto success1 = path_append(full, ".");
                     assert(success1);
 
-                    auto success2 = path_append(full, ext);
+                    [[maybe_unused]] auto success2 = path_append(full, ext);
                     assert(success2);
                 }
 
@@ -377,12 +373,8 @@ bulk_rename_transform_result bulk_rename_transform(
                 }
 
                 if (len <= space_left) {
-                    strncat(out, full.data() + op.slice_first, len);
-                    u64 spaces_removed = 0;
-                    if (compiled_pattern.squish_adjacent_spaces) {
-                        spaces_removed = remove_adjacent_spaces(out, len);
-                    }
-                    after_insert_idx += len - spaces_removed;
+                    (void) memcpy(out, full.data() + op.slice_first, len);
+                    after_insert_idx += len;
                 } else {
                     result.success = false;
                     (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
@@ -391,6 +383,11 @@ bulk_rename_transform_result bulk_rename_transform(
                 break;
             }
         }
+    }
+
+    u64 spaces_removed = 0;
+    if (compiled_pattern.squish_adjacent_spaces) {
+        spaces_removed = remove_adjacent_spaces(after.data(), path_length(after));
     }
 
     result.success = true;

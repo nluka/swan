@@ -2,7 +2,16 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Precompile",
+      "label": "Compile ImGui (Debug)",
+      "type": "shell",
+      "command": "cls; ptime.exe .\\compile_imgui_debug",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Precompile (Debug)",
       "type": "shell",
       "command": "cls; ptime.exe .\\precompile_debug",
       "group": {

@@ -453,6 +453,14 @@ try
                                               .pattern="<9,9>", .size={}, .counter={}, .squish_adjacent_spaces={},
                                               .expected_after="t" });
 
+    assert_successful_compile_and_transform({ .name="Some Long File Name", .ext="txt",
+                                              .pattern="<5,8>  <15,18>_<counter>_<bytes>.<ext>", .size=42, .counter=21, .squish_adjacent_spaces=true,
+                                              .expected_after="Long Name_21_42.txt" });
+
+    assert_successful_compile_and_transform({ .name="01-01-2023 Report Name", .ext="docx",
+                                              .pattern="<0,10> asdf", .size={}, .counter={}, .squish_adjacent_spaces=true,
+                                              .expected_after="01-01-2023 asdf" });
+
     auto assert_successful_compile_but_failed_transform = [](compile_and_transform_test_args args, std::source_location sloc = std::source_location::current()) {
       // using args.expected_after for expected error
 
@@ -817,24 +825,24 @@ try
   }
   #endif
 
-  // file_name_ext;
+  // file_name_extension_splitter;
   #if 1
   {
     {
       char name[] = "src/swan.cpp";
-      file_name_ext sut(name);
+      file_name_extension_splitter sut(name);
       ntest::assert_cstr("swan", sut.name);
       ntest::assert_cstr("cpp", sut.ext);
     }
     {
       char name[] = "C:/code/swan/src/explorer_window.cpp";
-      file_name_ext sut(name);
+      file_name_extension_splitter sut(name);
       ntest::assert_cstr("explorer_window", sut.name);
       ntest::assert_cstr("cpp", sut.ext);
     }
     {
       char name[] = "a.b.c";
-      file_name_ext sut(name);
+      file_name_extension_splitter sut(name);
       ntest::assert_cstr("a.b", sut.name);
       ntest::assert_cstr("c", sut.ext);
     }

@@ -4,8 +4,8 @@
 src/stdafx.cpp ^
 /Yustdafx.hpp ^
 /Fo:obj_debug\ ^
-/Fe:bin\swan_debug.exe ^
-/Fd:bin\vc140_debug.pdb ^
+/Fe:dist\swan_debug.exe ^
+/Fd:dist\vc140_debug.pdb ^
 /I"C:/code/glfw" ^
 /I"C:/code/boost_1_80_0" ^
 /std:c++20 ^

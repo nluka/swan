@@ -7,10 +7,10 @@ obj_release/imgui_impl_opengl3.obj ^
 obj_release/imgui_tables.obj ^
 obj_release/imgui_widgets.obj ^
 obj_release/imgui.obj ^
-resource/.res ^
+obj_release/stb_image.obj ^
 /Fo:obj_release\ ^
-/Fe:bin\swan_release.exe ^
-/Fd:bin\vc140_release.pdb ^
+/Fe:dist/swan_release.exe ^
+/Fd:dist/vc140_release.pdb ^
 /I"C:/code/glfw" ^
 /I"C:/code/boost_1_80_0" ^
 /std:c++20 ^
@@ -36,4 +36,5 @@ kernel32.lib ^
 msvcrt.lib ^
 ole32.lib ^
 shlwapi.lib ^
-Pathcch.lib
+Pathcch.lib ^
+Dbghelp.lib

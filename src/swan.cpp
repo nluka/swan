@@ -10,7 +10,7 @@ void glfw_error_callback(s32 error, char const *description) noexcept
 }
 
 static
-GLFWwindow *init_glfw_and_imgui() noexcept
+GLFWwindow *create_barebones_window() noexcept
 {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
@@ -18,19 +18,18 @@ GLFWwindow *init_glfw_and_imgui() noexcept
     }
 
     // GL 3.0 + GLSL 130
-    {
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-        //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-        //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
-    }
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    // glfwWindowHint(GLFW_HOVERED, GLFW_TRUE);
+    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 
     GLFWwindow *window = nullptr;
     // Create window with graphics context
     {
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-        window = glfwCreateWindow(screenWidth, screenHeight, "swan", nullptr, nullptr);
+        s32 screen_width = GetSystemMetrics(SM_CXSCREEN);
+        s32 screen_height = GetSystemMetrics(SM_CYSCREEN);
+        window = glfwCreateWindow(screen_width, screen_height, "swan", nullptr, nullptr);
         if (window == nullptr) {
             return nullptr;
         }
@@ -42,6 +41,7 @@ GLFWwindow *init_glfw_and_imgui() noexcept
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     imgui::CreateContext();
+    // implot::CreateContext();
     ImGuiIO &io = imgui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
@@ -50,82 +50,11 @@ GLFWwindow *init_glfw_and_imgui() noexcept
     imgui::SetNextWindowSizeConstraints(io.DisplaySize, io.DisplaySize);
 
     // Setup Platform/Renderer backends
-    {
-        char const *glsl_version = "#version 130";
-        ImGui_ImplGlfw_InitForOpenGL(window, true);
-        ImGui_ImplOpenGL3_Init(glsl_version);
+    if (!ImGui_ImplGlfw_InitForOpenGL(window, true)) {
+        return nullptr;
     }
-
-    {
-        ImFontConfig config;
-        config.MergeMode = true;
-
-        ImFont *font = nullptr;
-
-    #if 0
-        font = io.Fonts->AddFontDefault();
-        assert(font != nullptr);
-    #endif
-
-    #if 1
-        font = io.Fonts->AddFontFromFileTTF("data/fonts/RobotoMono-Regular.ttf", 18.0f);
-        assert(font != nullptr);
-    #endif
-
-    #if 0
-        font = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/consola.ttf", 17.0f);
-        assert(font != nullptr);
-    #endif
-
-    #if 0
-        font = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/arialuni.ttf", 20.0f);
-        assert(font != nullptr);
-    #endif
-
-        font = io.Fonts->AddFontFromFileTTF("data/fonts/CascadiaMonoPL.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesCyrillic());
-        assert(font != nullptr);
-
-    #if 1
-        // font awesome
-        {
-            f32 size = 16;
-            static ImWchar const icons_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
-            ImFontConfig icons_config;
-            icons_config.MergeMode = true;
-            icons_config.PixelSnapH = true;
-            icons_config.GlyphOffset.x = 0.25f;
-            icons_config.GlyphOffset.y = 0;
-            icons_config.GlyphMinAdvanceX = size;
-            icons_config.GlyphMaxAdvanceX = size;
-            io.Fonts->AddFontFromFileTTF("data/fonts/" FONT_ICON_FILE_NAME_FAS, size, &icons_config, icons_ranges);
-        }
-        // codicons
-        {
-            f32 size = 18;
-            static ImWchar const icons_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
-            ImFontConfig icons_config;
-            icons_config.MergeMode = true;
-            icons_config.PixelSnapH = true;
-            icons_config.GlyphOffset.x = 0;
-            icons_config.GlyphOffset.y = 3;
-            icons_config.GlyphMinAdvanceX = size;
-            icons_config.GlyphMaxAdvanceX = size;
-            io.Fonts->AddFontFromFileTTF("data/fonts/" FONT_ICON_FILE_NAME_CI, size, &icons_config, icons_ranges);
-        }
-        // material design
-        {
-            f32 size = 18;
-            static ImWchar const icons_ranges[] = { ICON_MIN_MD, ICON_MAX_16_MD, 0 };
-            ImFontConfig icons_config;
-            icons_config.MergeMode = true;
-            icons_config.PixelSnapH = true;
-            icons_config.GlyphOffset.x = 0;
-            icons_config.GlyphOffset.y = 3;
-            icons_config.GlyphMinAdvanceX = size;
-            icons_config.GlyphMaxAdvanceX = size;
-            io.Fonts->AddFontFromFileTTF("data/fonts/" FONT_ICON_FILE_NAME_MD, 13, &icons_config, icons_ranges);
-        }
-    #endif
+    if (!ImGui_ImplOpenGL3_Init("#version 130")) {
+        return nullptr;
     }
 
     return window;
@@ -155,23 +84,6 @@ void set_window_icon(GLFWwindow *window) noexcept
     else {
         print_debug_msg("FAILED to set window icon [%s]", icon_path);
     }
-}
-
-static
-void render(GLFWwindow *window) noexcept
-{
-    imgui::Render();
-
-    s32 display_w, display_h;
-    ImVec4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
-
-    glfwGetFramebufferSize(window, &display_w, &display_h);
-    glViewport(0, 0, display_w, display_h);
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(imgui::GetDrawData());
-
-    glfwSwapBuffers(window);
 }
 
 // SEH handler function
@@ -328,6 +240,7 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
     }
 }
 
+static
 void render_analytics() noexcept
 {
     if (imgui::Begin(swan_windows::get_name(swan_windows::analytics), &global_state::settings().show.analytics)) {
@@ -349,80 +262,241 @@ void render_analytics() noexcept
     imgui::End();
 }
 
+static
+void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept
+{
+    struct essential_file
+    {
+        std::string full_path = {};
+        char const *type = nullptr;
+        char const *path_relative_to_executable = nullptr;
+        bool found = false;
+        // TODO: maybe check for validity via hash?
+    };
+
+    essential_file essential[] = {
+        { .full_path={}, .type="directory", .path_relative_to_executable="data",                          .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\codicon.ttf",            .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\fa-solid-900.ttf",       .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\RobotoMono-Regular.ttf", .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\CascadiaMonoPL.ttf",     .found=false },
+    };
+
+    bool retry = true; // start true to do initial scan
+    bool all_essential_files_located = false;
+
+    while (true) {
+        if (retry) {
+            retry = false;
+            for (u64 i = 0; i < lengthof(essential); ++i) {
+                auto &file = essential[i];
+                std::filesystem::path full_path = global_state::execution_path() / file.path_relative_to_executable;
+                if (streq(file.type, "directory")) {
+                    file.found = std::filesystem::is_directory(full_path);
+                } else {
+                    file.found = std::filesystem::is_regular_file(full_path);
+                }
+                file.full_path = full_path.generic_string();
+            }
+            all_essential_files_located = std::all_of(essential, essential + lengthof(essential), [](essential_file const &f) { return f.found; });
+        }
+
+        if (all_essential_files_located) {
+            break;
+        }
+
+        new_frame(ini_file_path);
+
+        if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
+            imgui::TextColored(red(), "Application is unable to continue, essential file(s) not found:");
+            imgui::Spacing();
+            for (u64 i = 0; i < lengthof(essential); ++i) {
+                auto &file = essential[i];
+                if (!file.found) {
+                    imgui::Text("%s: [%s]", file.type, file.full_path.c_str());
+                }
+            }
+            imgui::Spacing();
+            retry = imgui::Button("Retry");
+        }
+        imgui::End();
+
+        render_frame(window);
+    }
+}
+
+void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept
+{
+    auto font_loaded = [](ImFont const *font) { return font && !font->IsLoaded(); };
+
+    bool retry = true; // start true to do initial load
+    std::vector<std::filesystem::path> failed_fonts = {};
+
+    while (true) {
+        if (retry) {
+            retry = false;
+            failed_fonts = {};
+
+            auto attempt_load_font = [&](char const *path, f32 size, bool merge, bool path_rel_to_exec = true, ImWchar const *ranges = nullptr)
+            {
+                std::filesystem::path font_file_path;
+                if (path_rel_to_exec) {
+                    font_file_path = global_state::execution_path() / path;
+                } else {
+                    font_file_path = path;
+                }
+
+                ImFontConfig cfg = {};
+                cfg.MergeMode = merge;
+
+                auto font = imgui::GetIO().Fonts->AddFontFromFileTTF(font_file_path.string().c_str(), size, &cfg, ranges);
+
+                if (!font_loaded(font)) {
+                    failed_fonts.push_back(font_file_path);
+                }
+            };
+
+            attempt_load_font("fonts/RobotoMono-Regular.ttf", 18.0f, false);
+            // attempt_load_font("C:/Windows/Fonts/consola.ttf", 17.0f, false, false);
+            // attempt_load_font("C:/Windows/Fonts/arialuni.ttf", 20.0f, false, false);
+            attempt_load_font("fonts/CascadiaMonoPL.ttf", 16.0f, true, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());
+
+            auto attempt_load_icon_font = [&](char const *path, f32 size, f32 offset_x, f32 offset_y, ImWchar const *glyph_ranges)
+            {
+                std::filesystem::path font_file_path = global_state::execution_path() / path;
+
+                ImFontConfig icons_config;
+                icons_config.MergeMode = true;
+                icons_config.PixelSnapH = true;
+                icons_config.GlyphOffset.x = offset_x;
+                icons_config.GlyphOffset.y = offset_y;
+                icons_config.GlyphMinAdvanceX = size;
+                icons_config.GlyphMaxAdvanceX = size;
+
+                auto font = imgui::GetIO().Fonts->AddFontFromFileTTF(font_file_path.generic_string().c_str(), size, &icons_config, glyph_ranges);
+
+                if (!font_loaded(font)) {
+                    failed_fonts.push_back(font_file_path);
+                }
+            };
+
+            // font awesome
+            {
+                static ImWchar const glyph_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
+                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_FAS, 16, 0.25f, 0, glyph_ranges);
+            }
+
+            // codicons
+            {
+                static ImWchar const glyph_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
+                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_CI, 18, 0, 3, glyph_ranges);
+            }
+
+            // material design
+            {
+                static ImWchar const glyph_ranges[] = { ICON_MIN_MD, ICON_MAX_16_MD, 0 };
+                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_CI, 13, 0, 3, glyph_ranges);
+            }
+        }
+
+        if (failed_fonts.empty()) {
+            break;
+        }
+
+        new_frame(ini_file_path);
+
+        if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
+            imgui::TextColored(red(), "Application is unable to continue, font(s) failed to load:");
+            imgui::Spacing();
+            for (auto const &font : failed_fonts) {
+                imgui::TextUnformatted(font.generic_string().c_str());
+            }
+            imgui::Spacing();
+            retry = imgui::Button("Retry");
+        }
+        imgui::End();
+
+        render_frame(window);
+    }
+}
+
 #if defined(NDEBUG)
 #   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 #endif
-s32 main(s32, char**)
-try
-{
+s32 main(s32, char const *argv[])
+try {
     SetUnhandledExceptionFilter(custom_exception_handler);
 
     SCOPE_EXIT { std::cout << boost::stacktrace::stacktrace(); };
 
-    GLFWwindow *window = init_glfw_and_imgui();
+    GLFWwindow *window = create_barebones_window();
     if (window == nullptr) {
         return 1;
     }
-
-    print_debug_msg("Initializing...");
-
-    if (!explorer_init_windows_shell_com_garbage()) {
-        return 2;
-    }
+    print_debug_msg("Barebones window created.");
 
     SCOPE_EXIT {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
+        // implot::DestroyContext();
         imgui::DestroyContext();
         glfwDestroyWindow(window);
         glfwTerminate();
-        explorer_cleanup_windows_shell_com_garbage();
     };
 
-    set_window_icon(window);
-
-    [[maybe_unused]] auto &io = imgui::GetIO();
-    io.IniFilename = "data/swan_imgui.ini";
-
-    seed_fast_rand((u64)current_time().time_since_epoch().count());
-
     {
+        std::filesystem::path swan_exec_path = argv[0];
+        swan_exec_path = swan_exec_path.remove_filename();
+        global_state::execution_path() = swan_exec_path;
+        print_debug_msg("global_state::execution_path = [%s]", swan_exec_path.generic_string().c_str());
+    }
+
+    std::string ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
+
+    // verify necessary files are in the expected locations, relative to execution path.
+    // this will block until all essential files are found. the user is notified of any missing files
+    // and is able to "Retry" which will rescan.
+    find_essential_files(window, ini_file_path.c_str());
+    print_debug_msg("Essential files found.");
+
+    // ensure all non-default fonts are loaded successfully. this will block until all are loaded.
+    // the user is notified of any failures and able to "Retry" which will attempt to reload the fonts.
+    load_non_default_fonts(window, ini_file_path.c_str());
+    print_debug_msg("Non-default fonts loaded.");
+
+    // ensure COM is initialized for usage by explorers. this will block until initialization is successful.
+    // the user is notified of any failures and able to "Retry" which will attempt to re-initialize.
+    init_COM_for_explorers(window, ini_file_path.c_str());
+    print_debug_msg("COM initialized for explorers.");
+    SCOPE_EXIT { clean_COM_for_explorers(); };
+
+    // other initialization stuff which is optional, cannot fail, or failure isn't fatal for the application
+    {
+        set_window_icon(window);
+
+        // imgui::GetIO().IniFilename = "swan_imgui.ini";
+
+        seed_fast_rand((u64)current_time().time_since_epoch().count());
+
         SYSTEM_INFO system_info;
         GetSystemInfo(&system_info);
-        print_debug_msg("GetSystemInfo.dwPageSize = %d", system_info.dwPageSize);
         global_state::page_size() = system_info.dwPageSize;
+        print_debug_msg("global_state::page_size = %d", global_state::page_size());
+
+        (void) global_state::settings().load_from_disk();
+        (void) global_state::load_pins_from_disk(global_state::settings().dir_separator_utf8);
+
+        if (global_state::settings().start_with_window_maximized) {
+            glfwMaximizeWindow(window);
+        }
+        if (global_state::settings().start_with_previous_window_pos_and_size) {
+            glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
+            glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
+        }
+
+        imgui::StyleColorsDark();
+        apply_swan_style_overrides();
     }
-
-    (void) global_state::settings().load_from_disk();
-
-    if (global_state::settings().start_with_window_maximized) {
-        glfwMaximizeWindow(window);
-    }
-    if (global_state::settings().start_with_previous_window_pos_and_size) {
-        glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
-        glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
-    }
-
-    static time_point_t last_window_move_or_resize_time = current_time();
-    static bool window_pos_or_size_needs_write = false;
-
-    glfwSetWindowPosCallback(window, [](GLFWwindow *, s32 new_x, s32 new_y) {
-        global_state::settings().window_x = new_x;
-        global_state::settings().window_y = new_y;
-        last_window_move_or_resize_time = current_time();
-        window_pos_or_size_needs_write = true;
-    });
-    glfwSetWindowSizeCallback(window, [](GLFWwindow *, s32 new_w, s32 new_h) {
-        global_state::settings().window_w = new_w;
-        global_state::settings().window_h = new_h;
-        last_window_move_or_resize_time = current_time();
-        window_pos_or_size_needs_write = true;
-    });
-
-    imgui::StyleColorsDark();
-    apply_swan_style_overrides();
-
-    (void) global_state::load_pins_from_disk(global_state::settings().dir_separator_utf8);
 
     auto &explorers = global_state::explorers();
     // init explorers
@@ -460,8 +534,6 @@ try
         }
     }
 
-    std::atomic<s32> window_close_flag = glfwWindowShouldClose(window);
-
     std::array<s32, swan_windows::count> window_render_order = {
         swan_windows::explorer_0,
         swan_windows::explorer_1,
@@ -472,10 +544,12 @@ try
         swan_windows::analytics,
         swan_windows::debug_log,
         swan_windows::settings,
+    #if !defined(NDEBUG)
         swan_windows::imgui_demo,
         swan_windows::icon_font_browser_font_awesome,
         swan_windows::icon_font_browser_codicon,
         swan_windows::icon_font_browser_material_design,
+    #endif
     };
 
     {
@@ -489,13 +563,25 @@ try
         }
     }
 
+    static time_point_t last_window_move_or_resize_time = current_time();
+    static bool window_pos_or_size_needs_write = false;
+
+    glfwSetWindowPosCallback(window, [](GLFWwindow *, s32 new_x, s32 new_y) {
+        global_state::settings().window_x = new_x;
+        global_state::settings().window_y = new_y;
+        last_window_move_or_resize_time = current_time();
+        window_pos_or_size_needs_write = true;
+    });
+    glfwSetWindowSizeCallback(window, [](GLFWwindow *, s32 new_w, s32 new_h) {
+        global_state::settings().window_w = new_w;
+        global_state::settings().window_h = new_h;
+        last_window_move_or_resize_time = current_time();
+        window_pos_or_size_needs_write = true;
+    });
+
     print_debug_msg("Entering render loop...");
 
-    for (
-        ;
-        !window_close_flag.load();
-         window_close_flag.store(glfwWindowShouldClose(window))
-    ) {
+    while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
         static s32 last_focused_window = window_render_order.back();
@@ -515,7 +601,7 @@ try
             }
         }
 
-        if (window_pos_or_size_needs_write && compute_diff_ms(last_window_move_or_resize_time, current_time()) > 1000) {
+        if (window_pos_or_size_needs_write && compute_diff_ms(last_window_move_or_resize_time, current_time()) > 250) {
             // we check that some time has passed since last_window_move_or_resize_time to avoid spam saving, which could degrade perf
             // as the user moves or resizes the window
 
@@ -524,23 +610,18 @@ try
             window_pos_or_size_needs_write = false;
         }
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        imgui::NewFrame();
+        new_frame(ini_file_path.c_str());
 
         auto visib_at_frame_start = global_state::settings().show;
 
         SCOPE_EXIT {
-            render(window);
+            render_frame(window);
 
             bool window_visibilities_changed = memcmp(&global_state::settings().show, &visib_at_frame_start, sizeof(visib_at_frame_start)) != 0;
             if (window_visibilities_changed) {
                 global_state::settings().save_to_disk();
             }
         };
-
-        // imgui::SetNextWindowPos(ImVec2(global_state::settings().window_x, global_state::settings().window_y), ImGuiCond_Always);
-        // imgui::SetNextWindowSize(ImVec2(global_state::settings().window_w, global_state::settings().window_h), ImGuiCond_Always);
 
         imgui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
@@ -604,6 +685,7 @@ try
                     }
                     break;
                 }
+            #if !defined(NDEBUG)
                 case swan_windows::imgui_demo: {
                     //! since ShowDemoWindow calls End() for you, we cannot use global_state::save_focused_window as per usual... oh well
                     if (window_visib.imgui_demo) {
@@ -650,6 +732,7 @@ try
                     }
                     break;
                 }
+            #endif
             }
         }
 

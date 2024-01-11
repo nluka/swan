@@ -65,14 +65,20 @@ char *get_file_ext(char *path) noexcept;
 
 std::string_view get_everything_minus_file_name(char const *path) noexcept;
 
-struct file_name_ext
+/// @brief Object to split a file path into 2 pieces: name and extension.
+/// It does so by finding the appropriate [.] character and replacing it with NUL on construction.
+/// `name` is a C-string pointing to the name, `dot` points to the NUL character where the [.] character was,
+/// `ext` is a C-string pointing to the extension (equivalent to `dot+1`). When destructed, the [.] character is restored,
+/// returning the path to its original state. If the given path does not have an extension, `ext` and `dot` are nullptr.
+struct file_name_extension_splitter
 {
-    char *name;
-    char *ext;
-    char *dot;
+    char *name = nullptr;
+    char *ext = nullptr;
+    char *dot = nullptr;
 
-    file_name_ext(char *path) noexcept;
-    ~file_name_ext() noexcept;
+    file_name_extension_splitter() = delete;
+    file_name_extension_splitter(char *path) noexcept;
+    ~file_name_extension_splitter() noexcept;
 };
 
 wchar_t const *windows_illegal_filename_chars() noexcept;

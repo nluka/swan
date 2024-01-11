@@ -57,6 +57,8 @@ namespace global_state
 
     s32 &debug_log_text_limit_megabytes() noexcept;
 
+    std::filesystem::path &execution_path() noexcept;
+
 } // namespace global_state
 
 namespace swan_windows
@@ -150,9 +152,8 @@ namespace swan_popup_modals
 
 } // namespace swan_popup_modals
 
-bool explorer_init_windows_shell_com_garbage() noexcept;
-void explorer_cleanup_windows_shell_com_garbage() noexcept;
-void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> const &window_close_flag) noexcept;
+void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexcept;
+void clean_COM_for_explorers() noexcept;
 
 void apply_swan_style_overrides() noexcept;
 

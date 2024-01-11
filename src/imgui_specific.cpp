@@ -1,6 +1,29 @@
 #include "imgui_specific.hpp"
 #include "util.hpp"
 
+void new_frame(char const *ini_file_path) noexcept
+{
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    imgui::NewFrame(ini_file_path);
+}
+
+void render_frame(GLFWwindow *window) noexcept
+{
+    imgui::Render();
+
+    s32 display_w, display_h;
+    ImVec4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
+
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+    glViewport(0, 0, display_w, display_h);
+    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ImGui_ImplOpenGL3_RenderDrawData(imgui::GetDrawData());
+
+    glfwSwapBuffers(window);
+}
+
 ImVec4 orange()                noexcept { return ImVec4(1, 0.5f, 0, 1); }
 ImVec4 red()                   noexcept { return ImVec4(1, 0.2f, 0, 1); }
 ImVec4 dir_color()             noexcept { return get_color(basic_dirent::kind::directory); }

@@ -170,10 +170,6 @@ u64 remove_adjacent_spaces(char *str, u64 len) noexcept
         }
     }
 
-    if (write_index > 0 && str[write_index - 1] == ' ') {
-        write_index--; // Remove trailing space, if any
-    }
-
     str[write_index] = '\0'; // Null-terminate the modified string
 
     return spaces_removed;
@@ -217,14 +213,9 @@ char const *lorem_ipsum() noexcept
         "Mauris commodo lorem a finibus volutpat. ";
 
     return data;
-
-    // std::array<char, 2048> retval;
-    // static_assert(lengthof(data) <= retval.size());
-    // std::memcpy(retval.data(), data, lengthof(data));
-    // return retval;
 }
 
-file_name_ext::file_name_ext(char *path) noexcept
+file_name_extension_splitter::file_name_extension_splitter(char *path) noexcept
 {
     this->name = get_file_name(path);
     this->ext = get_file_ext(name);
@@ -234,7 +225,7 @@ file_name_ext::file_name_ext(char *path) noexcept
     }
 }
 
-file_name_ext::~file_name_ext() noexcept
+file_name_extension_splitter::~file_name_extension_splitter() noexcept
 {
     if (this->dot) {
         *this->dot = '.';

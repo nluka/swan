@@ -11,7 +11,6 @@ src/libs/stb_image.c ^
 /std:c++20 ^
 /W4 ^
 /WX ^
-/nologo ^
 /EHsc ^
 /Fo:obj_debug\ ^
 /c ^

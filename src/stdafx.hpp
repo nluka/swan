@@ -18,10 +18,13 @@
 #include <cstring>
 #include <dbghelp.h>
 #include <fileapi.h>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <list>
 #include <mutex>
+#include <numeric>
+#include <oleidl.h>
 #include <pathcch.h>
 #include <ranges>
 #include <regex>
@@ -45,7 +48,6 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/font_awesome.h"
 #include "imgui/material_design.h"
-#include "imgui/codicons.h"
 #include "imgui/codicons.h"
 
 #define GL_SILENCE_DEPRECATION

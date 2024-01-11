@@ -149,7 +149,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                 for (auto &p_dirent : selection) {
                     auto &dirent = *p_dirent;
-                    file_name_ext name_ext(dirent.basic.path.data());
+                    file_name_extension_splitter name_ext(dirent.basic.path.data());
                     swan_path_t after;
 
                     auto transform = bulk_rename_transform(pattern_compile_res.compiled_pattern, after, name_ext.name,

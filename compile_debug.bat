@@ -10,8 +10,8 @@ obj_debug/imgui.obj ^
 obj_debug/stb_image.obj ^
 obj_debug/stdafx.obj ^
 /Fo:obj_debug\ ^
-/Fe:bin\swan_debug.exe ^
-/Fd:bin\vc140_debug.pdb ^
+/Fe:dist\swan_debug.exe ^
+/Fd:dist\vc140_debug.pdb ^
 /Yustdafx.hpp ^
 /I"C:/code/glfw" ^
 /I"C:/code/boost_1_80_0" ^

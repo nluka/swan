@@ -2,6 +2,7 @@
 #include "data_types.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
+#include "path.hpp"
 
 static circular_buffer<file_operation> s_file_ops_buffer(100);
 
@@ -179,11 +180,43 @@ void swan_windows::render_file_operations() noexcept
     imgui::End();
 }
 
+HRESULT progress_sink::PostMoveItem(
+    [[maybe_unused]] DWORD flags,
+    [[maybe_unused]] IShellItem *src_item,
+    [[maybe_unused]] IShellItem *destination,
+    LPCWSTR new_name_utf16,
+    HRESULT,
+    [[maybe_unused]] IShellItem *dst_item)
+{
+    print_debug_msg("PostMoveItem");
+    explorer_window &dst_expl = global_state::explorers()[this->dst_expl_id];
+
+    bool dst_expl_cwd_same = path_loosely_same(dst_expl.cwd, this->dst_expl_cwd_when_operation_started);
+
+    if (dst_expl_cwd_same) {
+        swan_path_t new_name_utf8;
+        s32 written = utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size());
+        if (written == 0) {
+            // TODO: error
+        } else {
+            print_debug_msg("new_name_utf8: [%s]", new_name_utf8.data());
+            std::scoped_lock lock(dst_expl.entries_to_select_mutex);
+            dst_expl.entries_to_select.push_back(new_name_utf8);
+        }
+    }
+
+    return S_OK;
+}
+
+HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *)
+{
+    print_debug_msg("PostCopyItem");
+    return S_OK;
+}
+
 HRESULT progress_sink::FinishOperations(HRESULT) { print_debug_msg("FinishOperations"); return S_OK; }
 HRESULT progress_sink::PauseTimer() { print_debug_msg("PauseTimer"); return S_OK; }
-HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("PostCopyItem"); return S_OK; }
 HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) { print_debug_msg("PostDeleteItem"); return S_OK; }
-HRESULT progress_sink::PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("PostMoveItem"); return S_OK; }
 HRESULT progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) { print_debug_msg("PostNewItem"); return S_OK; }
 HRESULT progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("PostRenameItem"); return S_OK; }
 HRESULT progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("PreCopyItem"); return S_OK; }
@@ -219,6 +252,7 @@ HRESULT progress_sink::QueryInterface(const IID &riid, void **ppv)
 /// @param init_done Set to true after initialization is completed.
 /// @param init_error Output parameter, where to store initialization error message. If empty, initalization was successful.
 void perform_file_operations(
+    s32 dst_expl_id,
     std::wstring destination_directory_utf16,
     std::wstring paths_to_execute_utf16,
     std::vector<char> operations_to_execute,
@@ -369,7 +403,7 @@ void perform_file_operations(
                     err << "IFileOperation::" << function << " [" << item_path_utf8.data() << "].";
                 }
             } else {
-                WCOUT_IF_DEBUG("file_op->" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
+                // WCOUT_IF_DEBUG("file_op->" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
             }
         }
 
@@ -381,6 +415,8 @@ void perform_file_operations(
     }
 
     progress_sink prog_sink;
+    prog_sink.dst_expl_id = dst_expl_id;
+    prog_sink.dst_expl_cwd_when_operation_started = global_state::explorers()[dst_expl_id].cwd;
     DWORD cookie = {};
 
     result = file_op->Advise(&prog_sink, &cookie);
