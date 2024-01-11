@@ -11,8 +11,8 @@ Swan is a substitute to the Windows File Explorer (WFE), for those wanting to sq
 *Many things, unfortunately.*
 
 - **Only 1 explorer per window**
-  - Want to work between 2 explorers at once? You need 2 windows open. Want 3 explorers? Have fun managing 3 separator windows!
-  - *Swan solves this by providing 4 explorers in its single window - dock them however suits your life best.*
+  - Want to work between 2 explorers at once? You need 2 windows open. Want 3 explorers? Have fun managing 3 separate windows!
+  - *Swan solves this by providing 4 explorers in its single window - dock them however suits you best.*
 
 - **Hard to filter through a directory to find files with particular names.**
   - The "Search" feature really ain't it because...
@@ -20,11 +20,11 @@ Swan is a substitute to the Windows File Explorer (WFE), for those wanting to sq
     - It's always recursive.
   - *Swan solves this by having a dedicated filter for the current working directory.*
 
-- **No facility to rename files in bulk, forcing you to write scripts or something...**
-  - *Swan solves this with a powerful and easy to use bulk renaming tool, for simple and complex renaming situations.*
+- **No bulk rename feature.**
+  - *Swan solves this with a powerful and user friendly bulk renaming tool, for simple and complex renaming situations.*
 
 - **It's hard to find a file when you don't know where it is.**
-  - WFE "Search" never fails to impress with its slow performance, freezing, crashing... seriously, what is Microsoft doing with that thing?
+  - WFE "Search" consistently disappoints its slow performance, freezing, crashing... seriously, what is Microsoft doing with that thing?
   - *Swan will eventually solve this by providing a fast, dedicated file finder which elegantly integrates with the explorer.*
 
 - **Impossible to figure out who locked a file you're trying to move/rename/delete.**
@@ -40,31 +40,18 @@ Swan is a substitute to the Windows File Explorer (WFE), for those wanting to sq
 
 Demo coming soon.
 
-<!-- - Fast, powerful filtering
-  - Several match modes:
-    - [x] `Contains` mode - searches for substring
-    - [x] `RegExp` mode - full Regular Expression support
-    - [ ] `Glob` mode - basic wildcards like * and ?
-  - [x] Case sensitivity toggle
-  - [x] Match polarity (i.e. == vs. !=)
-  - [x] Discriminate by entry type - e.g. filter for files only, which match pattern
--->
-
 ### Bulk renaming
 
-Demo coming soon.
+Quickly slice and dice file names for multiple files at once.
 
-<!--
-- Bulk renaming
-  - [x] Preview of current pattern's before/after transformation
-  - [x] Arbitrary counter with configurable start and step values
-  - [x] Refer to current name minus extension using `<name>` (e.g. if `file.cpp`, `<name>` = `file`)
-  - [x] Refer to current extension using `<ext>` (e.g. if `file.cpp`, `<ext>` = `cpp`, blank for directories)
-  - [x] Refer to size in bytes using `<bytes>` (= 0 for directories)
-  - [ ] Freeform mode
-  - [ ] Transactional
-  - [ ] Undo
--->
+<img src="resource/bulk_rename_demo_1.gif" />
+
+- Preview before and after prior to renaming
+- Insert arbitrary counter with customizable start and step values using `<counter>`
+- Insert current file name using `<name>`
+- Insert current file extension using `<ext>`
+- Insert current file extension with a leading dot using `<dotext>`
+- Insert file size (in bytes) using `<bytes>`
 
 ## Performance TODOs
 
