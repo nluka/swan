@@ -4,7 +4,7 @@
 #undef min
 #undef max
 
-swan_path_t path_create(char const *data) noexcept
+swan_path_t path_create(char const *data, u64 count) noexcept
 {
     swan_path_t p = {};
 
@@ -14,7 +14,7 @@ swan_path_t path_create(char const *data) noexcept
     assert(data_len < p.max_size());
 #endif
 
-    strncpy(p.data(), data, p.max_size() - 1);
+    strncpy(p.data(), data, std::min(count, p.max_size() - 1));
 
     return p;
 }

@@ -16,7 +16,7 @@ bool &global_state::move_dirents_payload_set() noexcept { return s_move_dirents_
 static std::filesystem::path s_execution_path = {};
 std::filesystem::path &global_state::execution_path() noexcept { return s_execution_path; }
 
-bool basic_dirent::is_dotdot()               const noexcept { return path_equals_exactly(path, ".."); }
+bool basic_dirent::is_path_dotdot()          const noexcept { return path_equals_exactly(path, ".."); }
 bool basic_dirent::is_dotdot_dir()           const noexcept { return type == basic_dirent::kind::directory && path_equals_exactly(path, ".."); }
 bool basic_dirent::is_directory()            const noexcept { return type == basic_dirent::kind::directory; }
 bool basic_dirent::is_symlink()              const noexcept { return one_of(type, { kind::symlink_to_directory, kind::symlink_to_file, kind::invalid_symlink }); }

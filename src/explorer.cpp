@@ -127,7 +127,7 @@ void explorer_window::deselect_all_cwd_entries() noexcept
 void explorer_window::select_all_visible_cwd_entries(bool select_dotdot_dir) noexcept
 {
     for (auto &dirent : this->cwd_entries) {
-        if ((!select_dotdot_dir && dirent.basic.is_dotdot()) || dirent.is_filtered_out) {
+        if ((!select_dotdot_dir && dirent.basic.is_path_dotdot()) || dirent.is_filtered_out) {
             continue;
         } else {
             dirent.is_selected = true;
@@ -225,7 +225,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
     std::stringstream err = {};
 
     for (auto &dirent : expl.cwd_entries) {
-        if (!dirent.is_selected || dirent.basic.is_dotdot()) {
+        if (!dirent.is_selected || dirent.basic.is_path_dotdot()) {
             continue;
         }
 
@@ -598,110 +598,102 @@ generic_result open_file(explorer_window::dirent const &file, explorer_window &e
     }
 }
 
-generic_result open_symlink(explorer_window::dirent const &dirent, explorer_window &expl, char dir_sep_utf8) noexcept
+generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const *cwd) noexcept
 {
-    swan_path_t symlink_self_path_utf8 = expl.cwd;
-    swan_path_t symlink_target_path_utf8 = {};
-    wchar_t symlink_self_path_utf16[MAX_PATH];      init_empty_cstr(symlink_self_path_utf16);
-    wchar_t symlink_target_path_utf16[MAX_PATH];    init_empty_cstr(symlink_target_path_utf16);
-    wchar_t working_dir_utf16[MAX_PATH];            init_empty_cstr(working_dir_utf16);
-    wchar_t command_line_utf16[2048];               init_empty_cstr(command_line_utf16);
-    s32 show_command = SW_SHOWNORMAL;
+    assert(lnk_file_path_utf8 != nullptr);
+
+    swan_path_t lnk_file_full_path_utf8;
+    wchar_t lnk_file_path_utf16[MAX_PATH]; init_empty_cstr(lnk_file_path_utf16);
+    s32 utf_written = {};
     HRESULT com_handle = {};
     LPITEMIDLIST item_id_list = nullptr;
-    s32 utf_written = {};
 
-    if (!path_append(symlink_self_path_utf8, dirent.basic.path.data(), dir_sep_utf8, true)) {
-        print_debug_msg("[ %d ] FAILED path_append(symlink_self_path_utf8, dirent.basic.path)", expl.id);
-        return { false, "Max path length exceeded when appending symlink name to current working directory path." };
+    if (cwd) {
+        lnk_file_full_path_utf8 = path_create(cwd);
+
+        if (!path_append(lnk_file_full_path_utf8, lnk_file_path_utf8, global_state::settings().dir_separator_utf8, true)) {
+            return { false, "Max path length exceeded when appending symlink name to current working directory path." };
+        }
+    } else {
+        lnk_file_full_path_utf8 = path_create(lnk_file_path_utf8);
     }
 
-    print_debug_msg("[ %d ] double clicked link [%s]", expl.id, symlink_self_path_utf8);
-
-    utf_written = utf8_to_utf16(symlink_self_path_utf8.data(), symlink_self_path_utf16, lengthof(symlink_self_path_utf16));
+    utf_written = utf8_to_utf16(lnk_file_full_path_utf8.data(), lnk_file_path_utf16, lengthof(lnk_file_path_utf16));
 
     if (utf_written == 0) {
-        print_debug_msg("[ %d ] utf8_to_utf16(symlink_self_path_utf8) FAILED", expl.id);
         return { false, "Conversion of symlink path from UTF-8 to UTF-16." };
-    } else {
-        print_debug_msg("[ %d ] utf8_to_utf16 wrote %d characters", expl.id, utf_written);
-        WCOUT_IF_DEBUG("symlink_self_path_utf16 = [" << symlink_self_path_utf16 << "]\n");
     }
 
-    com_handle = s_persist_file_interface->Load(symlink_self_path_utf16, STGM_READ);
+    com_handle = s_persist_file_interface->Load(lnk_file_path_utf16, STGM_READ);
 
     if (com_handle != S_OK) {
-        print_debug_msg("[ %d ] s_persist_file_interface->Load [%s] FAILED: %s", expl.id, symlink_self_path_utf8, get_last_error_string().c_str());
-        return { false, "Conversion of symlink path from UTF-8 to UTF-16." };
-    } else {
-        WCOUT_IF_DEBUG("s_persist_file_interface->Load [" << symlink_self_path_utf16 << "]\n");
+        return { false, "IPersistFile::Load(..., STGM_READ)." };
     }
 
     com_handle = s_shell_link->GetIDList(&item_id_list);
 
     if (com_handle != S_OK) {
         auto err = get_last_error_string();
-        print_debug_msg("[ %d ] s_shell_link->GetIDList FAILED: %s", expl.id, err.c_str());
         return { false, err + " (IShellLinkW::GetIDList)." };
     }
 
-    if (!SHGetPathFromIDListW(item_id_list, symlink_target_path_utf16)) {
+    if (!SHGetPathFromIDListW(item_id_list, this->target_path_utf16)) {
         auto err = get_last_error_string();
-        print_debug_msg("[ %d ] SHGetPathFromIDListW FAILED: %s", expl.id, err.c_str());
         return { false, err + " (SHGetPathFromIDListW)." };
-    } else {
-        WCOUT_IF_DEBUG("symlink_target_path_utf16 = [" << symlink_target_path_utf16 << "]\n");
     }
 
-    utf_written = utf16_to_utf8(symlink_target_path_utf16, symlink_target_path_utf8.data(), symlink_target_path_utf8.size());
+    utf_written = utf16_to_utf8(this->target_path_utf16, this->target_path_utf8.data(), this->target_path_utf8.size());
 
     if (utf_written == 0) {
-        print_debug_msg("[ %d ] utf16_to_utf8(symlink_target_path) FAILED", expl.id);
-        return { false, "conversion of symlink target path from UTF-16 to UTF-8" };
-    } else {
-        print_debug_msg("[ %d ] utf16_to_utf8 wrote %d characters", expl.id, utf_written);
-        print_debug_msg("[ %d ] symlink_target_path_utf8 = [%s]", expl.id, symlink_target_path_utf8.data());
+        return { false, "Conversion of symlink target path from UTF-16 to UTF-8." };
     }
 
-    if (directory_exists(symlink_target_path_utf8.data())) {
+    com_handle = s_shell_link->GetWorkingDirectory(this->working_directory_path_utf16, MAX_PATH);
+
+    if (com_handle != S_OK) {
+        return { false, get_last_error_string() + " (IShellLinkW::GetWorkingDirectory)." };
+    }
+
+    com_handle = s_shell_link->GetArguments(this->arguments_utf16, 1024);
+
+    if (com_handle != S_OK) {
+        return { false, get_last_error_string() + " (IShellLinkW::GetArguments)." };
+    }
+
+    com_handle = s_shell_link->GetShowCmd(&this->show_cmd);
+
+    if (com_handle != S_OK) {
+        return { false, get_last_error_string() + " (IShellLinkW::GetShowCmd)" };
+    }
+
+    return { true, "" }; // success
+}
+
+/// @brief Attempts to extract information from a .lnk file and do something with it depending on the target type.
+/// @param dirent The .lnk file.
+/// @param expl Contextual explorer window.
+/// @return If symlink points to a file, attempt ShellExecuteW("open") and return the result.
+/// If symlink points to a directory, return the path of the pointed to directory in `error_or_utf8_path`.
+/// If data extraction fails, the reason is stated in `error_or_utf8_path`.
+generic_result open_symlink(explorer_window::dirent const &dirent, explorer_window &expl, char dir_sep_utf8) noexcept
+{
+    symlink_data lnk_data = {};
+    auto extract_result = lnk_data.extract(dirent.basic.path.data(), expl.cwd.data());
+    if (!extract_result.success) {
+        return extract_result; // propogate failure to caller
+    }
+
+    if (directory_exists(lnk_data.target_path_utf8.data())) {
         // symlink to a directory, tell caller to navigate there
-        return { true, symlink_target_path_utf8.data() };
+        return { true, lnk_data.target_path_utf8.data() };
     }
     else {
         // symlink to a file, let's open it
-
-        com_handle = s_shell_link->GetWorkingDirectory(working_dir_utf16, lengthof(working_dir_utf16));
-
-        if (com_handle != S_OK) {
-            auto err = get_last_error_string();
-            print_debug_msg("[ %d ] s_shell_link->GetWorkingDirectory FAILED: %s", expl.id, err.c_str());
-            return { false, err + " (IShellLinkW::GetWorkingDirectory)" };
-        } else {
-            WCOUT_IF_DEBUG("s_shell_link->GetWorkingDirectory [" << working_dir_utf16 << "]\n");
-        }
-
-        com_handle = s_shell_link->GetArguments(command_line_utf16, lengthof(command_line_utf16));
-
-        if (com_handle != S_OK) {
-            auto err = get_last_error_string();
-            print_debug_msg("[ %d ] FAILED s_shell_link->GetArguments: %s", expl.id, err.c_str());
-            return { false, err + " (IShellLinkW::GetArguments)" };
-        } else {
-            WCOUT_IF_DEBUG("s_shell_link->GetArguments [" << command_line_utf16 << "]\n");
-        }
-
-        com_handle = s_shell_link->GetShowCmd(&show_command);
-
-        if (com_handle != S_OK) {
-            auto err = get_last_error_string();
-            print_debug_msg("[ %d ] FAILED s_shell_link->GetShowCmd: %s", expl.id, err.c_str());
-            return { false, err + " (IShellLinkW::GetShowCmd)" };
-        } else {
-            WCOUT_IF_DEBUG("s_shell_link->GetShowCmd [" << show_command << "]\n");
-        }
-
-        HINSTANCE result = ShellExecuteW(nullptr, L"open", symlink_target_path_utf16,
-                                         command_line_utf16, working_dir_utf16, show_command);
+        HINSTANCE result = ShellExecuteW(nullptr, L"open",
+                                         lnk_data.target_path_utf16,
+                                         lnk_data.arguments_utf16,
+                                         lnk_data.working_directory_path_utf16,
+                                         lnk_data.show_cmd);
 
         intptr_t err_code = (intptr_t)result;
 
@@ -978,7 +970,7 @@ bool explorer_window::update_cwd_entries(
                         entry.basic.type = basic_dirent::kind::file;
                     }
 
-                    if (entry.basic.is_dotdot()) {
+                    if (entry.basic.is_path_dotdot()) {
                         if (global_state::settings().show_dotdot_dir) {
                             this->cwd_entries.emplace_back(entry);
                             std::swap(this->cwd_entries.back(), this->cwd_entries.front());
@@ -2923,19 +2915,19 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
                 [[maybe_unused]] char const *path = dirent.basic.path.data();
 
-                bool is_dotdot = dirent.basic.is_dotdot();
+                bool is_path_dotdot = dirent.basic.is_path_dotdot();
 
                 cnt.filtered_directories += u64(dirent.is_filtered_out && dirent.basic.is_directory());
                 cnt.filtered_symlinks    += u64(dirent.is_filtered_out && dirent.basic.is_symlink());
                 cnt.filtered_files       += u64(dirent.is_filtered_out && dirent.basic.is_file());
 
-                cnt.child_dirents     += 1; // u64(!is_dotdot);
+                cnt.child_dirents     += 1; // u64(!is_path_dotdot);
                 cnt.child_directories += u64(dirent.basic.is_directory());
                 cnt.child_symlinks    += u64(dirent.basic.is_symlink());
                 cnt.child_files       += u64(dirent.basic.is_file());
 
                 if (!dirent.is_filtered_out && dirent.is_selected) {
-                    cnt.selected_directories += u64(dirent.is_selected && dirent.basic.is_directory() && !is_dotdot);
+                    cnt.selected_directories += u64(dirent.is_selected && dirent.basic.is_directory() && !is_path_dotdot);
                     cnt.selected_symlinks    += u64(dirent.is_selected && dirent.basic.is_symlink());
                     cnt.selected_files       += u64(dirent.is_selected && dirent.basic.is_file());
                 }
@@ -2943,6 +2935,19 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
             cnt.filtered_dirents = cnt.filtered_directories + cnt.filtered_symlinks + cnt.filtered_files;
             cnt.selected_dirents = cnt.selected_directories + cnt.selected_symlinks + cnt.selected_files;
+        }
+
+        std::optional<f32> scroll_to_offset_y = std::nullopt;
+
+        if (expl.scroll_to_first_selected_entry_next_frame) {
+            expl.scroll_to_first_selected_entry_next_frame = false;
+
+            auto first_selected_dirent = std::find_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
+                                                      [](explorer_window::dirent const &e) { return e.is_selected; });
+
+            if (first_selected_dirent != expl.cwd_entries.end()) {
+                scroll_to_offset_y = ImGui::GetTextLineHeightWithSpacing() * f32(std::distance(expl.cwd_entries.begin(), first_selected_dirent));
+            }
         }
 
         if (imgui::BeginChild("cwd_entries_child",
@@ -3045,7 +3050,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
                             ImVec2 path_text_rect_min = imgui::GetCursorScreenPos();
 
-                            if (imgui::Selectable(buffer, dirent.is_selected/*, ImGuiSelectableFlags_SpanAllColumns*/)) {
+                            if (imgui::Selectable(buffer, dirent.is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
                                 // print_debug_msg("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
 
                                 if (!io.KeyCtrl && !io.KeyShift) {
@@ -3079,7 +3084,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
                                     for (u64 j = first_idx; j <= last_idx; ++j) {
                                         auto &dirent_ = expl.cwd_entries[j];
-                                        if (!dirent_.basic.is_dotdot()) {
+                                        if (!dirent_.basic.is_path_dotdot()) {
                                             dirent_.is_selected = true;
                                         }
                                     }
@@ -3096,7 +3101,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                     if (dirent.basic.is_directory()) {
                                         print_debug_msg("[ %d ] double clicked directory [%s]", expl.id, dirent.basic.path.data());
 
-                                        if (dirent.basic.is_dotdot()) {
+                                        if (dirent.basic.is_path_dotdot()) {
                                             auto result = try_ascend_directory(expl);
 
                                             if (!result.success) {
@@ -3150,7 +3155,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                         }
                                     }
                                 }
-                                else if (dirent.basic.is_dotdot()) {
+                                else if (dirent.basic.is_path_dotdot()) {
                                     print_debug_msg("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
                                 }
 
@@ -3177,11 +3182,11 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                 ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 255, 0, 50));
                             }
 
-                            if (dirent.basic.is_dotdot()) {
+                            if (dirent.basic.is_path_dotdot()) {
                                 dirent.is_selected = false; // do no allow [..] to be selected
                             }
 
-                            if (imgui::IsItemClicked(ImGuiMouseButton_Right) && !dirent.basic.is_dotdot()) {
+                            if (imgui::IsItemClicked(ImGuiMouseButton_Right) && !dirent.basic.is_path_dotdot()) {
                                 print_debug_msg("[ %d ] right clicked [%s]", expl.id, dirent.basic.path.data());
                                 imgui::OpenPopup("Context");
                                 right_clicked_ent = &dirent;
@@ -3189,7 +3194,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
                         } // path column
 
-                        if (!dirent.basic.is_dotdot() && imgui::BeginDragDropSource()) {
+                        if (!dirent.basic.is_path_dotdot() && imgui::BeginDragDropSource()) {
                             auto cwd_to_utf16 = [&]() {
                                 std::wstring retval;
 
@@ -3332,7 +3337,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                             auto [result, buffer] = filetime_to_string(&dirent.basic.last_write_time_raw);
                             imgui::TextUnformatted(buffer.data());
                         }
-
                     }
                 }
                 exit_cwd_entries_passing_filter_loop:;
@@ -3346,6 +3350,29 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
                         // bool is_directory = right_clicked_ent->basic.is_directory();
 
+                        if (right_clicked_ent->basic.is_symlink_to_file() && imgui::Selectable("Open file location")) {
+                            symlink_data lnk_data = {};
+                            auto extract_result = lnk_data.extract(right_clicked_ent->basic.path.data(), expl.cwd.data());
+
+                            if (!extract_result.success) {
+                                swan_popup_modals::open_error(make_str("Open file location of [%s].", right_clicked_ent->basic.path.data()).c_str(),
+                                                              extract_result.error_or_utf8_path.c_str());
+                            } else {
+                                // no error checking because symlink_data::extract will already have validating things
+
+                                std::string_view parent_dir = get_everything_minus_file_name(lnk_data.target_path_utf8.data());
+                                expl.cwd = path_create(parent_dir.data(), parent_dir.size());
+
+                                swan_path_t to_select = path_create(get_file_name(lnk_data.target_path_utf8.data()));
+                                expl.entries_to_select.push_back(to_select);
+
+                                expl.push_history_item(expl.cwd);
+                                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+                                (void) expl.save_to_disk();
+
+                                expl.scroll_to_first_selected_entry_next_frame = true;
+                            }
+                        }
                         if (imgui::Selectable("Copy name")) {
                             imgui::SetClipboardText(right_clicked_ent->basic.path.data());
                         }
@@ -3464,6 +3491,10 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             cwd_entries_table_size = imgui::GetItemRectSize();
             cwd_entries_table_min = imgui::GetItemRectMin();
             cwd_entries_table_max = imgui::GetItemRectMax();
+
+            if (scroll_to_offset_y.has_value()) {
+                imgui::SetScrollY(scroll_to_offset_y.value());
+            }
         }
 
         imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 0);

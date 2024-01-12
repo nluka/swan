@@ -51,7 +51,7 @@ struct basic_dirent
     kind type = kind::nil;
     swan_path_t path = {};
 
-    bool is_dotdot() const noexcept;
+    bool is_path_dotdot() const noexcept;
     bool is_dotdot_dir() const noexcept;
     bool is_directory() const noexcept;
     bool is_symlink() const noexcept;
@@ -276,11 +276,23 @@ struct explorer_window
     bool filter_show_symlink_directories = true;    // persisted in file
     bool filter_show_symlink_files = true;          // persisted in file
     bool filter_show_invalid_symlinks = true;       // persisted in file
-    // bool table_sort_specs_dirty = true;
-    update_cwd_entries_actions update_request_from_outside = nil; // how code from outside the Begin()/End() of the explorer window
-                                                                  // tells this explorer to update its cwd_entries
+
+    bool scroll_to_first_selected_entry_next_frame = false;
+    update_cwd_entries_actions update_request_from_outside = nil; /* how code from outside the Begin()/End() of the explorer window
+                                                                     tells this explorer to update its cwd_entries */
 
     mutable s8 latest_save_to_disk_result = -1;
+};
+
+struct symlink_data
+{
+    s32 show_cmd;
+    wchar_t target_path_utf16[MAX_PATH];
+    swan_path_t target_path_utf8;
+    wchar_t working_directory_path_utf16[MAX_PATH];
+    wchar_t arguments_utf16[1024];
+
+    generic_result extract(char const *lnk_file_path_utf8, char const *cwd = nullptr) noexcept;
 };
 
 struct file_operation_command_buf

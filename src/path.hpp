@@ -3,7 +3,7 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
 
-[[nodiscard]] swan_path_t path_create(char const *data) noexcept;
+[[nodiscard]] swan_path_t path_create(char const *data, u64 count = u64(-1)) noexcept;
 
 [[nodiscard]] u16 path_length(swan_path_t const &path) noexcept;
 
