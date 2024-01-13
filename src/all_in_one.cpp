@@ -18,6 +18,7 @@
 #include "new_pin_mdl.cpp"
 #include "path.cpp"
 #include "pin_mgr.cpp"
+#include "recent_files.cpp"
 #include "settings.cpp"
 #include "sngl_rnm_mdl.cpp"
 #include "style.cpp"

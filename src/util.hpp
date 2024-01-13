@@ -15,9 +15,20 @@ consteval u64 lengthof(ElemTy (&)[Length]) noexcept
     return Length;
 }
 
-typedef std::chrono::high_resolution_clock::time_point time_point_t;
+typedef std::chrono::high_resolution_clock::time_point precise_time_point_t;
+typedef std::chrono::system_clock::time_point system_time_point_t;
 
-time_point_t current_time() noexcept;
+precise_time_point_t current_time_precise() noexcept;
+system_time_point_t current_time_system() noexcept;
+
+s64 compute_diff_ms(precise_time_point_t start, precise_time_point_t end) noexcept;
+s64 compute_diff_ms(system_time_point_t start, system_time_point_t end) noexcept;
+
+s64 compute_diff_us(precise_time_point_t start, precise_time_point_t end) noexcept;
+s64 compute_diff_us(system_time_point_t start, system_time_point_t end) noexcept;
+
+std::array<char, 64> compute_when_str(precise_time_point_t start, precise_time_point_t end) noexcept;
+std::array<char, 64> compute_when_str(system_time_point_t start, system_time_point_t end) noexcept;
 
 void flip_bool(bool &b) noexcept;
 
@@ -31,16 +42,9 @@ void format_file_size(
     u64 out_size,
     u64 unit_multiplier) noexcept;
 
-s64 compute_diff_ms(time_point_t start, time_point_t end) noexcept;
-s64 compute_diff_us(time_point_t start, time_point_t end) noexcept;
-
-std::array<char, 64> compute_when_str(
-    time_point_t start,
-    time_point_t end) noexcept;
-
 void seed_fast_rand(u64) noexcept;
 
-u64 fast_rand(u64 min, u64 max) noexcept;
+u64 fast_rand(u64 min = 1, u64 max = u64(-1)) noexcept;
 
 s32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept;
 

@@ -554,13 +554,13 @@ generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, exp
     }
 }
 
-generic_result open_file(explorer_window::dirent const &file, explorer_window &expl, char dir_sep_utf8) noexcept
+generic_result open_file(char const *file_name, char const *file_directory) noexcept
 {
-    swan_path_t target_full_path_utf8 = expl.cwd;
+    swan_path_t target_full_path_utf8 = path_create(file_directory);
 
-    if (!path_append(target_full_path_utf8, file.basic.path.data(), dir_sep_utf8, true)) {
-        print_debug_msg("[ %d ] FAILED path_append, cwd = [%s], append data = [\\%s]", expl.id, expl.cwd.data(), file.basic.path.data());
-        return { false, "Max path length exceeded when appending target name to cwd." };
+    if (!path_append(target_full_path_utf8, file_name, global_state::settings().dir_separator_utf8, true)) {
+        print_debug_msg("FAILED path_append, file_directory = [%s], file_name = [\\%s]", file_directory, file_name);
+        return { false, "Full file path exceeds max path length." };
     }
 
     wchar_t target_full_path_utf16[MAX_PATH]; init_empty_cstr(target_full_path_utf16);
@@ -568,32 +568,28 @@ generic_result open_file(explorer_window::dirent const &file, explorer_window &e
     s32 utf_written = utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16));
 
     if (utf_written == 0) {
-        print_debug_msg("[ %d ] FAILED utf8_to_utf16(target_full_path)", expl.id);
         return { false, "Conversion of target's full path from UTF-8 to UTF-16." };
     }
-
-    print_debug_msg("[ %d ] utf8_to_utf16 wrote %d characters (target_full_path_utf8 -> target_full_path_utf16)", expl.id, utf_written);
-    print_debug_msg("[ %d ] target_full_path = [%s]", expl.id, target_full_path_utf8.data());
 
     HINSTANCE result = ShellExecuteW(nullptr, L"open", target_full_path_utf16, nullptr, nullptr, SW_SHOWNORMAL);
 
     auto ec = (intptr_t)result;
 
     if (ec > HINSTANCE_ERROR) {
-        print_debug_msg("[ %d ] ShellExecuteW success", expl.id);
-        return { true, "" };
+        print_debug_msg("ShellExecuteW success");
+        return { true, target_full_path_utf8.data() };
     }
     else if (ec == SE_ERR_NOASSOC) {
-        print_debug_msg("[ %d ] ShellExecuteW: SE_ERR_NOASSOC", expl.id);
+        print_debug_msg("FAILED ShellExecuteW: SE_ERR_NOASSOC");
         return { false, "No association between file type and program (ShellExecuteW: SE_ERR_NOASSOC)." };
     }
     else if (ec == SE_ERR_FNF) {
-        print_debug_msg("[ %d ] ShellExecuteW: SE_ERR_FNF", expl.id);
+        print_debug_msg("FAILED ShellExecuteW: SE_ERR_FNF");
         return { false, "File not found (ShellExecuteW: SE_ERR_FNF)." };
     }
     else {
         auto err = get_last_error_string();
-        print_debug_msg("[ %d ] ShellExecuteW: %s", expl.id, err.c_str());
+        print_debug_msg("FAILED ShellExecuteW: %s", err.c_str());
         return { false, err };
     }
 }
@@ -672,10 +668,12 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
 /// @brief Attempts to extract information from a .lnk file and do something with it depending on the target type.
 /// @param dirent The .lnk file.
 /// @param expl Contextual explorer window.
+/// @param symlink_type_out The type of the symlink.
 /// @return If symlink points to a file, attempt ShellExecuteW("open") and return the result.
 /// If symlink points to a directory, return the path of the pointed to directory in `error_or_utf8_path`.
 /// If data extraction fails, the reason is stated in `error_or_utf8_path`.
-generic_result open_symlink(explorer_window::dirent const &dirent, explorer_window &expl, char dir_sep_utf8) noexcept
+static
+generic_result open_symlink(explorer_window::dirent const &dirent, explorer_window &expl) noexcept
 {
     symlink_data lnk_data = {};
     auto extract_result = lnk_data.extract(dirent.basic.path.data(), expl.cwd.data());
@@ -699,7 +697,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
 
         if (err_code > HINSTANCE_ERROR) {
             print_debug_msg("[ %d ] ShellExecuteW success", expl.id);
-            return { true, "" };
+            return { true, lnk_data.target_path_utf8.data() };
         }
         else if (err_code == SE_ERR_NOASSOC) {
             print_debug_msg("[ %d ] ShellExecuteW error: SE_ERR_NOASSOC", expl.id);
@@ -1025,7 +1023,7 @@ bool explorer_window::update_cwd_entries(
                 while (FindNextFileW(find_handle, &find_data));
 
                 this->refresh_message.clear();
-                this->last_filesystem_query_time = current_time();
+                this->last_filesystem_query_time = current_time_precise();
                 {
                     std::scoped_lock lock(entries_to_select_mutex);
                     this->entries_to_select.clear();
@@ -1850,7 +1848,7 @@ void render_pins_popup(explorer_window &expl) noexcept
                     if (!directory_exists(pin.path.data())) {
                         swan_popup_modals::open_error(
                             make_str("Open pin [%s].", pin.label.c_str()).c_str(),
-                            make_str("Pin path [%s] does not exit.").c_str());
+                            make_str("Pin path [%s] does not exit.", pin.path.data()).c_str());
                     }
                     else {
                         bool pin_is_valid_dir = expl.update_cwd_entries(query_filesystem, pin.path.data());
@@ -1990,16 +1988,16 @@ void render_filter_reset_button(explorer_window &expl) noexcept
 static
 void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit_multiplier) noexcept
 {
-    static time_point_t last_refresh_time = {};
+    static precise_time_point_t last_refresh_time = {};
     static drive_list_t drives = {};
 
     // refresh drives occasionally
     {
-        time_point_t now = current_time();
+        precise_time_point_t now = current_time_precise();
         s64 diff_ms = compute_diff_ms(last_refresh_time, now);
         if (diff_ms >= 1000) {
             drives = query_drive_list();
-            last_refresh_time = current_time();
+            last_refresh_time = current_time_precise();
         }
     }
 
@@ -2581,13 +2579,20 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     // handle [F2], [Ctrl-X], [Ctrl-C], [Ctrl-V]
     if (window_focused && !any_popups_open) {
         if (imgui::IsKeyPressed(ImGuiKey_F2)) {
-            if (explorer_window::NO_SELECTION == expl.cwd_prev_selected_dirent_idx) {
+            u64 num_entries_selected = std::count_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
+                                                     [](explorer_window::dirent const &e) { return e.is_selected; });
+
+            if (num_entries_selected == 0) {
                 swan_popup_modals::open_error("Keybind for rename [F2] was pressed.", "Nothing is selected.");
-            } else {
-                auto &dirent_which_f2_was_pressed_on = expl.cwd_entries[expl.cwd_prev_selected_dirent_idx];
-                // print_debug_msg("[ %d ] pressed F2 on [%s]", expl.id, dirent_which_f2_was_pressed_on.basic.path.data());
+            }
+            else if (num_entries_selected == 1) {
+                auto selected_dirent = std::find_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
+                                                    [](explorer_window::dirent const &e) { return e.is_selected; });
                 open_single_rename_popup = true;
-                dirent_to_be_renamed = &dirent_which_f2_was_pressed_on;
+                dirent_to_be_renamed = &(*selected_dirent);
+            }
+            else {
+                open_bulk_rename_popup = true;
             }
         }
 
@@ -2673,11 +2678,11 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                 }
             };
 
-            if (expl.read_dir_changes_refresh_request_time != time_point_t() &&
-                compute_diff_ms(expl.last_filesystem_query_time, current_time()) >= 250)
+            if (expl.read_dir_changes_refresh_request_time != precise_time_point_t() &&
+                compute_diff_ms(expl.last_filesystem_query_time, current_time_precise()) >= 250)
             {
                 refresh(full_refresh);
-                expl.read_dir_changes_refresh_request_time = time_point_t();
+                expl.read_dir_changes_refresh_request_time = precise_time_point_t();
             }
             else if (expl.read_dir_changes_handle != INVALID_HANDLE_VALUE && !path_loosely_same(expl.cwd, expl.read_dir_changes_target)) {
                 // cwd changed while waiting for signal from ReadDirectoryChangesW,
@@ -2701,9 +2706,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                     if (global_state::settings().expl_refresh_mode == swan_settings::explorer_refresh_mode_automatic) {
                         print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == automatic, refreshing...");
                         issue_read_dir_changes();
-                        if (expl.read_dir_changes_refresh_request_time == time_point_t()) {
+                        if (expl.read_dir_changes_refresh_request_time == precise_time_point_t()) {
                             // no refresh pending, submit request to refresh
-                            expl.read_dir_changes_refresh_request_time = current_time();
+                            expl.read_dir_changes_refresh_request_time = current_time_precise();
                         }
                     } else { // explorer_options::refresh_mode::notify
                         print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == notify, notifying...");
@@ -2937,7 +2942,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             cnt.selected_dirents = cnt.selected_directories + cnt.selected_symlinks + cnt.selected_files;
         }
 
-        std::optional<f32> scroll_to_offset_y = std::nullopt;
+        std::optional<f32> first_selected_dirent_offset_y = std::nullopt;
 
         if (expl.scroll_to_first_selected_entry_next_frame) {
             expl.scroll_to_first_selected_entry_next_frame = false;
@@ -2946,7 +2951,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                                       [](explorer_window::dirent const &e) { return e.is_selected; });
 
             if (first_selected_dirent != expl.cwd_entries.end()) {
-                scroll_to_offset_y = ImGui::GetTextLineHeightWithSpacing() * f32(std::distance(expl.cwd_entries.begin(), first_selected_dirent));
+                first_selected_dirent_offset_y = ImGui::GetTextLineHeightWithSpacing() * f32(std::distance(expl.cwd_entries.begin(), first_selected_dirent));
             }
         }
 
@@ -2954,6 +2959,23 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             ImVec2(0, imgui::GetContentRegionAvail().y - imgui::CalcTextSize("items").y - imgui::GetStyle().WindowPadding.y - 5)),
             ImGuiWindowFlags_NoNav|ImGuiWindowFlags_NoInputs
         ) {
+            if (first_selected_dirent_offset_y.has_value()) {
+                f32 current_scroll_offset_y = imgui::GetScrollY();
+                f32 window_height = imgui::GetWindowContentRegionMax().y - imgui::GetWindowContentRegionMin().y;
+                f32 visible_region_top_y = current_scroll_offset_y;
+                f32 visible_region_bottom_y = current_scroll_offset_y + window_height;
+                f32 first_selected_dirent_top_y = first_selected_dirent_offset_y.value() + imgui::TableGetHeaderRowHeight();
+                f32 first_selected_dirent_bottom_y = first_selected_dirent_top_y + ImGui::GetTextLineHeightWithSpacing();
+
+                if (first_selected_dirent_top_y >= visible_region_top_y && first_selected_dirent_bottom_y <= visible_region_bottom_y) {
+                    // already completely in view, don't scroll to avoid ugliness caused by 1 frame delay in fulfillment of imgui::SetScrollY
+                } else {
+                    f32 half_window_height = window_height / 2.0f;
+                    f32 half_dirent_row_height = ImGui::GetTextLineHeightWithSpacing() / 2.0f;
+                    imgui::SetScrollY(first_selected_dirent_offset_y.value() + imgui::TableGetHeaderRowHeight() - half_window_height + half_dirent_row_height);
+                }
+            }
+
             if (expl.cwd_entries.empty()) {
                 imgui::Spacing();
                 if (!directory_exists(expl.cwd.data())) {
@@ -3094,8 +3116,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                 static swan_path_t last_click_path = {};
                                 swan_path_t const &current_click_path = dirent.basic.path;
                                 f64 const double_click_window_sec = 0.3;
-                                f64 current_time = imgui::GetTime();
-                                f64 seconds_between_clicks = current_time - last_click_time;
+                                f64 current_time_precise = imgui::GetTime();
+                                f64 seconds_between_clicks = current_time_precise - last_click_time;
 
                                 if (seconds_between_clicks <= double_click_window_sec && path_equals_exactly(current_click_path, last_click_path)) {
                                     if (dirent.basic.is_directory()) {
@@ -3126,16 +3148,31 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                     else if (dirent.basic.is_symlink()) {
                                         print_debug_msg("[ %d ] double clicked symlink [%s]", expl.id, dirent.basic.path.data());
 
-                                        auto res = open_symlink(dirent, expl, dir_sep_utf8);
+                                        auto res = open_symlink(dirent, expl);
 
                                         if (res.success) {
-                                            auto const &target_dir_path = res.error_or_utf8_path;
-                                            if (!target_dir_path.empty()) {
-                                                expl.cwd = path_create(target_dir_path.c_str());
+                                            if (dirent.basic.is_symlink_to_directory()) {
+                                                char const *target_dir_path = res.error_or_utf8_path.c_str();
+                                                expl.cwd = path_create(target_dir_path);
                                                 expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                                                 expl.push_history_item(expl.cwd);
                                                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
                                                 (void) expl.save_to_disk();
+                                            }
+                                            else if (dirent.basic.is_symlink_to_file()) {
+                                                swan_path_t full_file_path = path_create(res.error_or_utf8_path.c_str());
+                                                auto &recent_files = global_state::recent_files();
+
+                                                auto where_in_recent = std::find_if(recent_files.begin(), recent_files.end(),
+                                                                                    [&](recent_file const &f) { return path_loosely_same(f.path, full_file_path); });
+
+                                                if (where_in_recent == recent_files.end()) { // not yet in recent
+                                                    recent_files.push_front({ current_time_system(), full_file_path });
+                                                    (void) global_state::save_recent_files_to_disk();
+                                                }
+                                                else { // already in recent
+                                                    move_recent_file_to_front_and_save(std::distance(recent_files.begin(), where_in_recent));
+                                                }
                                             }
                                         } else {
                                             swan_popup_modals::open_error(make_str("Open symlink [%s].", dirent.basic.path.data()).c_str(), res.error_or_utf8_path.c_str());
@@ -3144,11 +3181,21 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                     else {
                                         print_debug_msg("[ %d ] double clicked file [%s]", expl.id, dirent.basic.path.data());
 
-                                        auto res = open_file(dirent, expl, dir_sep_utf8);
+                                        auto res = open_file(dirent.basic.path.data(), expl.cwd.data());
 
                                         if (res.success) {
-                                            if (!res.error_or_utf8_path.empty()) {
-                                                // TODO: why is there no code here?
+                                            swan_path_t full_file_path = path_create(res.error_or_utf8_path.c_str());
+                                            auto &recent_files = global_state::recent_files();
+
+                                            auto where_in_recent = std::find_if(recent_files.begin(), recent_files.end(),
+                                                                                [&](recent_file const &f) { return path_loosely_same(f.path, full_file_path); });
+
+                                            if (where_in_recent == recent_files.end()) { // not yet in recent
+                                                recent_files.push_front({ current_time_system(), full_file_path });
+                                                (void) global_state::save_recent_files_to_disk();
+                                            }
+                                            else { // already in recent
+                                                move_recent_file_to_front_and_save(std::distance(recent_files.begin(), where_in_recent));
                                             }
                                         } else {
                                             swan_popup_modals::open_error(make_str("Open file [%s].", dirent.basic.path.data()).c_str(), res.error_or_utf8_path.c_str());
@@ -3159,7 +3206,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                                     print_debug_msg("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
                                 }
 
-                                last_click_time = current_time;
+                                last_click_time = current_time_precise;
                                 last_click_path = current_click_path;
                                 expl.cwd_prev_selected_dirent_idx = i;
 
@@ -3491,10 +3538,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             cwd_entries_table_size = imgui::GetItemRectSize();
             cwd_entries_table_min = imgui::GetItemRectMin();
             cwd_entries_table_max = imgui::GetItemRectMax();
-
-            if (scroll_to_offset_y.has_value()) {
-                imgui::SetScrollY(scroll_to_offset_y.value());
-            }
         }
 
         imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 0);
@@ -3657,7 +3700,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             if (!result.success) {
                 expl.cwd = initial_cwd;
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
-                swan_popup_modals::open_error(make_str("Open pin [%s] in %s.", pin.path.data(), expl.name).c_str(), result.err_msg.c_str());
+                swan_popup_modals::open_error(make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1).c_str(), result.err_msg.c_str());
             }
         }
 

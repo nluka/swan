@@ -18,18 +18,6 @@ void swan_windows::render_settings(GLFWwindow *window) noexcept
     if (imgui::Begin(swan_windows::get_name(swan_windows::settings), &global_state::settings().show.settings)) {
         auto &settings = global_state::settings();
 
-        // static imgui::EnumButton refresh_mode_button("Refresh mode");
-
-        // char const *labels[] = {
-        //     "Automatic",
-        //     "Notify   ",
-        //     "Manual   ",
-        // };
-
-        // change_made |= refresh_mode_button.Render((s32 &)global_state::settings().expl_refresh_mode,
-        //                                           0, swan_settings::explorer_refresh_mode_count,
-        //                                           labels, lengthof(labels));
-
         regular_change |= imgui::Checkbox("Start with window maximized", &settings.start_with_window_maximized);
         regular_change |= imgui::Checkbox("Start with previous window size & pos", &settings.start_with_previous_window_pos_and_size);
 
@@ -46,7 +34,6 @@ void swan_windows::render_settings(GLFWwindow *window) noexcept
                     (void) settings.save_to_disk();
                 }
             }
-            // imgui::Spacing();
         #if 1
             imgui::ScopedItemWidth w(200.f);
             overridden |= imgui::InputInt2("Window position (x, y)", &settings.window_x);
@@ -64,8 +51,6 @@ void swan_windows::render_settings(GLFWwindow *window) noexcept
             regular_change = false;
             (void) settings.save_to_disk();
         }
-
-
     }
 
     imgui::End();
@@ -111,16 +96,17 @@ try {
     write_bool("start_with_window_maximized", this->start_with_window_maximized);
     write_bool("start_with_previous_window_pos_and_size", this->start_with_previous_window_pos_and_size);
 
-    write_bool("show.pin_manager", this->show.pin_manager);
-    write_bool("show.file_operations", this->show.file_operations);
     write_bool("show.explorer_0", this->show.explorer_0);
     write_bool("show.explorer_1", this->show.explorer_1);
     write_bool("show.explorer_2", this->show.explorer_2);
     write_bool("show.explorer_3", this->show.explorer_3);
+    write_bool("show.pin_manager", this->show.pin_manager);
+    write_bool("show.file_operations", this->show.file_operations);
+    write_bool("show.recent_files", this->show.recent_files);
     write_bool("show.analytics", this->show.analytics);
     write_bool("show.settings", this->show.settings);
-#if !defined(NDEBUG)
     write_bool("show.debug_log", this->show.debug_log);
+#if !defined(NDEBUG)
     write_bool("show.imgui_demo", this->show.imgui_demo);
     write_bool("show.fa_icons", this->show.fa_icons);
     write_bool("show.ci_icons", this->show.ci_icons);
@@ -232,6 +218,9 @@ try {
         }
         else if (property == "show.file_operations") {
             this->show.file_operations = extract_bool();
+        }
+        else if (property == "show.recent_files") {
+            this->show.recent_files = extract_bool();
         }
         else if (property == "show.explorer_0") {
             this->show.explorer_0 = extract_bool();

@@ -91,8 +91,8 @@ void swan_windows::render_file_operations() noexcept
         for (auto const &file_op : file_ops_buffer) {
             imgui::TableNextRow();
 
-            time_point_t blank_time = {};
-            time_point_t now = current_time();
+            precise_time_point_t blank_time = {};
+            precise_time_point_t now = current_time_precise();
 
             auto start_time = file_op.start_time.load();
             auto end_time = file_op.end_time.load();
@@ -137,7 +137,7 @@ void swan_windows::render_file_operations() noexcept
                     imgui::TextUnformatted("--");
                 }
                 else {
-                    u64 ms = compute_diff_ms(start_time, end_time == time_point_t() ? now : end_time);
+                    u64 ms = compute_diff_ms(start_time, end_time == precise_time_point_t() ? now : end_time);
                     f64 bytes_per_ms = (f64)bytes_transferred / (f64)ms;
                     f64 bytes_per_sec = bytes_per_ms * 1'000.0;
 

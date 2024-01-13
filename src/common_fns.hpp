@@ -21,36 +21,21 @@ namespace global_constants
 
 namespace global_state
 {
-    swan_settings &settings() noexcept;
-
-    std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
-
-    boost::circular_buffer<file_operation> const &file_ops_buffer() noexcept;
-
-    s32 &page_size() noexcept;
-
-    swan_thread_pool_t &thread_pool() noexcept;
+    circular_buffer<recent_file> &recent_files() noexcept;
+    bool save_recent_files_to_disk() noexcept;
+    std::pair<bool, u64> load_recent_files_from_disk() noexcept;
 
     std::vector<pinned_path> &pins() noexcept;
-
     bool add_pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept;
-
     void remove_pin(u64 pin_idx) noexcept;
-
     void update_pin_dir_separators(char new_dir_separator) noexcept;
-
+    u64 find_pin_idx(swan_path_t const &) noexcept;
+    void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept;
     bool save_pins_to_disk() noexcept;
-
     std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
 
-    u64 find_pin_idx(swan_path_t const &) noexcept;
-
-    void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept;
-
     s32 focused_window() noexcept;
-
     bool save_focused_window(s32 window_code) noexcept;
-
     bool load_focused_window_from_disk(s32 &window_code) noexcept;
 
     bool &move_dirents_payload_set() noexcept;
@@ -58,6 +43,16 @@ namespace global_state
     s32 &debug_log_text_limit_megabytes() noexcept;
 
     std::filesystem::path &execution_path() noexcept;
+
+    swan_thread_pool_t &thread_pool() noexcept;
+
+    swan_settings &settings() noexcept;
+
+    std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
+
+    circular_buffer<file_operation> const &file_ops_buffer() noexcept;
+
+    s32 &page_size() noexcept;
 
 } // namespace global_state
 
@@ -70,6 +65,7 @@ namespace swan_windows
         explorer_3,
         pin_manager,
         file_operations,
+        recent_files,
         analytics,
         debug_log,
         settings,
@@ -91,6 +87,7 @@ namespace swan_windows
             case explorer_3: return " Explorer 4 ";
             case pin_manager: return " Pinned ";
             case file_operations: return " File Operations ";
+            case recent_files: return " Recent Files ";
             case analytics: return " Analytics ";
             case debug_log: return " Debug Log ";
             case settings: return " Settings ";
@@ -111,6 +108,8 @@ namespace swan_windows
     void render_debug_log(bool &open) noexcept;
 
     void render_file_operations() noexcept;
+
+    void render_recent_files(bool &open) noexcept;
 
     void render_icon_font_browser(
         s32 window_code,
@@ -161,7 +160,21 @@ char const *get_icon(basic_dirent::kind t) noexcept;
 
 drive_list_t query_drive_list() noexcept;
 
+generic_result open_file(char const *file_name, char const *file_directory) noexcept;
+
+void move_recent_file_to_front_and_save(u64 recent_file_idx) noexcept;
+
 std::string get_last_error_string() noexcept;
+
+void perform_file_operations(
+    s32 dst_expl_id,
+    std::wstring working_directory_utf16,
+    std::wstring paths_to_execute_utf16,
+    std::vector<char> operations_to_execute,
+    std::mutex *init_done_mutex,
+    std::condition_variable *init_done_cond,
+    bool *init_done,
+    std::string *init_error) noexcept;
 
 bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *pattern, bool squish_adjacent_spaces) noexcept;
 

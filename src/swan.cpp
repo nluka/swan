@@ -147,6 +147,7 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::pin_manager), nullptr, &global_state::settings().show.pin_manager);
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::file_operations), nullptr, &global_state::settings().show.file_operations);
+            change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::recent_files), nullptr, &global_state::settings().show.recent_files);
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::analytics), nullptr, &global_state::settings().show.analytics);
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::settings), nullptr, &global_state::settings().show.settings);
 
@@ -476,7 +477,7 @@ try {
 
         // imgui::GetIO().IniFilename = "swan_imgui.ini";
 
-        seed_fast_rand((u64)current_time().time_since_epoch().count());
+        seed_fast_rand((u64)current_time_precise().time_since_epoch().count());
 
         SYSTEM_INFO system_info;
         GetSystemInfo(&system_info);
@@ -485,6 +486,7 @@ try {
 
         (void) global_state::settings().load_from_disk();
         (void) global_state::load_pins_from_disk(global_state::settings().dir_separator_utf8);
+        (void) global_state::load_recent_files_from_disk();
 
         if (global_state::settings().start_with_window_maximized) {
             glfwMaximizeWindow(window);
@@ -541,6 +543,7 @@ try {
         swan_windows::explorer_3,
         swan_windows::pin_manager,
         swan_windows::file_operations,
+        swan_windows::recent_files,
         swan_windows::analytics,
         swan_windows::debug_log,
         swan_windows::settings,
@@ -563,19 +566,19 @@ try {
         }
     }
 
-    static time_point_t last_window_move_or_resize_time = current_time();
+    static precise_time_point_t last_window_move_or_resize_time = current_time_precise();
     static bool window_pos_or_size_needs_write = false;
 
     glfwSetWindowPosCallback(window, [](GLFWwindow *, s32 new_x, s32 new_y) {
         global_state::settings().window_x = new_x;
         global_state::settings().window_y = new_y;
-        last_window_move_or_resize_time = current_time();
+        last_window_move_or_resize_time = current_time_precise();
         window_pos_or_size_needs_write = true;
     });
     glfwSetWindowSizeCallback(window, [](GLFWwindow *, s32 new_w, s32 new_h) {
         global_state::settings().window_w = new_w;
         global_state::settings().window_h = new_h;
-        last_window_move_or_resize_time = current_time();
+        last_window_move_or_resize_time = current_time_precise();
         window_pos_or_size_needs_write = true;
     });
 
@@ -601,7 +604,7 @@ try {
             }
         }
 
-        if (window_pos_or_size_needs_write && compute_diff_ms(last_window_move_or_resize_time, current_time()) > 250) {
+        if (window_pos_or_size_needs_write && compute_diff_ms(last_window_move_or_resize_time, current_time_precise()) > 250) {
             // we check that some time has passed since last_window_move_or_resize_time to avoid spam saving, which could degrade perf
             // as the user moves or resizes the window
 
@@ -664,6 +667,12 @@ try {
                 case swan_windows::file_operations: {
                     if (window_visib.file_operations) {
                         swan_windows::render_file_operations();
+                    }
+                    break;
+                }
+                case swan_windows::recent_files: {
+                    if (window_visib.recent_files) {
+                        swan_windows::render_recent_files(window_visib.recent_files);
                     }
                     break;
                 }

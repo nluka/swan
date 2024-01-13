@@ -105,12 +105,13 @@ struct swan_settings
 
     struct window_visibility
     {
-        bool pin_manager = false;
-        bool file_operations = false;
         bool explorer_0 = true;
         bool explorer_1 = false;
         bool explorer_2 = false;
         bool explorer_3 = false;
+        bool pin_manager = false;
+        bool file_operations = false;
+        bool recent_files = false;
         bool analytics = false;
         bool debug_log = false;
         bool settings = false;
@@ -229,8 +230,8 @@ struct explorer_window
     u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
     u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
-    time_point_t read_dir_changes_refresh_request_time = {};
-    time_point_t last_filesystem_query_time = {};
+    precise_time_point_t read_dir_changes_refresh_request_time = {};
+    precise_time_point_t last_filesystem_query_time = {};
 
     static u64 const num_timing_samples = 10;
 
@@ -326,8 +327,8 @@ struct file_operation
     std::atomic<u64> total_bytes_transferred  = {};
     std::atomic<u64> stream_size              = {};
     std::atomic<u64> stream_bytes_transferred = {};
-    std::atomic<time_point_t> start_time      = {};
-    std::atomic<time_point_t> end_time        = {};
+    std::atomic<precise_time_point_t> start_time      = {};
+    std::atomic<precise_time_point_t> end_time        = {};
     type op_type = type::nil;
     bool success = false;
     swan_path_t src_path = {};
@@ -378,22 +379,18 @@ struct pin_drag_drop_payload
     u64 pin_idx;
 };
 
-void perform_file_operations(
-    s32 dst_expl_id,
-    std::wstring working_directory_utf16,
-    std::wstring paths_to_execute_utf16,
-    std::vector<char> operations_to_execute,
-    std::mutex *init_done_mutex,
-    std::condition_variable *init_done_cond,
-    bool *init_done,
-    std::string *init_error) noexcept;
-
 struct pinned_path
 {
     static u64 const LABEL_MAX_LEN = 64;
 
     ImVec4 color;
     boost::static_string<LABEL_MAX_LEN> label;
+    swan_path_t path;
+};
+
+struct recent_file
+{
+    system_time_point_t open_time;
     swan_path_t path;
 };
 

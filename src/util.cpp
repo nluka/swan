@@ -76,7 +76,7 @@ void format_file_size(
     snprintf(out, out_size, fmt, size, units[unit_idx]);
 }
 
-s64 compute_diff_ms(time_point_t start, time_point_t end) noexcept
+s64 compute_diff_ms(precise_time_point_t start, precise_time_point_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(end);
@@ -84,7 +84,7 @@ s64 compute_diff_ms(time_point_t start, time_point_t end) noexcept
     return diff_ms.count();
 }
 
-s64 compute_diff_us(time_point_t start, time_point_t end) noexcept
+s64 compute_diff_us(precise_time_point_t start, precise_time_point_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::microseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::microseconds>(end);
@@ -92,12 +92,12 @@ s64 compute_diff_us(time_point_t start, time_point_t end) noexcept
     return diff_us.count();
 }
 
-time_point_t current_time() noexcept
+precise_time_point_t current_time_precise() noexcept
 {
     return std::chrono::high_resolution_clock::now();
 }
 
-std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noexcept
+std::array<char, 64> compute_when_str(precise_time_point_t start, precise_time_point_t end) noexcept
 {
     std::array<char, 64> out = {};
 
@@ -106,7 +106,62 @@ std::array<char, 64> compute_when_str(time_point_t start, time_point_t end) noex
     s64 one_hour = one_minute * 60;
     s64 one_day = one_hour * 24;
 
-    if (ms_diff < one_minute) {
+    if (ms_diff < 0) {
+        strncpy(out.data(), "in the future", out.size());
+    }
+    else if (ms_diff < one_minute) {
+        strncpy(out.data(), "just now", out.size());
+    }
+    else if (ms_diff < one_hour) {
+        u64 minutes = u64(ms_diff / one_minute);
+        snprintf(out.data(), out.size(), "%zu min%s ago", minutes, minutes == 1 ? "" : "s");
+    }
+    else if (ms_diff < one_day) {
+        u64 hours = u64(ms_diff / one_hour);
+        snprintf(out.data(), out.size(), "%zu hour%s ago", hours, hours == 1 ? "" : "s");
+    }
+    else {
+        u64 days = u64(ms_diff / one_day);
+        snprintf(out.data(), out.size(), "%zu day%s ago", days, days == 1 ? "" : "s");
+    }
+
+    return out;
+}
+
+system_time_point_t current_time_system() noexcept
+{
+    return std::chrono::system_clock::now();
+}
+
+s64 compute_diff_ms(system_time_point_t start, system_time_point_t end) noexcept
+{
+    auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
+    auto end_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(end);
+    auto diff_ms = end_ms - start_ms;
+    return diff_ms.count();
+}
+
+s64 compute_diff_us(system_time_point_t start, system_time_point_t end) noexcept
+{
+    auto start_ms = std::chrono::time_point_cast<std::chrono::microseconds>(start);
+    auto end_ms = std::chrono::time_point_cast<std::chrono::microseconds>(end);
+    auto diff_us = end_ms - start_ms;
+    return diff_us.count();
+}
+
+std::array<char, 64> compute_when_str(system_time_point_t start, system_time_point_t end) noexcept
+{
+    std::array<char, 64> out = {};
+
+    s64 ms_diff = compute_diff_ms(start, end);
+    s64 one_minute = 60'000;
+    s64 one_hour = one_minute * 60;
+    s64 one_day = one_hour * 24;
+
+    if (ms_diff < 0) {
+        strncpy(out.data(), "in the future", out.size());
+    }
+    else if (ms_diff < one_minute) {
         strncpy(out.data(), "just now", out.size());
     }
     else if (ms_diff < one_hour) {

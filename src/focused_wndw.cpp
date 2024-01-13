@@ -34,8 +34,7 @@ bool global_state::save_focused_window(s32 window_code) noexcept
             success = false;
         }
 
-        print_debug_msg("[%s] global_state::save_focused_window disk: %d (new code: %d)",
-                        file_path.generic_string().c_str(), success, window_code);
+        print_debug_msg("global_state::save_focused_window disk: %d (new code: %d)", success, window_code);
     }
 
     return success;
@@ -49,18 +48,18 @@ bool global_state::load_focused_window_from_disk(s32 &out) noexcept
         std::ifstream in(file_path);
 
         if (!in) {
-            print_debug_msg("[%s] FAILED global_state::load_focused_window_from_disk: !in", file_path.generic_string().c_str());
+            print_debug_msg("FAILED global_state::load_focused_window_from_disk: !in");
             return false;
         }
 
         in >> s_focused_window;
         out = s_focused_window;
 
-        print_debug_msg("SUCCESS load_focused_window_from_disk [%s]", file_path.generic_string().c_str());
+        print_debug_msg("SUCCESS load_focused_window_from_disk");
         return true;
     }
     catch (...) {
-        print_debug_msg("FAILED load_focused_window_from_disk [%s]: catch(...)", file_path.generic_string().c_str());
+        print_debug_msg("FAILED load_focused_window_from_disk: catch(...)");
         return false;
     }
 }
