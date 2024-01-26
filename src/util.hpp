@@ -100,6 +100,12 @@ bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_st
 std::string make_str(char const *fmt, ...) noexcept;
 
 template <typename Ty>
+char const *pluralized(Ty num, char const *if_single, char const *if_zero_or_multiple) noexcept
+{
+    return num == 1 ? if_single : if_zero_or_multiple;
+}
+
+template <typename Ty>
 bool one_of(Ty const &test_val, std::initializer_list<Ty> const &possible_values) noexcept
 {
     for (auto const &val : possible_values) {

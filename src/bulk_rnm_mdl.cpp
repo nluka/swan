@@ -5,7 +5,7 @@
 
 static bool s_bulk_rename_open = false;
 static explorer_window *s_bulk_rename_expl = nullptr;
-static std::vector<explorer_window::dirent *> s_bulk_rename_selection = {};
+static std::vector<explorer_window::dirent> s_bulk_rename_selection = {};
 static std::function<void ()> s_bulk_rename_on_rename_finish_callback = {};
 
 void swan_popup_modals::open_bulk_rename(
@@ -15,9 +15,9 @@ void swan_popup_modals::open_bulk_rename(
     s_bulk_rename_open = true;
 
     s_bulk_rename_selection.clear();
-    for (auto &dirent : expl.cwd_entries) {
+    for (auto const &dirent : expl.cwd_entries) {
         if (dirent.is_selected) {
-            s_bulk_rename_selection.push_back(&dirent);
+            s_bulk_rename_selection.push_back(dirent);
         }
     }
 
@@ -30,6 +30,25 @@ void swan_popup_modals::open_bulk_rename(
 bool swan_popup_modals::is_open_bulk_rename() noexcept
 {
     return s_bulk_rename_open;
+}
+
+static
+void set_clipboard_to_slice(ImGuiInputTextState *state) noexcept
+{
+    assert(state != nullptr);
+
+    s32 start = state->GetSelectionStart();
+    s32 end = state->GetSelectionEnd();
+
+    if (start > end) { // reverse selection
+        std::swap(start, end);
+    }
+
+    end -= 1;
+
+    char slice[64];
+    (void) snprintf(slice, lengthof(slice), "<%d,%d>", start, end);
+    imgui::SetClipboardText(slice);
 }
 
 void swan_popup_modals::render_bulk_rename() noexcept
@@ -69,6 +88,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
     static bool initial_computed = false;
     static bulk_rename_compile_pattern_result pattern_compile_res = {};
+    static std::vector<bulk_rename_op> sorted_renames = {};
     static std::vector<bulk_rename_op> renames = {};
     static std::vector<bulk_rename_collision> collisions;
     static f64 transform_us = {};
@@ -82,6 +102,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
         initial_computed = false;
         pattern_compile_res = {};
         renames.clear();
+        sorted_renames.clear();
         collisions.clear();
         transform_us = {};
         collisions_us = {};
@@ -135,6 +156,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         renames.reserve(selection.size());
         renames.clear();
+        sorted_renames.clear();
 
         collisions.reserve(selection.size());
         collisions.clear();
@@ -147,8 +169,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                 s32 counter = counter_start;
 
-                for (auto &p_dirent : selection) {
-                    auto &dirent = *p_dirent;
+                for (auto &dirent : selection) {
                     file_name_extension_splitter name_ext(dirent.basic.path.data());
                     swan_path_t after;
 
@@ -166,7 +187,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
             }
             {
                 scoped_timer<timer_unit::MICROSECONDS> find_collisions_timer(&collisions_us);
-                collisions = bulk_rename_find_collisions(expl.cwd_entries, renames);
+                auto result = bulk_rename_find_collisions(expl.cwd_entries, renames);
+                collisions = result.collisions;
+                sorted_renames = result.sorted_renames;
             }
         }
 
@@ -177,6 +200,8 @@ void swan_popup_modals::render_bulk_rename() noexcept
     u64 success = num_renames_success.load();
     u64 fail = num_renames_fail.load();
     u64 total = num_renames_total.load();
+
+    imgui::Spacing();
 
     imgui::BeginDisabled(!pattern_compile_res.success || !collisions.empty() || pattern_utf8[0] == '\0' || state != bulk_rename_state::nil);
     bool rename_button_pressed = imgui::Button("Rename##bulk_perform");
@@ -197,12 +222,6 @@ void swan_popup_modals::render_bulk_rename() noexcept
             cleanup_and_close_popup();
         }
     }
-
-    // imgui::BeginDisabled(state != bulk_rename_state::in_progress);
-    // if (imgui::Button("Cancel##bulk_perform")) {
-    //     rename_state.store(bulk_rename_state::cancelled);
-    // }
-    // imgui::EndDisabled();
 
     state = rename_state.load();
 
@@ -231,11 +250,12 @@ void swan_popup_modals::render_bulk_rename() noexcept
         }
     }
 
-    imgui::Separator();
+    imgui::Spacing();
 
     if (global_state::settings().show_debug_info) {
-        imgui::Text("transform_us: %.2lf", transform_us);
-        imgui::Text("collisions_us: %.2lf", collisions_us);
+        imgui::Text("transform_us  : %.1lf", transform_us);
+        imgui::Text("collisions_us : %.1lf", collisions_us);
+        imgui::Spacing();
     }
 
     bool all_renames_attempted = (success + fail) == total;
@@ -254,7 +274,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
     else if (state == bulk_rename_state::cancelled) {
         imgui::TextColored(red(), "Operation cancelled.");
     }
-    else if (!collisions.empty()) { // show collisions
+    else if (!collisions.empty()) {
+        imgui::TextColored(red(), "Collisions detected, see below.");
+
         enum collisions_table_col_id : s32
         {
             collisions_table_col_problem,
@@ -263,35 +285,86 @@ void swan_popup_modals::render_bulk_rename() noexcept
             collisions_table_col_count,
         };
 
-        if (imgui::BeginTable("bulk_rename_collisions", collisions_table_col_count, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersInnerV)) {
-            imgui::TableSetupColumn("Problem");
-            imgui::TableSetupColumn("After");
-            imgui::TableSetupColumn("Before");
-            imgui::TableHeadersRow();
+        if (imgui::BeginChild("bulk_rename_collisions_child")) {
+            if (imgui::BeginTable("bulk_rename_collisions", collisions_table_col_count, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_BordersH)) {
+                imgui::TableSetupColumn("Problem");
+                imgui::TableSetupColumn("After");
+                imgui::TableSetupColumn("Before");
+                imgui::TableHeadersRow();
 
-            for (auto const &c : collisions) {
-                u64 first = c.first_rename_pair_idx;
-                u64 last = c.last_rename_pair_idx;
+                ImGuiListClipper clipper;
+                assert(collisions.size() <= (u64)INT32_MAX);
+                clipper.Begin((s32)collisions.size());
 
-                imgui::TableNextRow();
+                while (clipper.Step())
+                for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+                    auto const &c = collisions[i];
+                    u64 first = c.first_rename_pair_idx;
+                    u64 last = c.last_rename_pair_idx;
 
-                if (imgui::TableSetColumnIndex(collisions_table_col_problem)) {
-                    imgui::TextColored(red(), c.dest_dirent ? "Name taken" : "Same result");
-                }
+                    imgui::TableNextRow();
 
-                if (imgui::TableSetColumnIndex(collisions_table_col_after)) {
-                    imgui::Text(renames.front().after.data());
-                }
-
-                if (imgui::TableSetColumnIndex(collisions_table_col_before)) {
-                    for (u64 i = first; i < last; ++i) {
-                        imgui::TextColored(get_color(renames[i].before->type), "%s\n", renames[i].before->path.data());
+                    if (imgui::TableSetColumnIndex(collisions_table_col_problem)) {
+                        imgui::AlignTextToFramePadding();
+                        imgui::TextColored(red(), c.dest_dirent ? "Name exists in destination" : "Converge to same name");
                     }
-                    imgui::TextColored(get_color(renames[last].before->type), "%s", renames[last].before->path.data());
+
+                    if (imgui::TableSetColumnIndex(collisions_table_col_after)) {
+                        imgui::AlignTextToFramePadding();
+                        if (imgui::Selectable(c.dest_dirent ? c.dest_dirent->path.data() : sorted_renames[i].after.data())) {
+                            {
+                                std::scoped_lock lock(expl.entries_to_select_mutex);
+                                expl.entries_to_select.clear();
+                                expl.entries_to_select.push_back(c.dest_dirent->path);
+                                expl.scroll_to_nth_selected_entry_next_frame = 0;
+                            }
+                            expl.deselect_all_cwd_entries();
+                            (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+                            cleanup_and_close_popup();
+                        }
+                    }
+                    if (c.dest_dirent && imgui::IsItemHovered()) {
+                        imgui::SetTooltip("Click to open entry in destination");
+                    }
+
+                    imgui::ScopedStyle<f32> isx(imgui::GetStyle().ItemSpacing.x, 5);
+
+                    if (imgui::TableSetColumnIndex(collisions_table_col_before)) {
+                        for (u64 i = first; i <= last; ++i) {
+                            char buffer[64];
+                            (void) snprintf(buffer, lengthof(buffer), "##before_%zu", i);
+
+                            char buffer2[64];
+                            (void) snprintf(buffer2, lengthof(buffer2), "... %zu more", last - i + 1);
+
+                            f32 width = imgui::CalcTextSize(sorted_renames[i].before->path.data()).x + (imgui::GetStyle().FramePadding.x * 2);
+                            f32 width_more = imgui::CalcTextSize(buffer2).x;
+
+                            if ((width + width_more) > imgui::GetContentRegionAvail().x) {
+                                imgui::AlignTextToFramePadding();
+                                imgui::TextUnformatted(buffer2);
+                                break;
+                            }
+
+                            imgui::ScopedTextColor tc(get_color(sorted_renames[i].before->type));
+                            imgui::ScopedItemWidth w(width);
+
+                            imgui::InputText(buffer, sorted_renames[i].before->path.data(), sorted_renames[i].before->path.max_size(), ImGuiInputTextFlags_ReadOnly);
+                            imgui::SameLine();
+
+                            if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
+                                ImGuiInputTextState *input_txt_state = imgui::GetInputTextState(imgui::GetID(buffer));
+                                if (input_txt_state->HasSelection()) {
+                                    set_clipboard_to_slice(input_txt_state);
+                                }
+                            }
+                        }
+                    }
                 }
+                imgui::EndTable();
             }
-            imgui::EndTable();
         }
+        imgui::EndChild();
     }
     else if (!pattern_compile_res.success) {
         auto &compile_error = pattern_compile_res.error;
@@ -311,20 +384,43 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                 ImGuiListClipper clipper;
                 assert(renames.size() <= (u64)INT32_MAX);
-                clipper.Begin((s32)selection.size());
+                clipper.Begin((s32)renames.size());
 
                 while (clipper.Step())
                 for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-                    auto const &rename = renames[i];
+                    auto &rename = renames[i];
                     auto &before = *rename.before;
                     auto &after = rename.after;
                     auto color = get_color(before.type);
 
                     imgui::TableNextColumn();
-                    imgui::TextColored(color, before.path.data());
+                    {
+                        char buffer[64];
+                        (void) snprintf(buffer, lengthof(buffer), "##before_%zu", i);
+
+                        imgui::ScopedAvailWidth w = {};
+                        imgui::ScopedTextColor tc(color);
+
+                        imgui::InputText(buffer, before.path.data(), before.path.max_size(), ImGuiInputTextFlags_ReadOnly);
+
+                        if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
+                            ImGuiInputTextState *input_txt_state = imgui::GetInputTextState(imgui::GetID(buffer));
+                            if (input_txt_state->HasSelection()) {
+                                set_clipboard_to_slice(input_txt_state);
+                            }
+                        }
+                    }
 
                     imgui::TableNextColumn();
-                    imgui::TextColored(color, after.data());
+                    {
+                        char buffer[64];
+                        (void) snprintf(buffer, lengthof(buffer), "##after_%zu", i);
+
+                        imgui::ScopedAvailWidth w = {};
+                        imgui::ScopedTextColor tc(color);
+
+                        imgui::InputText(buffer, after.data(), after.max_size(), ImGuiInputTextFlags_ReadOnly);
+                    }
                 }
 
                 imgui::EndTable();
@@ -334,7 +430,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     }
 
     if (rename_button_pressed && pattern_compile_res.success && collisions.empty() && rename_state.load() == bulk_rename_state::nil) {
-        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops, swan_path_t expl_cwd, wchar_t dir_sep_utf16) {
+        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops,  swan_path_t expl_cwd, wchar_t dir_sep_utf16) {
             rename_state.store(bulk_rename_state::in_progress);
             num_renames_total.store(rename_ops.size());
 
@@ -369,7 +465,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(expl_cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
 
                     if (utf_written == 0) {
-                        print_debug_msg("utf8_to_utf16 failed (expl_cwd -> buffer_cwd_utf16)");
+                        print_debug_msg("FAILED utf8_to_utf16 (expl_cwd -> buffer_cwd_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -378,7 +474,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(rename.before->path.data(), buffer_before_utf16, lengthof(buffer_before_utf16));
 
                     if (utf_written == 0) {
-                        print_debug_msg("utf8_to_utf16 failed (rename.before.path -> buffer_before_utf16)");
+                        print_debug_msg("FAILED utf8_to_utf16 (rename.before.path -> buffer_before_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -392,7 +488,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     utf_written = utf8_to_utf16(rename.after.data(), buffer_after_utf16, lengthof(buffer_after_utf16));
 
                     if (utf_written == 0) {
-                        print_debug_msg("utf8_to_utf16 failed (rename.after -> buffer_after_utf16)");
+                        print_debug_msg("FAILED utf8_to_utf16 (rename.after -> buffer_after_utf16)");
                         ++num_renames_fail;
                         continue;
                     }
@@ -408,6 +504,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                     if (result == 0) {
                         ++num_renames_success;
+                        // TODO: select renamed entry in expl
                     }
                 }
             }

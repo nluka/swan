@@ -26,28 +26,22 @@ void render_frame(GLFWwindow *window) noexcept
 
 ImVec4 orange()                noexcept { return ImVec4(1, 0.5f, 0, 1); }
 ImVec4 red()                   noexcept { return ImVec4(1, 0.2f, 0, 1); }
+ImVec4 white()                 noexcept { return ImVec4(1, 1, 1, 1); }
 ImVec4 dir_color()             noexcept { return get_color(basic_dirent::kind::directory); }
-ImVec4 symlink_color()         noexcept { return get_color(basic_dirent::kind::symlink_to_directory); }
+ImVec4 symlink_color()         noexcept { return orange(); }
 ImVec4 invalid_symlink_color() noexcept { return get_color(basic_dirent::kind::invalid_symlink); }
 ImVec4 file_color()            noexcept { return get_color(basic_dirent::kind::file); }
 
-bool imgui::EnumButton::Render(s32 &enum_value, s32 enum_first, s32 enum_count, char const *labels[], u64 num_labels) noexcept
+bool imgui::EnumButton::Render(s32 &enum_value, s32 enum_first, s32 enum_count, char const *labels[], [[maybe_unused]] u64 num_labels) noexcept
 {
-    assert(enum_count > enum_first);
-
-    u64 num_enums = enum_count - enum_first;
+    [[maybe_unused]] u64 num_enums = enum_count - enum_first;
     assert(num_enums > 1);
     assert(num_enums == num_labels);
 
     this->current_label = labels[enum_value];
 
     char buffer[128]; init_empty_cstr(buffer);
-    s32 written = snprintf(buffer, lengthof(buffer), "%s##%zu-%zu", this->current_label, this->rand_1, this->rand_2);
-    // s32 written = snprintf(buffer, lengthof(buffer), "%s", this->current_label);
-    // s32 written = snprintf(buffer, lengthof(buffer), "%s%s%s##%zu-%zu",
-    //                        (this->name != nullptr ? this->name : ""),
-    //                        (this->name != nullptr && !strempty(this->name) ? ": " : ""),
-    //                        this->current_label, fast_rand(0, UINT32_MAX), fast_rand(0, UINT32_MAX));
+    [[maybe_unused]] s32 written = snprintf(buffer, lengthof(buffer), "%s##%zu-%zu", this->current_label, this->rand_1, this->rand_2);
     assert(written > 0);
 
     if (this->name != nullptr && !strempty(this->name)) {
@@ -55,9 +49,6 @@ bool imgui::EnumButton::Render(s32 &enum_value, s32 enum_first, s32 enum_count, 
         imgui::TextUnformatted(this->name);
         imgui::SameLine();
     }
-
-    // bool selected = {};
-    // bool activated = imgui::Selectable(buffer, selected);
 
     bool activated = imgui::Button(buffer);
 

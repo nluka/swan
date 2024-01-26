@@ -183,32 +183,52 @@ u64 path_append(
     return 1;
 }
 
-bool path_loosely_same(swan_path_t const &p1, swan_path_t const &p2) noexcept
+bool path_loosely_same(char const *p1, char const *p2, u64 p1_len, u64 p2_len) noexcept
 {
-    u16 p1_len = path_length(p1);
-    u16 p2_len = path_length(p2);
+    if (p1_len == u64(-1)) {
+        p1_len = strlen(p1);
+    }
+    if (p2_len == u64(-1)) {
+        p2_len = strlen(p2);
+    }
+
     s32 len_diff = (s32)std::max(p1_len, p2_len) - (s32)std::min(p1_len, p2_len);
     assert(len_diff >= 0);
 
     if (len_diff == 0) {
-        return StrCmpNIA(p1.data(), p2.data(), std::min(p1_len, p2_len)) == 0;
+        return StrCmpNIA(p1, p2, (s32)std::min(p1_len, p2_len)) == 0;
     }
     else {
-        bool same_beginning = StrCmpNIA(p1.data(), p2.data(), std::min(p1_len, p2_len)) == 0;
+        bool same_beginning = StrCmpNIA(p1, p2, (s32)std::min(p1_len, p2_len)) == 0;
         bool all_rest_are_separators = {};
 
         if (p1_len > p2_len) { // p1 is longer one
-            all_rest_are_separators = std::all_of(p1.data() + p1_len - len_diff,
-                                                  p1.data() + p1_len,
+            all_rest_are_separators = std::all_of(p1 + p1_len - len_diff,
+                                                  p1 + p1_len,
                                                   [](char ch) { return strchr("\\/", ch); });
         } else { // p2 is longer one
-            all_rest_are_separators = std::all_of(p2.data() + p2_len - len_diff,
-                                                  p2.data() + p2_len,
+            all_rest_are_separators = std::all_of(p2 + p2_len - len_diff,
+                                                  p2 + p2_len,
                                                   [](char ch) { return strchr("\\/", ch); });
         }
 
         return same_beginning && all_rest_are_separators;
     }
+}
+
+bool path_loosely_same(swan_path_t const &p1, char const *p2, u64 p2_len) noexcept
+{
+    return path_loosely_same(p1.data(), p2, path_length(p1), p2_len);
+}
+
+bool path_loosely_same(char const *p1, swan_path_t const &p2, u64 p1_len) noexcept
+{
+    return path_loosely_same(p1, p2.data(), p1_len, path_length(p2));
+}
+
+bool path_loosely_same(swan_path_t const &p1, swan_path_t const &p2) noexcept
+{
+    return path_loosely_same(p1.data(), p2.data(), path_length(p1), path_length(p2));
 }
 
 swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept
@@ -242,4 +262,42 @@ swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept
     }
 
     return cleaned_path;
+}
+
+swan_path_t path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf8) noexcept
+{
+    auto segments = std::string_view(path_utf8) | std::ranges::views::split(dir_sep_utf8);
+
+    char subpath_utf8[2048] = {};
+
+    char dir_sep_utf8_[] = { dir_sep_utf8, '\0' };
+
+    swan_path_t retval = path_create("");
+
+    for (auto const &seg : segments) {
+        (void) strncat(subpath_utf8, seg.data(), seg.size());
+        (void) strcat(subpath_utf8, dir_sep_utf8_);
+
+        wchar_t subpath_utf16[MAX_PATH];
+        s32 written = utf8_to_utf16(subpath_utf8, subpath_utf16, lengthof(subpath_utf16));
+
+        if (written > 0) {
+            WIN32_FIND_DATAW find_data;
+            HANDLE find_handle = FindFirstFileW(subpath_utf16, &find_data);
+            SCOPE_EXIT { FindClose(find_handle); };
+
+            char file_name_utf8[MAX_PATH * 2];
+            written = utf16_to_utf8(find_data.cFileName, file_name_utf8, lengthof(file_name_utf8));
+
+            if (written > 0) {
+                bool app_success = path_append(retval, file_name_utf8, dir_sep_utf8, true);
+
+                if (!app_success) {
+                    return path_create("");
+                }
+            }
+        }
+    }
+
+    return retval;
 }

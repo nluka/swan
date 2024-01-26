@@ -13,6 +13,7 @@ void render_frame(GLFWwindow *window) noexcept;
 
 ImVec4 orange() noexcept;
 ImVec4 red() noexcept;
+ImVec4 white() noexcept;
 ImVec4 dir_color() noexcept;
 ImVec4 symlink_color() noexcept;
 ImVec4 file_color() noexcept;

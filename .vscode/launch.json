@@ -11,7 +11,8 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "console": "integratedTerminal",
-            "preLaunchTask": "Build Swan (Debug)"
+            "preLaunchTask": "Build Swan (Debug)",
+            "requireExactSource": false
         },
         {
             "name": "Debug Swan Tests",

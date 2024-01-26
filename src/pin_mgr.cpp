@@ -55,6 +55,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
             auto &pin = pins[i];
 
             if (edit_enabled) {
+            #if 0
                 {
                     char buffer[32];
                     snprintf(buffer, lengthof(buffer), "Color##%zu", i);
@@ -64,10 +65,11 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                     }
                 }
                 imgui::SameLine();
+            #endif
                 {
                     char buffer[32];
                     snprintf(buffer, lengthof(buffer), ICON_CI_EDIT "##pin%zu", i);
-                    if (imgui::Button(buffer)) {
+                    if (imgui::SmallButton(buffer)) {
                         swan_popup_modals::open_edit_pin(&pin);
                     }
                 }
@@ -75,7 +77,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                 {
                     char buffer[32];
                     snprintf(buffer, lengthof(buffer), ICON_CI_TRASH "##pin%zu", i);
-                    if (imgui::Button(buffer)) {
+                    if (imgui::SmallButton(buffer)) {
                         pin_to_delete_idx = i;
                     }
                 }

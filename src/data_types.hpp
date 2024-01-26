@@ -141,6 +141,7 @@ struct explorer_window
         basic_dirent basic;
         ptrdiff_t highlight_start_idx = 0;
         u64 highlight_len = 0;
+        u32 spotlight_frames_remaining = 0;
         bool is_filtered_out = false;
         bool is_selected = false;
         bool is_cut = false;
@@ -186,6 +187,7 @@ struct explorer_window
     void push_history_item(swan_path_t const &new_latest_entry) noexcept;
 
     // 104 byte alignment members
+
     static_vector<ImGuiTableColumnSortSpecs, cwd_entries_table_col_count> column_sort_specs;
 
     // 80 byte alignment members
@@ -199,13 +201,9 @@ struct explorer_window
 
     // 40 byte alignment members
 
-    /* TODO:
-        add time_departed, but seralizing time_point_t is not easy: https://stackoverflow.com/questions/22291506/persisting-stdchrono-time-point-instances
-        might have to use system time instead
-    */
     // struct history_item
     // {
-    //     time_point_t? time_departed;
+    //     system_time_point_t? time_departed;
     //     swan_path_t path;
     // };
 
@@ -220,15 +218,17 @@ struct explorer_window
 
     // 24 byte alignment members
 
-    std::vector<dirent> cwd_entries = {}; // all direct children of the cwd
-    std::vector<swan_path_t> entries_to_select = {}; // entries to select on the next update of cwd_entries
+    std::vector<dirent> cwd_entries = {};               // all direct children of the cwd
+    std::vector<swan_path_t> entries_to_select = {};    // entries to select on the next update of cwd_entries
 
     // 8 byte alignment members
 
     char const *name = nullptr;
-    filter_mode filter_mode = filter_mode::contains; // persisted in file
-    u64 cwd_prev_selected_dirent_idx = NO_SELECTION; // idx of most recently clicked cwd entry, NO_SELECTION means there isn't one
-    u64 wd_history_pos = 0; // where in wd_history we are, persisted in file
+    filter_mode filter_mode = filter_mode::contains;    // persisted in file
+    u64 cwd_latest_selected_dirent_idx = u64(-1);       // idx of most recently clicked cwd entry
+    u64 wd_history_pos = 0;                             // where in wd_history we are, persisted in file
+    u64 nth_last_cwd_dirent_scrolled = u64(-1);
+    u64 scroll_to_nth_selected_entry_next_frame = u64(-1);
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
     precise_time_point_t read_dir_changes_refresh_request_time = {};
     precise_time_point_t last_filesystem_query_time = {};
@@ -278,9 +278,10 @@ struct explorer_window
     bool filter_show_symlink_files = true;          // persisted in file
     bool filter_show_invalid_symlinks = true;       // persisted in file
 
-    bool scroll_to_first_selected_entry_next_frame = false;
+    bool cwd_latest_selected_dirent_idx_changed = false;
+
     update_cwd_entries_actions update_request_from_outside = nil; /* how code from outside the Begin()/End() of the explorer window
-                                                                     tells this explorer to update its cwd_entries */
+                                                                     signals to the explorer to call update_cwd_entries */
 
     mutable s8 latest_save_to_disk_result = -1;
 };
@@ -343,6 +344,7 @@ struct progress_sink : public IFileOperationProgressSink
 {
     s32 dst_expl_id;
     swan_path_t dst_expl_cwd_when_operation_started;
+    bool contains_delete_operations;
 
     HRESULT FinishOperations(HRESULT) override;
     HRESULT PauseTimer() override;
@@ -390,7 +392,10 @@ struct pinned_path
 
 struct recent_file
 {
-    system_time_point_t open_time;
+    static u64 const ACTION_MAX_LEN = 64;
+
+    boost::static_string<ACTION_MAX_LEN> action;
+    system_time_point_t action_time;
     swan_path_t path;
 };
 

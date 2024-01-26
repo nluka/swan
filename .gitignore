@@ -13,3 +13,4 @@ swan_tests.md
 *.expected
 *.pch
 *.dmp
+symbol_cache/

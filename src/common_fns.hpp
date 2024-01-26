@@ -22,6 +22,10 @@ namespace global_constants
 namespace global_state
 {
     circular_buffer<recent_file> &recent_files() noexcept;
+    u64 find_recent_file_idx(char const *search_path) noexcept;
+    void move_recent_file_idx_to_front(u64 recent_file_idx, char const *new_action = nullptr) noexcept;
+    void add_recent_file(char const *action, char const *full_file_path) noexcept;
+    void remove_recent_file(u64 recent_file_idx) noexcept;
     bool save_recent_files_to_disk() noexcept;
     std::pair<bool, u64> load_recent_files_from_disk() noexcept;
 
@@ -158,11 +162,11 @@ void apply_swan_style_overrides() noexcept;
 
 char const *get_icon(basic_dirent::kind t) noexcept;
 
+char const *get_icon_for_extension(char const *extension) noexcept;
+
 drive_list_t query_drive_list() noexcept;
 
 generic_result open_file(char const *file_name, char const *file_directory) noexcept;
-
-void move_recent_file_to_front_and_save(u64 recent_file_idx) noexcept;
 
 std::string get_last_error_string() noexcept;
 
@@ -188,7 +192,13 @@ bulk_rename_transform_result bulk_rename_transform(
 
 void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> &renames) noexcept;
 
+struct bulk_rename_find_collisions_result
+{
+    std::vector<bulk_rename_collision> collisions;
+    std::vector<bulk_rename_op> sorted_renames;
+};
+
 // Slow function which allocates & deallocates memory. Cache the result, don't call this function every frame.
-std::vector<bulk_rename_collision> bulk_rename_find_collisions(
+bulk_rename_find_collisions_result bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> const &renames) noexcept;

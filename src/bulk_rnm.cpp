@@ -412,14 +412,14 @@ void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> 
     });
 }
 
-std::vector<bulk_rename_collision> bulk_rename_find_collisions(
+bulk_rename_find_collisions_result bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> const &renames_in) noexcept
 {
     std::vector<bulk_rename_collision> collisions = {};
 
     if (renames_in.empty()) {
-        return collisions;
+        return { collisions, {} };
     }
 
     auto renames = renames_in; // make a copy cuz we gotta sort this sucker
@@ -490,5 +490,5 @@ std::vector<bulk_rename_collision> bulk_rename_find_collisions(
         }
     }
 
-    return collisions;
+    return { collisions, renames };
 }

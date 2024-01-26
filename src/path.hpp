@@ -32,9 +32,14 @@ bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept;
   bool postpend_slash = false) noexcept;
 
 bool path_loosely_same(swan_path_t const &p1, swan_path_t const &p2) noexcept;
+bool path_loosely_same(swan_path_t const &p1, char const *p2, u64 p2_len = u64(-1)) noexcept;
+bool path_loosely_same(char const *p1, swan_path_t const &p2, u64 p1_len = u64(-1)) noexcept;
+bool path_loosely_same(char const *p1, char const *p2, u64 p1_len = u64(-1), u64 p2_len = u64(-1)) noexcept;
 
 bool path_equals_exactly(swan_path_t const &p1, swan_path_t const &p2) noexcept;
 
 bool path_equals_exactly(swan_path_t const &p1, char const *p2) noexcept;
 
 [[nodiscard]] swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept;
+
+swan_path_t path_reconstruct_canonically(char const *path_utf8) noexcept;

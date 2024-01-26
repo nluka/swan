@@ -68,10 +68,11 @@ void set_window_icon(GLFWwindow *window) noexcept
     icon.width = 0;
     icon.height = 0;
 
-    char const *icon_path = "resource/swan_4.png";
+    std::filesystem::path icon_file_path = global_state::execution_path() / "swan.png";
+    std::string icon_file_path_str = icon_file_path.generic_string();
 
     s32 icon_width, icon_height, icon_channels;
-    u8 *icon_pixels = stbi_load(icon_path, &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
+    u8 *icon_pixels = stbi_load(icon_file_path_str.c_str(), &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
 
     SCOPE_EXIT { stbi_image_free(icon_pixels); };
 
@@ -82,7 +83,7 @@ void set_window_icon(GLFWwindow *window) noexcept
         glfwSetWindowIcon(window, 1, &icon);
     }
     else {
-        print_debug_msg("FAILED to set window icon [%s]", icon_path);
+        print_debug_msg("FAILED to set window icon [%s]", icon_file_path_str.c_str());
     }
 }
 
@@ -396,7 +397,7 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
             // material design
             {
                 static ImWchar const glyph_ranges[] = { ICON_MIN_MD, ICON_MAX_16_MD, 0 };
-                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_CI, 13, 0, 3, glyph_ranges);
+                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_MD, 13, 0, 3, glyph_ranges);
             }
         }
 
