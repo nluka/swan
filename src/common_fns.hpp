@@ -166,7 +166,7 @@ char const *get_icon_for_extension(char const *extension) noexcept;
 
 drive_list_t query_drive_list() noexcept;
 
-generic_result open_file(char const *file_name, char const *file_directory) noexcept;
+generic_result open_file(char const *file_name, char const *file_directory, bool as_admin = false) noexcept;
 
 std::string get_last_error_string() noexcept;
 

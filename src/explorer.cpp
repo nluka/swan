@@ -555,7 +555,7 @@ generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, exp
     }
 }
 
-generic_result open_file(char const *file_name, char const *file_directory) noexcept
+generic_result open_file(char const *file_name, char const *file_directory, bool as_admin) noexcept
 {
     swan_path_t target_full_path_utf8 = path_create(file_directory);
 
@@ -572,7 +572,9 @@ generic_result open_file(char const *file_name, char const *file_directory) noex
         return { false, "Conversion of target's full path from UTF-8 to UTF-16." };
     }
 
-    HINSTANCE result = ShellExecuteW(nullptr, L"open", target_full_path_utf16, nullptr, nullptr, SW_SHOWNORMAL);
+    wchar_t const *operation = as_admin ? L"runas" : L"open";
+
+    HINSTANCE result = ShellExecuteW(nullptr, operation, target_full_path_utf16, nullptr, nullptr, SW_SHOWNORMAL);
 
     auto ec = (intptr_t)result;
 
@@ -1285,7 +1287,7 @@ void explorer_window::push_history_item(swan_path_t const &new_latest_entry) noe
     path_pop_back_if(new_latest_entry_clean, dir_sep_utf8);
 
     // TODO: split `new_latest_entry_clean` by `dir_sep_utf8` and progressively reconstruct path with canonical capitalization
-    new_latest_entry_clean = path_reconstruct_canonically(new_latest_entry_clean.data());
+    // new_latest_entry_clean = path_reconstruct_canonically(new_latest_entry_clean.data(), dir_sep_utf8);
 
     if (this->wd_history.empty()) {
         this->wd_history_pos = 0;
@@ -3468,6 +3470,28 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                         imgui::Separator();
 
                         // bool is_directory = right_clicked_ent->basic.is_directory();
+
+                        if ((path_ends_with(right_clicked_ent->basic.path, ".exe") || path_ends_with(right_clicked_ent->basic.path, ".bat"))
+                            && imgui::Selectable("Run as administrator"))
+                        {
+                            auto res = open_file(right_clicked_ent->basic.path.data(), expl.cwd.data(), true);
+
+                            if (res.success) {
+                                char const *full_file_path = res.error_or_utf8_path.c_str();
+                                u64 recent_file_idx = global_state::find_recent_file_idx(full_file_path);
+
+                                if (recent_file_idx == u64(-1)) {
+                                    global_state::add_recent_file("Opened", full_file_path);
+                                }
+                                else { // already in recent
+                                    global_state::move_recent_file_idx_to_front(recent_file_idx, "Opened");
+                                }
+                                (void) global_state::save_recent_files_to_disk();
+                            } else {
+                                swan_popup_modals::open_error(make_str("Open file as administrator [%s].", right_clicked_ent->basic.path.data()).c_str(),
+                                                              res.error_or_utf8_path.c_str());
+                            }
+                        }
 
                         if (right_clicked_ent->basic.is_symlink_to_file() && imgui::Selectable("Open file location")) {
                             symlink_data lnk_data = {};

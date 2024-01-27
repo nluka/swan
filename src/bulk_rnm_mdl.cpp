@@ -330,14 +330,14 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     imgui::ScopedStyle<f32> isx(imgui::GetStyle().ItemSpacing.x, 5);
 
                     if (imgui::TableSetColumnIndex(collisions_table_col_before)) {
-                        for (u64 i = first; i <= last; ++i) {
+                        for (u64 j = first; j <= last; ++j) {
                             char buffer[64];
-                            (void) snprintf(buffer, lengthof(buffer), "##before_%zu", i);
+                            (void) snprintf(buffer, lengthof(buffer), "##before_%zu", j);
 
                             char buffer2[64];
-                            (void) snprintf(buffer2, lengthof(buffer2), "... %zu more", last - i + 1);
+                            (void) snprintf(buffer2, lengthof(buffer2), "... %zu more", last - j + 1);
 
-                            f32 width = imgui::CalcTextSize(sorted_renames[i].before->path.data()).x + (imgui::GetStyle().FramePadding.x * 2);
+                            f32 width = imgui::CalcTextSize(sorted_renames[j].before->path.data()).x + (imgui::GetStyle().FramePadding.x * 2);
                             f32 width_more = imgui::CalcTextSize(buffer2).x;
 
                             if ((width + width_more) > imgui::GetContentRegionAvail().x) {
@@ -346,10 +346,10 @@ void swan_popup_modals::render_bulk_rename() noexcept
                                 break;
                             }
 
-                            imgui::ScopedTextColor tc(get_color(sorted_renames[i].before->type));
+                            imgui::ScopedTextColor tc(get_color(sorted_renames[j].before->type));
                             imgui::ScopedItemWidth w(width);
 
-                            imgui::InputText(buffer, sorted_renames[i].before->path.data(), sorted_renames[i].before->path.max_size(), ImGuiInputTextFlags_ReadOnly);
+                            imgui::InputText(buffer, sorted_renames[j].before->path.data(), sorted_renames[j].before->path.max_size(), ImGuiInputTextFlags_ReadOnly);
                             imgui::SameLine();
 
                             if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
