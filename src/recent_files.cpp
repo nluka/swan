@@ -18,26 +18,22 @@ HRESULT progress_sink::FinishOperations(HRESULT)
     print_debug_msg("FinishOperations");
 
     if (this->contains_delete_operations) {
-        std::scoped_lock lock(s_recent_files_mutex);
+        {
+            auto new_buffer = circular_buffer<recent_file>(MAX_RECENT_FILES);
 
-        static_vector<u64, MAX_RECENT_FILES> indices_to_remove = {};
+            std::scoped_lock lock(s_recent_files_mutex);
 
-        for (u64 i = 0; i < s_recent_files.size(); ++i) {
-            recent_file const &recent_file = s_recent_files[i];
+            for (auto const &recent_file : s_recent_files) {
+                wchar_t recent_file_path_utf16[MAX_PATH];
 
-            wchar_t recent_file_path_utf16[MAX_PATH];
-
-            s32 written = utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16));
-
-            if (written == 0) {
-                // TODO: error
-            } else if (!PathFileExistsW(recent_file_path_utf16)) {
-                indices_to_remove.push_back(i);
+                if (!utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16))) {
+                    // TODO: error
+                } else if (PathFileExistsW(recent_file_path_utf16)) {
+                    new_buffer.push_back(recent_file);
+                }
             }
-        }
 
-        for (u64 const &rm_idx : indices_to_remove) {
-            s_recent_files.erase(s_recent_files.begin() + rm_idx);
+            s_recent_files = new_buffer;
         }
 
         global_state::save_recent_files_to_disk();

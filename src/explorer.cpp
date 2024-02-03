@@ -124,7 +124,7 @@ void explorer_window::deselect_all_cwd_entries() noexcept
 void explorer_window::select_all_visible_cwd_entries(bool select_dotdot_dir) noexcept
 {
     for (auto &dirent : this->cwd_entries) {
-        if ((!select_dotdot_dir && dirent.basic.is_path_dotdot()) || dirent.is_filtered_out) {
+        if ( (!select_dotdot_dir && dirent.basic.is_path_dotdot()) || dirent.is_filtered_out ) {
             continue;
         } else {
             dirent.is_selected = true;
