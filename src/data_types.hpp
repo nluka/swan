@@ -74,6 +74,13 @@ struct drive_info
 
 typedef static_vector<drive_info, 26> drive_list_t;
 
+struct recycle_bin_info
+{
+    HRESULT result;
+    s64 bytes_used;
+    s64 num_items;
+};
+
 struct swan_settings
 {
     bool save_to_disk() const noexcept;
@@ -115,7 +122,7 @@ struct swan_settings
         bool analytics = false;
         bool debug_log = false;
         bool settings = false;
-    #if !defined(NDEBUG)
+    #if DEBUG_MODE
         bool imgui_demo = false;
         bool fa_icons = false;
         bool ci_icons = false;
@@ -168,6 +175,8 @@ struct explorer_window
         cwd_entries_table_col_count
     };
 
+    typedef static_vector<ImGuiTableColumnSortSpecs, cwd_entries_table_col_count> cwd_entries_column_sort_specs_t;
+
     static u64 const NO_SELECTION = UINT64_MAX;
     static u64 const MAX_WD_HISTORY_SIZE = 15;
     bool save_to_disk() const noexcept;
@@ -178,6 +187,7 @@ struct explorer_window
     void set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept;
     void uncut() noexcept;
     void reset_filter() noexcept;
+    cwd_entries_column_sort_specs_t copy_column_sort_specs(ImGuiTableSortSpecs const *sort_specs) noexcept;
 
     bool update_cwd_entries(
         update_cwd_entries_actions actions,
@@ -188,12 +198,12 @@ struct explorer_window
 
     // 104 byte alignment members
 
-    static_vector<ImGuiTableColumnSortSpecs, cwd_entries_table_col_count> column_sort_specs;
+    cwd_entries_column_sort_specs_t column_sort_specs;
 
     // 80 byte alignment members
 
     std::mutex shlwapi_task_initialization_mutex = {};
-    std::mutex entries_to_select_mutex = {};
+    std::mutex select_cwd_entries_on_next_update_mutex = {};
 
     // 72 byte alignment members
 
@@ -219,7 +229,7 @@ struct explorer_window
     // 24 byte alignment members
 
     std::vector<dirent> cwd_entries = {};               // all direct children of the cwd
-    std::vector<swan_path_t> entries_to_select = {};    // entries to select on the next update of cwd_entries
+    std::vector<swan_path_t> select_cwd_entries_on_next_update = {};    // entries to select on the next update of cwd_entries
 
     // 8 byte alignment members
 
@@ -232,6 +242,7 @@ struct explorer_window
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
     precise_time_point_t read_dir_changes_refresh_request_time = {};
     precise_time_point_t last_filesystem_query_time = {};
+    dirent *right_clicked_ent = nullptr;
 
     static u64 const num_timing_samples = 10;
 

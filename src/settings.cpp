@@ -16,6 +16,10 @@ void swan_windows::render_settings(GLFWwindow *window) noexcept
     static bool overridden = false;
 
     if (imgui::Begin(swan_windows::get_name(swan_windows::settings), &global_state::settings().show.settings)) {
+        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+            global_state::save_focused_window(swan_windows::settings);
+        }
+
         auto &settings = global_state::settings();
 
         regular_change |= imgui::Checkbox("Start with window maximized", &settings.start_with_window_maximized);
@@ -106,7 +110,7 @@ try {
     write_bool("show.analytics", this->show.analytics);
     write_bool("show.settings", this->show.settings);
     write_bool("show.debug_log", this->show.debug_log);
-#if !defined(NDEBUG)
+#if DEBUG_MODE
     write_bool("show.imgui_demo", this->show.imgui_demo);
     write_bool("show.fa_icons", this->show.fa_icons);
     write_bool("show.ci_icons", this->show.ci_icons);
@@ -243,7 +247,7 @@ try {
         else if (property == "show.settings") {
             this->show.settings = extract_bool();
         }
-    #if !defined(NDEBUG)
+    #if DEBUG_MODE
         else if (property == "show.imgui_demo") {
             this->show.imgui_demo = extract_bool();
         }

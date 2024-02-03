@@ -352,7 +352,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
     if (!ImGui::Begin("Dear ImGui Demo", p_open, window_flags))
     {
         // Early out if the window is collapsed, as an optimization.
-        ImGui::End();
+        // ImGui::End();
         return;
     }
 
@@ -613,7 +613,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
 
     // End of ShowDemoWindow()
     ImGui::PopItemWidth();
-    ImGui::End();
+    // ImGui::End();
 }
 
 static void ShowDemoWindowWidgets()

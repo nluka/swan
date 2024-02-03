@@ -34,7 +34,7 @@ bool global_state::save_focused_window(s32 window_code) noexcept
             success = false;
         }
 
-        print_debug_msg("global_state::save_focused_window disk: %d (new code: %d)", success, window_code);
+        print_debug_msg("global_state::save_focused_window disk: %d (%s)", success, swan_windows::get_name(window_code));
     }
 
     return success;

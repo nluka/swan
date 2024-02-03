@@ -3,6 +3,375 @@
 #include "imgui_specific.hpp"
 #include "util.hpp"
 
+static void glfw_error_callback(s32 error, char const *description) noexcept;
+static GLFWwindow *create_barebones_window() noexcept;
+static void set_window_icon(GLFWwindow *window) noexcept;
+static LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcept;
+static void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
+static void render_analytics() noexcept;
+static void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept;
+static void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept;
+
+#if defined(NDEBUG)
+#   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
+#endif
+s32 main(s32, char const *argv[])
+try {
+    SetUnhandledExceptionFilter(custom_exception_handler);
+
+    SCOPE_EXIT { std::cout << boost::stacktrace::stacktrace(); };
+
+    GLFWwindow *window = create_barebones_window();
+    if (window == nullptr) {
+        return 1;
+    }
+    print_debug_msg("Barebones window created.");
+
+    SCOPE_EXIT {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        // implot::DestroyContext();
+        imgui::DestroyContext();
+        glfwDestroyWindow(window);
+        glfwTerminate();
+    };
+
+    {
+        std::filesystem::path swan_exec_path = argv[0];
+        swan_exec_path = swan_exec_path.remove_filename();
+        global_state::execution_path() = swan_exec_path;
+        print_debug_msg("global_state::execution_path = [%s]", swan_exec_path.generic_string().c_str());
+    }
+
+    std::string ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
+
+    // block execution until all necessary files are found in their expected locations, relative to execution path.
+    // if any are not found, the user is notified and given the ability to "Retry" the search for essential files.
+    find_essential_files(window, ini_file_path.c_str());
+    print_debug_msg("Essential files found.");
+
+    // block execution until all non-default fonts are loaded successfully.
+    // the user is notified of any font load failures and given the ability to "Retry" which will attempt to reload the fonts.
+    load_non_default_fonts(window, ini_file_path.c_str());
+    print_debug_msg("Non-default fonts loaded.");
+
+    // block until COM is successfully initialized. the user is notified if an error occurs,
+    // and has the ability to "Retry" which will attempt to re-initialize COM.
+    init_COM_for_explorers(window, ini_file_path.c_str());
+    print_debug_msg("COM initialized for explorers.");
+    SCOPE_EXIT { clean_COM_for_explorers(); };
+
+    // other initialization stuff which is either: optional, cannot fail, or whose failure is considered non-fatal
+    {
+        set_window_icon(window);
+
+        seed_fast_rand((u64)current_time_precise().time_since_epoch().count());
+
+        SYSTEM_INFO system_info;
+        GetSystemInfo(&system_info);
+        global_state::page_size() = system_info.dwPageSize;
+        print_debug_msg("global_state::page_size = %d", global_state::page_size());
+
+        (void) global_state::settings().load_from_disk();
+        (void) global_state::load_pins_from_disk(global_state::settings().dir_separator_utf8);
+        (void) global_state::load_recent_files_from_disk();
+
+        if (global_state::settings().start_with_window_maximized) {
+            glfwMaximizeWindow(window);
+        }
+        if (global_state::settings().start_with_previous_window_pos_and_size) {
+            glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
+            glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
+        }
+
+        imgui::StyleColorsDark();
+        apply_swan_style_overrides();
+    }
+
+    auto &explorers = global_state::explorers();
+    // init explorers
+    {
+        char const *names[global_constants::num_explorers] = {
+            swan_windows::get_name(swan_windows::explorer_0),
+            swan_windows::get_name(swan_windows::explorer_1),
+            swan_windows::get_name(swan_windows::explorer_2),
+            swan_windows::get_name(swan_windows::explorer_3),
+        };
+
+        for (u64 i = 0; i < explorers.size(); ++i) {
+            auto &expl = explorers[i];
+
+            expl.id = s32(i);
+            expl.name = names[i];
+            expl.filter_error.reserve(1024);
+
+            bool load_result = explorers[i].load_from_disk(global_state::settings().dir_separator_utf8);
+            print_debug_msg("[ %d ] explorer_window::load_from_disk: %d", i, load_result);
+
+            if (!load_result) {
+                expl.cwd = path_create("");
+                bool save_result = explorers[i].save_to_disk();
+                print_debug_msg("[%s] save_to_disk: %d", expl.name, save_result);
+            }
+
+            bool starting_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            if (starting_dir_exists) {
+                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                (void) expl.update_cwd_entries(filter, expl.cwd.data());
+            }
+        }
+    }
+
+    std::array<s32, swan_windows::count> window_render_order = {
+        swan_windows::explorer_0,
+        swan_windows::explorer_1,
+        swan_windows::explorer_2,
+        swan_windows::explorer_3,
+        swan_windows::pin_manager,
+        swan_windows::file_operations,
+        swan_windows::recent_files,
+        swan_windows::analytics,
+        swan_windows::debug_log,
+        swan_windows::settings,
+    #if DEBUG_MODE
+        swan_windows::imgui_demo,
+        swan_windows::icon_font_browser_font_awesome,
+        swan_windows::icon_font_browser_codicon,
+        swan_windows::icon_font_browser_material_design,
+    #endif
+    };
+
+    {
+        s32 last_focused_window;
+        if (!global_state::load_focused_window_from_disk(last_focused_window)) {
+            last_focused_window = swan_windows::explorer_0;
+        } else {
+            assert(last_focused_window != -1);
+            auto last_focused_window_it = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window);
+            std::swap(*last_focused_window_it, window_render_order.back());
+        }
+    }
+
+    static precise_time_point_t last_window_move_or_resize_time = current_time_precise();
+    static bool window_pos_or_size_needs_write = false;
+
+    glfwSetWindowPosCallback(window, [](GLFWwindow *, s32 new_x, s32 new_y) {
+        global_state::settings().window_x = new_x;
+        global_state::settings().window_y = new_y;
+        last_window_move_or_resize_time = current_time_precise();
+        window_pos_or_size_needs_write = true;
+    });
+    glfwSetWindowSizeCallback(window, [](GLFWwindow *, s32 new_w, s32 new_h) {
+        global_state::settings().window_w = new_w;
+        global_state::settings().window_h = new_h;
+        last_window_move_or_resize_time = current_time_precise();
+        window_pos_or_size_needs_write = true;
+    });
+
+    print_debug_msg("Entering render loop...");
+
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+
+        static s32 last_focused_window = window_render_order.back();
+        {
+            s32 focused_now = global_state::focused_window();
+            assert(focused_now != -1);
+
+            if (last_focused_window != focused_now) {
+                auto focused_now_it = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window);
+                std::swap(*focused_now_it, window_render_order.back());
+            }
+
+            // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing escape
+            if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE) })) {
+                // ImGui::SetWindowFocus(nullptr);
+                ImGui::SetWindowFocus(swan_windows::get_name(focused_now));
+            }
+        }
+
+        if (window_pos_or_size_needs_write && compute_diff_ms(last_window_move_or_resize_time, current_time_precise()) > 250) {
+            // we check that some time has passed since last_window_move_or_resize_time to avoid spamming the disk as the user moves or resizes the window
+            print_debug_msg("window_pos_or_size_needs_write");
+            (void) global_state::settings().save_to_disk();
+            window_pos_or_size_needs_write = false;
+        }
+
+        new_frame(ini_file_path.c_str());
+
+        auto visib_at_frame_start = global_state::settings().show;
+
+        SCOPE_EXIT {
+            render_frame(window);
+
+            bool window_visibilities_changed = memcmp(&global_state::settings().show, &visib_at_frame_start, sizeof(visib_at_frame_start)) != 0;
+            if (window_visibilities_changed) {
+                global_state::settings().save_to_disk();
+            }
+        };
+
+        imgui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
+
+        render_main_menu_bar(explorers);
+
+        auto &window_visib = global_state::settings().show;
+
+        for (s32 window_code : window_render_order) {
+            switch (window_code) {
+                case swan_windows::explorer_0: {
+                    if (window_visib.explorer_0) {
+                        swan_windows::render_explorer(explorers[0], window_visib.explorer_0);
+                    }
+                    break;
+                }
+                case swan_windows::explorer_1: {
+                    if (window_visib.explorer_1) {
+                        swan_windows::render_explorer(explorers[1], window_visib.explorer_1);
+                    }
+                    break;
+                }
+                case swan_windows::explorer_2: {
+                    if (window_visib.explorer_2) {
+                        swan_windows::render_explorer(explorers[2], window_visib.explorer_2);
+                    }
+                    break;
+                }
+                case swan_windows::explorer_3: {
+                    if (window_visib.explorer_3) {
+                        swan_windows::render_explorer(explorers[3], window_visib.explorer_3);
+                    }
+                    break;
+                }
+                case swan_windows::pin_manager: {
+                    if (window_visib.pin_manager) {
+                        swan_windows::render_pin_manager(explorers, window_visib.pin_manager);
+                    }
+                    break;
+                }
+                case swan_windows::file_operations: {
+                    if (window_visib.file_operations) {
+                        swan_windows::render_file_operations();
+                    }
+                    break;
+                }
+                case swan_windows::recent_files: {
+                    if (window_visib.recent_files) {
+                        swan_windows::render_recent_files(window_visib.recent_files);
+                    }
+                    break;
+                }
+                case swan_windows::analytics: {
+                    if (window_visib.analytics) {
+                        render_analytics();
+                    }
+                    break;
+                }
+                case swan_windows::debug_log: {
+                    if (window_visib.debug_log) {
+                        swan_windows::render_debug_log(window_visib.debug_log);
+                    }
+                    break;
+                }
+                case swan_windows::settings: {
+                    if (window_visib.settings) {
+                        swan_windows::render_settings(window);
+                    }
+                    break;
+                }
+            #if DEBUG_MODE
+                case swan_windows::imgui_demo: {
+                    if (window_visib.imgui_demo) {
+                        imgui::ShowDemoWindow(&window_visib.imgui_demo);
+                        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+                            global_state::save_focused_window(swan_windows::imgui_demo);
+                        }
+                        imgui::End();
+                    }
+                    break;
+                }
+                case swan_windows::icon_font_browser_font_awesome: {
+                    static icon_font_browser_state fa_browser = { {}, 10, global_constants::icon_font_glyphs_font_awesome() };
+                    if (window_visib.fa_icons) {
+                        swan_windows::render_icon_font_browser(
+                            swan_windows::icon_font_browser_font_awesome,
+                            fa_browser,
+                            window_visib.fa_icons,
+                            "Font Awesome",
+                            "ICON_FA_",
+                            global_constants::icon_font_glyphs_font_awesome);
+                    }
+                    break;
+                }
+                case swan_windows::icon_font_browser_codicon: {
+                    static icon_font_browser_state ci_browser = { {}, 10, global_constants::icon_font_glyphs_codicon() };
+                    if (window_visib.ci_icons) {
+                        swan_windows::render_icon_font_browser(
+                            swan_windows::icon_font_browser_codicon,
+                            ci_browser,
+                            window_visib.ci_icons,
+                            "Codicons",
+                            "ICON_CI_",
+                            global_constants::icon_font_glyphs_codicon);
+                    }
+                    break;
+                }
+                case swan_windows::icon_font_browser_material_design: {
+                    static icon_font_browser_state md_browser = { {}, 10, global_constants::icon_font_glyphs_material_design() };
+                    if (window_visib.md_icons) {
+                        swan_windows::render_icon_font_browser(
+                            swan_windows::icon_font_browser_material_design,
+                            md_browser,
+                            window_visib.md_icons,
+                            "Material Design",
+                            "ICON_MD_",
+                            global_constants::icon_font_glyphs_material_design);
+                    }
+                    break;
+                }
+            #endif
+            }
+        }
+
+        if (swan_popup_modals::is_open_single_rename()) {
+            swan_popup_modals::render_single_rename();
+        }
+        if (swan_popup_modals::is_open_bulk_rename()) {
+            swan_popup_modals::render_bulk_rename();
+        }
+        if (swan_popup_modals::is_open_new_pin()) {
+            swan_popup_modals::render_new_pin();
+        }
+        if (swan_popup_modals::is_open_edit_pin()) {
+            swan_popup_modals::render_edit_pin();
+        }
+        if (swan_popup_modals::is_open_error()) {
+            swan_popup_modals::render_error();
+        }
+    }
+
+    //? I don't know if this is safe to do, would be good to look into it,
+    //? but as of now the program seems to work...
+    std::exit(0); // kill all change notif threads
+
+    return 0;
+}
+catch (std::exception const &except) {
+    fprintf(stderr, "fatal: %s\n", except.what());
+    std::cout << boost::stacktrace::stacktrace();
+}
+catch (std::string const &err) {
+    fprintf(stderr, "fatal: %s\n", err.c_str());
+    std::cout << boost::stacktrace::stacktrace();
+}
+catch (char const *err) {
+    fprintf(stderr, "fatal: %s\n", err);
+    std::cout << boost::stacktrace::stacktrace();
+}
+catch (...) {
+    fprintf(stderr, "fatal: unknown error, catch(...)\n");
+    std::cout << boost::stacktrace::stacktrace();
+}
+
 static
 void glfw_error_callback(s32 error, char const *description) noexcept
 {
@@ -29,7 +398,10 @@ GLFWwindow *create_barebones_window() noexcept
     {
         s32 screen_width = GetSystemMetrics(SM_CXSCREEN);
         s32 screen_height = GetSystemMetrics(SM_CYSCREEN);
-        window = glfwCreateWindow(screen_width, screen_height, "swan", nullptr, nullptr);
+
+        std::string window_title = make_str("swan - %s - %s %s", get_build_mode().str, __DATE__, __TIME__);
+
+        window = glfwCreateWindow(screen_width, screen_height, window_title.c_str(), nullptr, nullptr);
         if (window == nullptr) {
             return nullptr;
         }
@@ -152,7 +524,7 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::analytics), nullptr, &global_state::settings().show.analytics);
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::settings), nullptr, &global_state::settings().show.settings);
 
-        #if !defined(NDEBUG)
+        #if DEBUG_MODE
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::debug_log), nullptr, &global_state::settings().show.debug_log);
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::imgui_demo), nullptr, &global_state::settings().show.imgui_demo);
             change_made |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_font_browser_font_awesome), nullptr, &global_state::settings().show.fa_icons);
@@ -250,14 +622,8 @@ void render_analytics() noexcept
             global_state::save_focused_window(swan_windows::analytics);
         }
 
-    #if !defined(NDEBUG)
-        char const *build_mode = "Debug";
-    #else
-        char const *build_mode = "Release";
-    #endif
-
         auto &io = imgui::GetIO();
-        imgui::Text("Build mode : %s", build_mode);
+        imgui::Text("Build mode : %s", get_build_mode());
         imgui::Text("FPS        : %.1f FPS", io.Framerate);
         imgui::Text("ms/frame   : %.3f", 1000.0f / io.Framerate);
     }
@@ -420,368 +786,4 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
 
         render_frame(window);
     }
-}
-
-#if defined(NDEBUG)
-#   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
-#endif
-s32 main(s32, char const *argv[])
-try {
-    SetUnhandledExceptionFilter(custom_exception_handler);
-
-    SCOPE_EXIT { std::cout << boost::stacktrace::stacktrace(); };
-
-    GLFWwindow *window = create_barebones_window();
-    if (window == nullptr) {
-        return 1;
-    }
-    print_debug_msg("Barebones window created.");
-
-    SCOPE_EXIT {
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        // implot::DestroyContext();
-        imgui::DestroyContext();
-        glfwDestroyWindow(window);
-        glfwTerminate();
-    };
-
-    {
-        std::filesystem::path swan_exec_path = argv[0];
-        swan_exec_path = swan_exec_path.remove_filename();
-        global_state::execution_path() = swan_exec_path;
-        print_debug_msg("global_state::execution_path = [%s]", swan_exec_path.generic_string().c_str());
-    }
-
-    std::string ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
-
-    // verify necessary files are in the expected locations, relative to execution path.
-    // this will block until all essential files are found. the user is notified of any missing files
-    // and is able to "Retry" which will rescan.
-    find_essential_files(window, ini_file_path.c_str());
-    print_debug_msg("Essential files found.");
-
-    // ensure all non-default fonts are loaded successfully. this will block until all are loaded.
-    // the user is notified of any failures and able to "Retry" which will attempt to reload the fonts.
-    load_non_default_fonts(window, ini_file_path.c_str());
-    print_debug_msg("Non-default fonts loaded.");
-
-    // ensure COM is initialized for usage by explorers. this will block until initialization is successful.
-    // the user is notified of any failures and able to "Retry" which will attempt to re-initialize.
-    init_COM_for_explorers(window, ini_file_path.c_str());
-    print_debug_msg("COM initialized for explorers.");
-    SCOPE_EXIT { clean_COM_for_explorers(); };
-
-    // other initialization stuff which is optional, cannot fail, or failure isn't fatal for the application
-    {
-        set_window_icon(window);
-
-        // imgui::GetIO().IniFilename = "swan_imgui.ini";
-
-        seed_fast_rand((u64)current_time_precise().time_since_epoch().count());
-
-        SYSTEM_INFO system_info;
-        GetSystemInfo(&system_info);
-        global_state::page_size() = system_info.dwPageSize;
-        print_debug_msg("global_state::page_size = %d", global_state::page_size());
-
-        (void) global_state::settings().load_from_disk();
-        (void) global_state::load_pins_from_disk(global_state::settings().dir_separator_utf8);
-        (void) global_state::load_recent_files_from_disk();
-
-        if (global_state::settings().start_with_window_maximized) {
-            glfwMaximizeWindow(window);
-        }
-        if (global_state::settings().start_with_previous_window_pos_and_size) {
-            glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
-            glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
-        }
-
-        imgui::StyleColorsDark();
-        apply_swan_style_overrides();
-    }
-
-    auto &explorers = global_state::explorers();
-    // init explorers
-    {
-        char const *names[global_constants::num_explorers] = {
-            swan_windows::get_name(swan_windows::explorer_0),
-            swan_windows::get_name(swan_windows::explorer_1),
-            swan_windows::get_name(swan_windows::explorer_2),
-            swan_windows::get_name(swan_windows::explorer_3),
-        };
-
-        for (u64 i = 0; i < explorers.size(); ++i) {
-            auto &expl = explorers[i];
-
-            expl.id = s32(i);
-            expl.name = names[i];
-            expl.filter_error.reserve(1024);
-
-            bool load_result = explorers[i].load_from_disk(global_state::settings().dir_separator_utf8);
-            print_debug_msg("[ %d ] explorer_window::load_from_disk: %d", i, load_result);
-
-            if (!load_result) {
-                swan_path_t startup_path = {};
-                expl.cwd = startup_path;
-
-                bool save_result = explorers[i].save_to_disk();
-                print_debug_msg("[%s] save_to_disk: %d", expl.name, save_result);
-            }
-
-            bool starting_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-            if (starting_dir_exists) {
-                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                (void) expl.update_cwd_entries(filter, expl.cwd.data());
-            }
-        }
-    }
-
-    std::array<s32, swan_windows::count> window_render_order = {
-        swan_windows::explorer_0,
-        swan_windows::explorer_1,
-        swan_windows::explorer_2,
-        swan_windows::explorer_3,
-        swan_windows::pin_manager,
-        swan_windows::file_operations,
-        swan_windows::recent_files,
-        swan_windows::analytics,
-        swan_windows::debug_log,
-        swan_windows::settings,
-    #if !defined(NDEBUG)
-        swan_windows::imgui_demo,
-        swan_windows::icon_font_browser_font_awesome,
-        swan_windows::icon_font_browser_codicon,
-        swan_windows::icon_font_browser_material_design,
-    #endif
-    };
-
-    {
-        s32 last_focused_window;
-        if (!global_state::load_focused_window_from_disk(last_focused_window)) {
-            last_focused_window = swan_windows::explorer_0;
-        } else {
-            assert(last_focused_window != -1);
-            auto last_focused_window_it = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window);
-            std::swap(*last_focused_window_it, window_render_order.back());
-        }
-    }
-
-    static precise_time_point_t last_window_move_or_resize_time = current_time_precise();
-    static bool window_pos_or_size_needs_write = false;
-
-    glfwSetWindowPosCallback(window, [](GLFWwindow *, s32 new_x, s32 new_y) {
-        global_state::settings().window_x = new_x;
-        global_state::settings().window_y = new_y;
-        last_window_move_or_resize_time = current_time_precise();
-        window_pos_or_size_needs_write = true;
-    });
-    glfwSetWindowSizeCallback(window, [](GLFWwindow *, s32 new_w, s32 new_h) {
-        global_state::settings().window_w = new_w;
-        global_state::settings().window_h = new_h;
-        last_window_move_or_resize_time = current_time_precise();
-        window_pos_or_size_needs_write = true;
-    });
-
-    print_debug_msg("Entering render loop...");
-
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-
-        static s32 last_focused_window = window_render_order.back();
-        {
-            s32 focused_now = global_state::focused_window();
-            assert(focused_now != -1);
-
-            if (last_focused_window != focused_now) {
-                auto focused_now_it = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window);
-                std::swap(*focused_now_it, window_render_order.back());
-            }
-
-            // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing escape
-            if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE) })) {
-                // ImGui::SetWindowFocus(nullptr);
-                ImGui::SetWindowFocus(swan_windows::get_name(focused_now));
-            }
-        }
-
-        if (window_pos_or_size_needs_write && compute_diff_ms(last_window_move_or_resize_time, current_time_precise()) > 250) {
-            // we check that some time has passed since last_window_move_or_resize_time to avoid spam saving, which could degrade perf
-            // as the user moves or resizes the window
-
-            print_debug_msg("window_pos_or_size_needs_write");
-            (void) global_state::settings().save_to_disk();
-            window_pos_or_size_needs_write = false;
-        }
-
-        new_frame(ini_file_path.c_str());
-
-        auto visib_at_frame_start = global_state::settings().show;
-
-        SCOPE_EXIT {
-            render_frame(window);
-
-            bool window_visibilities_changed = memcmp(&global_state::settings().show, &visib_at_frame_start, sizeof(visib_at_frame_start)) != 0;
-            if (window_visibilities_changed) {
-                global_state::settings().save_to_disk();
-            }
-        };
-
-        imgui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
-
-        render_main_menu_bar(explorers);
-
-        auto &window_visib = global_state::settings().show;
-
-        for (s32 window_code : window_render_order) {
-            switch (window_code) {
-                case swan_windows::explorer_0: {
-                    if (window_visib.explorer_0) {
-                        swan_windows::render_explorer(explorers[0], window_visib.explorer_0);
-                    }
-                    break;
-                }
-                case swan_windows::explorer_1: {
-                    if (window_visib.explorer_1) {
-                        swan_windows::render_explorer(explorers[1], window_visib.explorer_1);
-                    }
-                    break;
-                }
-                case swan_windows::explorer_2: {
-                    if (window_visib.explorer_2) {
-                        swan_windows::render_explorer(explorers[2], window_visib.explorer_2);
-                    }
-                    break;
-                }
-                case swan_windows::explorer_3: {
-                    if (window_visib.explorer_3) {
-                        swan_windows::render_explorer(explorers[3], window_visib.explorer_3);
-                    }
-                    break;
-                }
-                case swan_windows::pin_manager: {
-                    if (window_visib.pin_manager) {
-                        swan_windows::render_pin_manager(explorers, window_visib.pin_manager);
-                    }
-                    break;
-                }
-                case swan_windows::file_operations: {
-                    if (window_visib.file_operations) {
-                        swan_windows::render_file_operations();
-                    }
-                    break;
-                }
-                case swan_windows::recent_files: {
-                    if (window_visib.recent_files) {
-                        swan_windows::render_recent_files(window_visib.recent_files);
-                    }
-                    break;
-                }
-                case swan_windows::analytics: {
-                    if (window_visib.analytics) {
-                        render_analytics();
-                    }
-                    break;
-                }
-                case swan_windows::debug_log: {
-                    if (window_visib.debug_log) {
-                        swan_windows::render_debug_log(window_visib.debug_log);
-                    }
-                    break;
-                }
-                case swan_windows::settings: {
-                    if (window_visib.settings) {
-                        swan_windows::render_settings(window);
-                    }
-                    break;
-                }
-            #if !defined(NDEBUG)
-                case swan_windows::imgui_demo: {
-                    //! since ShowDemoWindow calls End() for you, we cannot use global_state::save_focused_window as per usual... oh well
-                    if (window_visib.imgui_demo) {
-                        imgui::ShowDemoWindow(&window_visib.imgui_demo);
-                    }
-                    break;
-                }
-                case swan_windows::icon_font_browser_font_awesome: {
-                    static icon_font_browser_state fa_browser = { {}, 10, global_constants::icon_font_glyphs_font_awesome() };
-                    if (window_visib.fa_icons) {
-                        swan_windows::render_icon_font_browser(
-                            swan_windows::icon_font_browser_font_awesome,
-                            fa_browser,
-                            window_visib.fa_icons,
-                            "Font Awesome",
-                            "ICON_FA_",
-                            global_constants::icon_font_glyphs_font_awesome);
-                    }
-                    break;
-                }
-                case swan_windows::icon_font_browser_codicon: {
-                    static icon_font_browser_state ci_browser = { {}, 10, global_constants::icon_font_glyphs_codicon() };
-                    if (window_visib.ci_icons) {
-                        swan_windows::render_icon_font_browser(
-                            swan_windows::icon_font_browser_codicon,
-                            ci_browser,
-                            window_visib.ci_icons,
-                            "Codicons",
-                            "ICON_CI_",
-                            global_constants::icon_font_glyphs_codicon);
-                    }
-                    break;
-                }
-                case swan_windows::icon_font_browser_material_design: {
-                    static icon_font_browser_state md_browser = { {}, 10, global_constants::icon_font_glyphs_material_design() };
-                    if (window_visib.md_icons) {
-                        swan_windows::render_icon_font_browser(
-                            swan_windows::icon_font_browser_material_design,
-                            md_browser,
-                            window_visib.md_icons,
-                            "Material Design",
-                            "ICON_MD_",
-                            global_constants::icon_font_glyphs_material_design);
-                    }
-                    break;
-                }
-            #endif
-            }
-        }
-
-        if (swan_popup_modals::is_open_single_rename()) {
-            swan_popup_modals::render_single_rename();
-        }
-        if (swan_popup_modals::is_open_bulk_rename()) {
-            swan_popup_modals::render_bulk_rename();
-        }
-        if (swan_popup_modals::is_open_new_pin()) {
-            swan_popup_modals::render_new_pin();
-        }
-        if (swan_popup_modals::is_open_edit_pin()) {
-            swan_popup_modals::render_edit_pin();
-        }
-        if (swan_popup_modals::is_open_error()) {
-            swan_popup_modals::render_error();
-        }
-    }
-
-    //? I don't know if this is safe to do, would be good to look into it,
-    //? but as of now the program seems to work...
-    std::exit(0); // kill all change notif threads
-
-    return 0;
-}
-catch (std::exception const &except) {
-    fprintf(stderr, "fatal: %s\n", except.what());
-    std::cout << boost::stacktrace::stacktrace();
-}
-catch (std::string const &err) {
-    fprintf(stderr, "fatal: %s\n", err.c_str());
-    std::cout << boost::stacktrace::stacktrace();
-}
-catch (char const *err) {
-    fprintf(stderr, "fatal: %s\n", err);
-    std::cout << boost::stacktrace::stacktrace();
-}
-catch (...) {
-    fprintf(stderr, "fatal: unknown error, catch(...)\n");
-    std::cout << boost::stacktrace::stacktrace();
 }

@@ -18,21 +18,26 @@ HRESULT progress_sink::FinishOperations(HRESULT)
     print_debug_msg("FinishOperations");
 
     if (this->contains_delete_operations) {
-        {
-            std::scoped_lock lock(s_recent_files_mutex);
+        std::scoped_lock lock(s_recent_files_mutex);
 
-            s_recent_files.erase(std::remove_if(s_recent_files.begin(), s_recent_files.end(), [](recent_file &recent_file) {
-                wchar_t recent_file_path_utf16[MAX_PATH];
+        static_vector<u64, MAX_RECENT_FILES> indices_to_remove = {};
 
-                s32 written = utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16));
+        for (u64 i = 0; i < s_recent_files.size(); ++i) {
+            recent_file const &recent_file = s_recent_files[i];
 
-                if (written == 0) {
-                    // TODO: error
-                    return false;
-                } else {
-                    return !PathFileExistsW(recent_file_path_utf16);
-                }
-            }));
+            wchar_t recent_file_path_utf16[MAX_PATH];
+
+            s32 written = utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16));
+
+            if (written == 0) {
+                // TODO: error
+            } else if (!PathFileExistsW(recent_file_path_utf16)) {
+                indices_to_remove.push_back(i);
+            }
+        }
+
+        for (u64 const &rm_idx : indices_to_remove) {
+            s_recent_files.erase(s_recent_files.begin() + rm_idx);
         }
 
         global_state::save_recent_files_to_disk();
@@ -283,8 +288,10 @@ void swan_windows::render_recent_files(bool &open) noexcept
                     }
                     else {
                         expl.deselect_all_cwd_entries();
-                        swan_path_t to_select = path_create(file_name);
-                        expl.entries_to_select.push_back(to_select);
+                        {
+                            std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
+                            expl.select_cwd_entries_on_next_update.push_back(path_create(file_name));
+                        }
 
                         bool file_directory_exists = expl.update_cwd_entries(full_refresh, file_directory.data());
 
@@ -295,10 +302,18 @@ void swan_windows::render_recent_files(bool &open) noexcept
                         }
                         else {
                             expl.cwd = path_create(file_directory.data());
-                            expl.push_history_item(expl.cwd);
-                            (void) expl.save_to_disk();
+
+                            if (!path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
+                                expl.push_history_item(expl.cwd);
+                            }
+
+                            expl.latest_valid_cwd = expl.cwd;
                             expl.scroll_to_nth_selected_entry_next_frame = 0;
+                            (void) expl.save_to_disk();
+
                             global_state::settings().show.explorer_0 = true;
+                            (void) global_state::settings().save_to_disk();
+
                             imgui::SetWindowFocus(expl.name);
                         }
                     }

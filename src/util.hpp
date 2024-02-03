@@ -2,7 +2,10 @@
 
 #include "stdafx.hpp"
 
-#if !defined(NDEBUG)
+#define DEBUG_MODE !defined(NDEBUG)
+#define RELEASE_MODE defined(NDEBUG)
+
+#if DEBUG_MODE
 #define WCOUT_IF_DEBUG(x) std::wcout << '[' << std::source_location::current().file_name() << ':' << std::source_location::current().line() << "] " << x
 #else
 #define WCOUT_IF_DEBUG(x) do {} while(0)
@@ -98,6 +101,15 @@ char *rtrim(char *szX) noexcept;
 bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept;
 
 std::string make_str(char const *fmt, ...) noexcept;
+
+struct build_mode
+{
+    bool debug;
+    bool release;
+    char const *str;
+};
+
+build_mode get_build_mode() noexcept;
 
 template <typename Ty>
 char const *pluralized(Ty num, char const *if_single, char const *if_zero_or_multiple) noexcept

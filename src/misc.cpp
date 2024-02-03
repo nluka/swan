@@ -178,3 +178,65 @@ std::string get_last_error_string() noexcept
 
     return error_message;
 }
+
+drive_list_t query_drive_list() noexcept
+{
+    drive_list_t drive_list;
+
+    s32 drives_mask = GetLogicalDrives();
+
+    for (u64 i = 0; i < 26; ++i) {
+        if (drives_mask & (1 << i)) {
+            char letter = 'A' + (char)i;
+
+            wchar_t drive_root[] = { wchar_t(letter), L':', L'\\', L'\0' };
+            wchar_t volume_name[MAX_PATH + 1];          init_empty_cstr(volume_name);
+            wchar_t filesystem_name_utf8[MAX_PATH + 1]; init_empty_cstr(filesystem_name_utf8);
+            DWORD serial_num = 0;
+            DWORD max_component_length = 0;
+            DWORD filesystem_flags = 0;
+            s32 utf_written = 0;
+
+            auto vol_info_result = GetVolumeInformationW(
+                drive_root, volume_name, lengthof(volume_name),
+                &serial_num, &max_component_length, &filesystem_flags,
+                filesystem_name_utf8, lengthof(filesystem_name_utf8)
+            );
+
+            ULARGE_INTEGER total_bytes;
+            ULARGE_INTEGER free_bytes;
+
+            if (vol_info_result) {
+                auto space_result = GetDiskFreeSpaceExW(drive_root, nullptr, &total_bytes, &free_bytes);
+                if (space_result) {
+                    drive_info info = {};
+                    info.letter = letter;
+                    info.total_bytes = total_bytes.QuadPart;
+                    info.available_bytes = free_bytes.QuadPart;
+                    utf_written = utf16_to_utf8(volume_name, info.name_utf8, lengthof(info.name_utf8));
+                    utf_written = utf16_to_utf8(filesystem_name_utf8, info.filesystem_name_utf8, lengthof(info.filesystem_name_utf8));
+                    drive_list.push_back(info);
+                }
+            }
+        }
+    }
+
+    return drive_list;
+}
+
+recycle_bin_info query_recycle_bin() noexcept
+{
+    SHQUERYRBINFO query_info;
+    query_info.cbSize = sizeof(query_info);
+
+    recycle_bin_info retval = {};
+
+    retval.result = SHQueryRecycleBinW(nullptr, &query_info);
+
+    if (retval.result == S_OK) {
+        retval.bytes_used = query_info.i64Size;
+        retval.num_items = query_info.i64NumItems;
+    }
+
+    return retval;
+}

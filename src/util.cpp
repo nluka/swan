@@ -463,3 +463,20 @@ std::string make_str(char const *fmt, ...) noexcept
 
     return std::string(buffer);
 }
+
+build_mode get_build_mode() noexcept
+{
+    build_mode retval = {};
+
+#if DEBUG_MODE
+    retval.debug = true;
+    retval.release = false;
+    retval.str = "Debug";
+#else
+    retval.debug = false;
+    retval.release = true;
+    retval.str = "Release";
+#endif
+
+    return retval;
+}

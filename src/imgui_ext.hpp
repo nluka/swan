@@ -15,6 +15,8 @@ namespace ImGui
 
     ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;
 
+    void SetInitialFocusOnNextWidget() noexcept;
+
     struct EnumButton
     {
     public:

@@ -101,3 +101,10 @@ void imgui::SameLineSpaced(u64 num_spacing_calls) noexcept
         ImGui::SameLine();
     }
 }
+
+void imgui::SetInitialFocusOnNextWidget() noexcept
+{
+    if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
+        imgui::SetKeyboardFocusHere(0);
+    }
+}

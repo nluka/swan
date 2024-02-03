@@ -286,7 +286,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
         };
 
         if (imgui::BeginChild("bulk_rename_collisions_child")) {
-            if (imgui::BeginTable("bulk_rename_collisions", collisions_table_col_count, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_BordersH)) {
+            if (imgui::BeginTable("bulk_rename_collisions", collisions_table_col_count, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|
+                                                                                        ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_BordersH))
+            {
                 imgui::TableSetupColumn("Problem");
                 imgui::TableSetupColumn("After");
                 imgui::TableSetupColumn("Before");
@@ -313,9 +315,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
                         imgui::AlignTextToFramePadding();
                         if (imgui::Selectable(c.dest_dirent ? c.dest_dirent->path.data() : sorted_renames[i].after.data())) {
                             {
-                                std::scoped_lock lock(expl.entries_to_select_mutex);
-                                expl.entries_to_select.clear();
-                                expl.entries_to_select.push_back(c.dest_dirent->path);
+                                std::scoped_lock lock(expl.select_cwd_entries_on_next_update_mutex);
+                                expl.select_cwd_entries_on_next_update.clear();
+                                expl.select_cwd_entries_on_next_update.push_back(c.dest_dirent->path);
                                 expl.scroll_to_nth_selected_entry_next_frame = 0;
                             }
                             expl.deselect_all_cwd_entries();

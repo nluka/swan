@@ -200,8 +200,8 @@ HRESULT progress_sink::PostMoveItem(
                 // TODO: error
             } else {
                 print_debug_msg("PostMoveItem [%s]", new_name_utf8.data());
-                std::scoped_lock lock(dst_expl.entries_to_select_mutex);
-                dst_expl.entries_to_select.push_back(new_name_utf8);
+                std::scoped_lock lock(dst_expl.select_cwd_entries_on_next_update_mutex);
+                dst_expl.select_cwd_entries_on_next_update.push_back(new_name_utf8);
             }
         }
     }
@@ -286,9 +286,8 @@ void perform_file_operations(
     std::string *init_error) noexcept
 {
     assert(!destination_directory_utf16.empty());
-    if (!StrChrW(L"\\/", destination_directory_utf16.back())) {
-        destination_directory_utf16 += L'\\';
-    }
+
+    std::replace(destination_directory_utf16.begin(), destination_directory_utf16.end(), L'/', L'\\');
 
     auto set_init_error_and_notify = [&](char const *err) {
         std::unique_lock lock(*init_done_mutex);
@@ -353,7 +352,7 @@ void perform_file_operations(
         paths_to_execute_utf16.pop_back();
     }
 
-    progress_sink prog_sink;
+    progress_sink prog_sink = {};
     prog_sink.dst_expl_id = dst_expl_id;
     prog_sink.dst_expl_cwd_when_operation_started = global_state::explorers()[dst_expl_id].cwd;
 
