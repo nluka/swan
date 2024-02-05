@@ -2584,7 +2584,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                 open_single_rename_popup = true;
                 dirent_to_be_renamed = &(*selected_dirent);
             }
-            else {
+            else if (num_entries_selected > 1) {
                 open_bulk_rename_popup = true;
             }
         }
@@ -3040,9 +3040,11 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                 render_table_rows_for_cwd_entries(expl, cnt, size_unit_multiplier, window_focused, any_popups_open, dir_sep_utf8, dir_sep_utf16);
 
                 auto result = render_dirent_right_click_context_menu(expl, cnt, global_state::settings());
-                open_bulk_rename_popup   = result.open_bulk_rename_popup;
-                open_single_rename_popup = result.open_single_rename_popup;
-                dirent_to_be_renamed     = result.single_dirent_to_be_renamed;
+                open_bulk_rename_popup   |= result.open_bulk_rename_popup;
+                open_single_rename_popup |= result.open_single_rename_popup;
+                if (result.single_dirent_to_be_renamed) {
+                    dirent_to_be_renamed = result.single_dirent_to_be_renamed;
+                }
 
                 imgui::EndTable();
             }
