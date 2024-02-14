@@ -146,7 +146,8 @@ void explorer_window::invert_selected_visible_cwd_entries() noexcept
 void explorer_window::set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept
 {
     if (global_state::settings().clear_filter_on_cwd_change) {
-        init_empty_cstr(this->filter_text.data());
+        this->reset_filter();
+        this->show_filter_window = false;
     }
     this->latest_valid_cwd = new_latest_valid_cwd;
     while (path_pop_back_if(this->latest_valid_cwd, "\\/ "));
@@ -480,26 +481,33 @@ generic_result handle_drag_drop_onto_dirent(
 }
 
 static
-generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, explorer_window &expl, wchar_t dir_sep_utf16) noexcept
+generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, explorer_window &expl) noexcept
 {
+    swan_path_t cwd_path_utf8 = expl.cwd;
+    swan_path_t entry_path_utf8 = entry.basic.path;
+
+    // Windows File Explorer does not like unix separator
+    path_force_separator(cwd_path_utf8, '\\');
+    path_force_separator(entry_path_utf8, '\\');
+
     wchar_t select_path_cwd_buffer_utf16[MAX_PATH];     init_empty_cstr(select_path_cwd_buffer_utf16);
     wchar_t select_path_dirent_buffer_utf16[MAX_PATH];  init_empty_cstr(select_path_dirent_buffer_utf16);
     std::wstring select_command = {};
 
     select_command.reserve(1024);
 
-    if (!utf8_to_utf16(expl.cwd.data(), select_path_cwd_buffer_utf16, lengthof(select_path_cwd_buffer_utf16))) {
+    if (!utf8_to_utf16(cwd_path_utf8.data(), select_path_cwd_buffer_utf16, lengthof(select_path_cwd_buffer_utf16))) {
         return { false, "Conversion of cwd path from UTF-8 to UTF-16." };
     }
 
     select_command += L"/select,";
     select_command += L'"';
     select_command += select_path_cwd_buffer_utf16;
-    if (!select_command.ends_with(dir_sep_utf16)) {
-        select_command += dir_sep_utf16;
+    if (!select_command.ends_with(L'\\')) {
+        select_command += L'\\';
     }
 
-    if (!utf8_to_utf16(entry.basic.path.data(), select_path_dirent_buffer_utf16, lengthof(select_path_dirent_buffer_utf16))) {
+    if (!utf8_to_utf16(entry_path_utf8.data(), select_path_dirent_buffer_utf16, lengthof(select_path_dirent_buffer_utf16))) {
         return { false, "Conversion of selected entry's path from UTF-8 to UTF-16." };
     }
 
@@ -1689,7 +1697,7 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
 }
 
 static
-bool render_history_browser_popup(explorer_window &expl, bool cwd_exists_before_edit) noexcept
+bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[maybe_unused]] bool show_history_label = true) noexcept
 {
     auto cleanup_and_close_popup = []() {
         imgui::CloseCurrentPopup();
@@ -1701,19 +1709,21 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists_before_
 
     imgui::SameLine();
 
-    imgui::BeginDisabled(expl.wd_history.empty());
-    if (imgui::SmallButton("Clear")) {
-        expl.wd_history.clear();
-        expl.wd_history_pos = 0;
+    {
+        imgui::ScopedDisable d(expl.wd_history.empty());
 
-        if (cwd_exists_before_edit) {
-            expl.push_history_item(expl.cwd);
+        if (imgui::SmallButton("Clear")) {
+            expl.wd_history.clear();
+            expl.wd_history_pos = 0;
+
+            if (cwd_exists) {
+                expl.push_history_item(expl.cwd);
+            }
+
+            expl.save_to_disk();
+            cleanup_and_close_popup();
         }
-
-        expl.save_to_disk();
-        cleanup_and_close_popup();
     }
-    imgui::EndDisabled();
 
     imgui::Separator();
 
@@ -1721,7 +1731,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists_before_
         imgui::TextUnformatted("(empty)");
     }
     else {
-        if (imgui::BeginTable("history_table", 3)) {
+        if (imgui::BeginTable("history_table", 3, ImGuiTableFlags_SizingStretchProp)) {
             u64 i = expl.wd_history.size() - 1;
             u64 i_inverse = 0;
 
@@ -2450,7 +2460,8 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
 static
 void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, char dir_sep_utf8, wchar_t dir_sep_utf16) noexcept
 {
-    f32 button_space = imgui::CalcTextSize(ICON_CI_BLANK).x + imgui::GetStyle().ItemSpacing.x + (imgui::GetStyle().FramePadding.x * 2);
+    // f32 button_space = imgui::CalcTextSize(ICON_CI_BLANK).x + imgui::GetStyle().ItemSpacing.x + (imgui::GetStyle().FramePadding.x * 2);
+    f32 button_space = 0;
     imgui::ScopedAvailWidth w(button_space);
 
     static swan_path_t cwd_input = {};
@@ -2517,7 +2528,11 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
     bool any_popups_open = swan_popup_modals::is_open_bulk_rename() || swan_popup_modals::is_open_error() ||
                            swan_popup_modals::is_open_single_rename() || swan_popup_modals::is_open_edit_pin() ||
-                           swan_popup_modals::is_open_new_pin();
+                           swan_popup_modals::is_open_new_pin() ||
+                           imgui::IsPopupOpen("History") ||
+                           imgui::IsPopupOpen("Create file") ||
+                           imgui::IsPopupOpen("Create directory")
+                           ;
 
     static std::string error_popup_action = {};
     static std::string error_popup_failure = {};
@@ -2545,6 +2560,66 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         }
 
         if (io.KeyCtrl) {
+
+            //? arrow keys cause navigation in ImGui, using arrow keys for back/forward wd_history nav would require fancy key handling
+            //? to suppress default ImGui behaviour (but not to the point where some desirable navigation is affected)
+        #if 0
+            if (imgui::IsKeyPressed(ImGuiKey_LeftArrow)) {
+                if (io.KeyShift) {
+                    expl.wd_history_pos = 0;
+                } else {
+                    expl.wd_history_pos -= 1;
+                }
+
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                bool back_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                if (back_dir_exists) {
+                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                    (void) expl.save_to_disk();
+                }
+            }
+
+            if (imgui::IsKeyPressed(ImGuiKey_RightArrow)) {
+                if (io.KeyShift) {
+                    u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
+                    expl.wd_history_pos = wd_history_last_idx;
+                } else {
+                    expl.wd_history_pos += 1;
+                }
+
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                bool forward_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                if (forward_dir_exists) {
+                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                }
+            }
+        #endif
+
+            if (imgui::IsKeyPressed(ImGuiKey_I)) {
+                expl.invert_selected_visible_cwd_entries();
+            }
+
+            if (imgui::IsKeyPressed(ImGuiKey_H)) {
+                expl.show_filter_window = false;
+                imgui::OpenPopup("History");
+            }
+
+            if (imgui::IsKeyDown(ImGuiKey_N)) {
+                if (imgui::IsKeyPressed(ImGuiKey_F)) {
+                    expl.show_filter_window = false;
+                    imgui::OpenPopup("Create file");
+                }
+                else if (imgui::IsKeyPressed(ImGuiKey_D)) {
+                    expl.show_filter_window = false;
+                    imgui::OpenPopup("Create directory");
+                }
+            }
+            else if (imgui::IsKeyPressed(ImGuiKey_F) && !any_popups_open) {
+                expl.show_filter_window = true;
+            }
+
             auto handle_failure = [](char const *operation, generic_result const &result) {
                 if (!result.success) {
                     u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
@@ -2553,7 +2628,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                         result.error_or_utf8_path.c_str());
                 }
             };
-
 
             if (imgui::IsKeyPressed(ImGuiKey_X)) {
                 s_file_op_payload.clear();
@@ -2688,163 +2762,111 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         imgui::End();
     }
 
-    if (imgui::BeginTable("explorer_header", 2, ImGuiTableFlags_SizingStretchProp, { imgui::GetWindowContentRegionWidth(), 0 }, 50)) {
-        imgui::TableNextColumn();
-        {
-            render_back_to_prev_valid_cwd_button(expl);
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Back");
-            }
+    {
+        char const *icon = expl.show_function_buttons ? ICON_CI_CHEVRON_DOWN : ICON_CI_CHEVRON_RIGHT;
 
-            imgui::SameLine();
+        if (imgui::Button(icon)) {
+            flip_bool(expl.show_function_buttons);
+        }
+    }
 
-            render_forward_to_next_valid_cwd_button(expl);
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Forward");
-            }
+    imgui::SameLine();
 
-            imgui::SameLine();
+    render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16);
 
-            if (imgui::Button(ICON_CI_HISTORY "##expl.wd_history")) {
-                imgui::OpenPopup("history_popup");
-            }
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Open history");
-            }
-            if (imgui::BeginPopup("history_popup")) {
-                swan_path_t backup = expl.cwd;
-                bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
+    imgui::Spacing();
 
-                if (history_item_clicked) {
-                    bool history_item_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                    if (history_item_exists) {
-                        expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                        (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                        (void) expl.save_to_disk();
-                    } else {
-                        swan_popup_modals::open_error(make_str("Navigate to history item [%s]", expl.cwd.data()).c_str(), "Path not found, maybe it was renamed or deleted?");
-                        expl.cwd = backup;
-                        (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
-                    }
+    if (expl.show_function_buttons) {
+        SCOPE_EXIT { imgui::Spacing(); };
+
+        render_button_pin_cwd(expl, cwd_exists_before_edit);
+
+        imgui::SameLineSpaced(2);
+
+        render_back_to_prev_valid_cwd_button(expl);
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Back");
+        }
+
+        imgui::SameLine();
+
+        render_forward_to_next_valid_cwd_button(expl);
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Forward");
+        }
+
+        imgui::SameLine();
+
+        if (imgui::Button(ICON_CI_HISTORY "##expl.wd_history")) {
+            imgui::OpenPopup("history_popup");
+        }
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Open history");
+        }
+        if (imgui::BeginPopup("history_popup")) {
+            swan_path_t backup = expl.cwd;
+            bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
+
+            if (history_item_clicked) {
+                bool history_item_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                if (history_item_exists) {
+                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                    (void) expl.save_to_disk();
+                } else {
+                    swan_popup_modals::open_error(make_str("Navigate to history item [%s]", expl.cwd.data()).c_str(), "Path not found, maybe it was renamed or deleted?");
+                    expl.cwd = backup;
+                    (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
                 }
-            }
-
-            imgui::SameLine();
-
-            render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Up to parent directory");
-            }
-
-            imgui::SameLineSpaced(1);
-            imgui::Spacing(1);
-
-            if (imgui::Button(ICON_CI_BOOKMARK "##pins")) {
-                imgui::OpenPopup("pins_popup");
-            }
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Open pins");
-            }
-            if (imgui::BeginPopup("pins_popup")) {
-                render_pins_popup(expl);
-                imgui::EndPopup();
-            }
-
-            imgui::SameLine();
-
-            if (imgui::Button(ICON_CI_SYMBOL_NULL "##invert_selection")) {
-                expl.invert_selected_visible_cwd_entries();
-            }
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Invert selection");
-            }
-
-            imgui::SameLine();
-
-            if (imgui::Button(ICON_CI_NEW_FOLDER "##+dir")) {
-                imgui::OpenPopup("Create directory ##from_header");
-            }
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Create directory");
-            }
-            if (imgui::BeginPopupModal("Create directory ##from_header", nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
-                render_create_directory_popup(expl, dir_sep_utf16);
-                imgui::EndPopup();
-            }
-
-            imgui::SameLine();
-
-            if (imgui::Button(ICON_CI_NEW_FILE "##+file")) {
-                imgui::OpenPopup("Create file ##from_header");
-            }
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Create file");
-            }
-            if (imgui::BeginPopupModal("Create file ##from_header", nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
-                render_create_file_popup(expl, dir_sep_utf16);
-                imgui::EndPopup();
             }
         }
 
-        imgui::TableNextColumn();
-        {
-            {
-                imgui::ScopedDisable d(!cwd_exists_before_edit);
-                if (imgui::Button(ICON_CI_DEBUG_LINE_BY_LINE "##clicknav")) {
-                    imgui::OpenPopup("Click Navigation");
-                }
-            }
-            if (cwd_exists_before_edit && imgui::IsItemHovered()) {
-                imgui::SetTooltip("Navigate to segment");
-            }
-            if (imgui::BeginPopup("Click Navigation")) {
-                render_cwd_clicknav(expl, cwd_exists_before_edit, dir_sep_utf8);
-                imgui::EndPopup();
-            }
+        imgui::SameLine();
 
-            imgui::SameLine();
-
-            render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16);
-
-            imgui::SameLine();
-
-            render_button_pin_cwd(expl, cwd_exists_before_edit);
-
-            // new line
-
-            render_filter_reset_button(expl);
-
-            imgui::SameLine();
-
-            render_filter_text_input(expl);
-            if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
-                imgui::ActivateItemByID(imgui::GetID("##filter"));
-            }
-
-            {
-                imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
-                imgui::SameLineSpaced(0);
-                imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
-                imgui::SameLineSpaced(0);
-            }
-
-            render_filter_polarity_button(expl);
-            imgui::SameLine();
-            render_filter_case_sensitivity_button(expl);
-            imgui::SameLine();
-            render_filter_mode_toggle(expl);
-
-            {
-                imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
-                imgui::SameLineSpaced(0);
-                imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
-                imgui::SameLineSpaced(0);
-            }
-
-            render_filter_type_toggler_buttons(expl);
+        render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Up to parent directory");
         }
 
-        imgui::EndTable();
+        imgui::SameLineSpaced(2);
+
+        if (imgui::Button(ICON_CI_BOOKMARK "##pins")) {
+            imgui::OpenPopup("pins_popup");
+        }
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Open pins");
+        }
+        if (imgui::BeginPopup("pins_popup")) {
+            render_pins_popup(expl);
+            imgui::EndPopup();
+        }
+
+        imgui::SameLine();
+
+        if (imgui::Button(ICON_CI_SYMBOL_NULL "##invert_selection")) {
+            expl.invert_selected_visible_cwd_entries();
+        }
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Invert selection");
+        }
+
+        imgui::SameLine();
+
+        if (imgui::Button(ICON_CI_NEW_FOLDER "##+dir")) {
+            imgui::OpenPopup("Create directory");
+        }
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Create directory");
+        }
+
+        imgui::SameLine();
+
+        if (imgui::Button(ICON_CI_NEW_FILE "##+file")) {
+            imgui::OpenPopup("Create file");
+        }
+        if (imgui::IsItemHovered()) {
+            imgui::SetTooltip("Create file");
+        }
     }
 
     if (expl.filter_error != "") {
@@ -2911,6 +2933,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             });
 
             expl.reset_filter();
+            expl.show_filter_window = false;
 
             if (scrolled_to_dirent != expl.cwd_entries.end()) {
                 scrolled_to_dirent->spotlight_frames_remaining = u32(imgui::GetIO().Framerate) / 3;
@@ -3037,29 +3060,34 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     if (window_focused && imgui::IsMouseHoveringRect(leftovers_rect_min, leftovers_rect_max) && imgui::IsMouseClicked(ImGuiMouseButton_Right)) {
         imgui::OpenPopup("##cwd_entries_child_leftovers");
     }
-    if (!s_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::BeginPopup("##cwd_entries_child_leftovers")) {
-        if (imgui::Selectable("Paste")) {
-            auto result = s_file_op_payload.execute(expl);
-            // TODO: why is result unused?
+    {
+        // can't open another popup from within a popup, hence we need these
+        bool open_create_file_popup = false;
+        bool open_create_dir_popup = false;
+
+        if (imgui::BeginPopup("##cwd_entries_child_leftovers")) {
+            if (!s_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
+                auto result = s_file_op_payload.execute(expl);
+                // TODO: why is result unused?
+            }
+
+            if (imgui::Selectable("New file")) {
+                open_create_file_popup = true;
+            }
+            if (imgui::Selectable("New directory")) {
+                open_create_dir_popup = true;
+            }
+
+            imgui::EndPopup();
         }
 
-        // if (imgui::Selectable("New file")) {
-        //     imgui::OpenPopup("Create file##from_footer");
-        // }
-        // if (imgui::Selectable("New directory")) {
-        //     imgui::OpenPopup("Create directory##from_footer");
-        // }
-
-        imgui::EndPopup();
+        if (open_create_file_popup) {
+            imgui::OpenPopup("Create file");
+        }
+        if (open_create_dir_popup) {
+            imgui::OpenPopup("Create directory");
+        }
     }
-
-    // TODO: figure out why these don't render
-    // if (imgui::BeginPopupModal("Create file##from_footer", nullptr)) {
-    //     render_create_file_popup(expl, dir_sep_utf16);
-    // }
-    // if (imgui::BeginPopupModal("Create directory##from_footer", nullptr)) {
-    //     render_create_directory_popup(expl, dir_sep_utf16);
-    // }
 
     if (!drives_table_rendered) {
         render_footer(expl, cnt, style);
@@ -3090,6 +3118,80 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
             }
         });
+    }
+
+    if (imgui::BeginPopupModal("History", nullptr, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_AlwaysAutoResize)) {
+        swan_path_t backup = expl.cwd;
+        bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_after_edit, false);
+
+        if (history_item_clicked) {
+            bool history_item_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            if (history_item_exists) {
+                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                (void) expl.save_to_disk();
+            } else {
+                swan_popup_modals::open_error(make_str("Navigate to history item [%s]", expl.cwd.data()).c_str(), "Path not found, maybe it was renamed or deleted?");
+                expl.cwd = backup;
+                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+            }
+        }
+    }
+
+    if (imgui::BeginPopupModal("Create directory", nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
+        render_create_directory_popup(expl, dir_sep_utf16);
+        imgui::EndPopup();
+    }
+    if (imgui::BeginPopupModal("Create file", nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
+        render_create_file_popup(expl, dir_sep_utf16);
+        imgui::EndPopup();
+    }
+
+    if (expl.show_filter_window && imgui::Begin("Filter", nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoTitleBar)) {
+        if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
+            flip_bool(expl.show_filter_window);
+            expl.reset_filter();
+            (void) expl.update_cwd_entries(filter, expl.cwd.data());
+            (void) expl.save_to_disk();
+        }
+        else {
+            imgui::AlignTextToFramePadding();
+            imgui::TextUnformatted(ICON_CI_GRIPPER);
+
+            imgui::SameLine();
+
+            render_filter_reset_button(expl);
+
+            imgui::SameLine();
+
+            render_filter_text_input(expl);
+            if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
+                imgui::ActivateItemByID(imgui::GetID("##filter"));
+            }
+
+            {
+                imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
+                imgui::SameLineSpaced(0);
+                imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
+                imgui::SameLineSpaced(0);
+            }
+
+            render_filter_polarity_button(expl);
+            imgui::SameLine();
+            render_filter_case_sensitivity_button(expl);
+            imgui::SameLine();
+            render_filter_mode_toggle(expl);
+
+            {
+                imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
+                imgui::SameLineSpaced(0);
+                imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
+                imgui::SameLineSpaced(0);
+            }
+
+            render_filter_type_toggler_buttons(expl);
+        }
+        imgui::End();
     }
 
     }
@@ -3651,7 +3753,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             }
 
             if (imgui::Selectable("Reveal in File Explorer")) {
-                auto res = reveal_in_file_explorer(*expl.right_clicked_ent, expl, settings.dir_separator_utf8);
+                auto res = reveal_in_file_explorer(*expl.right_clicked_ent, expl);
                 if (!res.success) {
                     swan_popup_modals::open_error(
                         make_str("Reveal [%s] in File Explorer.", expl.right_clicked_ent->basic.path.data()).c_str(),

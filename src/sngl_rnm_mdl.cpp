@@ -34,7 +34,7 @@ void swan_popup_modals::render_single_rename() noexcept
     if (s_single_rename_open) {
         imgui::OpenPopup(swan_popup_modals::single_rename);
     }
-    if (!imgui::BeginPopupModal(swan_popup_modals::single_rename, nullptr)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::single_rename, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
 
@@ -110,17 +110,14 @@ void swan_popup_modals::render_single_rename() noexcept
         }
     };
 
-    imgui::TextUnformatted("Current name:");
-    imgui::SameLine();
-    imgui::TextColored(get_color(s_single_rename_entry_to_be_renamed->basic.type), s_single_rename_entry_to_be_renamed->basic.path.data());
-
     // set initial focus on input text below
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
         imgui::SetKeyboardFocusHere(0);
         new_name_utf8 = s_single_rename_entry_to_be_renamed->basic.path;
     }
     {
-        imgui::ScopedAvailWidth w = {};
+        auto style = imgui::GetStyle();
+        imgui::ScopedAvailWidth w(imgui::CalcTextSize(ICON_CI_DEBUG_RESTART).x + style.FramePadding.x*2 + style.ItemSpacing.x*2 + imgui::CalcTextSize("(?)").x);
 
         if (imgui::InputTextWithHint(
             "##New name", "New name...", new_name_utf8.data(), new_name_utf8.size(),
@@ -128,25 +125,30 @@ void swan_popup_modals::render_single_rename() noexcept
         ) {
             err_msg.clear();
         }
-        if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter) && !strempty(new_name_utf8.data())) {
-            attempt_rename();
-        }
     }
-
-    if (imgui::Button("Rename##single") && !strempty(new_name_utf8.data())) {
+    if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter) && !strempty(new_name_utf8.data())) {
         attempt_rename();
     }
 
     imgui::SameLine();
 
-    if (imgui::Button("Restore##restore_current_name")) {
+    if (imgui::Button(ICON_CI_DEBUG_RESTART "##reset_name")) {
         new_name_utf8 = path_create(s_single_rename_entry_to_be_renamed->basic.path.data());
+    }
+    if (imgui::IsItemHovered()) {
+        if (imgui::BeginTooltip()) {
+            imgui::TextUnformatted("Click to reset name");
+            imgui::TextColored(get_color(s_single_rename_entry_to_be_renamed->basic.type), s_single_rename_entry_to_be_renamed->basic.path.data());
+            imgui::EndTooltip();
+        }
     }
 
     imgui::SameLine();
 
-    if (imgui::Button("Cancel")) {
-        cleanup_and_close_popup();
+    imgui::TextUnformatted("(?)");
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("[Enter]   rename\n"
+                          "[Escape]  exit");
     }
 
     if (!err_msg.empty()) {
