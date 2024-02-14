@@ -1524,9 +1524,13 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
 }
 
 static
-void render_num_cwd_items_filtered(cwd_count_info const &cnt) noexcept
+void render_num_cwd_items_filtered(explorer_window &expl, cwd_count_info const &cnt) noexcept
 {
     imgui::Text("(%zu filtered)", cnt.filtered_dirents);
+
+    if (imgui::IsItemClicked()) {
+        expl.show_filter_window = true;
+    }
 
     if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
         if (cnt.filtered_directories > 0) {
@@ -1537,6 +1541,10 @@ void render_num_cwd_items_filtered(cwd_count_info const &cnt) noexcept
         }
         if (cnt.filtered_files > 0) {
             imgui::TextColored(file_color(), "%zu file%s filtered.", cnt.filtered_files, pluralized(cnt.filtered_files, "", "s"));
+        }
+
+        if (!expl.show_filter_window) {
+            imgui::TextUnformatted("Click to expose filter.");
         }
 
         imgui::EndTooltip();
@@ -2494,6 +2502,13 @@ void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, c
 
 void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 {
+    ImVec4 window_bg_color = imgui::GetStyle().Colors[ImGuiCol_WindowBg];
+    if (expl.highlight) {
+        expl.highlight = false;
+        imgui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.15f, 0.06f, 0.06f, 0.94f);
+    }
+    SCOPE_EXIT { imgui::GetStyle().Colors[ImGuiCol_WindowBg] = window_bg_color; };
+
     {
         bool is_explorer_visible = imgui::Begin(expl.name, &open);
         if (!is_explorer_visible) {
@@ -2602,22 +2617,23 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             }
 
             if (imgui::IsKeyPressed(ImGuiKey_H)) {
-                expl.show_filter_window = false;
+                // expl.show_filter_window = false;
                 imgui::OpenPopup("History");
             }
 
             if (imgui::IsKeyDown(ImGuiKey_N)) {
                 if (imgui::IsKeyPressed(ImGuiKey_F)) {
-                    expl.show_filter_window = false;
+                    // expl.show_filter_window = false;
                     imgui::OpenPopup("Create file");
                 }
                 else if (imgui::IsKeyPressed(ImGuiKey_D)) {
-                    expl.show_filter_window = false;
+                    // expl.show_filter_window = false;
                     imgui::OpenPopup("Create directory");
                 }
             }
-            else if (imgui::IsKeyPressed(ImGuiKey_F) && !any_popups_open) {
-                expl.show_filter_window = true;
+            else if (imgui::IsKeyPressed(ImGuiKey_F) /* && !any_popups_open */) {
+                // expl.show_filter_window = true;
+                flip_bool(expl.show_filter_window);
             }
 
             auto handle_failure = [](char const *operation, generic_result const &result) {
@@ -2763,6 +2779,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     }
 
     {
+        // char const *icon = expl.show_function_buttons ? ICON_CI_LAYOUT_PANEL : ICON_CI_LAYOUT_PANEL_OFF;
         char const *icon = expl.show_function_buttons ? ICON_CI_CHEVRON_DOWN : ICON_CI_CHEVRON_RIGHT;
 
         if (imgui::Button(icon)) {
@@ -2869,11 +2886,45 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         }
     }
 
-    if (expl.filter_error != "") {
-        imgui::PushTextWrapPos(imgui::GetColumnWidth());
-        imgui::TextColored(red(), "%s", expl.filter_error.c_str());
-        imgui::PopTextWrapPos();
-        imgui::Spacing(1);
+    if (expl.show_filter_window) {
+        render_filter_reset_button(expl);
+
+        imgui::SameLine();
+
+        render_filter_text_input(expl);
+        if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
+            imgui::ActivateItemByID(imgui::GetID("##filter"));
+        }
+
+        {
+            imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
+            imgui::SameLineSpaced(0);
+            imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
+            imgui::SameLineSpaced(0);
+        }
+
+        render_filter_polarity_button(expl);
+        imgui::SameLine();
+        render_filter_case_sensitivity_button(expl);
+        imgui::SameLine();
+        render_filter_mode_toggle(expl);
+
+        {
+            imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
+            imgui::SameLineSpaced(0);
+            imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
+            imgui::SameLineSpaced(0);
+        }
+
+        render_filter_type_toggler_buttons(expl);
+
+        if (expl.filter_error != "") {
+            imgui::PushTextWrapPos(imgui::GetColumnWidth());
+            imgui::TextColored(red(), "%s", expl.filter_error.c_str());
+            imgui::PopTextWrapPos();
+        }
+
+        imgui::Spacing();
     }
 
     cwd_count_info cnt = {};
@@ -2980,6 +3031,13 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             else if (cnt.filtered_dirents == expl.cwd_entries.size()) {
                 imgui::Spacing();
                 imgui::TextColored(orange(), "All items filtered.");
+
+                if (imgui::IsItemClicked()) {
+                    expl.show_filter_window = true;
+                }
+                if (!expl.show_filter_window && imgui::IsItemHovered()) {
+                    imgui::SetTooltip("Click to expose filter.");
+                }
             }
             else if (cnt.filtered_dirents < expl.cwd_entries.size() && imgui::BeginTable("cwd_entries", explorer_window::cwd_entries_table_col_count,
                 ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|
@@ -3147,52 +3205,71 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         imgui::EndPopup();
     }
 
-    if (expl.show_filter_window && imgui::Begin("Filter", nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoTitleBar)) {
-        if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
-            flip_bool(expl.show_filter_window);
-            expl.reset_filter();
-            (void) expl.update_cwd_entries(filter, expl.cwd.data());
-            (void) expl.save_to_disk();
+    #if 0
+    {
+        imgui::ScopedColor c(ImGuiCol_WindowBg, window_bg_color);
+
+        char buffer[32];
+        (void) snprintf(buffer, lengthof(buffer), "Filter##%d", expl.id);
+
+        if (expl.show_filter_window && imgui::Begin(buffer, nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoTitleBar)) {
+            if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
+                flip_bool(expl.show_filter_window);
+                expl.reset_filter();
+                (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                (void) expl.save_to_disk();
+            }
+            else {
+                imgui::AlignTextToFramePadding();
+
+                imgui::Text("(?)", expl.id + 1);
+                if (imgui::IsItemHovered()) {
+                    expl.highlight = true;
+                }
+
+                imgui::SameLine();
+
+                render_filter_reset_button(expl);
+
+                imgui::SameLine();
+
+                render_filter_text_input(expl);
+                if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
+                    imgui::ActivateItemByID(imgui::GetID("##filter"));
+                }
+
+                {
+                    imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
+                    imgui::SameLineSpaced(0);
+                    imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
+                    imgui::SameLineSpaced(0);
+                }
+
+                render_filter_polarity_button(expl);
+                imgui::SameLine();
+                render_filter_case_sensitivity_button(expl);
+                imgui::SameLine();
+                render_filter_mode_toggle(expl);
+
+                {
+                    imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
+                    imgui::SameLineSpaced(0);
+                    imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
+                    imgui::SameLineSpaced(0);
+                }
+
+                render_filter_type_toggler_buttons(expl);
+
+                if (expl.filter_error != "") {
+                    imgui::PushTextWrapPos(imgui::GetColumnWidth());
+                    imgui::TextColored(red(), "%s", expl.filter_error.c_str());
+                    imgui::PopTextWrapPos();
+                }
+            }
+            imgui::End();
         }
-        else {
-            imgui::AlignTextToFramePadding();
-            imgui::TextUnformatted(ICON_CI_GRIPPER);
-
-            imgui::SameLine();
-
-            render_filter_reset_button(expl);
-
-            imgui::SameLine();
-
-            render_filter_text_input(expl);
-            if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
-                imgui::ActivateItemByID(imgui::GetID("##filter"));
-            }
-
-            {
-                imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
-                imgui::SameLineSpaced(0);
-                imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
-                imgui::SameLineSpaced(0);
-            }
-
-            render_filter_polarity_button(expl);
-            imgui::SameLine();
-            render_filter_case_sensitivity_button(expl);
-            imgui::SameLine();
-            render_filter_mode_toggle(expl);
-
-            {
-                imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
-                imgui::SameLineSpaced(0);
-                imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
-                imgui::SameLineSpaced(0);
-            }
-
-            render_filter_type_toggler_buttons(expl);
-        }
-        imgui::End();
     }
+    #endif
 
     }
     imgui::EndChild();
@@ -3944,7 +4021,7 @@ void render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle 
 
             if (expl.filter_error == "" && cnt.filtered_dirents > 0) {
                 imgui::SameLineSpaced(1);
-                render_num_cwd_items_filtered(cnt);
+                render_num_cwd_items_filtered(expl, cnt);
             }
 
             if (cnt.selected_dirents > 0) {

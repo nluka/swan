@@ -293,6 +293,7 @@ struct explorer_window
     bool show_filter_window = false;
     bool show_function_buttons = false;
     bool cwd_latest_selected_dirent_idx_changed = false;
+    bool highlight = false;
 
     update_cwd_entries_actions update_request_from_outside = nil; /* how code from outside the Begin()/End() of the explorer window
                                                                      signals to the explorer to call update_cwd_entries */

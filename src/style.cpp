@@ -1,9 +1,10 @@
 #include "stdafx.hpp"
 #include "common_fns.hpp"
+#include "imgui_ext.hpp"
 #include "imgui_specific.hpp"
 
 // https://github.com/ocornut/imgui/issues/5102
-ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept {
+ImVec4 imgui::RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept {
     f32 newr = f32(r) / 255.0f;
     f32 newg = f32(g) / 255.0f;
     f32 newb = f32(b) / 255.0f;
@@ -38,18 +39,18 @@ void apply_swan_style_overrides() noexcept
     style.ScrollbarRounding       = 0;
     style.FrameRounding           = 2;
 
-    style.Colors[ImGuiCol_FrameBg] = RGBA_to_ImVec4(35,40,45, 255);
-    style.Colors[ImGuiCol_FrameBg] = RGBA_to_ImVec4(35,40,45, 255);
+    style.Colors[ImGuiCol_FrameBg] = imgui::RGBA_to_ImVec4(35,40,45, 255);
+    style.Colors[ImGuiCol_FrameBg] = imgui::RGBA_to_ImVec4(35,40,45, 255);
 
-    style.Colors[ImGuiCol_TableHeaderBg] = RGBA_to_ImVec4(0,0,0,0);
+    style.Colors[ImGuiCol_TableHeaderBg] = imgui::RGBA_to_ImVec4(0,0,0,0);
     style.Colors[ImGuiCol_TableRowBg]    = ImVec4(0.07f, 0.07f, 0.07f, 0.94f);
     style.Colors[ImGuiCol_TableRowBgAlt] = ImVec4(0.06f, 0.06f, 0.06f, 0.94f);
 
-    style.Colors[ImGuiCol_Button]        = RGBA_to_ImVec4(45,60,80, s32(255*0.4f));
-    style.Colors[ImGuiCol_ButtonHovered] = RGBA_to_ImVec4(60,90,120, 255);
-    style.Colors[ImGuiCol_ButtonActive]  = RGBA_to_ImVec4(75,110,140, 255);
+    style.Colors[ImGuiCol_Button]        = imgui::RGBA_to_ImVec4(45,60,80, s32(255*0.4f));
+    style.Colors[ImGuiCol_ButtonHovered] = imgui::RGBA_to_ImVec4(60,90,120, 255);
+    style.Colors[ImGuiCol_ButtonActive]  = imgui::RGBA_to_ImVec4(75,110,140, 255);
 
-    style.Colors[ImGuiCol_Separator]        = RGBA_to_ImVec4(30,30,30, 255);
-    style.Colors[ImGuiCol_SeparatorHovered] = RGBA_to_ImVec4(30,30,30, 255);
-    style.Colors[ImGuiCol_SeparatorActive]  = RGBA_to_ImVec4(30,30,30, 255);
+    style.Colors[ImGuiCol_Separator]        = imgui::RGBA_to_ImVec4(30,30,30, 255);
+    style.Colors[ImGuiCol_SeparatorHovered] = imgui::RGBA_to_ImVec4(30,30,30, 255);
+    style.Colors[ImGuiCol_SeparatorActive]  = imgui::RGBA_to_ImVec4(30,30,30, 255);
 }
