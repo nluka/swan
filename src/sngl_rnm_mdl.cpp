@@ -64,29 +64,19 @@ void swan_popup_modals::render_single_rename() noexcept
         wchar_t buffer_new_name_utf16[MAX_PATH] = {};
         std::wstring old_path_utf16 = {};
         std::wstring new_path_utf16 = {};
-        s32 utf_written = 0;
         s32 result = {};
 
-        utf_written = utf8_to_utf16(s_single_rename_expl->cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
-
-        if (utf_written == 0) {
-            print_debug_msg("[%s] FAILED utf8_to_utf16(expl.cwd)", s_single_rename_expl->name);
+        if (!utf8_to_utf16(s_single_rename_expl->cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16))) {
             cleanup_and_close_popup();
             return;
         }
 
-        utf_written = utf8_to_utf16(s_single_rename_entry_to_be_renamed->basic.path.data(), buffer_old_name_utf16, lengthof(buffer_old_name_utf16));
-
-        if (utf_written == 0) {
-            print_debug_msg("[%s] FAILED utf8_to_utf16(s_entry_to_be_renamed.basic.path)", s_single_rename_expl->name);
+        if (!utf8_to_utf16(s_single_rename_entry_to_be_renamed->basic.path.data(), buffer_old_name_utf16, lengthof(buffer_old_name_utf16))) {
             cleanup_and_close_popup();
             return;
         }
 
-        utf_written = utf8_to_utf16(new_name_utf8.data(), buffer_new_name_utf16, lengthof(buffer_new_name_utf16));
-
-        if (utf_written == 0) {
-            print_debug_msg("[%s] FAILED utf8_to_utf16(new_name)", s_single_rename_expl->name);
+        if (!utf8_to_utf16(new_name_utf8.data(), buffer_new_name_utf16, lengthof(buffer_new_name_utf16))) {
             cleanup_and_close_popup();
             return;
         }

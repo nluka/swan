@@ -16,18 +16,19 @@ namespace global_constants
     std::vector<icon_font_glyph> const &icon_font_glyphs_material_design() noexcept;
 
     constexpr u64 num_explorers = 4;
+    constexpr u64 MAX_RECENT_FILES = 100;
 
 } // global_constants
 
 namespace global_state
 {
-    circular_buffer<recent_file> &recent_files() noexcept;
+    std::pair<circular_buffer<recent_file> *, std::mutex *> recent_files() noexcept;
     u64 find_recent_file_idx(char const *search_path) noexcept;
     void move_recent_file_idx_to_front(u64 recent_file_idx, char const *new_action = nullptr) noexcept;
     void add_recent_file(char const *action, char const *full_file_path) noexcept;
     void remove_recent_file(u64 recent_file_idx) noexcept;
     bool save_recent_files_to_disk() noexcept;
-    std::pair<bool, u64> load_recent_files_from_disk() noexcept;
+    std::pair<bool, u64> load_recent_files_from_disk(char dir_separator) noexcept;
 
     std::vector<pinned_path> &pins() noexcept;
     bool add_pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept;
@@ -37,6 +38,10 @@ namespace global_state
     void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept;
     bool save_pins_to_disk() noexcept;
     std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
+
+    std::pair<circular_buffer<completed_file_operation> *, std::mutex *> completed_file_ops() noexcept;
+    bool save_completed_file_ops_to_disk() noexcept;
+    std::pair<bool, u64> load_completed_file_ops_from_disk(char dir_separator) noexcept;
 
     s32 focused_window() noexcept;
     bool save_focused_window(s32 window_code) noexcept;
@@ -53,8 +58,6 @@ namespace global_state
     swan_settings &settings() noexcept;
 
     std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
-
-    circular_buffer<file_operation> const &file_ops_buffer() noexcept;
 
     s32 &page_size() noexcept;
 
@@ -111,7 +114,7 @@ namespace swan_windows
 
     void render_debug_log(bool &open) noexcept;
 
-    void render_file_operations() noexcept;
+    void render_file_operations(bool &open) noexcept;
 
     void render_recent_files(bool &open) noexcept;
 

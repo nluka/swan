@@ -10,8 +10,7 @@ swan_path_t path_create(char const *data, u64 count) noexcept
 
 #if DEBUG_MODE
     assert(data != nullptr);
-    u16 data_len = (u16)strnlen(data, UINT16_MAX);
-    assert(data_len < p.max_size());
+    assert(strlen(data) < p.max_size());
 #endif
 
     strncpy(p.data(), data, std::min(count, p.max_size() - 1));
@@ -279,17 +278,15 @@ swan_path_t path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf
         (void) strcat(subpath_utf8, dir_sep_utf8_);
 
         wchar_t subpath_utf16[MAX_PATH];
-        s32 written = utf8_to_utf16(subpath_utf8, subpath_utf16, lengthof(subpath_utf16));
 
-        if (written > 0) {
+        if (utf8_to_utf16(subpath_utf8, subpath_utf16, lengthof(subpath_utf16))) {
             WIN32_FIND_DATAW find_data;
             HANDLE find_handle = FindFirstFileW(subpath_utf16, &find_data);
             SCOPE_EXIT { FindClose(find_handle); };
 
             char file_name_utf8[MAX_PATH * 2];
-            written = utf16_to_utf8(find_data.cFileName, file_name_utf8, lengthof(file_name_utf8));
 
-            if (written > 0) {
+            if (utf16_to_utf8(find_data.cFileName, file_name_utf8, lengthof(file_name_utf8))) {
                 bool app_success = path_append(retval, file_name_utf8, dir_sep_utf8, true);
 
                 if (!app_success) {

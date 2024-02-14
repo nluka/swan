@@ -4,56 +4,176 @@
 #include "imgui_specific.hpp"
 #include "path.hpp"
 
-static circular_buffer<file_operation> s_file_ops_buffer(100);
+#undef min
+#undef max
 
-circular_buffer<file_operation> const &global_state::file_ops_buffer() noexcept
+static std::mutex s_completed_file_ops_mutex = {};
+static circular_buffer<completed_file_operation> s_completed_file_ops(1000);
+
+std::pair<circular_buffer<completed_file_operation> *, std::mutex *> global_state::completed_file_ops() noexcept
 {
-    return s_file_ops_buffer;
+    return std::make_pair(&s_completed_file_ops, &s_completed_file_ops_mutex);
 }
 
-file_operation::file_operation(type op_type, u64 file_size, swan_path_t const &src, swan_path_t const &dst) noexcept
-    : op_type(op_type)
-    , src_path(src)
-    , dest_path(dst)
-{
-    total_file_size.store(file_size);
+bool global_state::save_completed_file_ops_to_disk() noexcept
+try {
+    std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_ops.txt";
+
+    std::ofstream out(full_path);
+
+    if (!out) {
+        return false;
+    }
+
+    auto pair = global_state::completed_file_ops();
+    auto const &completed_operations = *pair.first;
+    auto &mutex = *pair.second;
+
+    {
+        std::scoped_lock lock(mutex);
+
+        for (auto const &file_op : completed_operations) {
+            auto time_t = std::chrono::system_clock::to_time_t(file_op.completion_time);
+            std::tm tm = *std::localtime(&time_t);
+
+            out
+                << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << ' '
+                << s32(file_op.op_type) << ' '
+                << s32(file_op.obj_type) << ' '
+                << path_length(file_op.src_path) << ' '
+                << file_op.src_path.data() << ' '
+                << path_length(file_op.dst_path) << ' '
+                << file_op.dst_path.data() << '\n';
+        }
+    }
+
+    print_debug_msg("SUCCESS global_state::save_completed_file_ops_to_disk");
+    return true;
+}
+catch (...) {
+    print_debug_msg("FAILED global_state::save_completed_file_ops_to_disk");
+    return false;
 }
 
-file_operation::file_operation(file_operation const &other) noexcept // for boost::circular_buffer
-    : op_type(other.op_type)
-    , success(other.success)
+std::pair<bool, u64> global_state::load_completed_file_ops_from_disk(char dir_separator) noexcept
+try {
+    std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_ops.txt";
+
+    std::ifstream in(full_path);
+
+    if (!in) {
+        return { false, 0 };
+    }
+
+    auto pair = global_state::completed_file_ops();
+    auto &completed_operations = *pair.first;
+    auto &mutex = *pair.second;
+
+    std::scoped_lock lock(mutex);
+
+    completed_operations.clear();
+
+    std::string line = {};
+    line.reserve(global_state::page_size() - 1);
+
+    u64 num_loaded_successfully = 0;
+
+    while (std::getline(in, line)) {
+        std::istringstream iss(line);
+
+        s32 stored_op_type = 0;
+        s32 stored_obj_type = 0;
+        u64 stored_src_path_len = 0;
+        u64 stored_dst_path_len = 0;
+        swan_path_t stored_src_path = {};
+        swan_path_t stored_dst_path = {};
+
+        std::tm tm = {};
+        iss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+        system_time_point_t stored_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+        iss.ignore(1);
+
+        iss >> stored_op_type;
+        iss.ignore(1);
+
+        iss >> stored_obj_type;
+        iss.ignore(1);
+
+        iss >> (u64 &)stored_src_path_len;
+        iss.ignore(1);
+
+        iss.read(stored_src_path.data(), std::min(stored_src_path_len, stored_src_path.max_size() - 1));
+        iss.ignore(1);
+
+        iss >> (u64 &)stored_dst_path_len;
+        iss.ignore(1);
+
+        iss.read(stored_dst_path.data(), std::min(stored_dst_path_len, stored_dst_path.max_size() - 1));
+
+        path_force_separator(stored_src_path, dir_separator);
+        path_force_separator(stored_dst_path, dir_separator);
+
+        completed_operations.push_back();
+        completed_operations.back().completion_time = stored_time;
+        completed_operations.back().src_path = stored_src_path;
+        completed_operations.back().dst_path = stored_dst_path;
+        completed_operations.back().op_type = (completed_file_operation::type) stored_op_type;
+        completed_operations.back().obj_type = (basic_dirent::kind) stored_obj_type;
+
+        ++num_loaded_successfully;
+
+        line.clear();
+    }
+
+    print_debug_msg("SUCCESS global_state::load_completed_file_ops_from_disk, loaded %zu records", num_loaded_successfully);
+    return { true, num_loaded_successfully };
+}
+catch (...) {
+    print_debug_msg("FAILED global_state::load_completed_file_ops_from_disk");
+    return { false, 0 };
+}
+
+completed_file_operation::completed_file_operation() noexcept // for boost::circular_buffer
+    : completion_time()
+    , src_path()
+    , dst_path()
+    , op_type()
+    , obj_type()
+{
+}
+
+completed_file_operation::completed_file_operation(system_time_point_t completion_time, type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept // for boost::circular_buffer
+    : completion_time(completion_time)
+    , src_path(path_create(src))
+    , dst_path(path_create(dst))
+    , op_type(op_type)
+    , obj_type(obj_type)
+{
+}
+
+completed_file_operation::completed_file_operation(completed_file_operation const &other) noexcept // for boost::circular_buffer
+    : completion_time(other.completion_time)
     , src_path(other.src_path)
-    , dest_path(other.dest_path)
+    , dst_path(other.dst_path)
+    , op_type(other.op_type)
+    , obj_type(other.obj_type)
 {
-    this->total_file_size.store(other.total_file_size.load());
-    this->total_bytes_transferred.store(other.total_bytes_transferred.load());
-    this->stream_size.store(other.stream_size.load());
-    this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
-    this->start_time.store(other.start_time.load());
-    this->end_time.store(other.end_time.load());
 }
 
-file_operation &file_operation::operator=(file_operation const &other) noexcept // for boost::circular_buffer
+completed_file_operation &completed_file_operation::operator=(completed_file_operation const &other) noexcept // for boost::circular_buffer
 {
-    this->total_file_size.store(other.total_file_size.load());
-    this->total_bytes_transferred.store(other.total_bytes_transferred.load());
-    this->stream_size.store(other.stream_size.load());
-    this->stream_bytes_transferred.store(other.stream_bytes_transferred.load());
-
-    this->start_time.store(other.start_time.load());
-    this->end_time.store(other.end_time.load());
-
-    this->op_type = other.op_type;
-    this->success = other.success;
+    this->completion_time = other.completion_time;
     this->src_path = other.src_path;
-    this->dest_path = other.dest_path;
+    this->dst_path = other.dst_path;
+    this->op_type = other.op_type;
+    this->obj_type = other.obj_type;
 
     return *this;
 }
 
-void swan_windows::render_file_operations() noexcept
+void swan_windows::render_file_operations(bool &open) noexcept
 {
-    if (!imgui::Begin(swan_windows::get_name(swan_windows::file_operations))) {
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::file_operations), &open)) {
         imgui::End();
         return;
     }
@@ -64,113 +184,72 @@ void swan_windows::render_file_operations() noexcept
 
     [[maybe_unused]] auto &io = imgui::GetIO();
 
-    auto const &file_ops_buffer = global_state::file_ops_buffer();
-
     enum file_ops_table_col : s32
     {
         file_ops_table_col_action,
-        file_ops_table_col_status,
         file_ops_table_col_op_type,
-        file_ops_table_col_speed,
+        file_ops_table_col_completion_time,
         file_ops_table_col_src_path,
         file_ops_table_col_dest_path,
         file_ops_table_col_count
     };
 
     if (imgui::BeginTable("Activities", file_ops_table_col_count,
-        ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp)
+        ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|
+        (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
     ) {
         imgui::TableSetupColumn("Action", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_action);
-        imgui::TableSetupColumn("Status", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_status);
-        imgui::TableSetupColumn("Op", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
-        imgui::TableSetupColumn("Speed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_speed);
+        imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
+        imgui::TableSetupColumn("Completed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_completion_time);
         imgui::TableSetupColumn("Src", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
         imgui::TableSetupColumn("Dst", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dest_path);
         imgui::TableHeadersRow();
 
-        for (auto const &file_op : file_ops_buffer) {
+        auto pair = global_state::completed_file_ops();
+        auto &completed_operations = *pair.first;
+        auto &mutex = *pair.second;
+
+        std::scoped_lock lock(mutex);
+
+        for (auto const &file_op : completed_operations) {
             imgui::TableNextRow();
 
-            precise_time_point_t blank_time = {};
-            precise_time_point_t now = current_time_precise();
-
-            auto start_time = file_op.start_time.load();
-            auto end_time = file_op.end_time.load();
-            auto total_size = file_op.total_file_size.load();
-            auto bytes_transferred = file_op.total_bytes_transferred.load();
-            auto success = file_op.success;
-
             if (imgui::TableSetColumnIndex(file_ops_table_col_action)) {
+                imgui::ScopedDisable d(true);
                 imgui::SmallButton("Undo");
             }
 
-            if (imgui::TableSetColumnIndex(file_ops_table_col_status)) {
-                if (start_time == blank_time) {
-                    imgui::TextUnformatted("Queued");
-                }
-                else if (end_time == blank_time) {
-                    f64 percent_completed = ((f64)bytes_transferred / (f64)total_size) * 100.0;
-                    imgui::Text("%.1lf %%", percent_completed);
-                }
-                else if (!success) {
-                    auto when_str = compute_when_str(end_time, now);
-                    imgui::Text("Fail (%s)", when_str.data());
-                }
-                else {
-                    auto when_str = compute_when_str(end_time, now);
-                    imgui::Text("Done (%s)", when_str.data());
-                }
-            }
-
             if (imgui::TableSetColumnIndex(file_ops_table_col_op_type)) {
-                if      (file_op.op_type == file_operation::type::move  ) imgui::TextUnformatted("mv");
-                else if (file_op.op_type == file_operation::type::copy  ) imgui::TextUnformatted("cp");
-                else if (file_op.op_type == file_operation::type::remove) imgui::TextUnformatted("rm");
+                char const *icon = get_icon(file_op.obj_type);
+                ImVec4 icon_color = get_color(file_op.obj_type);
+
+                char const *desc = nullptr;
+                if      (file_op.op_type == completed_file_operation::type::move) desc = "Move";
+                else if (file_op.op_type == completed_file_operation::type::copy) desc = "Copy";
+                else if (file_op.op_type == completed_file_operation::type::del ) desc = "Delete";
+
+                imgui::TextColored(icon_color, icon);
+                imgui::SameLine();
+                imgui::TextUnformatted(desc);
             }
 
-            if (imgui::TableSetColumnIndex(file_ops_table_col_speed)) {
-                if (
-                    start_time == blank_time // operation not started
-                    || file_op.op_type == file_operation::type::remove // delete operation
-                    || (end_time != blank_time && !success) // operation failed
-                ) {
-                    imgui::TextUnformatted("--");
-                }
-                else {
-                    u64 ms = compute_diff_ms(start_time, end_time == precise_time_point_t() ? now : end_time);
-                    f64 bytes_per_ms = (f64)bytes_transferred / (f64)ms;
-                    f64 bytes_per_sec = bytes_per_ms * 1'000.0;
-
-                    f64 gb = 1'000'000'000.0;
-                    f64 mb = 1'000'000.0;
-                    f64 kb = 1'000.0;
-
-                    f64 rate = bytes_per_sec;
-                    char const *unit = "B";
-
-                    if (bytes_per_sec >= gb) {
-                        rate = bytes_per_sec / gb;
-                        unit = "GB";
-                    }
-                    else if (bytes_per_sec >= mb) {
-                        rate = bytes_per_sec / mb;
-                        unit = "MB";
-                    }
-                    else if (bytes_per_sec >= kb) {
-                        rate = bytes_per_sec / kb;
-                        unit = "KB";
-                    }
-
-                    imgui::Text("%.1lf %s/s", rate, unit);
-                }
+            if (imgui::TableSetColumnIndex(file_ops_table_col_completion_time)) {
+                auto when_completed_str = compute_when_str(file_op.completion_time, current_time_system());
+                imgui::TextUnformatted(when_completed_str.data());
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_src_path)) {
                 imgui::TextUnformatted(file_op.src_path.data());
+                if (imgui::IsItemClicked()) {
+                    // TODO: find most appropriate explorer and spotlight the item
+                }
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_dest_path)) {
-                imgui::TextUnformatted(file_op.dest_path.data());
+                imgui::TextUnformatted(file_op.dst_path.data());
+                if (imgui::IsItemClicked()) {
+                    // TODO: find most appropriate explorer and spotlight the item
+                }
             }
         }
 
@@ -180,6 +259,20 @@ void swan_windows::render_file_operations() noexcept
     imgui::End();
 }
 
+HRESULT progress_sink::StartOperations() { print_debug_msg("StartOperations"); return S_OK; }
+HRESULT progress_sink::PauseTimer() { print_debug_msg("PauseTimer"); return S_OK; }
+HRESULT progress_sink::ResetTimer() { print_debug_msg("ResetTimer"); return S_OK; }
+HRESULT progress_sink::ResumeTimer() { print_debug_msg("ResumeTimer"); return S_OK; }
+
+HRESULT progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) { print_debug_msg("PostNewItem"); return S_OK; }
+HRESULT progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("PostRenameItem"); return S_OK; }
+
+HRESULT progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("PreCopyItem"); return S_OK; }
+HRESULT progress_sink::PreDeleteItem(DWORD, IShellItem *) { print_debug_msg("PreDeleteItem"); return S_OK; }
+HRESULT progress_sink::PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("PreMoveItem"); return S_OK; }
+HRESULT progress_sink::PreNewItem(DWORD, IShellItem *, LPCWSTR) { print_debug_msg("PreNewItem"); return S_OK; }
+HRESULT progress_sink::PreRenameItem(DWORD, IShellItem *, LPCWSTR) { print_debug_msg("PreRenameItem"); return S_OK; }
+
 HRESULT progress_sink::PostMoveItem(
     [[maybe_unused]] DWORD flags,
     [[maybe_unused]] IShellItem *src_item,
@@ -188,22 +281,74 @@ HRESULT progress_sink::PostMoveItem(
     HRESULT result,
     [[maybe_unused]] IShellItem *dst_item)
 {
+    if (!SUCCEEDED(result)) {
+        return S_OK;
+    }
+
+    SFGAOF attributes = {};
+    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER, &attributes))) {
+        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER)");
+        return S_OK;
+    }
+
+    wchar_t *src_path_utf16 = nullptr;
+    swan_path_t src_path_utf8;
+
+    if (FAILED(src_item->GetDisplayName(SIGDN_FILESYSPATH, &src_path_utf16))) {
+        return S_OK;
+    }
+    SCOPE_EXIT { CoTaskMemFree(src_path_utf16); };
+
+    if (!utf16_to_utf8(src_path_utf16, src_path_utf8.data(), src_path_utf8.max_size())) {
+        return S_OK;
+    }
+
+    wchar_t *dst_path_utf16 = nullptr;
+    swan_path_t dst_path_utf8;
+
+    if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {
+        return S_OK;
+    }
+    SCOPE_EXIT { CoTaskMemFree(dst_path_utf16); };
+
+    if (!utf16_to_utf8(dst_path_utf16, dst_path_utf8.data(), dst_path_utf8.max_size())) {
+        return S_OK;
+    }
+
+    print_debug_msg("PostMoveItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
+
+    swan_path_t new_name_utf8;
+
+    if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
+        return S_OK;
+    }
+
     explorer_window &dst_expl = global_state::explorers()[this->dst_expl_id];
 
-    if (SUCCEEDED(result)) {
-        bool dst_expl_cwd_same = path_loosely_same(dst_expl.cwd, this->dst_expl_cwd_when_operation_started);
+    bool dst_expl_cwd_same = path_loosely_same(dst_expl.cwd, this->dst_expl_cwd_when_operation_started);
 
-        if (dst_expl_cwd_same) {
-            swan_path_t new_name_utf8;
-            s32 written = utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size());
-            if (written == 0) {
-                // TODO: error
-            } else {
-                print_debug_msg("PostMoveItem [%s]", new_name_utf8.data());
-                std::scoped_lock lock(dst_expl.select_cwd_entries_on_next_update_mutex);
-                dst_expl.select_cwd_entries_on_next_update.push_back(new_name_utf8);
-            }
-        }
+    if (dst_expl_cwd_same) {
+        print_debug_msg("PostMoveItem [%s]", new_name_utf8.data());
+        std::scoped_lock lock(dst_expl.select_cwd_entries_on_next_update_mutex);
+        dst_expl.select_cwd_entries_on_next_update.push_back(new_name_utf8);
+    }
+
+    {
+        auto pair = global_state::completed_file_ops();
+        auto &completed_operations = *pair.first;
+        auto &mutex = *pair.second;
+
+        path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
+        path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
+
+        completed_file_operation to_push(current_time_system(),
+                                         completed_file_operation::type::move,
+                                         src_path_utf8.data(),
+                                         dst_path_utf8.data(),
+                                         attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file);
+
+        std::scoped_lock lock(mutex);
+        completed_operations.push_front(to_push);
     }
 
     return S_OK;
@@ -216,11 +361,10 @@ HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *, HRESULT result, IShel
 
         if (SUCCEEDED(deleted_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &deleted_path_utf16))) {
             SCOPE_EXIT { CoTaskMemFree(deleted_path_utf16); };
+
             swan_path_t deleted_path_utf8;
-            s32 written = utf16_to_utf8(deleted_path_utf16, deleted_path_utf8.data(), deleted_path_utf8.max_size());
-            if (written == 0) {
-                // TODO: handle error
-            } else {
+
+            if (utf16_to_utf8(deleted_path_utf16, deleted_path_utf8.data(), deleted_path_utf8.max_size())) {
                 print_debug_msg("PostDeleteItem [%s]", deleted_path_utf8.data());
             }
         }
@@ -229,27 +373,109 @@ HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *, HRESULT result, IShel
     return S_OK;
 }
 
-HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *)
+HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, LPCWSTR new_name_utf16, HRESULT result, IShellItem *dst_item)
 {
-    print_debug_msg("PostCopyItem");
+    if (!SUCCEEDED(result)) {
+        return S_OK;
+    }
+
+    SFGAOF attributes = {};
+    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER, &attributes))) {
+        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER)");
+        return S_OK;
+    }
+
+    wchar_t *src_path_utf16 = nullptr;
+    swan_path_t src_path_utf8;
+
+    if (FAILED(src_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &src_path_utf16))) {
+        return S_OK;
+    }
+    SCOPE_EXIT { CoTaskMemFree(src_path_utf16); };
+
+    if (!utf16_to_utf8(src_path_utf16, src_path_utf8.data(), src_path_utf8.max_size())) {
+        return S_OK;
+    }
+
+    wchar_t *dst_path_utf16 = nullptr;
+    swan_path_t dst_path_utf8;
+
+    if (FAILED(dst_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &dst_path_utf16))) {
+        return S_OK;
+    }
+    SCOPE_EXIT { CoTaskMemFree(dst_path_utf16); };
+
+    if (!utf16_to_utf8(dst_path_utf16, dst_path_utf8.data(), dst_path_utf8.max_size())) {
+        return S_OK;
+    }
+
+    print_debug_msg("PostCopyItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
+
+    swan_path_t new_name_utf8;
+
+    if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
+        return S_OK;
+    }
+
+    {
+        auto pair = global_state::completed_file_ops();
+        auto &completed_operations = *pair.first;
+        auto &mutex = *pair.second;
+
+        path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
+        path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
+
+        completed_file_operation to_push(current_time_system(),
+                                         completed_file_operation::type::move,
+                                         src_path_utf8.data(),
+                                         dst_path_utf8.data(),
+                                         attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file);
+
+        std::scoped_lock lock(mutex);
+        completed_operations.push_front(to_push);
+    }
+
     return S_OK;
 }
-
-HRESULT progress_sink::PauseTimer() { print_debug_msg("PauseTimer"); return S_OK; }
-HRESULT progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) { print_debug_msg("PostNewItem"); return S_OK; }
-HRESULT progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("PostRenameItem"); return S_OK; }
-HRESULT progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("PreCopyItem"); return S_OK; }
-HRESULT progress_sink::PreDeleteItem(DWORD, IShellItem *) { print_debug_msg("PreDeleteItem"); return S_OK; }
-HRESULT progress_sink::PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("PreMoveItem"); return S_OK; }
-HRESULT progress_sink::PreNewItem(DWORD, IShellItem *, LPCWSTR) { print_debug_msg("PreNewItem"); return S_OK; }
-HRESULT progress_sink::PreRenameItem(DWORD, IShellItem *, LPCWSTR) { print_debug_msg("PreRenameItem"); return S_OK; }
-HRESULT progress_sink::ResetTimer() { print_debug_msg("ResetTimer"); return S_OK; }
-HRESULT progress_sink::ResumeTimer() { print_debug_msg("ResumeTimer"); return S_OK; }
-HRESULT progress_sink::StartOperations() { print_debug_msg("StartOperations"); return S_OK; }
 
 HRESULT progress_sink::UpdateProgress(UINT work_total, UINT work_so_far)
 {
     print_debug_msg("UpdateProgress %zu/%zu", work_so_far, work_total);
+    return S_OK;
+}
+
+HRESULT progress_sink::FinishOperations(HRESULT)
+{
+    print_debug_msg("FinishOperations");
+
+    if (this->contains_delete_operations) {
+        {
+            auto new_buffer = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
+
+            auto pair = global_state::recent_files();
+            auto &recent_files = *pair.first;
+            auto &mutex = *pair.second;
+
+            std::scoped_lock lock(mutex);
+
+            for (auto const &recent_file : recent_files) {
+                wchar_t recent_file_path_utf16[MAX_PATH];
+
+                if (utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16))) {
+                    if (PathFileExistsW(recent_file_path_utf16)) {
+                        new_buffer.push_back(recent_file);
+                    }
+                }
+            }
+
+            recent_files = new_buffer;
+        }
+
+        global_state::save_recent_files_to_disk();
+    }
+
+    (void) global_state::save_completed_file_ops_to_disk();
+
     return S_OK;
 }
 
@@ -334,16 +560,19 @@ void perform_file_operations(
                 NULL);
 
             WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << destination_directory_utf16.c_str() << "]\n");
-            s32 written = utf16_to_utf8(destination_directory_utf16.data(), destination_utf8.data(), destination_utf8.size());
+
             std::string error = {};
-            if (written == 0) {
+
+            if (!utf16_to_utf8(destination_directory_utf16.data(), destination_utf8.data(), destination_utf8.size())) {
                 error = "SHCreateItemFromParsingName and conversion of destination path from UTF-16 to UTF-8";
-            } else {
+            }
+            else {
                 if (accessible == INVALID_HANDLE_VALUE) {
                     error.append("file or directory is not accessible, maybe it is locked or has been moved/deleted? ");
                 }
                 error.append("SHCreateItemFromParsingName failed for [").append(destination_utf8.data()).append("]");
             }
+
             return set_init_error_and_notify(error.c_str());
         }
     }
@@ -376,7 +605,6 @@ void perform_file_operations(
             std::replace(full_path_to_exec_utf16.begin(), full_path_to_exec_utf16.end(), L'/', L'\\');
 
             swan_path_t item_path_utf8 = path_create("");
-            s32 written = 0;
 
             IShellItem *to_exec = nullptr;
             result = SHCreateItemFromParsingName(full_path_to_exec_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_exec));
@@ -391,15 +619,17 @@ void perform_file_operations(
                     NULL);
 
                 WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_exec_utf16.c_str() << "]\n");
-                written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                if (written == 0) {
+
+                if (!utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size())) {
                     err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8.\n";
-                } else {
+                }
+                else {
                     if (accessible == INVALID_HANDLE_VALUE) {
                         err << "File or directory is not accessible, maybe it is locked or has been moved/deleted? ";
                     }
                     err << "SHCreateItemFromParsingName failed for [" << item_path_utf8.data() << "].\n";
                 }
+
                 continue;
             }
 
@@ -424,8 +654,8 @@ void perform_file_operations(
 
             if (FAILED(result)) {
                 WCOUT_IF_DEBUG("FAILED: IFileOperation::" << function << " [" << full_path_to_exec_utf16.c_str() << "]\n");
-                written = utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                if (written == 0) {
+
+                if (!utf16_to_utf8(full_path_to_exec_utf16.data(), item_path_utf8.data(), item_path_utf8.size())) {
                     err << "IFileOperation::" << function << " and conversion of delete path from UTF-16 to UTF-8.\n";
                 } else {
                     err << "IFileOperation::" << function << " [" << item_path_utf8.data() << "].";

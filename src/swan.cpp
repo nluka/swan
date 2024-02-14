@@ -48,17 +48,17 @@ try {
     // block execution until all necessary files are found in their expected locations, relative to execution path.
     // if any are not found, the user is notified and given the ability to "Retry" the search for essential files.
     find_essential_files(window, ini_file_path.c_str());
-    print_debug_msg("Essential files found.");
+    print_debug_msg("Essential files found");
 
     // block execution until all non-default fonts are loaded successfully.
     // the user is notified of any font load failures and given the ability to "Retry" which will attempt to reload the fonts.
     load_non_default_fonts(window, ini_file_path.c_str());
-    print_debug_msg("Non-default fonts loaded.");
+    print_debug_msg("Non-default fonts loaded successfully");
 
     // block until COM is successfully initialized. the user is notified if an error occurs,
     // and has the ability to "Retry" which will attempt to re-initialize COM.
     init_COM_for_explorers(window, ini_file_path.c_str());
-    print_debug_msg("COM initialized for explorers.");
+    print_debug_msg("COM initialized successfully for explorers");
     SCOPE_EXIT { clean_COM_for_explorers(); };
 
     // other initialization stuff which is either: optional, cannot fail, or whose failure is considered non-fatal
@@ -74,7 +74,8 @@ try {
 
         (void) global_state::settings().load_from_disk();
         (void) global_state::load_pins_from_disk(global_state::settings().dir_separator_utf8);
-        (void) global_state::load_recent_files_from_disk();
+        (void) global_state::load_recent_files_from_disk(global_state::settings().dir_separator_utf8);
+        (void) global_state::load_completed_file_ops_from_disk(global_state::settings().dir_separator_utf8);
 
         if (global_state::settings().start_with_window_maximized) {
             glfwMaximizeWindow(window);
@@ -250,7 +251,7 @@ try {
                 }
                 case swan_windows::file_operations: {
                     if (window_visib.file_operations) {
-                        swan_windows::render_file_operations();
+                        swan_windows::render_file_operations(window_visib.file_operations);
                     }
                     break;
                 }
@@ -579,7 +580,31 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 
                     for (auto &expl : explorers) {
                         path_force_separator(expl.cwd, new_utf8_separator);
-                        // expl.update_request_from_outside = full_refresh;
+                    }
+
+                    {
+                        auto pair = global_state::recent_files();
+                        auto &recent_files = *pair.first;
+                        auto &mutex = *pair.second;
+
+                        std::scoped_lock lock(mutex);
+
+                        for (auto &recent_file : recent_files) {
+                            path_force_separator(recent_file.path, new_utf8_separator);
+                        }
+                    }
+
+                    {
+                        auto pair = global_state::completed_file_ops();
+                        auto &completed_operations = *pair.first;
+                        auto &mutex = *pair.second;
+
+                        std::scoped_lock lock(mutex);
+
+                        for (auto &file_op : completed_operations) {
+                            path_force_separator(file_op.src_path, global_state::settings().dir_separator_utf8);
+                            path_force_separator(file_op.dst_path, global_state::settings().dir_separator_utf8);
+                        }
                     }
                 }
             }

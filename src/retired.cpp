@@ -46,9 +46,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
         watch_target_utf8 = expl.cwd;
     }
 
-    s32 utf_written = utf8_to_utf16(watch_target_utf8.data(), watch_target_utf16, 2048);
-    if (utf_written == 0) {
-        print_debug_msg("[ %d ] utf8_to_utf16 failed during setup: watch_target_utf8 -> watch_target_utf16", expl.id);
+    if (!utf8_to_utf16(watch_target_utf8.data(), watch_target_utf16, 2048)) {
     }
 
     watch_handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
@@ -82,9 +80,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
                 watch_handle = INVALID_HANDLE_VALUE;
             }
             else {
-                utf_written = utf8_to_utf16(latest_valid_cwd.data(), watch_target_utf16, 2048);
-                if (utf_written == 0) {
-                    print_debug_msg("[ %d ] utf8_to_utf16 failed: latest_valid_cwd -> watch_target_utf16", expl.id);
+                if (utf8_to_utf16(latest_valid_cwd.data(), watch_target_utf16, 2048)) {
                 } else {
                     watch_handle = FindFirstChangeNotificationW(watch_target_utf16, false, notify_filter);
                     if (watch_handle == INVALID_HANDLE_VALUE) {

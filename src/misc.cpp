@@ -195,7 +195,6 @@ drive_list_t query_drive_list() noexcept
             DWORD serial_num = 0;
             DWORD max_component_length = 0;
             DWORD filesystem_flags = 0;
-            s32 utf_written = 0;
 
             auto vol_info_result = GetVolumeInformationW(
                 drive_root, volume_name, lengthof(volume_name),
@@ -213,8 +212,8 @@ drive_list_t query_drive_list() noexcept
                     info.letter = letter;
                     info.total_bytes = total_bytes.QuadPart;
                     info.available_bytes = free_bytes.QuadPart;
-                    utf_written = utf16_to_utf8(volume_name, info.name_utf8, lengthof(info.name_utf8));
-                    utf_written = utf16_to_utf8(filesystem_name_utf8, info.filesystem_name_utf8, lengthof(info.filesystem_name_utf8));
+                    (void) utf16_to_utf8(volume_name, info.name_utf8, lengthof(info.name_utf8));
+                    (void) utf16_to_utf8(filesystem_name_utf8, info.filesystem_name_utf8, lengthof(info.filesystem_name_utf8));
                     drive_list.push_back(info);
                 }
             }

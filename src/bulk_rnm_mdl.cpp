@@ -462,21 +462,15 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     wchar_t buffer_cwd_utf16[MAX_PATH];     init_empty_cstr(buffer_cwd_utf16);
                     wchar_t buffer_before_utf16[MAX_PATH];  init_empty_cstr(buffer_before_utf16);
                     wchar_t buffer_after_utf16[MAX_PATH];   init_empty_cstr(buffer_after_utf16);
-                    s32 utf_written = 0;
 
-                    utf_written = utf8_to_utf16(expl_cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16));
-
-                    if (utf_written == 0) {
-                        print_debug_msg("FAILED utf8_to_utf16 (expl_cwd -> buffer_cwd_utf16)");
+                    if (!utf8_to_utf16(expl_cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16))) {
                         ++num_renames_fail;
                         continue;
                     }
 
                     assert(rename.before != nullptr);
-                    utf_written = utf8_to_utf16(rename.before->path.data(), buffer_before_utf16, lengthof(buffer_before_utf16));
 
-                    if (utf_written == 0) {
-                        print_debug_msg("FAILED utf8_to_utf16 (rename.before.path -> buffer_before_utf16)");
+                    if (!utf8_to_utf16(rename.before->path.data(), buffer_before_utf16, lengthof(buffer_before_utf16))) {
                         ++num_renames_fail;
                         continue;
                     }
@@ -487,10 +481,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     }
                     before_path_utf16 += buffer_before_utf16;
 
-                    utf_written = utf8_to_utf16(rename.after.data(), buffer_after_utf16, lengthof(buffer_after_utf16));
-
-                    if (utf_written == 0) {
-                        print_debug_msg("FAILED utf8_to_utf16 (rename.after -> buffer_after_utf16)");
+                    if (!utf8_to_utf16(rename.after.data(), buffer_after_utf16, lengthof(buffer_after_utf16))) {
                         ++num_renames_fail;
                         continue;
                     }

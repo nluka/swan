@@ -2,6 +2,7 @@
 
 #include "stdafx.hpp"
 #include "util.hpp"
+#include "imgui_specific.hpp"
 
 static u64 s_fast_rand_seed = {};
 void seed_fast_rand(u64 v) noexcept
@@ -180,16 +181,32 @@ std::array<char, 64> compute_when_str(system_time_point_t start, system_time_poi
     return out;
 }
 
-s32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept
+s32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity, std::source_location sloc) noexcept
 {
+    assert(utf8_text != nullptr);
+    assert(utf16_text != nullptr);
+    assert(utf16_text_capacity > 0);
+
     s32 chars_written = MultiByteToWideChar(CP_UTF8, 0, utf8_text, -1, utf16_text, (s32)utf16_text_capacity);
+
+    if (chars_written == 0) {
+        print_debug_msg({ "FAILED utf8_to_utf16: %s", sloc }, get_last_error_string().c_str());
+    }
 
     return chars_written;
 }
 
-s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept
+s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity, std::source_location sloc) noexcept
 {
+    assert(utf16_text != nullptr);
+    assert(utf8_text != nullptr);
+    assert(utf8_text_capacity > 0);
+
     s32 chars_written = WideCharToMultiByte(CP_UTF8, 0, utf16_text, -1, utf8_text, (s32)utf8_text_capacity, "!", nullptr);
+
+    if (chars_written == 0) {
+        print_debug_msg({ "FAILED utf16_to_utf8: %s", sloc }, get_last_error_string().c_str());
+    }
 
     return chars_written;
 }

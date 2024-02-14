@@ -178,7 +178,7 @@ struct explorer_window
     typedef static_vector<ImGuiTableColumnSortSpecs, cwd_entries_table_col_count> cwd_entries_column_sort_specs_t;
 
     static u64 const NO_SELECTION = UINT64_MAX;
-    static u64 const MAX_WD_HISTORY_SIZE = 15;
+    static u64 const MAX_WD_HISTORY_SIZE = 30;
     bool save_to_disk() const noexcept;
     bool load_from_disk(char dir_separator) noexcept;
     void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
@@ -224,6 +224,7 @@ struct explorer_window
 
     std::string filter_error = "";
     std::string refresh_message = "";
+    std::string refresh_message_tooltip = "";
     OVERLAPPED read_dir_changes_overlapped;
 
     // 24 byte alignment members
@@ -324,31 +325,28 @@ struct file_operation_command_buf
     generic_result execute(explorer_window &expl) noexcept;
 };
 
-struct file_operation
+struct completed_file_operation
 {
     enum class type : u8
     {
         nil = 0,
         move,
         copy,
-        remove,
+        del,
         count
     };
 
-    std::atomic<u64> total_file_size          = {};
-    std::atomic<u64> total_bytes_transferred  = {};
-    std::atomic<u64> stream_size              = {};
-    std::atomic<u64> stream_bytes_transferred = {};
-    std::atomic<precise_time_point_t> start_time      = {};
-    std::atomic<precise_time_point_t> end_time        = {};
-    type op_type = type::nil;
-    bool success = false;
+    system_time_point_t completion_time = {};
     swan_path_t src_path = {};
-    swan_path_t dest_path = {};
+    swan_path_t dst_path = {};
+    type op_type = type::nil;
+    basic_dirent::kind obj_type = basic_dirent::kind::nil;
 
-    file_operation(type op_type, u64 file_size, swan_path_t const &src, swan_path_t const &dst) noexcept;
-    file_operation(file_operation const &other) noexcept; // for boost::circular_buffer
-    file_operation &operator=(file_operation const &other) noexcept; // for boost::circular_buffer
+    completed_file_operation(system_time_point_t completion_time, type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept;
+
+    completed_file_operation() noexcept; // for boost::circular_buffer
+    completed_file_operation(completed_file_operation const &other) noexcept; // for boost::circular_buffer
+    completed_file_operation &operator=(completed_file_operation const &other) noexcept; // for boost::circular_buffer
 };
 
 struct progress_sink : public IFileOperationProgressSink

@@ -293,7 +293,6 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                 std::replace(full_path_to_delete_utf16.begin(), full_path_to_delete_utf16.end(), L'/', L'\\');
 
                 swan_path_t item_path_utf8 = path_create("");
-                s32 written = 0;
 
                 IShellItem *to_delete = nullptr;
                 result = SHCreateItemFromParsingName(full_path_to_delete_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_delete));
@@ -308,8 +307,8 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                         NULL);
 
                     WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_delete_utf16.c_str() << "]\n");
-                    written = utf16_to_utf8(full_path_to_delete_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                    if (written == 0) {
+
+                    if (!utf16_to_utf8(full_path_to_delete_utf16.data(), item_path_utf8.data(), item_path_utf8.size())) {
                         err << "SHCreateItemFromParsingName and conversion of delete path from UTF-16 to UTF-8.\n";
                     } else {
                         if (accessible == INVALID_HANDLE_VALUE) {
@@ -325,8 +324,8 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                 result = file_op->DeleteItem(to_delete, nullptr);
                 if (FAILED(result)) {
                     WCOUT_IF_DEBUG("FAILED: IFileOperation::DeleteItem [" << full_path_to_delete_utf16.c_str() << "]\n");
-                    written = utf16_to_utf8(full_path_to_delete_utf16.data(), item_path_utf8.data(), item_path_utf8.size());
-                    if (written == 0) {
+
+                    if (!utf16_to_utf8(full_path_to_delete_utf16.data(), item_path_utf8.data(), item_path_utf8.size())) {
                         err << "IFileOperation::DeleteItem and conversion of delete path from UTF-16 to UTF-8.\n";
                     } else {
                         err << "IFileOperation::DeleteItem [" << item_path_utf8.data() << "]";
@@ -367,9 +366,8 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
     };
 
     wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
-    s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-    if (written == 0) {
-        print_debug_msg("FAILED utf8_to_utf16(expl.cwd)");
+
+    if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
         return { false, "Conversion of current working directory path from UTF-8 to UTF-16." };
     }
 
@@ -382,10 +380,8 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
         for (auto const &item : expl.cwd_entries) {
             if (!item.is_filtered_out && item.is_selected) {
                 init_empty_cstr(item_utf16);
-                written = utf8_to_utf16(item.basic.path.data(), item_utf16, lengthof(item_utf16));
 
-                if (written == 0) {
-                    print_debug_msg("FAILED utf8_to_utf16(item.basic.path)");
+                if (!utf8_to_utf16(item.basic.path.data(), item_utf16, lengthof(item_utf16))) {
                     err << "Conversion of [" << item.basic.path.data() << "] from UTF-8 to UTF-16.\n";
                 }
 
@@ -430,9 +426,8 @@ generic_result move_files_into(swan_path_t const &destination_utf8, explorer_win
     SCOPE_EXIT { delete[] payload.absolute_paths_delimited_by_newlines; };
 
     wchar_t destination_utf16[2048]; init_empty_cstr(destination_utf16);
-    s32 written = utf8_to_utf16(destination_utf8.data(), destination_utf16, lengthof(destination_utf16));
-    if (written == 0) {
-        print_debug_msg("FAILED utf8_to_utf16(destination)");
+
+    if (!utf8_to_utf16(destination_utf8.data(), destination_utf16, lengthof(destination_utf16))) {
         return { false, "Conversion of destination directory path from UTF-8 to UTF-16." };
     }
 
@@ -484,19 +479,16 @@ generic_result handle_drag_drop_onto_dirent(
     }
 }
 
+static
 generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, explorer_window &expl, wchar_t dir_sep_utf16) noexcept
 {
     wchar_t select_path_cwd_buffer_utf16[MAX_PATH];     init_empty_cstr(select_path_cwd_buffer_utf16);
     wchar_t select_path_dirent_buffer_utf16[MAX_PATH];  init_empty_cstr(select_path_dirent_buffer_utf16);
     std::wstring select_command = {};
-    s32 utf_written = 0;
 
     select_command.reserve(1024);
 
-    utf_written = utf8_to_utf16(expl.cwd.data(), select_path_cwd_buffer_utf16, lengthof(select_path_cwd_buffer_utf16));
-
-    if (utf_written == 0) {
-        print_debug_msg("[ %d ] FAILED utf8_to_utf16(expl.cwd)", expl.id);
+    if (!utf8_to_utf16(expl.cwd.data(), select_path_cwd_buffer_utf16, lengthof(select_path_cwd_buffer_utf16))) {
         return { false, "Conversion of cwd path from UTF-8 to UTF-16." };
     }
 
@@ -507,10 +499,7 @@ generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, exp
         select_command += dir_sep_utf16;
     }
 
-    utf_written = utf8_to_utf16(entry.basic.path.data(), select_path_dirent_buffer_utf16, lengthof(select_path_dirent_buffer_utf16));
-
-    if (utf_written == 0) {
-        print_debug_msg("[ %d ] FAILED utf8_to_utf16(entry.basic.path)", expl.id);
+    if (!utf8_to_utf16(entry.basic.path.data(), select_path_dirent_buffer_utf16, lengthof(select_path_dirent_buffer_utf16))) {
         return { false, "Conversion of selected entry's path from UTF-8 to UTF-16." };
     }
 
@@ -539,9 +528,7 @@ generic_result open_file(char const *file_name, char const *file_directory, bool
 
     wchar_t target_full_path_utf16[MAX_PATH]; init_empty_cstr(target_full_path_utf16);
 
-    s32 utf_written = utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16));
-
-    if (utf_written == 0) {
+    if (!utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16))) {
         return { false, "Conversion of target's full path from UTF-8 to UTF-16." };
     }
 
@@ -576,7 +563,6 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
 
     swan_path_t lnk_file_full_path_utf8;
     wchar_t lnk_file_path_utf16[MAX_PATH]; init_empty_cstr(lnk_file_path_utf16);
-    s32 utf_written = {};
     HRESULT com_handle = {};
     LPITEMIDLIST item_id_list = nullptr;
 
@@ -590,9 +576,7 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
         lnk_file_full_path_utf8 = path_create(lnk_file_path_utf8);
     }
 
-    utf_written = utf8_to_utf16(lnk_file_full_path_utf8.data(), lnk_file_path_utf16, lengthof(lnk_file_path_utf16));
-
-    if (utf_written == 0) {
+    if (!utf8_to_utf16(lnk_file_full_path_utf8.data(), lnk_file_path_utf16, lengthof(lnk_file_path_utf16))) {
         return { false, "Conversion of symlink path from UTF-8 to UTF-16." };
     }
 
@@ -614,9 +598,7 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
         return { false, err + " (SHGetPathFromIDListW)." };
     }
 
-    utf_written = utf16_to_utf8(this->target_path_utf16, this->target_path_utf8.data(), this->target_path_utf8.size());
-
-    if (utf_written == 0) {
+    if (!utf16_to_utf8(this->target_path_utf16, this->target_path_utf8.data(), this->target_path_utf8.size())) {
         return { false, "Conversion of symlink target path from UTF-16 to UTF-8." };
     }
 
@@ -840,7 +822,7 @@ bool explorer_window::update_cwd_entries(
                     swan_path_t parent_dir_trimmed = {};
                     strncpy(parent_dir_trimmed.data(), parent_dir.data(), parent_dir.size() - num_trailing_spaces);
 
-                    utf8_to_utf16(parent_dir_trimmed.data(), search_path_utf16, lengthof(search_path_utf16));
+                    (void) utf8_to_utf16(parent_dir_trimmed.data(), search_path_utf16, lengthof(search_path_utf16));
 
                     wchar_t dir_sep_w[] = { (wchar_t)dir_sep_utf8, L'\0' };
 
@@ -854,10 +836,7 @@ bool explorer_window::update_cwd_entries(
                 {
                     char utf8_buffer[2048]; init_empty_cstr(utf8_buffer);
 
-                    u64 utf_written = utf16_to_utf8(search_path_utf16, utf8_buffer, lengthof(utf8_buffer));
-
-                    if (utf_written == 0) {
-                        print_debug_msg("[ %d ] FAILED utf16_to_utf8(search_path)", this->id);
+                    if (!utf16_to_utf8(search_path_utf16, utf8_buffer, lengthof(utf8_buffer))) {
                         return parent_dir_exists;
                     }
 
@@ -895,14 +874,8 @@ bool explorer_window::update_cwd_entries(
                     entry.basic.creation_time_raw = find_data.ftCreationTime;
                     entry.basic.last_write_time_raw = find_data.ftLastWriteTime;
 
-                    // entry.basic.path = find_data.cFileName;
-                    {
-                        s32 utf_written = utf16_to_utf8(find_data.cFileName, entry.basic.path.data(), entry.basic.path.size());
-
-                        if (utf_written == 0) {
-                            print_debug_msg("[ %d ] FAILED utf16_to_utf8(find_data.cFileName)", this->id);
-                            continue;
-                        }
+                    if (!utf16_to_utf8(find_data.cFileName, entry.basic.path.data(), entry.basic.path.size())) {
+                        continue;
                     }
 
                     if (path_equals_exactly(entry.basic.path, ".")) {
@@ -1001,6 +974,7 @@ bool explorer_window::update_cwd_entries(
                 while (FindNextFileW(find_handle, &find_data));
 
                 this->refresh_message.clear();
+                this->refresh_message_tooltip.clear();
                 this->last_filesystem_query_time = current_time_precise();
                 {
                     std::scoped_lock lock(select_cwd_entries_on_next_update_mutex);
@@ -1344,10 +1318,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
 
     wchar_t new_cwd_utf16[MAX_PATH]; init_empty_cstr(new_cwd_utf16);
 
-    s32 utf_written = utf8_to_utf16(new_cwd_utf8.data(), new_cwd_utf16, lengthof(new_cwd_utf16));
-
-    if (utf_written == 0) {
-        print_debug_msg("[ %d ] utf8_to_utf16(new_cwd) FAILED", expl.id);
+    if (!utf8_to_utf16(new_cwd_utf8.data(), new_cwd_utf16, lengthof(new_cwd_utf16))) {
         descend_result res;
         res.success = false;
         res.err_msg = "Conversion of new cwd path from UTF-8 to UTF-16.";
@@ -1372,10 +1343,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
 
     swan_path_t new_cwd_canoncial_utf8;
 
-    utf_written = utf16_to_utf8(new_cwd_canonical_utf16, new_cwd_canoncial_utf8.data(), new_cwd_canoncial_utf8.size());
-
-    if (utf_written == 0) {
-        print_debug_msg("[ %d ] utf16_to_utf8(new_cwd_canonical) FAILED", expl.id);
+    if (!utf16_to_utf8(new_cwd_canonical_utf16, new_cwd_canoncial_utf8.data(), new_cwd_canoncial_utf8.size())) {
         descend_result res;
         res.success = false;
         res.err_msg = "Conversion of new canonical cwd path from UTF-8 to UTF-16.";
@@ -1880,19 +1848,14 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
         wchar_t cwd_utf16[MAX_PATH];        init_empty_cstr(cwd_utf16);
         wchar_t dir_name_utf16[MAX_PATH];   init_empty_cstr(dir_name_utf16);
         std::wstring create_path = {};
-        s32 utf_written = 0;
         BOOL result = {};
 
-        utf_written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-        if (utf_written == 0) {
-            print_debug_msg("[ %d ] FAILED utf8_to_utf16(expl.cwd)", expl.id);
+        if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
             cleanup_and_close_popup();
             return;
         }
 
-        utf_written = utf8_to_utf16(dir_name_utf8, dir_name_utf16, lengthof(dir_name_utf16));
-        if (utf_written == 0) {
-            print_debug_msg("[ %d ] FAILED utf8_to_utf16(dir_name)", expl.id);
+        if (!utf8_to_utf16(dir_name_utf8, dir_name_utf16, lengthof(dir_name_utf16))) {
             cleanup_and_close_popup();
             return;
         }
@@ -2246,19 +2209,14 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
         wchar_t cwd_utf16[MAX_PATH];        init_empty_cstr(cwd_utf16);
         wchar_t file_name_utf16[MAX_PATH];  init_empty_cstr(file_name_utf16);
         std::wstring create_path_utf16 = {};
-        s32 utf_written = 0;
         HANDLE result = {};
 
-        utf_written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-        if (utf_written == 0) {
-            print_debug_msg("[ %d ] FAILED utf8_to_utf16(expl.cwd)", expl.id);
+        if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
             cleanup_and_close_popup();
             return;
         }
 
-        utf_written = utf8_to_utf16(file_name_utf8, file_name_utf16, lengthof(file_name_utf16));
-        if (utf_written == 0) {
-            print_debug_msg("[ %d ] FAILED utf8_to_utf16(file_name)", expl.id);
+        if (!utf8_to_utf16(file_name_utf8, file_name_utf16, lengthof(file_name_utf16))) {
             cleanup_and_close_popup();
             return;
         }
@@ -2292,13 +2250,10 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
             print_debug_msg("[ %d ] FAILED CreateFileW: %d, %s", expl.id, result, err_msg.c_str());
         } else {
             swan_path_t create_path_utf8;
-            s32 written = utf16_to_utf8(create_path_utf16.c_str(), create_path_utf8.data(), create_path_utf8.max_size());
 
-            if (written != 0) {
+            if (utf16_to_utf8(create_path_utf16.c_str(), create_path_utf8.data(), create_path_utf8.max_size())) {
                 global_state::add_recent_file("Created", create_path_utf8.data());
                 (void) global_state::save_recent_files_to_disk();
-            } else {
-                print_debug_msg("[ %d ] FAILED utf16_to_utf8(create_path)", expl.id);
             }
 
             {
@@ -2634,9 +2589,11 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         else if (global_state::settings().expl_refresh_mode != swan_settings::explorer_refresh_mode_manual && cwd_exists_before_edit) {
             auto issue_read_dir_changes = [&]() {
                 wchar_t cwd_utf16[MAX_PATH];
-                s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-                if (written == 0) {
-                    print_debug_msg("[ %d ] FAILED utf8_to_utf16(expl.cwd)", expl.id);
+
+                if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
+                    expl.refresh_message = ICON_CI_ERROR " Auto refresh disabled";
+                    expl.refresh_message_tooltip = "Something went wrong when trying to subscribe to directory changes. Sorry!";
+                    return;
                 }
 
                 expl.read_dir_changes_handle = CreateFileW(
@@ -2705,7 +2662,12 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                         }
                     } else { // explorer_options::refresh_mode::notify
                         print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == notify, notifying...");
+
                         expl.refresh_message = ICON_FA_EXCLAMATION_TRIANGLE " Outdated" ;
+
+                        expl.refresh_message_tooltip = "Directory content has changed since it was last updated.\n"
+                                                       "To see the changes, click to refresh.\n"
+                                                       "Alternatively, you can set refresh mode to 'automatic' in [Explorer Options] > Refresh mode.";
                         issue_read_dir_changes();
                     }
                 }
@@ -3172,9 +3134,8 @@ void file_operation_command_buf::clear() noexcept
 generic_result file_operation_command_buf::execute(explorer_window &expl) noexcept
 {
     wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
-    s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-    if (written == 0) {
-        print_debug_msg("FAILED utf8_to_utf16(expl.cwd)");
+
+    if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
         return { false, "Conversion of current working directory path from UTF-8 to UTF-16." };
     }
 
@@ -3188,15 +3149,13 @@ generic_result file_operation_command_buf::execute(explorer_window &expl) noexce
 
         for (auto const &item : this->items) {
             init_empty_cstr(item_utf16);
-            written = utf8_to_utf16(item.path.data(), item_utf16, lengthof(item_utf16));
 
-            if (written == 0) {
-                print_debug_msg("FAILED utf8_to_utf16(item.path)");
+            if (!utf8_to_utf16(item.path.data(), item_utf16, lengthof(item_utf16))) {
                 err << "Conversion of [" << item.path.data() << "] from UTF-8 to UTF-16.\n";
+            } else {
+                packed_paths_to_exec_utf16.append(item_utf16).append(L"\n");
+                operations_to_exec.push_back(item.operation_code);
             }
-
-            packed_paths_to_exec_utf16.append(item_utf16).append(L"\n");
-            operations_to_exec.push_back(item.operation_code);
         }
 
         // WCOUT_IF_DEBUG("packed_paths_to_exec_utf16:\n" << packed_paths_to_exec_utf16 << '\n');
@@ -3467,9 +3426,8 @@ void render_table_rows_for_cwd_entries(
                     std::wstring retval;
 
                     wchar_t cwd_utf16[MAX_PATH];
-                    s32 written = utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16));
-                    if (written == 0) {
-                        // TODO: handle error
+
+                    if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
                         retval = {};
                     } else {
                         retval = cwd_utf16;
@@ -3492,12 +3450,8 @@ void render_table_rows_for_cwd_entries(
                     }
 
                     wchar_t item_utf16[MAX_PATH];
-                    s32 written = utf8_to_utf16(item_utf8, item_utf16, lengthof(item_utf16));
 
-                    if (written == 0) {
-                        // TODO: handle error
-                    }
-                    else {
+                    if (utf8_to_utf16(item_utf8, item_utf16, lengthof(item_utf16))) {
                         paths += item_utf16;
                         paths += L'\n';
                     }
@@ -3875,9 +3829,7 @@ void render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle 
         if (expl.refresh_message != "") {
             imgui::TextColored(orange(), "%s", expl.refresh_message.c_str());
             if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Things have changed in this directory since this list of entries was last retrieved.\n"
-                                  "These changes are not being shown, click to refresh and see them.\n"
-                                  "Alternatively, you can set refresh mode to 'automatic' in [Explorer Options] > Refresh mode.");
+                imgui::SetTooltip(expl.refresh_message_tooltip.c_str());
             }
             if (imgui::IsItemClicked(ImGuiMouseButton_Left)) {
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());

@@ -7,49 +7,17 @@
 #undef min
 #undef max
 
-static u64 const MAX_RECENT_FILES = 100;
-static circular_buffer<recent_file> s_recent_files = circular_buffer<recent_file>(MAX_RECENT_FILES);
+static circular_buffer<recent_file> s_recent_files = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
 static std::mutex s_recent_files_mutex = {};
 
-circular_buffer<recent_file> &global_state::recent_files() noexcept { return s_recent_files; }
-
-HRESULT progress_sink::FinishOperations(HRESULT)
-{
-    print_debug_msg("FinishOperations");
-
-    if (this->contains_delete_operations) {
-        {
-            auto new_buffer = circular_buffer<recent_file>(MAX_RECENT_FILES);
-
-            std::scoped_lock lock(s_recent_files_mutex);
-
-            for (auto const &recent_file : s_recent_files) {
-                wchar_t recent_file_path_utf16[MAX_PATH];
-
-                if (!utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16))) {
-                    // TODO: error
-                } else if (PathFileExistsW(recent_file_path_utf16)) {
-                    new_buffer.push_back(recent_file);
-                }
-            }
-
-            s_recent_files = new_buffer;
-        }
-
-        global_state::save_recent_files_to_disk();
-    }
-
-    return S_OK;
-}
+std::pair<circular_buffer<recent_file> *, std::mutex *> global_state::recent_files() noexcept { return std::make_pair(&s_recent_files, &s_recent_files_mutex); }
 
 u64 global_state::find_recent_file_idx(char const *search_path) noexcept
 {
-    auto &recent_files = global_state::recent_files();
-
     std::scoped_lock lock(s_recent_files_mutex);
 
     for (u64 i = 0; i < s_recent_files.size(); ++i) {
-        auto const &recent_file = recent_files[i];
+        auto const &recent_file = s_recent_files[i];
         if (path_loosely_same(recent_file.path.data(), search_path)) {
             return i;
         }
@@ -60,37 +28,31 @@ u64 global_state::find_recent_file_idx(char const *search_path) noexcept
 
 void global_state::move_recent_file_idx_to_front(u64 recent_file_idx, char const *new_action) noexcept
 {
-    auto &recent_files = global_state::recent_files();
-
     std::scoped_lock lock(s_recent_files_mutex);
 
-    auto temp = recent_files[recent_file_idx];
+    auto temp = s_recent_files[recent_file_idx];
     temp.action_time = current_time_system();
     if (new_action) {
         temp.action.clear();
         temp.action = new_action;
     }
 
-    recent_files.erase(recent_files.begin() + recent_file_idx);
-    recent_files.push_front(temp);
+    s_recent_files.erase(s_recent_files.begin() + recent_file_idx);
+    s_recent_files.push_front(temp);
 }
 
 void global_state::add_recent_file(char const *action, char const *full_file_path) noexcept
 {
-    auto &recent_files = global_state::recent_files();
     swan_path_t path = path_create(full_file_path);
 
     std::scoped_lock lock(s_recent_files_mutex);
-    recent_files.push_front({ action, current_time_system(), path });
+    s_recent_files.push_front({ action, current_time_system(), path });
 }
 
 void global_state::remove_recent_file(u64 recent_file_idx) noexcept
 {
-    auto &recent_files = global_state::recent_files();
-
     std::scoped_lock lock(s_recent_files_mutex);
-
-    recent_files.erase(recent_files.begin() + recent_file_idx);
+    s_recent_files.erase(s_recent_files.begin() + recent_file_idx);
 }
 
 bool global_state::save_recent_files_to_disk() noexcept
@@ -103,11 +65,9 @@ try {
         return false;
     }
 
-    auto const &recent_files = global_state::recent_files();
-
     std::scoped_lock lock(s_recent_files_mutex);
 
-    for (auto const &file : recent_files) {
+    for (auto const &file : s_recent_files) {
         auto time_t = std::chrono::system_clock::to_time_t(file.action_time);
         std::tm tm = *std::localtime(&time_t);
 
@@ -126,7 +86,7 @@ catch (...) {
     return false;
 }
 
-std::pair<bool, u64> global_state::load_recent_files_from_disk() noexcept
+std::pair<bool, u64> global_state::load_recent_files_from_disk(char dir_separator) noexcept
 try {
     std::filesystem::path full_path = global_state::execution_path() / "data\\recent_files.txt";
 
@@ -136,11 +96,9 @@ try {
         return { false, 0 };
     }
 
-    auto &recent_files = global_state::recent_files();
-
     std::scoped_lock lock(s_recent_files_mutex);
 
-    recent_files.clear();
+    s_recent_files.clear();
 
     std::string line = {};
     line.reserve(global_state::page_size() - 1);
@@ -164,17 +122,19 @@ try {
         std::tm tm = {};
         iss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
         system_time_point_t stored_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-
         iss.ignore(1);
+
         iss >> (u64 &)stored_path_len;
-
         iss.ignore(1);
+
         iss.read(stored_path.data(), stored_path_len);
 
-        recent_files.push_back();
-        recent_files.back().action = buffer;
-        recent_files.back().action_time = stored_time;
-        recent_files.back().path = stored_path;
+        path_force_separator(stored_path, dir_separator);
+
+        s_recent_files.push_back();
+        s_recent_files.back().action = buffer;
+        s_recent_files.back().action_time = stored_time;
+        s_recent_files.back().path = stored_path;
 
         ++num_loaded_successfully;
 
@@ -200,12 +160,14 @@ void swan_windows::render_recent_files(bool &open) noexcept
         global_state::save_focused_window(swan_windows::recent_files);
     }
 
-    auto &recent_files = global_state::recent_files();
     system_time_point_t current_time = current_time_system();
     u64 remove_idx = u64(-1);
     u64 move_to_front_idx = u64(-1);
 
-    if (imgui::BeginTable("recent_files", 4, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|ImGuiTableFlags_Hideable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Resizable)) {
+    if (imgui::BeginTable("recent_files", 4,
+        ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|ImGuiTableFlags_Hideable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Resizable|
+        (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)))
+    {
         imgui::TableSetupColumn("#");
         imgui::TableSetupColumn("When");
         imgui::TableSetupColumn("File Name");
@@ -215,7 +177,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
         std::scoped_lock lock(s_recent_files_mutex);
 
         u64 n = 0;
-        for (auto &file : recent_files) {
+        for (auto &file : s_recent_files) {
             char *file_name = get_file_name(file.path.data());
             char const *full_path = file.path.data();
             auto directory = get_everything_minus_file_name(full_path);
@@ -270,12 +232,8 @@ void swan_windows::render_recent_files(bool &open) noexcept
                 auto &expl = global_state::explorers()[0];
 
                 wchar_t file_path_utf16[MAX_PATH];
-                s32 written = utf8_to_utf16(full_path, file_path_utf16, lengthof(file_path_utf16));
 
-                if (written == 0) {
-                    // TODO: handle error
-                }
-                else {
+                if (utf8_to_utf16(full_path, file_path_utf16, lengthof(file_path_utf16))) {
                     auto file_exists = PathFileExistsW(file_path_utf16);
 
                     if (!file_exists) {
@@ -319,10 +277,10 @@ void swan_windows::render_recent_files(bool &open) noexcept
         imgui::EndTable();
     }
 
-    if (!recent_files.empty()) {
+    if (!s_recent_files.empty()) {
         if (imgui::Button("Clear##recent_files")) {
             std::scoped_lock lock(s_recent_files_mutex);
-            recent_files.clear();
+            s_recent_files.clear();
             (void) global_state::save_recent_files_to_disk();
         }
     }

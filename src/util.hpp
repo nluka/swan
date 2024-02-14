@@ -39,19 +39,15 @@ u64 two_u32_to_one_u64(u32 low, u32 high) noexcept;
 
 s32 directory_exists(char const *path) noexcept;
 
-void format_file_size(
-    u64 file_size,
-    char *out,
-    u64 out_size,
-    u64 unit_multiplier) noexcept;
+void format_file_size(u64 file_size, char *out, u64 out_size, u64 unit_multiplier) noexcept;
 
 void seed_fast_rand(u64) noexcept;
 
 u64 fast_rand(u64 min = 1, u64 max = u64(-1)) noexcept;
 
-s32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity) noexcept;
+s32 utf8_to_utf16(char const *utf8_text, wchar_t *utf16_text, u64 utf16_text_capacity, std::source_location sloc = std::source_location::current()) noexcept;
 
-s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity) noexcept;
+s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity, std::source_location sloc = std::source_location::current()) noexcept;
 
 bool streq(char const *s1, char const *s2) noexcept;
 
