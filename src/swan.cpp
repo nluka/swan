@@ -348,6 +348,8 @@ try {
         if (swan_popup_modals::is_open_error()) {
             swan_popup_modals::render_error();
         }
+
+        imgui::RenderConfirmationModal();
     }
 
     //? I don't know if this is safe to do, would be good to look into it,
@@ -496,7 +498,8 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcep
         CloseHandle(dump_file);
         _tprintf(_T("Crash dump generated successfully.\n"));
     } else {
-        _tprintf(_T("Error creating crash dump file: %d - %s\n"), GetLastError(), get_last_error_string().c_str());
+        auto last_error = get_last_winapi_error();
+        _tprintf(_T("Error creating crash dump file: %d - %s\n"), last_error.code, last_error.formatted_message.c_str());
     }
 
     // Allow the default exception handling to continue (e.g., generate an error report)

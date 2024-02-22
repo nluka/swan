@@ -132,8 +132,9 @@ char const *get_icon_for_extension(char const *extension) noexcept
             { "xml",    ICON_FA_FILE_ALT },
             { "ini",    ICON_FA_FILE_ALT },
             { "conf",   ICON_FA_FILE_ALT },
-            { "json",   ICON_FA_FILE_ALT },
+            { "cfg",    ICON_FA_FILE_ALT },
             { "config", ICON_FA_FILE_ALT },
+            { "json",   ICON_FA_FILE_ALT },
         };
 
         for (auto const &pair : extension_to_icon) {
@@ -146,11 +147,11 @@ char const *get_icon_for_extension(char const *extension) noexcept
     }
 }
 
-std::string get_last_error_string() noexcept
+winapi_error get_last_winapi_error() noexcept
 {
     DWORD error_code = GetLastError();
     if (error_code == 0) {
-        return "No error.";
+        return { 0, "No error." };
     }
 
     LPSTR buffer = nullptr;
@@ -165,7 +166,7 @@ std::string get_last_error_string() noexcept
     );
 
     if (buffer_size == 0) {
-        return "Error formatting message.";
+        return { 0, "Error formatting message." };
     }
 
     std::string error_message(buffer, buffer + buffer_size);
@@ -176,7 +177,7 @@ std::string get_last_error_string() noexcept
         error_message.pop_back();
     }
 
-    return error_message;
+    return { error_code, error_message };
 }
 
 drive_list_t query_drive_list() noexcept

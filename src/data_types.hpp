@@ -340,10 +340,12 @@ struct completed_file_operation
     };
 
     system_time_point_t completion_time = {};
+    u32 group_id = {};
     swan_path_t src_path = {};
     swan_path_t dst_path = {};
     type op_type = type::nil;
     basic_dirent::kind obj_type = basic_dirent::kind::nil;
+    bool selected = false;
 
     completed_file_operation(system_time_point_t completion_time, type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept;
 
@@ -484,4 +486,11 @@ struct icon_font_browser_state
     char search_input[256];
     s32 grid_width;
     std::vector<icon_font_glyph> matches;
+};
+
+enum swan_confirmation_id : s32
+{
+    swan_confirm_id_clear_recent_files,
+    swan_confirm_id_delete_pin,
+    swan_confirm_id_count
 };

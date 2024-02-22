@@ -45,10 +45,6 @@ void swan_popup_modals::render_new_pin() noexcept
         imgui::CloseCurrentPopup();
     };
 
-    imgui::ColorEdit4("Edit Color##pin", &color_input.x, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
-    imgui::SameLine();
-    imgui::TextColored(color_input, "Color");
-
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
         // when modal just opened:
         imgui::SetKeyboardFocusHere(0); // set focus on label input
@@ -87,6 +83,12 @@ void swan_popup_modals::render_new_pin() noexcept
             err_msg.clear();
         }
     }
+
+    imgui::ColorEdit4("Edit Color##pin", &color_input.x, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
+    imgui::SameLine();
+    imgui::TextColored(color_input, "Color");
+
+    imgui::SameLineSpaced(1);
 
     if (imgui::Button("Create##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
         swan_path_t path = path_squish_adjacent_separators(path_input);

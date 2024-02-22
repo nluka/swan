@@ -101,7 +101,7 @@ void swan_popup_modals::render_single_rename() noexcept
                 case EACCES: err_msg = "New path already exists or couldn't be created."; break;
                 case ENOENT: err_msg = "Old path not found, probably a bug. Sorry!"; break;
                 case EINVAL: err_msg = "Name contains invalid characters."; break;
-                default: err_msg = get_last_error_string(); break;
+                default: err_msg = get_last_winapi_error().formatted_message; break;
             }
         }
         else {
@@ -147,8 +147,8 @@ void swan_popup_modals::render_single_rename() noexcept
 
     imgui::TextUnformatted("(?)");
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("[Enter]   rename\n"
-                          "[Escape]  exit");
+        imgui::SetTooltip("[Enter]   Rename\n"
+                          "[Escape]  Exit");
     }
 
     if (!err_msg.empty()) {

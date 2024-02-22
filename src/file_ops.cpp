@@ -186,23 +186,25 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
     enum file_ops_table_col : s32
     {
-        file_ops_table_col_action,
+        // file_ops_table_col_action,
+        file_ops_table_col_group,
         file_ops_table_col_op_type,
         file_ops_table_col_completion_time,
         file_ops_table_col_src_path,
-        file_ops_table_col_dest_path,
+        file_ops_table_col_dst_path,
         file_ops_table_col_count
     };
 
     if (imgui::BeginTable("Activities", file_ops_table_col_count,
-        ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|
+        ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|
         (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
     ) {
-        imgui::TableSetupColumn("Action", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_action);
+        // imgui::TableSetupColumn("Action", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_action);
+        imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
         imgui::TableSetupColumn("Completed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_completion_time);
-        imgui::TableSetupColumn("Src", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
-        imgui::TableSetupColumn("Dst", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dest_path);
+        imgui::TableSetupColumn("Source Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
+        imgui::TableSetupColumn("Destination Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dst_path);
         imgui::TableHeadersRow();
 
         auto pair = global_state::completed_file_ops();
@@ -211,12 +213,21 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
         std::scoped_lock lock(mutex);
 
-        for (auto const &file_op : completed_operations) {
+        for (u64 i = 0; i < completed_operations.size(); ++i) {
+        // for (auto const &file_op : completed_operations) {
+            auto &file_op = completed_operations[i];
+
             imgui::TableNextRow();
 
-            if (imgui::TableSetColumnIndex(file_ops_table_col_action)) {
-                imgui::ScopedDisable d(true);
-                imgui::SmallButton("Undo");
+            // if (imgui::TableSetColumnIndex(file_ops_table_col_action)) {
+            //     imgui::ScopedDisable d(true);
+            //     imgui::SmallButton("Undo");
+            // }
+
+            if (imgui::TableSetColumnIndex(file_ops_table_col_group)) {
+                if (file_op.group_id != 0) {
+                    imgui::Text("%zu", file_op.group_id);
+                }
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_op_type)) {
@@ -239,24 +250,58 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_src_path)) {
-                imgui::TextUnformatted(file_op.src_path.data());
+                char buffer[2048];
+                (void) snprintf(buffer, lengthof(buffer), "%s##%zu", file_op.src_path.data(), i);
+
+                imgui::Selectable(buffer, &file_op.selected, ImGuiSelectableFlags_SpanAllColumns);
+                // imgui::TextUnformatted(file_op.src_path.data());
+
                 if (imgui::IsItemClicked()) {
                     // TODO: find most appropriate explorer and spotlight the item
                 }
             }
+            imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_src_path, file_op.src_path.data());
 
-            if (imgui::TableSetColumnIndex(file_ops_table_col_dest_path)) {
+            if (imgui::TableSetColumnIndex(file_ops_table_col_dst_path)) {
                 imgui::TextUnformatted(file_op.dst_path.data());
                 if (imgui::IsItemClicked()) {
                     // TODO: find most appropriate explorer and spotlight the item
                 }
             }
+            imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_dst_path, file_op.dst_path.data());
         }
 
         imgui::EndTable();
     }
 
     imgui::End();
+}
+
+void print_SIGDN_values(char const *func_label, char const *item_name, IShellItem *item) noexcept
+{
+    std::pair<SIGDN, char const *> values[] = {
+        { SIGDN_DESKTOPABSOLUTEEDITING, "SIGDN_DESKTOPABSOLUTEEDITING" },
+        { SIGDN_DESKTOPABSOLUTEPARSING, "SIGDN_DESKTOPABSOLUTEPARSING" },
+        { SIGDN_FILESYSPATH, "SIGDN_FILESYSPATH" },
+        { SIGDN_NORMALDISPLAY, "SIGDN_NORMALDISPLAY" },
+        { SIGDN_PARENTRELATIVE, "SIGDN_PARENTRELATIVE" },
+        { SIGDN_PARENTRELATIVEEDITING, "SIGDN_PARENTRELATIVEEDITING" },
+        { SIGDN_PARENTRELATIVEFORADDRESSBAR, "SIGDN_PARENTRELATIVEFORADDRESSBAR" },
+        { SIGDN_PARENTRELATIVEFORUI, "SIGDN_PARENTRELATIVEFORUI" },
+        { SIGDN_PARENTRELATIVEPARSING, "SIGDN_PARENTRELATIVEPARSING" },
+        { SIGDN_URL, "SIGDN_URL" },
+    };
+
+    for (auto const &val : values) {
+        wchar_t *data = nullptr;
+        if (SUCCEEDED(item->GetDisplayName(val.first, &data))) {
+            char data_utf8[2048]; init_empty_cstr(data_utf8);
+            if (utf16_to_utf8(data, data_utf8, lengthof(data_utf8))) {
+                print_debug_msg("%s %s %s = [%s]", func_label, item_name, val.second, data_utf8);
+            }
+            CoTaskMemFree(data);
+        }
+    }
 }
 
 HRESULT progress_sink::StartOperations() { print_debug_msg("StartOperations"); return S_OK; }
@@ -354,28 +399,49 @@ HRESULT progress_sink::PostMoveItem(
     return S_OK;
 }
 
-HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *, HRESULT result, IShellItem *deleted_item)
+HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *item, HRESULT result, IShellItem *item_newly_created)
 {
-    if (SUCCEEDED(result)) {
-        wchar_t *deleted_path_utf16 = nullptr;
-
-        if (SUCCEEDED(deleted_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &deleted_path_utf16))) {
-            SCOPE_EXIT { CoTaskMemFree(deleted_path_utf16); };
-
-            swan_path_t deleted_path_utf8;
-
-            if (utf16_to_utf8(deleted_path_utf16, deleted_path_utf8.data(), deleted_path_utf8.max_size())) {
-                print_debug_msg("PostDeleteItem [%s]", deleted_path_utf8.data());
-            }
-        }
+    if (FAILED(result)) {
+        return S_OK;
     }
+
+    // print_SIGDN_values("PostDeleteItem", "item", item);
+    // print_SIGDN_values("PostDeleteItem", "item_newly_created", item_newly_created);
+
+    // Extract deleted item path, UTF16
+    wchar_t *deleted_item_path_utf16 = nullptr;
+    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &deleted_item_path_utf16))) {
+        return S_OK;
+    }
+    SCOPE_EXIT { CoTaskMemFree(deleted_item_path_utf16); };
+
+    // Convert deleted item path to UTF8
+    swan_path_t deleted_item_path_utf8;
+    if (!utf16_to_utf8(deleted_item_path_utf16, deleted_item_path_utf8.data(), deleted_item_path_utf8.max_size())) {
+        return S_OK;
+    }
+
+    // Extract recycle bin item path, UTF16
+    wchar_t *recycle_bin_item_path_utf16 = nullptr;
+    if (FAILED(item_newly_created->GetDisplayName(SIGDN_FILESYSPATH, &recycle_bin_item_path_utf16))) {
+        return S_OK;
+    }
+    SCOPE_EXIT { CoTaskMemFree(recycle_bin_item_path_utf16); };
+
+    // Convert recycle bin item path to UTF8
+    swan_path_t recycle_bin_item_path_utf8;
+    if (!utf16_to_utf8(recycle_bin_item_path_utf16, recycle_bin_item_path_utf8.data(), recycle_bin_item_path_utf8.max_size())) {
+        return S_OK;
+    }
+
+    print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
 
     return S_OK;
 }
 
 HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, LPCWSTR new_name_utf16, HRESULT result, IShellItem *dst_item)
 {
-    if (!SUCCEEDED(result)) {
+    if (FAILED(result)) {
         return S_OK;
     }
 

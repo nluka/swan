@@ -160,6 +160,31 @@ void swan_windows::render_recent_files(bool &open) noexcept
         global_state::save_focused_window(swan_windows::recent_files);
     }
 
+    {
+        imgui::ScopedDisable d(s_recent_files.empty());
+
+        if (imgui::Button("Clear##recent_files")) {
+            imgui::OpenConfirmationModal(swan_confirm_id_clear_recent_files, "Are you sure you want to clear your recent files? "
+                                                                             "This action cannot be undone.");
+        }
+
+        auto status = imgui::GetConfirmationStatus(swan_confirm_id_clear_recent_files);
+
+        if (status.value_or(false)) {
+            std::scoped_lock lock(s_recent_files_mutex);
+            s_recent_files.clear();
+            (void) global_state::save_recent_files_to_disk();
+        }
+    }
+
+    imgui::SameLine();
+
+    imgui::TextUnformatted("(?)");
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("[L click]  row  Open file\n"
+                          "[R click]  row  Reveal file in Explorer 1");
+    }
+
     system_time_point_t current_time = current_time_system();
     u64 remove_idx = u64(-1);
     u64 move_to_front_idx = u64(-1);
@@ -275,14 +300,6 @@ void swan_windows::render_recent_files(bool &open) noexcept
             }
         }
         imgui::EndTable();
-    }
-
-    if (!s_recent_files.empty()) {
-        if (imgui::Button("Clear##recent_files")) {
-            std::scoped_lock lock(s_recent_files_mutex);
-            s_recent_files.clear();
-            (void) global_state::save_recent_files_to_disk();
-        }
     }
 
     if (remove_idx != u64(-1)) {

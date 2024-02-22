@@ -65,7 +65,7 @@ namespace global_state
 
 namespace swan_windows
 {
-    enum : s32 {
+    enum window_id : s32 {
         explorer_0,
         explorer_1,
         explorer_2,
@@ -171,7 +171,13 @@ drive_list_t query_drive_list() noexcept;
 
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin = false) noexcept;
 
-std::string get_last_error_string() noexcept;
+struct winapi_error
+{
+    DWORD code;
+    std::string formatted_message;
+};
+
+winapi_error get_last_winapi_error() noexcept;
 
 void perform_file_operations(
     s32 dst_expl_id,

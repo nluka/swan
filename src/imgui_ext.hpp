@@ -17,6 +17,18 @@ namespace ImGui
 
     void SetInitialFocusOnNextWidget() noexcept;
 
+    void RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, char const *tooltip_content = nullptr) noexcept;
+
+    void OpenConfirmationModal(s32 confirmation_id, char const *message) noexcept;
+
+    void OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn) noexcept;
+
+    std::optional<bool> GetConfirmationStatus(s32 confirmation_id) noexcept;
+
+    bool HaveActiveConfirmationModal() noexcept;
+
+    void RenderConfirmationModal() noexcept;
+
     struct EnumButton
     {
     public:

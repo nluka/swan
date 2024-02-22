@@ -45,10 +45,6 @@ void swan_popup_modals::render_edit_pin() noexcept
         imgui::CloseCurrentPopup();
     };
 
-    imgui::ColorEdit4("Edit Color##pin", &color_input.x, ImGuiColorEditFlags_NoAlpha|ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_NoLabel);
-    imgui::SameLine();
-    imgui::TextColored(color_input, "Color");
-
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
         // set initial focus on label input
         imgui::SetKeyboardFocusHere(0);
@@ -78,7 +74,13 @@ void swan_popup_modals::render_edit_pin() noexcept
         }
     }
 
-    if (imgui::Button("Save##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
+    imgui::ColorEdit4("Edit Color##pin", &color_input.x, ImGuiColorEditFlags_NoAlpha|ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_NoLabel);
+    imgui::SameLine();
+    imgui::TextColored(color_input, "Color");
+
+    imgui::SameLineSpaced(1);
+
+    auto apply_changes = [&]() noexcept {
         swan_path_t path = path_squish_adjacent_separators(path_input);
         path_force_separator(path, global_state::settings().dir_separator_utf8);
 
@@ -88,7 +90,10 @@ void swan_popup_modals::render_edit_pin() noexcept
 
         bool success = global_state::save_pins_to_disk();
         print_debug_msg("save_pins_to_disk: %d", success);
+    };
 
+    if (imgui::Button("Save##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
+        apply_changes();
         cleanup_and_close_popup();
     }
 
@@ -103,6 +108,10 @@ void swan_popup_modals::render_edit_pin() noexcept
     }
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
+        cleanup_and_close_popup();
+    }
+    if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
+        apply_changes();
         cleanup_and_close_popup();
     }
 

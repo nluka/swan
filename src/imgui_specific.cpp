@@ -85,26 +85,3 @@ ImVec4 get_color(basic_dirent::kind t) noexcept
         default:                                       return ImVec4(1, 1, 1, 1);         // white
     }
 }
-
-void imgui::Spacing(u64 n) noexcept
-{
-    for (u64 i = 0; i < n; ++i) {
-        ImGui::Spacing();
-    }
-}
-
-void imgui::SameLineSpaced(u64 num_spacing_calls) noexcept
-{
-    ImGui::SameLine();
-    for (u64 i = 0; i < num_spacing_calls; ++i) {
-        ImGui::Spacing();
-        ImGui::SameLine();
-    }
-}
-
-void imgui::SetInitialFocusOnNextWidget() noexcept
-{
-    if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
-        imgui::SetKeyboardFocusHere(0);
-    }
-}

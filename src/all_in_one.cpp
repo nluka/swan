@@ -13,6 +13,7 @@
 #include "focused_wndw.cpp"
 #include "icon_browser.cpp"
 #include "icons.cpp"
+#include "imgui_ext.cpp"
 #include "imgui_specific.cpp"
 #include "misc.cpp"
 #include "new_pin_mdl.cpp"

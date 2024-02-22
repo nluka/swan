@@ -4016,7 +4016,7 @@ bool ImGui::IsWindowContentHoverable(ImGuiWindow* window, ImGuiHoveredFlags flag
 // This is roughly matching the behavior of internal-facing ItemHoverable()
 // - we allow hovering to be true when ActiveId==window->MoveID, so that clicking on non-interactive items such as a Text() item still returns true with IsItemHovered()
 // - this should work even for non-interactive items that have no ID, so we cannot use LastItemId
-bool ImGui::IsItemHovered(ImGuiHoveredFlags flags)
+bool ImGui::IsItemHovered(ImGuiHoveredFlags flags, float hover_delay_input)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
@@ -4075,7 +4075,8 @@ bool ImGui::IsItemHovered(ImGuiHoveredFlags flags)
     else if (flags & ImGuiHoveredFlags_DelayShort)
         delay = g.IO.HoverDelayShort;
     else
-        delay = 0.0f;
+        delay = hover_delay_input;
+
     if (delay > 0.0f)
     {
         ImGuiID hover_delay_id = (g.LastItemData.ID != 0) ? g.LastItemData.ID : window->GetIDFromRectangle(g.LastItemData.Rect);

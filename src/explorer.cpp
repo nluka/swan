@@ -521,7 +521,7 @@ generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, exp
     if ((intptr_t)result > HINSTANCE_ERROR) {
         return { true, "" };
     } else {
-        return { false, get_last_error_string() };
+        return { false, get_last_winapi_error().formatted_message };
     }
 }
 
@@ -559,7 +559,7 @@ generic_result open_file(char const *file_name, char const *file_directory, bool
         return { false, "File not found (ShellExecuteW: SE_ERR_FNF)." };
     }
     else {
-        auto err = get_last_error_string();
+        auto err = get_last_winapi_error().formatted_message;
         print_debug_msg("FAILED ShellExecuteW: %s", err.c_str());
         return { false, err };
     }
@@ -597,12 +597,12 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
     com_handle = s_shell_link->GetIDList(&item_id_list);
 
     if (com_handle != S_OK) {
-        auto err = get_last_error_string();
+        auto err = get_last_winapi_error().formatted_message;
         return { false, err + " (IShellLinkW::GetIDList)." };
     }
 
     if (!SHGetPathFromIDListW(item_id_list, this->target_path_utf16)) {
-        auto err = get_last_error_string();
+        auto err = get_last_winapi_error().formatted_message;
         return { false, err + " (SHGetPathFromIDListW)." };
     }
 
@@ -613,19 +613,19 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
     com_handle = s_shell_link->GetWorkingDirectory(this->working_directory_path_utf16, MAX_PATH);
 
     if (com_handle != S_OK) {
-        return { false, get_last_error_string() + " (IShellLinkW::GetWorkingDirectory)." };
+        return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetWorkingDirectory)." };
     }
 
     com_handle = s_shell_link->GetArguments(this->arguments_utf16, 1024);
 
     if (com_handle != S_OK) {
-        return { false, get_last_error_string() + " (IShellLinkW::GetArguments)." };
+        return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetArguments)." };
     }
 
     com_handle = s_shell_link->GetShowCmd(&this->show_cmd);
 
     if (com_handle != S_OK) {
-        return { false, get_last_error_string() + " (IShellLinkW::GetShowCmd)" };
+        return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetShowCmd)" };
     }
 
     return { true, "" }; // success
@@ -675,7 +675,7 @@ generic_result open_symlink(explorer_window::dirent const &dirent, explorer_wind
         }
         else {
             print_debug_msg("[ %d ] ShellExecuteW error: unexpected error", expl.id);
-            return { false, get_last_error_string() };
+            return { false, get_last_winapi_error().formatted_message };
         }
     }
 }
@@ -1894,7 +1894,7 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
             switch (error) {
                 case ERROR_ALREADY_EXISTS: err_msg = "File or directory with same name already exists."; break;
                 case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist. This is probably a bug. Sorry!"; break;
-                default: err_msg = get_last_error_string(); break;
+                default: err_msg = get_last_winapi_error().formatted_message; break;
             }
             print_debug_msg("[ %d ] FAILED CreateDirectoryW: %d, %s", expl.id, result, err_msg.c_str());
         } else {
@@ -1924,7 +1924,8 @@ void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16)
     imgui::SameLine();
     imgui::TextUnformatted("(?)");
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Press [Enter] to create directory\n""Press [Escape] to exit");
+        imgui::SetTooltip("[Enter]   Create\n"
+                          "[Escape]  Exit");
     }
 
     if (!err_msg.empty()) {
@@ -2092,10 +2093,9 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
         }
 
         if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-            imgui::SetTooltip("Toggle mute %s\n\n"
-                              "[Shift + click] to unmute all\n"
-                              "[Ctrl  + click] to mute others",
-                              type_str);
+            imgui::SetTooltip("[L click]        Toggle %s visibility\n"
+                              "[Ctrl L click]   Solo type\n"
+                              "[Shift L click]  Unmute all type", type_str);
         }
 
         if (imgui::IsItemClicked()) {
@@ -2263,7 +2263,7 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
             switch (error) {
                 case ERROR_ALREADY_EXISTS: err_msg = "File or directory with same name already exists."; break;
                 case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist; probably a bug. Sorry!"; break;
-                default: err_msg = get_last_error_string(); break;
+                default: err_msg = get_last_winapi_error().formatted_message; break;
             }
             print_debug_msg("[ %d ] FAILED CreateFileW: %d, %s", expl.id, result, err_msg.c_str());
         } else {
@@ -2301,7 +2301,8 @@ void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noex
     imgui::SameLine();
     imgui::TextUnformatted("(?)");
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Press [Enter] to create file\n""Press [Escape] to exit");
+        imgui::SetTooltip("[Enter]   Create\n"
+                          "[Escape]  Exit");
     }
 
     if (!err_msg.empty()) {
@@ -2325,11 +2326,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
 
     char buffer[4] = {};
     {
-#if 0
-        s32 written = snprintf(buffer, lengthof(buffer), "[%c]", (already_pinned ? '*' : ' '));
-#else
         [[maybe_unused]] s32 written = snprintf(buffer, lengthof(buffer), "%s", already_pinned ? ICON_CI_STAR_FULL : ICON_CI_STAR_EMPTY);
-#endif
         assert(written < lengthof(buffer));
     }
 
@@ -2512,6 +2509,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     {
         bool is_explorer_visible = imgui::Begin(expl.name, &open);
         if (!is_explorer_visible) {
+            // expl.deselect_all_cwd_entries();
             imgui::End();
             return;
         }
@@ -2519,6 +2517,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
     char child_name[64];
     (void) snprintf(child_name, lengthof(child_name), "%s##main_child", expl.name);
+
+    ImVec2 base_window_pos = imgui::GetCursorScreenPos();
 
     if (imgui::BeginChild(child_name)) {
 
@@ -2575,42 +2575,42 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         }
 
         if (io.KeyCtrl) {
+            if (imgui::IsKeyPressed(ImGuiKey_L)) {
+                if (expl.wd_history_pos > 0) {
+                    if (io.KeyShift) {
+                        expl.wd_history_pos = 0;
+                    } else {
+                        expl.wd_history_pos -= 1;
+                    }
 
-            //? arrow keys cause navigation in ImGui, using arrow keys for back/forward wd_history nav would require fancy key handling
-            //? to suppress default ImGui behaviour (but not to the point where some desirable navigation is affected)
-        #if 0
-            if (imgui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-                if (io.KeyShift) {
-                    expl.wd_history_pos = 0;
-                } else {
-                    expl.wd_history_pos -= 1;
-                }
-
-                expl.cwd = expl.wd_history[expl.wd_history_pos];
-                bool back_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                if (back_dir_exists) {
-                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                    (void) expl.save_to_disk();
+                    expl.cwd = expl.wd_history[expl.wd_history_pos];
+                    bool back_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                    if (back_dir_exists) {
+                        expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                        (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                        (void) expl.save_to_disk();
+                    }
                 }
             }
 
-            if (imgui::IsKeyPressed(ImGuiKey_RightArrow)) {
-                if (io.KeyShift) {
-                    u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
-                    expl.wd_history_pos = wd_history_last_idx;
-                } else {
-                    expl.wd_history_pos += 1;
-                }
+            if (imgui::IsKeyPressed(ImGuiKey_R)) {
+                u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
 
-                expl.cwd = expl.wd_history[expl.wd_history_pos];
-                bool forward_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                if (forward_dir_exists) {
-                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                if (expl.wd_history_pos != wd_history_last_idx) {
+                    if (io.KeyShift) {
+                        expl.wd_history_pos = wd_history_last_idx;
+                    } else {
+                        expl.wd_history_pos += 1;
+                    }
+
+                    expl.cwd = expl.wd_history[expl.wd_history_pos];
+                    bool forward_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                    if (forward_dir_exists) {
+                        expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                        (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                    }
                 }
             }
-        #endif
 
             if (imgui::IsKeyPressed(ImGuiKey_I)) {
                 expl.invert_selected_visible_cwd_entries();
@@ -2672,10 +2672,10 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             refresh(expl.update_request_from_outside);
             expl.update_request_from_outside = nil;
         }
-        else if (window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
-            print_debug_msg("[ %d ] Ctrl-R, refresh triggered", expl.id);
-            refresh(full_refresh);
-        }
+        // else if (window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
+        //     print_debug_msg("[ %d ] Ctrl-R, refresh triggered", expl.id);
+        //     refresh(full_refresh);
+        // }
         else if (global_state::settings().expl_refresh_mode != swan_settings::explorer_refresh_mode_manual && cwd_exists_before_edit) {
             auto issue_read_dir_changes = [&]() {
                 wchar_t cwd_utf16[MAX_PATH];
@@ -2713,7 +2713,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                     if (success) {
                         print_debug_msg("[ %d ] ReadDirectoryChangesW(%s) succeeded", expl.id, expl.cwd.data());
                     } else {
-                        print_debug_msg("[ %d ] ReadDirectoryChangesW FAILED: %s", expl.id, get_last_error_string().c_str());
+                        print_debug_msg("[ %d ] ReadDirectoryChangesW FAILED: %s", expl.id, get_last_winapi_error().formatted_message.c_str());
                     }
                 }
             };
@@ -3178,6 +3178,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         });
     }
 
+    imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Appearing);
+
     if (imgui::BeginPopupModal("History", nullptr, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_AlwaysAutoResize)) {
         swan_path_t backup = expl.cwd;
         bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_after_edit, false);
@@ -3407,20 +3409,19 @@ void render_table_rows_for_cwd_entries(
             }
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_path)) {
+                char const *icon = nullptr;
+                if (dirent.basic.is_file()) {
+                    file_name_extension_splitter splitter(path);
+                    icon = get_icon_for_extension(splitter.ext);
+                } else {
+                    icon = dirent.basic.kind_icon();
+                }
+
                 // render colored icon
                 {
                     ImVec4 color = dirent.spotlight_frames_remaining > 0 ? red() : get_color(dirent.basic.type);
                     f32 &alpha = color.w;
                     alpha = 1.0f - (f32(dirent.is_cut) * 0.75f);
-
-                    char const *icon = nullptr;
-                    if (dirent.basic.is_file()) {
-                        file_name_extension_splitter splitter(path);
-                        icon = get_icon_for_extension(splitter.ext);
-                    } else {
-                        icon = dirent.basic.kind_icon();
-                    }
-
                     imgui::TextColored(color, icon);
                 }
 
@@ -3569,6 +3570,20 @@ void render_table_rows_for_cwd_entries(
                         expl.cwd_latest_selected_dirent_idx_changed = true;
 
                     } // imgui::Selectable
+
+                    // if hovering the path with at least 1 character's worth of content truncated, display full path as tooltip
+                    if (imgui::IsItemHovered(0, 0.7f) && imgui::TableGetHoveredColumn() == explorer_window::cwd_entries_table_col_path) {
+                        auto const &style = imgui::GetStyle();
+                        f32 icon_text_width = imgui::CalcTextSize(icon).x;
+                        f32 path_text_width = imgui::CalcTextSize(path).x;
+                        f32 space_width = imgui::CalcTextSize(" ").x;
+                        f32 total_content_width = icon_text_width + style.ItemSpacing.x + path_text_width; // + (style.CellPadding.x * 2);
+
+                        f32 path_column_width = imgui::GetColumnWidth(explorer_window::cwd_entries_table_col_path);
+                        if (total_content_width - 1.5f*space_width > path_column_width) {
+                            imgui::SetTooltip(path);
+                        }
+                    }
                 }
 
                 // draw rectangle to highlight filter match
