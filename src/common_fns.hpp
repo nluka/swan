@@ -183,7 +183,7 @@ void perform_file_operations(
     s32 dst_expl_id,
     std::wstring working_directory_utf16,
     std::wstring paths_to_execute_utf16,
-    std::vector<char> operations_to_execute,
+    std::vector<file_operation_type> operations_to_execute,
     std::mutex *init_done_mutex,
     std::condition_variable *init_done_cond,
     bool *init_done,

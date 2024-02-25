@@ -183,7 +183,7 @@ struct explorer_window
     bool load_from_disk(char dir_separator) noexcept;
     void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
     void deselect_all_cwd_entries() noexcept;
-    void invert_selected_visible_cwd_entries() noexcept;
+    void invert_selection_on_visible_cwd_entries() noexcept;
     void set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept;
     void uncut() noexcept;
     void reset_filter() noexcept;
@@ -312,12 +312,20 @@ struct symlink_data
     generic_result extract(char const *lnk_file_path_utf8, char const *cwd = nullptr) noexcept;
 };
 
+enum class file_operation_type : char
+{
+    nil = '\0',
+    move = 'M',
+    copy = 'C',
+    del = 'D',
+};
+
 struct file_operation_command_buf
 {
     struct item
     {
-        char const *operation;
-        char operation_code;
+        char const *operation_desc;
+        file_operation_type operation_type;
         basic_dirent::kind type;
         swan_path_t path;
     };
@@ -330,24 +338,15 @@ struct file_operation_command_buf
 
 struct completed_file_operation
 {
-    enum class type : u8
-    {
-        nil = 0,
-        move,
-        copy,
-        del,
-        count
-    };
-
     system_time_point_t completion_time = {};
     u32 group_id = {};
     swan_path_t src_path = {};
     swan_path_t dst_path = {};
-    type op_type = type::nil;
+    file_operation_type op_type = file_operation_type::nil;
     basic_dirent::kind obj_type = basic_dirent::kind::nil;
     bool selected = false;
 
-    completed_file_operation(system_time_point_t completion_time, type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept;
+    completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept;
 
     completed_file_operation() noexcept; // for boost::circular_buffer
     completed_file_operation(completed_file_operation const &other) noexcept; // for boost::circular_buffer

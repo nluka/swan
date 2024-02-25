@@ -104,8 +104,7 @@ struct render_dirent_right_click_context_menu_result
     bool open_single_rename_popup;
     explorer_window::dirent *single_dirent_to_be_renamed;
 };
-static
-render_dirent_right_click_context_menu_result
+static render_dirent_right_click_context_menu_result
 render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info const &cnt, swan_settings const &settings) noexcept;
 
 static
@@ -132,7 +131,7 @@ void explorer_window::select_all_visible_cwd_entries(bool select_dotdot_dir) noe
     }
 }
 
-void explorer_window::invert_selected_visible_cwd_entries() noexcept
+void explorer_window::invert_selection_on_visible_cwd_entries() noexcept
 {
     for (auto &dirent : this->cwd_entries) {
         if (dirent.is_filtered_out) {
@@ -194,7 +193,7 @@ std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
 }
 
 static
-generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, char const *operation, char operation_code) noexcept
+generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, char const *operation_desc, file_operation_type operation_type) noexcept
 {
     std::stringstream err = {};
 
@@ -203,7 +202,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
             continue;
         }
 
-        if (operation_code == 'X') {
+        if (operation_type == file_operation_type::move) {
             if (dirent.is_cut) {
                 continue; // prevent same dirent from being cut multiple times
                           // (although multiple copy commands of the same dirent are permitted, intentionally)
@@ -212,7 +211,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
             }
         }
 
-        if (operation_code == 'C' && dirent.is_cut) {
+        if (operation_type == file_operation_type::copy && dirent.is_cut) {
             // this situation wouldn't make sense, because you can't CopyItem after MoveItem since there's nothing left to copy
             // TODO: maybe indicate something to the user rather than ignoring their request?
             continue;
@@ -221,7 +220,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
         swan_path_t src = expl.cwd;
 
         if (path_append(src, dirent.basic.path.data(), global_state::settings().dir_separator_utf8, true)) {
-            s_file_op_payload.items.push_back({ operation, operation_code, dirent.basic.type, src });
+            s_file_op_payload.items.push_back({ operation_desc, operation_type, dirent.basic.type, src });
         } else {
             err << "Current working directory path + [" << src.data() << "] exceeds max allowed path length.\n";
         }
@@ -242,13 +241,13 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
         std::condition_variable *init_done_cond,
         bool *init_done,
         std::string *init_error
-    ) {
+    ) noexcept {
         assert(!working_directory_utf16.empty());
         if (!StrChrW(L"\\/", working_directory_utf16.back())) {
             working_directory_utf16 += L'\\';
         }
 
-        auto set_init_error_and_notify = [&](char const *err) {
+        auto set_init_error_and_notify = [&](char const *err) noexcept {
             std::unique_lock lock(*init_done_mutex);
             *init_done = true;
             *init_error = err;
@@ -306,6 +305,8 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                         OPEN_EXISTING,
                         FILE_FLAG_BACKUP_SEMANTICS,
                         NULL);
+
+                    SCOPE_EXIT { CloseHandle(accessible); };
 
                     WCOUT_IF_DEBUG("FAILED: SHCreateItemFromParsingName [" << full_path_to_delete_utf16.c_str() << "]\n");
 
@@ -366,7 +367,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
         }
     };
 
-    wchar_t cwd_utf16[2048]; init_empty_cstr(cwd_utf16);
+    wchar_t cwd_utf16[MAX_PATH]; init_empty_cstr(cwd_utf16);
 
     if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
         return { false, "Conversion of current working directory path from UTF-8 to UTF-16." };
@@ -426,7 +427,7 @@ generic_result move_files_into(swan_path_t const &destination_utf8, explorer_win
 {
     SCOPE_EXIT { delete[] payload.absolute_paths_delimited_by_newlines; };
 
-    wchar_t destination_utf16[2048]; init_empty_cstr(destination_utf16);
+    wchar_t destination_utf16[MAX_PATH]; init_empty_cstr(destination_utf16);
 
     if (!utf8_to_utf16(destination_utf8.data(), destination_utf16, lengthof(destination_utf16))) {
         return { false, "Conversion of destination directory path from UTF-8 to UTF-16." };
@@ -439,7 +440,7 @@ generic_result move_files_into(swan_path_t const &destination_utf8, explorer_win
         expl.id,
         destination_utf16,
         std::wstring(payload.absolute_paths_delimited_by_newlines),
-        std::vector<char>(payload.num_items, 'X'),
+        std::vector<file_operation_type>(payload.num_items, file_operation_type::move),
         &expl.shlwapi_task_initialization_mutex,
         &expl.shlwapi_task_initialization_cond,
         &initialization_done,
@@ -1627,7 +1628,7 @@ void render_file_op_payload_hint() noexcept
                 auto const &item = s_file_op_payload.items[i];
 
                 imgui::TableNextColumn();
-                imgui::TextUnformatted(item.operation);
+                imgui::TextUnformatted(item.operation_desc);
 
                 imgui::TableNextColumn();
                 imgui::TextColored(get_color(item.type), get_icon(item.type));
@@ -2613,7 +2614,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             }
 
             if (imgui::IsKeyPressed(ImGuiKey_I)) {
-                expl.invert_selected_visible_cwd_entries();
+                expl.invert_selection_on_visible_cwd_entries();
             }
 
             if (imgui::IsKeyPressed(ImGuiKey_H)) {
@@ -2647,12 +2648,12 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
             if (imgui::IsKeyPressed(ImGuiKey_X)) {
                 s_file_op_payload.clear();
-                auto result = add_selected_entries_to_file_op_payload(expl, "Cut", 'X');
+                auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("cut", result);
             }
             if (imgui::IsKeyPressed(ImGuiKey_C)) {
                 s_file_op_payload.clear();
-                auto result = add_selected_entries_to_file_op_payload(expl, "Copy", 'C');
+                auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
                 handle_failure("copy", result);
             }
             if (imgui::IsKeyPressed(ImGuiKey_V) && !s_file_op_payload.items.empty()) {
@@ -2861,7 +2862,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         imgui::SameLine();
 
         if (imgui::Button(ICON_CI_SYMBOL_NULL "##invert_selection")) {
-            expl.invert_selected_visible_cwd_entries();
+            expl.invert_selection_on_visible_cwd_entries();
         }
         if (imgui::IsItemHovered()) {
             imgui::SetTooltip("Invert selection");
@@ -3321,7 +3322,7 @@ generic_result file_operation_command_buf::execute(explorer_window &expl) noexce
     }
 
     std::wstring packed_paths_to_exec_utf16 = {};
-    std::vector<char> operations_to_exec = {};
+    std::vector<file_operation_type> operations_to_exec = {};
     {
         wchar_t item_utf16[MAX_PATH];
         std::stringstream err = {};
@@ -3335,7 +3336,7 @@ generic_result file_operation_command_buf::execute(explorer_window &expl) noexce
                 err << "Conversion of [" << item.path.data() << "] from UTF-8 to UTF-16.\n";
             } else {
                 packed_paths_to_exec_utf16.append(item_utf16).append(L"\n");
-                operations_to_exec.push_back(item.operation_code);
+                operations_to_exec.push_back(item.operation_type);
             }
         }
 
@@ -3868,7 +3869,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 }
                 expl.deselect_all_cwd_entries();
                 expl.right_clicked_ent->is_selected = true;
-                auto result = add_selected_entries_to_file_op_payload(expl, "Cut", 'X');
+                auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("cut", result);
             }
             if (imgui::Selectable("Copy##single")) {
@@ -3879,7 +3880,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 expl.deselect_all_cwd_entries();
                 expl.right_clicked_ent->is_selected = true;
 
-                auto result = add_selected_entries_to_file_op_payload(expl, "Copy", 'C');
+                auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
                 handle_failure("copy", result);
             }
 
@@ -3942,14 +3943,14 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 if (!io.KeyShift) {
                     s_file_op_payload.clear();
                 }
-                auto result = add_selected_entries_to_file_op_payload(expl, "Cut", 'X');
+                auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("Cut", result);
             }
             if (imgui::Selectable("Copy##multi")) {
                 if (!io.KeyShift) {
                     s_file_op_payload.clear();
                 }
-                auto result = add_selected_entries_to_file_op_payload(expl, "Copy", 'C');
+                auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
                 handle_failure("Copy", result);
             }
 

@@ -38,7 +38,7 @@ try {
 
             out
                 << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << ' '
-                << s32(file_op.op_type) << ' '
+                << char(file_op.op_type) << ' '
                 << s32(file_op.obj_type) << ' '
                 << path_length(file_op.src_path) << ' '
                 << file_op.src_path.data() << ' '
@@ -81,7 +81,7 @@ try {
     while (std::getline(in, line)) {
         std::istringstream iss(line);
 
-        s32 stored_op_type = 0;
+        char stored_op_type = 0;
         s32 stored_obj_type = 0;
         u64 stored_src_path_len = 0;
         u64 stored_dst_path_len = 0;
@@ -117,8 +117,8 @@ try {
         completed_operations.back().completion_time = stored_time;
         completed_operations.back().src_path = stored_src_path;
         completed_operations.back().dst_path = stored_dst_path;
-        completed_operations.back().op_type = (completed_file_operation::type) stored_op_type;
-        completed_operations.back().obj_type = (basic_dirent::kind) stored_obj_type;
+        completed_operations.back().op_type = file_operation_type(stored_op_type);
+        completed_operations.back().obj_type = basic_dirent::kind(stored_obj_type);
 
         ++num_loaded_successfully;
 
@@ -142,7 +142,7 @@ completed_file_operation::completed_file_operation() noexcept // for boost::circ
 {
 }
 
-completed_file_operation::completed_file_operation(system_time_point_t completion_time, type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept // for boost::circular_buffer
+completed_file_operation::completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept // for boost::circular_buffer
     : completion_time(completion_time)
     , src_path(path_create(src))
     , dst_path(path_create(dst))
@@ -235,9 +235,9 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 ImVec4 icon_color = get_color(file_op.obj_type);
 
                 char const *desc = nullptr;
-                if      (file_op.op_type == completed_file_operation::type::move) desc = "Move";
-                else if (file_op.op_type == completed_file_operation::type::copy) desc = "Copy";
-                else if (file_op.op_type == completed_file_operation::type::del ) desc = "Delete";
+                if      (file_op.op_type == file_operation_type::move) desc = "Move";
+                else if (file_op.op_type == file_operation_type::copy) desc = "Copy";
+                else if (file_op.op_type == file_operation_type::del ) desc = "Delete";
 
                 imgui::TextColored(icon_color, icon);
                 imgui::SameLine();
@@ -387,7 +387,7 @@ HRESULT progress_sink::PostMoveItem(
         path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
 
         completed_file_operation to_push(current_time_system(),
-                                         completed_file_operation::type::move,
+                                         file_operation_type::move,
                                          src_path_utf8.data(),
                                          dst_path_utf8.data(),
                                          attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file);
@@ -492,7 +492,7 @@ HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, L
         path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
 
         completed_file_operation to_push(current_time_system(),
-                                         completed_file_operation::type::move,
+                                         file_operation_type::copy,
                                          src_path_utf8.data(),
                                          dst_path_utf8.data(),
                                          attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file);
@@ -571,7 +571,7 @@ void perform_file_operations(
     s32 dst_expl_id,
     std::wstring destination_directory_utf16,
     std::wstring paths_to_execute_utf16,
-    std::vector<char> operations_to_execute,
+    std::vector<file_operation_type> operations_to_execute,
     std::mutex *init_done_mutex,
     std::condition_variable *init_done_cond,
     bool *init_done,
@@ -662,7 +662,7 @@ void perform_file_operations(
         u64 i = 0;
         for (auto item_utf16 : items_to_execute) {
             SCOPE_EXIT { ++i; };
-            char operation_code = operations_to_execute[i];
+            file_operation_type op_type = operations_to_execute[i];
 
             std::wstring_view view(item_utf16.begin(), item_utf16.end());
             full_path_to_exec_utf16 = view;
@@ -702,16 +702,16 @@ void perform_file_operations(
             SCOPE_EXIT { to_exec->Release(); };
 
             char const *function = nullptr;
-            switch (operation_code) {
-                case 'C':
+            switch (op_type) {
+                case file_operation_type::copy:
                     result = file_op->CopyItem(to_exec, destination, nullptr, nullptr);
                     function = "CopyItem";
                     break;
-                case 'X':
+                case file_operation_type::move:
                     result = file_op->MoveItem(to_exec, destination, nullptr, nullptr);
                     function = "MoveItem";
                     break;
-                case 'D':
+                case file_operation_type::del:
                     result = file_op->DeleteItem(to_exec, nullptr);
                     function = "DeleteItem";
                     prog_sink.contains_delete_operations = true;

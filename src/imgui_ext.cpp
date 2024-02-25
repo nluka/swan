@@ -138,7 +138,7 @@ void imgui::RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char co
 {
     // if hovering the path with at least 1 character's worth of content truncated, display full path as tooltip
     if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && imgui::TableGetHoveredColumn() == table_column_index) {
-        auto const &style = imgui::GetStyle();
+        // auto const &style = imgui::GetStyle();
 
         f32 text_width = imgui::CalcTextSize(possibly_truncated_text).x;
         f32 column_width = imgui::GetColumnWidth(table_column_index);
