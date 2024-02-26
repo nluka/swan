@@ -81,6 +81,7 @@ ImVec4 get_color(basic_dirent::kind t) noexcept
         case basic_dirent::kind::file:                 return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
         case basic_dirent::kind::symlink_to_directory: return ImVec4(1, 1, 0, 1);         // yellow
         case basic_dirent::kind::symlink_to_file:      return ImVec4(0.85f, 1, 0.85f, 1); // pale_green
+        case basic_dirent::kind::symlink_ambiguous:    return ImVec4(1, 0.7f, 0, 1);      // orange
         case basic_dirent::kind::invalid_symlink:      return ImVec4(1, 0, 0, 1);         // red
         default:                                       return ImVec4(1, 1, 1, 1);         // white
     }

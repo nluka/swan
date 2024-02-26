@@ -22,6 +22,7 @@ bool basic_dirent::is_directory()            const noexcept { return type == bas
 bool basic_dirent::is_symlink()              const noexcept { return one_of(type, { kind::symlink_to_directory, kind::symlink_to_file, kind::invalid_symlink }); }
 bool basic_dirent::is_symlink_to_file()      const noexcept { return type == basic_dirent::kind::symlink_to_file; }
 bool basic_dirent::is_symlink_to_directory() const noexcept { return type == basic_dirent::kind::symlink_to_directory; }
+bool basic_dirent::is_symlink_ambiguous()    const noexcept { return type == basic_dirent::kind::symlink_ambiguous; }
 bool basic_dirent::is_file()                 const noexcept { return type == basic_dirent::kind::file; }
 
 char const *basic_dirent::kind_cstr() const noexcept
@@ -33,6 +34,7 @@ char const *basic_dirent::kind_cstr() const noexcept
         case basic_dirent::kind::file:                 return "file";
         case basic_dirent::kind::symlink_to_directory: return "symlink_to_directory";
         case basic_dirent::kind::symlink_to_file:      return "symlink_to_file";
+        case basic_dirent::kind::symlink_ambiguous:    return "symlink_ambiguous";
         case basic_dirent::kind::invalid_symlink:      return "invalid_symlink";
         default: return "";
     }
@@ -47,7 +49,8 @@ char const *basic_dirent::kind_short_cstr() const noexcept
         case basic_dirent::kind::file:                 return "file";
         case basic_dirent::kind::symlink_to_directory: return ICON_CI_ARROW_SMALL_RIGHT "dir";
         case basic_dirent::kind::symlink_to_file:      return ICON_CI_ARROW_SMALL_RIGHT "file";
-        case basic_dirent::kind::invalid_symlink:      return ICON_CI_ARROW_SMALL_RIGHT "?";
+        case basic_dirent::kind::symlink_ambiguous:    return ICON_CI_ARROW_SMALL_RIGHT "?";
+        case basic_dirent::kind::invalid_symlink:      return ICON_CI_ARROW_SMALL_RIGHT ICON_CI_ISSUE_DRAFT;
         default:                                       return "";
     }
 }
@@ -64,6 +67,7 @@ char const *get_icon(basic_dirent::kind t) noexcept
         case basic_dirent::kind::file:                 return ICON_FA_FILE;
         case basic_dirent::kind::symlink_to_directory: return ICON_CI_FILE_SYMLINK_DIRECTORY;
         case basic_dirent::kind::symlink_to_file:      return ICON_CI_FILE_SYMLINK_FILE;
+        case basic_dirent::kind::symlink_ambiguous:    return ICON_CI_LINK_EXTERNAL;
         case basic_dirent::kind::invalid_symlink:      return ICON_CI_ERROR;
         default:                                       assert(false && "has no icon"); break;
     }

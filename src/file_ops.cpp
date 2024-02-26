@@ -331,8 +331,8 @@ HRESULT progress_sink::PostMoveItem(
     }
 
     SFGAOF attributes = {};
-    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER, &attributes))) {
-        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER)");
+    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER|SFGAO_LINK, &attributes))) {
+        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER|SFGAO_LINK)");
         return S_OK;
     }
 
@@ -380,20 +380,25 @@ HRESULT progress_sink::PostMoveItem(
 
     {
         auto pair = global_state::completed_file_ops();
-        auto &completed_operations = *pair.first;
+        auto &completed_file_ops = *pair.first;
         auto &mutex = *pair.second;
 
         path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
         path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
 
-        completed_file_operation to_push(current_time_system(),
-                                         file_operation_type::move,
-                                         src_path_utf8.data(),
-                                         dst_path_utf8.data(),
-                                         attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file);
-
         std::scoped_lock lock(mutex);
-        completed_operations.push_front(to_push);
+
+        completed_file_ops.push_front();
+        completed_file_ops.front().completion_time = current_time_system();
+        completed_file_ops.front().src_path = src_path_utf8;
+        completed_file_ops.front().dst_path = dst_path_utf8;
+        completed_file_ops.front().op_type = file_operation_type::move;
+
+        if (attributes & SFGAO_LINK) {
+            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
+        } else {
+            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
+        }
     }
 
     return S_OK;
@@ -435,8 +440,8 @@ HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *item, HRESULT result, I
     }
 
     SFGAOF attributes = {};
-    if (FAILED(item->GetAttributes(SFGAO_FOLDER, &attributes))) {
-        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER)");
+    if (FAILED(item->GetAttributes(SFGAO_FOLDER|SFGAO_LINK, &attributes))) {
+        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER|SFGAO_LINK)");
         return S_OK;
     }
 
@@ -452,7 +457,12 @@ HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *item, HRESULT result, I
         completed_file_ops.front().src_path = deleted_item_path_utf8;
         completed_file_ops.front().dst_path = recycle_bin_item_path_utf8;
         completed_file_ops.front().op_type = file_operation_type::del;
-        completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
+
+        if (attributes & SFGAO_LINK) {
+            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
+        } else {
+            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
+        }
     }
 
     print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
@@ -467,8 +477,8 @@ HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, L
     }
 
     SFGAOF attributes = {};
-    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER, &attributes))) {
-        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER)");
+    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER|SFGAO_LINK, &attributes))) {
+        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER|SFGAO_LINK)");
         return S_OK;
     }
 
@@ -506,20 +516,25 @@ HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, L
 
     {
         auto pair = global_state::completed_file_ops();
-        auto &completed_operations = *pair.first;
+        auto &completed_file_ops = *pair.first;
         auto &mutex = *pair.second;
 
         path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
         path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
 
-        completed_file_operation to_push(current_time_system(),
-                                         file_operation_type::copy,
-                                         src_path_utf8.data(),
-                                         dst_path_utf8.data(),
-                                         attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file);
-
         std::scoped_lock lock(mutex);
-        completed_operations.push_front(to_push);
+
+        completed_file_ops.push_front();
+        completed_file_ops.front().completion_time = current_time_system();
+        completed_file_ops.front().src_path = src_path_utf8;
+        completed_file_ops.front().dst_path = dst_path_utf8;
+        completed_file_ops.front().op_type = file_operation_type::copy;
+
+        if (attributes & SFGAO_LINK) {
+            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
+        } else {
+            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
+        }
     }
 
     return S_OK;

@@ -722,6 +722,7 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
                         {
                             everything_else,
                             symlink_invalid,
+                            // symlink_ambiguous,
                             symlink_file,
                             file,
                             symlink_directory,
@@ -732,6 +733,7 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
                         else if (ent.basic.is_file())                 return (u32)precedence::file;
                         else if (ent.basic.is_symlink_to_directory()) return (u32)precedence::symlink_directory;
                         else if (ent.basic.is_symlink_to_file())      return (u32)precedence::symlink_file;
+                        // else if (ent.basic.is_symlink_ambiguous())    return (u32)precedence::symlink_ambiguous;
                         else if (ent.basic.is_symlink())              return (u32)precedence::symlink_invalid;
                         else                                          return (u32)precedence::everything_else;
                     };
@@ -984,6 +986,7 @@ bool explorer_window::update_cwd_entries(
                 this->filter_show_files,
                 this->filter_show_symlink_directories,
                 this->filter_show_symlink_files,
+                true, // ambiguous
                 this->filter_show_invalid_symlinks,
             };
 
@@ -2055,7 +2058,7 @@ void render_filter_text_input(explorer_window &expl) noexcept
 static
 void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
 {
-    std::tuple<basic_dirent::kind, bool &, char const *> button_defs[(u64)basic_dirent::kind::count] = {
+    std::tuple<basic_dirent::kind, bool &, char const *> button_defs[(u64)basic_dirent::kind::count - 1] = {
         { basic_dirent::kind::directory,             expl.filter_show_directories,          "directories"         },
         { basic_dirent::kind::symlink_to_directory,  expl.filter_show_symlink_directories,  "directory shortcuts" },
         { basic_dirent::kind::file,                  expl.filter_show_files,                "files"               },
@@ -3578,12 +3581,12 @@ void render_table_rows_for_cwd_entries(
 
                     // move forward min.x to skip characters before highlight begins
                     min.x += imgui::CalcTextSize(dirent.basic.path.data(),
-                                                    dirent.basic.path.data() + dirent.highlight_start_idx).x;
+                                                 dirent.basic.path.data() + dirent.highlight_start_idx).x;
 
                     // move backward max.x to eliminate characters after the highlight ends
                     max.x -= imgui::CalcTextSize(dirent.basic.path.data() + dirent.highlight_start_idx + dirent.highlight_len).x;
 
-                    ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 255, 0, 50));
+                    ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 100, 0, 60));
                 }
 
                 if (dirent.basic.is_path_dotdot()) {
@@ -3775,7 +3778,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     (void) global_state::save_recent_files_to_disk();
                 } else {
                     swan_popup_modals::open_error(make_str("Open file as administrator [%s].", expl.right_clicked_ent->basic.path.data()).c_str(),
-                                                    res.error_or_utf8_path.c_str());
+                                                  res.error_or_utf8_path.c_str());
                 }
             }
 
@@ -3785,9 +3788,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
                 if (!extract_result.success) {
                     swan_popup_modals::open_error(make_str("Open file location of [%s].", expl.right_clicked_ent->basic.path.data()).c_str(),
-                                                    extract_result.error_or_utf8_path.c_str());
+                                                  extract_result.error_or_utf8_path.c_str());
                 } else {
-                    // no error checking because symlink_data::extract will already have validated things
+                    // no error checking because symlink_data::extract has already validated things
 
                     std::string_view parent_dir = get_everything_minus_file_name(lnk_data.target_path_utf8.data());
                     expl.cwd = path_create(parent_dir.data(), parent_dir.size());
@@ -3813,7 +3816,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 swan_path_t full_path = path_create(expl.cwd.data());
                 if (!path_append(full_path, expl.right_clicked_ent->basic.path.data(), settings.dir_separator_utf8, true)) {
                     swan_popup_modals::open_error(make_str("Copy full path of [%s].", expl.right_clicked_ent->basic.path.data()).c_str(),
-                                                    "Max path length exceeded when appending name to current working directory path.");
+                                                  "Max path length exceeded when appending name to current working directory path.");
                 } else {
                     imgui::SetClipboardText(full_path.data());
                 }

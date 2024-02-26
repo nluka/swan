@@ -40,6 +40,7 @@ struct basic_dirent
         file,
         symlink_to_directory,
         symlink_to_file,
+        symlink_ambiguous,
         invalid_symlink,
         count
     };
@@ -57,6 +58,7 @@ struct basic_dirent
     bool is_symlink() const noexcept;
     bool is_symlink_to_file() const noexcept;
     bool is_symlink_to_directory() const noexcept;
+    bool is_symlink_ambiguous() const noexcept;
     bool is_file() const noexcept;
     char const *kind_cstr() const noexcept;
     char const *kind_short_cstr() const noexcept;
