@@ -328,6 +328,28 @@ char *get_file_name(char *path) noexcept
     return just_the_file_name;
 }
 
+wchar_t *get_file_name(wchar_t *path) noexcept
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                  ^^^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    //     ^^^^^^^^ what we are after
+
+    assert(path != nullptr);
+
+    wchar_t *just_the_file_name = path;
+
+    std::wstring_view view(just_the_file_name);
+
+    u64 last_sep_pos = view.find_last_of(L"\\/");
+
+    if (last_sep_pos != std::string::npos) {
+        just_the_file_name += last_sep_pos + 1;
+    }
+
+    return just_the_file_name;
+}
+
 char const *cget_file_name(char const *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
@@ -498,4 +520,21 @@ build_mode get_build_mode() noexcept
 #endif
 
     return retval;
+}
+
+std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
+{
+    std::array<char, 64> buffer_raw;
+    std::array<char, 64> buffer_final;
+
+    DWORD flags = FDTF_SHORTDATE | FDTF_SHORTTIME;
+    s32 length = SHFormatDateTimeA(time, &flags, buffer_raw.data(), (u32)buffer_raw.size());
+
+    // for some reason, SHFormatDateTimeA will pad parts of the string with ASCII 63 (?)
+    // when using LONGDATE or LONGTIME, we are discarding them
+    std::copy_if(buffer_raw.begin(), buffer_raw.end(), buffer_final.begin(), [](char ch) { return ch != '?'; });
+
+    // std::replace(buffer_final.begin(), buffer_final.end(), '-', ' ');
+
+    return { length, buffer_final };
 }

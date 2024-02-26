@@ -63,8 +63,12 @@ char const *lorem_ipsum() noexcept;
 char *get_file_name(char *path) noexcept;
 char const *cget_file_name(char const *path) noexcept;
 
+wchar_t *get_file_name(wchar_t *path) noexcept;
+
 char *get_file_ext(char *path) noexcept;
 // char const *cget_file_ext(char const *path) noexcept;
+
+std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept;
 
 std::string_view get_everything_minus_file_name(char const *path) noexcept;
 

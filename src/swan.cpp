@@ -25,7 +25,7 @@ try {
     if (window == nullptr) {
         return 1;
     }
-    print_debug_msg("Barebones window created.");
+    print_debug_msg("Barebones window created");
 
     SCOPE_EXIT {
         ImGui_ImplOpenGL3_Shutdown();

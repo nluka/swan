@@ -422,16 +422,37 @@ HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *item, HRESULT result, I
     }
 
     // Extract recycle bin item path, UTF16
-    wchar_t *recycle_bin_item_path_utf16 = nullptr;
-    if (FAILED(item_newly_created->GetDisplayName(SIGDN_FILESYSPATH, &recycle_bin_item_path_utf16))) {
+    wchar_t *recycle_bin_hardlink_path_utf16 = nullptr;
+    if (FAILED(item_newly_created->GetDisplayName(SIGDN_FILESYSPATH, &recycle_bin_hardlink_path_utf16))) {
         return S_OK;
     }
-    SCOPE_EXIT { CoTaskMemFree(recycle_bin_item_path_utf16); };
+    SCOPE_EXIT { CoTaskMemFree(recycle_bin_hardlink_path_utf16); };
 
     // Convert recycle bin item path to UTF8
     swan_path_t recycle_bin_item_path_utf8;
-    if (!utf16_to_utf8(recycle_bin_item_path_utf16, recycle_bin_item_path_utf8.data(), recycle_bin_item_path_utf8.max_size())) {
+    if (!utf16_to_utf8(recycle_bin_hardlink_path_utf16, recycle_bin_item_path_utf8.data(), recycle_bin_item_path_utf8.max_size())) {
         return S_OK;
+    }
+
+    SFGAOF attributes = {};
+    if (FAILED(item->GetAttributes(SFGAO_FOLDER, &attributes))) {
+        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER)");
+        return S_OK;
+    }
+
+    {
+        auto pair = global_state::completed_file_ops();
+        auto &completed_file_ops = *pair.first;
+        auto &mutex = *pair.second;
+
+        std::scoped_lock lock(mutex);
+
+        completed_file_ops.push_front();
+        completed_file_ops.front().completion_time = current_time_system();
+        completed_file_ops.front().src_path = deleted_item_path_utf8;
+        completed_file_ops.front().dst_path = recycle_bin_item_path_utf8;
+        completed_file_ops.front().op_type = file_operation_type::del;
+        completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
     }
 
     print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());

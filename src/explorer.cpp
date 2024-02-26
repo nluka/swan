@@ -175,24 +175,6 @@ void explorer_window::reset_filter() noexcept
 }
 
 static
-std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
-{
-    std::array<char, 64> buffer_raw;
-    std::array<char, 64> buffer_final;
-
-    DWORD flags = FDTF_SHORTDATE | FDTF_SHORTTIME;
-    s32 length = SHFormatDateTimeA(time, &flags, buffer_raw.data(), (u32)buffer_raw.size());
-
-    // for some reason, SHFormatDateTimeA will pad parts of the string with ASCII 63 (?)
-    // when using LONGDATE or LONGTIME, we are discarding them
-    std::copy_if(buffer_raw.begin(), buffer_raw.end(), buffer_final.begin(), [](char ch) { return ch != '?'; });
-
-    // std::replace(buffer_final.begin(), buffer_final.end(), '-', ' ');
-
-    return { length, buffer_final };
-}
-
-static
 generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, char const *operation_desc, file_operation_type operation_type) noexcept
 {
     std::stringstream err = {};

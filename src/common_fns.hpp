@@ -169,6 +169,8 @@ char const *get_icon_for_extension(char const *extension) noexcept;
 
 drive_list_t query_drive_list() noexcept;
 
+recycle_bin_info query_recycle_bin() noexcept;
+
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin = false) noexcept;
 
 struct winapi_error
