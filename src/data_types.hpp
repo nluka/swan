@@ -19,14 +19,6 @@ struct generic_result
     std::string error_or_utf8_path;
 };
 
-// TODO:
-/*
-  Requirements for the underlying data type which will replace std::array for swan_path_t:
-  - has a .data() member function which returns a non-const char *
-  - can easily be visualized as a string in the debugger
-*/
-// typedef std::array<char, ((MAX_PATH - 1) * 4) + 1> swan_path_t;
-
 struct swan_path_t final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
 {
     bool operator>(swan_path_t const &other) const noexcept { return lstrcmpiA(this->data(), other.data()) < 0; }
@@ -341,12 +333,15 @@ struct file_operation_command_buf
 struct completed_file_operation
 {
     system_time_point_t completion_time = {};
+    system_time_point_t undo_time = {};
     u32 group_id = {};
     swan_path_t src_path = {};
     swan_path_t dst_path = {};
     file_operation_type op_type = file_operation_type::nil;
     basic_dirent::kind obj_type = basic_dirent::kind::nil;
     bool selected = false;
+
+    bool undone() noexcept { return undo_time != system_time_point_t(); }
 
     completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept;
 
@@ -355,11 +350,38 @@ struct completed_file_operation
     completed_file_operation &operator=(completed_file_operation const &other) noexcept; // for boost::circular_buffer
 };
 
-struct progress_sink : public IFileOperationProgressSink
+struct explorer_file_op_progress_sink : public IFileOperationProgressSink
 {
     s32 dst_expl_id;
     swan_path_t dst_expl_cwd_when_operation_started;
     bool contains_delete_operations;
+
+    HRESULT FinishOperations(HRESULT) override;
+    HRESULT PauseTimer() override;
+    HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
+    HRESULT PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) override;
+    HRESULT PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
+    HRESULT PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override;
+    HRESULT PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
+    HRESULT PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
+    HRESULT PreDeleteItem(DWORD, IShellItem *) override;
+    HRESULT PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
+    HRESULT PreNewItem(DWORD, IShellItem *, LPCWSTR) override;
+    HRESULT PreRenameItem(DWORD, IShellItem *, LPCWSTR) override;
+    HRESULT ResetTimer() override;
+    HRESULT ResumeTimer() override;
+    HRESULT StartOperations() override;
+    HRESULT UpdateProgress(UINT work_total, UINT work_so_far) override;
+
+    ULONG AddRef();
+    ULONG Release();
+
+    HRESULT QueryInterface(const IID &riid, void **ppv);
+};
+
+struct undelete_directory_progress_sink : public IFileOperationProgressSink
+{
+    swan_path_t destination_full_path_utf8;
 
     HRESULT FinishOperations(HRESULT) override;
     HRESULT PauseTimer() override;

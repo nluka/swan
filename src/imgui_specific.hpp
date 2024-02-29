@@ -70,7 +70,7 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
             debug_buffer.clear();
         }
 
-        debug_buffer.appendf("%-5d %10.3lf %18s:%-5d ", thread_id, current_time, just_the_file_name, pack.loc.line());
+        debug_buffer.appendf("%-5d %10.3lf %24s:%-5d ", thread_id, current_time, just_the_file_name, pack.loc.line());
         debug_buffer.appendf(pack.fmt, args...);
         debug_buffer.append("\n");
     }

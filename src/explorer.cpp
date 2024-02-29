@@ -229,7 +229,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
             working_directory_utf16 += L'\\';
         }
 
-        auto set_init_error_and_notify = [&](char const *err) noexcept {
+        auto set_init_error_and_notify = [&](std::string const &err) noexcept {
             std::unique_lock lock(*init_done_mutex);
             *init_done = true;
             *init_error = err;
@@ -240,7 +240,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
 
         result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (FAILED(result)) {
-            return set_init_error_and_notify("CoInitializeEx(COINIT_APARTMENTTHREADED)");
+            return set_init_error_and_notify(make_str("CoInitializeEx(COINIT_APARTMENTTHREADED), %s", _com_error(result).ErrorMessage()));
         }
         SCOPE_EXIT { CoUninitialize(); };
 
@@ -248,13 +248,13 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
 
         result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
         if (FAILED(result)) {
-            return set_init_error_and_notify("CoCreateInstance(CLSID_FileOperation)");
+            return set_init_error_and_notify(make_str("CoCreateInstance(CLSID_FileOperation), %s", _com_error(result).ErrorMessage()));
         }
         SCOPE_EXIT { file_op->Release(); };
 
         result = file_op->SetOperationFlags(/*FOF_NOCONFIRMATION | */FOF_ALLOWUNDO);
         if (FAILED(result)) {
-            return set_init_error_and_notify("IFileOperation::SetOperationFlags");
+            return set_init_error_and_notify(make_str("IFileOperation::SetOperationFlags, %s", _com_error(result).ErrorMessage()));
         }
 
         // add items (IShellItem) for exec to IFileOperation
@@ -322,17 +322,17 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
             std::string errors = err.str();
             if (!errors.empty()) {
                 errors.pop_back(); // remove trailing '\n'
-                return set_init_error_and_notify(errors.c_str());
+                return set_init_error_and_notify(errors);
             }
         }
 
-        progress_sink prog_sink;
+        explorer_file_op_progress_sink prog_sink;
         prog_sink.contains_delete_operations = true;
         DWORD cookie = {};
 
         result = file_op->Advise(&prog_sink, &cookie);
         if (FAILED(result)) {
-            return set_init_error_and_notify("IFileOperation::Advise(IFileOperationProgressSink *pfops, DWORD *pdwCookie)");
+            return set_init_error_and_notify(make_str("IFileOperation::Advise, %s", _com_error(result).ErrorMessage()));
         }
         print_debug_msg("IFileOperation::Advise(%d)", cookie);
 
@@ -340,12 +340,12 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
 
         result = file_op->PerformOperations();
         if (FAILED(result)) {
-            print_debug_msg("FAILED IFileOperation::PerformOperations()");
+            print_debug_msg("FAILED IFileOperation::PerformOperations, %s", _com_error(result).ErrorMessage());
         }
 
         file_op->Unadvise(cookie);
         if (FAILED(result)) {
-            print_debug_msg("FAILED IFileOperation::Unadvise(%d)", cookie);
+            print_debug_msg("FAILED IFileOperation::Unadvise(%d), %s", cookie, _com_error(result).ErrorMessage());
         }
     };
 
@@ -407,6 +407,14 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
 
 generic_result move_files_into(swan_path_t const &destination_utf8, explorer_window &expl, move_dirents_drag_drop_payload &payload) noexcept
 {
+    /*
+        ? The process of moving files via the shlwapi is a blocking operation.
+        ? Thus we must call IFileOperation::PerformOperations outside of the main UI thread so the user can continue to interact with the UI during the operation.
+        ? There is a constraint however: the IFileOperation object must be initialized on the same thread which will call PerformOperations.
+        ? This function will block until the IFileOperation initialization is completed so that we can report any initialization errors to the user.
+        ? After the worker thread signals that initialization is complete, we proceed with execution and let PerformOperations happen asynchronously.
+    */
+
     SCOPE_EXIT { delete[] payload.absolute_paths_delimited_by_newlines; };
 
     wchar_t destination_utf16[MAX_PATH]; init_empty_cstr(destination_utf16);

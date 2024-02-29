@@ -40,7 +40,7 @@ namespace global_state
     std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
 
     std::pair<circular_buffer<completed_file_operation> *, std::mutex *> completed_file_ops() noexcept;
-    bool save_completed_file_ops_to_disk() noexcept;
+    bool save_completed_file_ops_to_disk(std::scoped_lock<std::mutex> *lock) noexcept;
     std::pair<bool, u64> load_completed_file_ops_from_disk(char dir_separator) noexcept;
 
     s32 focused_window() noexcept;

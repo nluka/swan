@@ -53,10 +53,6 @@ Quickly slice and dice file names for multiple files at once.
 - Insert current file extension with a leading dot using `<dotext>`
 - Insert file size (in bytes) using `<bytes>`
 
-## Performance TODOs
-
-- [ ] Implement fixed_string_allocator to reduce memory waste from swan_path_t
-
 ## Attributions
 
 - <a href="https://ezgif.com/video-to-gif" title="site used for making GIFs">GIFs made using ezgif.com</a>

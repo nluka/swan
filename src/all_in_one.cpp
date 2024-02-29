@@ -24,4 +24,6 @@
 #include "sngl_rnm_mdl.cpp"
 #include "style.cpp"
 #include "swan.cpp"
+#include "und_dir_prog_snk.cpp"
 #include "util.cpp"
+#include "xpl_file_op_prog_snk.cpp"

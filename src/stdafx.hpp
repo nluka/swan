@@ -2,10 +2,6 @@
     Bunch of headers to precompile - things that aren't touched when developing swan: STL, STB libs, Boost, ImGui itself, etc.
 */
 
-#include "primitives.hpp"
-#include "libs/thread_pool.hpp"
-#include "libs/on_scope_exit.hpp"
-#include "libs/on_scope_exit_2.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -15,6 +11,7 @@
 #include <boost/static_string.hpp>
 #include <cassert>
 #include <chrono>
+#include <comdef.h>
 #include <cstring>
 #include <dbghelp.h>
 #include <fileapi.h>
@@ -60,3 +57,8 @@
 #pragma warning(pop)
 
 namespace imgui = ImGui;
+
+#include "primitives.hpp"
+#include "libs/thread_pool.hpp"
+#include "libs/on_scope_exit.hpp"
+#include "libs/on_scope_exit_2.hpp"

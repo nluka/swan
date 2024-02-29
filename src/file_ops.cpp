@@ -15,7 +15,7 @@ std::pair<circular_buffer<completed_file_operation> *, std::mutex *> global_stat
     return std::make_pair(&s_completed_file_ops, &s_completed_file_ops_mutex);
 }
 
-bool global_state::save_completed_file_ops_to_disk() noexcept
+bool global_state::save_completed_file_ops_to_disk(std::scoped_lock<std::mutex> *supplied_lock) noexcept
 try {
     std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_ops.txt";
 
@@ -30,14 +30,18 @@ try {
     auto &mutex = *pair.second;
 
     {
-        std::scoped_lock lock(mutex);
+        auto lock = supplied_lock != nullptr ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(mutex);
 
         for (auto const &file_op : completed_operations) {
-            auto time_t = std::chrono::system_clock::to_time_t(file_op.completion_time);
-            std::tm tm = *std::localtime(&time_t);
+            auto time_t_completion = std::chrono::system_clock::to_time_t(file_op.completion_time);
+            std::tm tm_completion = *std::localtime(&time_t_completion);
+
+            auto time_t_undo = std::chrono::system_clock::to_time_t(file_op.undo_time);
+            std::tm tm_undo = *std::localtime(&time_t_undo);
 
             out
-                << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << ' '
+                << std::put_time(&tm_completion, "%Y-%m-%d %H:%M:%S") << ' '
+                << std::put_time(&tm_undo, "%Y-%m-%d %H:%M:%S") << ' '
                 << char(file_op.op_type) << ' '
                 << s32(file_op.obj_type) << ' '
                 << path_length(file_op.src_path) << ' '
@@ -88,9 +92,14 @@ try {
         swan_path_t stored_src_path = {};
         swan_path_t stored_dst_path = {};
 
-        std::tm tm = {};
-        iss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-        system_time_point_t stored_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+        std::tm tm_completion = {};
+        iss >> std::get_time(&tm_completion, "%Y-%m-%d %H:%M:%S");
+        system_time_point_t stored_time_completion = std::chrono::system_clock::from_time_t(std::mktime(&tm_completion));
+        iss.ignore(1);
+
+        std::tm tm_undo = {};
+        iss >> std::get_time(&tm_undo, "%Y-%m-%d %H:%M:%S");
+        system_time_point_t stored_time_undo = std::chrono::system_clock::from_time_t(std::mktime(&tm_undo));
         iss.ignore(1);
 
         iss >> stored_op_type;
@@ -114,7 +123,8 @@ try {
         path_force_separator(stored_dst_path, dir_separator);
 
         completed_operations.push_back();
-        completed_operations.back().completion_time = stored_time;
+        completed_operations.back().completion_time = stored_time_completion;
+        completed_operations.back().undo_time = stored_time_undo;
         completed_operations.back().src_path = stored_src_path;
         completed_operations.back().dst_path = stored_dst_path;
         completed_operations.back().op_type = file_operation_type(stored_op_type);
@@ -171,6 +181,248 @@ completed_file_operation &completed_file_operation::operator=(completed_file_ope
     return *this;
 }
 
+struct undelete_file_result
+{
+    bool step0_convert_hardlink_path_to_utf16;
+    bool step1_metadata_file_opened;
+    bool step2_metadata_file_read;
+    bool step3_new_hardlink_created;
+    bool step4_old_hardlink_deleted;
+    bool step5_metadata_file_deleted;
+
+    bool success() noexcept
+    {
+        return step0_convert_hardlink_path_to_utf16
+            && step1_metadata_file_opened
+            && step2_metadata_file_read
+            && step3_new_hardlink_created
+            && step4_old_hardlink_deleted
+            && step5_metadata_file_deleted;
+    }
+};
+
+/// @brief Restores a "deleted" file from the recycle bin. Implementation closely follows https://superuser.com/a/1736690.
+/// @param recycle_bin_hardlink_path_utf8 The full UTF-8 path to the hardlink in the recycling bin, format: $Recycle.Bin/.../RXXXXXX[.ext]
+/// @return A structure of booleans indicating which steps were completed successfully. If all values are true, the undelete was successful.
+undelete_file_result undelete_file(char const *recycle_bin_hardlink_path_utf8) noexcept
+{
+    undelete_file_result retval = {};
+
+    wchar_t recycle_bin_hardlink_path_utf16[MAX_PATH];
+
+    if (!utf8_to_utf16(recycle_bin_hardlink_path_utf8, recycle_bin_hardlink_path_utf16, lengthof(recycle_bin_hardlink_path_utf16))) {
+        return retval;
+    }
+    retval.step0_convert_hardlink_path_to_utf16 = true;
+
+    wchar_t recycle_bin_metadata_path_utf16[MAX_PATH];
+    (void) StrCpyNW(recycle_bin_metadata_path_utf16, recycle_bin_hardlink_path_utf16, lengthof(recycle_bin_metadata_path_utf16));
+    {
+        wchar_t *metadata_file_name = get_file_name(recycle_bin_metadata_path_utf16);
+        metadata_file_name[1] = L'I'; // $RXXXXXX[.ext] -> $IXXXXXX[.ext]
+    }
+
+    HANDLE metadata_file_handle = CreateFileW(recycle_bin_metadata_path_utf16,
+                                              GENERIC_READ,
+                                              0,
+                                              NULL,
+                                              OPEN_EXISTING,
+                                              FILE_FLAG_SEQUENTIAL_SCAN,
+                                              NULL);
+
+    if (metadata_file_handle == INVALID_HANDLE_VALUE) {
+        return retval;
+    }
+    retval.step1_metadata_file_opened = true;
+
+    SCOPE_EXIT { if (metadata_file_handle != INVALID_HANDLE_VALUE) CloseHandle(metadata_file_handle); };
+
+    constexpr u64 num_bytes_header = sizeof(s64);
+    constexpr u64 num_bytes_file_size = sizeof(s64);
+    constexpr u64 num_bytes_file_deletion_date = sizeof(s64);
+    constexpr u64 num_bytes_file_path_length = sizeof(s32);
+
+    char metadata_buffer[num_bytes_header + 2 + // 2 potential junk bytes preceeding header, is my interpretation
+                         num_bytes_file_size +
+                         num_bytes_file_deletion_date +
+                         num_bytes_file_path_length +
+                         MAX_PATH] = {};
+
+    DWORD metadata_file_size = GetFileSize(metadata_file_handle, nullptr);
+    assert(metadata_file_size <= lengthof(metadata_buffer));
+
+    DWORD bytes_read = 0;
+    if (!ReadFile(metadata_file_handle, metadata_buffer, metadata_file_size, &bytes_read, NULL)) {
+        return retval;
+    }
+    assert(bytes_read == metadata_file_size);
+    retval.step2_metadata_file_read = true;
+
+    u64 num_bytes_junk = 0;
+    num_bytes_junk += u64(metadata_buffer[0] == 0xFF);
+    num_bytes_junk += u64(metadata_buffer[1] == 0xFE);
+
+    [[maybe_unused]] s64      *header             = reinterpret_cast<s64 *     >(metadata_buffer + num_bytes_junk);
+    [[maybe_unused]] s64      *file_size          = reinterpret_cast<s64 *     >(metadata_buffer + num_bytes_junk + num_bytes_header);
+    [[maybe_unused]] FILETIME *file_deletion_date = reinterpret_cast<FILETIME *>(metadata_buffer + num_bytes_junk + num_bytes_header + num_bytes_file_size);
+    [[maybe_unused]] s32      *file_path_len      = reinterpret_cast<s32 *     >(metadata_buffer + num_bytes_junk + num_bytes_header + num_bytes_file_size + num_bytes_file_deletion_date);
+    [[maybe_unused]] wchar_t  *file_path_utf16    = reinterpret_cast<wchar_t * >(metadata_buffer + num_bytes_junk + num_bytes_header + num_bytes_file_size + num_bytes_file_deletion_date + num_bytes_file_path_length);
+
+    if (!CreateHardLinkW(file_path_utf16, recycle_bin_hardlink_path_utf16, NULL)) {
+        return retval;
+    }
+    retval.step3_new_hardlink_created = true;
+
+    retval.step4_old_hardlink_deleted = DeleteFileW(recycle_bin_hardlink_path_utf16);
+
+    if (CloseHandle(metadata_file_handle)) {
+        metadata_file_handle = INVALID_HANDLE_VALUE;
+    }
+    retval.step5_metadata_file_deleted = DeleteFileW(recycle_bin_metadata_path_utf16);
+
+    return retval;
+}
+
+void perform_undelete_directory(
+    swan_path_t directory_path_in_recycle_bin_utf8,
+    swan_path_t destination_dir_path_utf8,
+    swan_path_t destination_full_path_utf8,
+    std::mutex *init_done_mutex,
+    std::condition_variable *init_done_cond,
+    bool *init_done,
+    std::string *init_error) noexcept
+{
+    auto set_init_error_and_notify = [&](std::string const &err) {
+        std::unique_lock lock(*init_done_mutex);
+        *init_done = true;
+        *init_error = err;
+        init_done_cond->notify_one();
+    };
+
+    wchar_t directory_path_in_recycle_bin_utf16[MAX_PATH];
+
+    if (!utf8_to_utf16(directory_path_in_recycle_bin_utf8.data(), directory_path_in_recycle_bin_utf16, lengthof(directory_path_in_recycle_bin_utf16))) {
+        return set_init_error_and_notify("Conversion of directory path (in recycle bin) from UTF-8 to UTF-16.");
+    }
+    {
+        auto begin = directory_path_in_recycle_bin_utf16;
+        auto end = directory_path_in_recycle_bin_utf16 + wcslen(directory_path_in_recycle_bin_utf16);
+        std::replace(begin, end, L'/', L'\\');
+    }
+
+    wchar_t destination_dir_path_utf16[MAX_PATH];
+
+    if (!utf8_to_utf16(destination_dir_path_utf8.data(), destination_dir_path_utf16, lengthof(destination_dir_path_utf16))) {
+        return set_init_error_and_notify("Conversion of destination path from UTF-8 to UTF-16.");
+    }
+    {
+        auto begin = destination_dir_path_utf16;
+        auto end = destination_dir_path_utf16 + wcslen(destination_dir_path_utf16);
+        std::replace(begin, end, L'/', L'\\');
+    }
+
+    HRESULT result = {};
+
+    result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (FAILED(result)) {
+        return set_init_error_and_notify(make_str("CoInitializeEx(COINIT_APARTMENTTHREADED), %s", _com_error(result).ErrorMessage()));
+    }
+    SCOPE_EXIT { CoUninitialize(); };
+
+    IFileOperation *file_op = nullptr;
+
+    result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
+    if (FAILED(result)) {
+        return set_init_error_and_notify(make_str("CoCreateInstance(CLSID_FileOperation), %s", _com_error(result).ErrorMessage()));
+    }
+    SCOPE_EXIT { file_op->Release(); };
+
+#if 0
+    result = file_op->SetOperationFlags(FOF_NOCONFIRMATION);
+    if (FAILED(result)) {
+        return set_init_error_and_notify(make_str("IFileOperation::SetOperationFlags, %s", _com_error(result).ErrorMessage()));
+    }
+#endif
+
+    IShellItem *item_to_restore = nullptr;
+
+    result = SHCreateItemFromParsingName(directory_path_in_recycle_bin_utf16, nullptr, IID_PPV_ARGS(&item_to_restore));
+    if (FAILED(result)) {
+        return set_init_error_and_notify(make_str("SHCreateItemFromParsingName, %s", _com_error(result).ErrorMessage()));
+    }
+    SCOPE_EXIT { item_to_restore->Release(); };
+
+    IShellItem *destination = nullptr;
+
+    result = SHCreateItemFromParsingName(destination_dir_path_utf16, nullptr, IID_PPV_ARGS(&destination));
+    if (FAILED(result)) {
+        return set_init_error_and_notify(make_str("SHCreateItemFromParsingName, %s", _com_error(result).ErrorMessage()));
+    }
+    SCOPE_EXIT { destination->Release(); };
+
+    undelete_directory_progress_sink prog_sink;
+    prog_sink.destination_full_path_utf8 = destination_full_path_utf8;
+    DWORD cookie = {};
+
+    wchar_t const *restored_name = cget_file_name(destination_dir_path_utf16);
+    result = file_op->MoveItem(item_to_restore, destination, restored_name, &prog_sink);
+    if (FAILED(result)) {
+        return set_init_error_and_notify(make_str("FAILED IFileOperation::MoveItem, %s", _com_error(result).ErrorMessage()));
+    }
+
+    result = file_op->Advise(&prog_sink, &cookie);
+    if (FAILED(result)) {
+        return set_init_error_and_notify(make_str("FAILED IFileOperation::Advise, %s", _com_error(result).ErrorMessage()));
+    }
+
+    set_init_error_and_notify(""); // init succeeded, no error
+
+    result = file_op->PerformOperations();
+    if (FAILED(result)) {
+        _com_error err(result);
+        print_debug_msg("FAILED IFileOperation::PerformOperations, %s", err.ErrorMessage());
+    }
+
+    file_op->Unadvise(cookie);
+    if (FAILED(result)) {
+        print_debug_msg("FAILED IFileOperation::Unadvise(%d), %s", cookie, _com_error(result).ErrorMessage());
+    }
+
+    // `undone_time` is set in undelete_directory_progress_sink::FinishOperations
+}
+
+generic_result enqueue_undelete_directory(char const *directory_path_in_recycle_bin_utf8, char const *destination_dir_path_utf8, char const *desination_full_path) noexcept
+{
+    /*
+        ? Undeleting a directory from the recycle bin (moving the directory from the recycle bin to it's original location) via shlwapi is a blocking operation.
+        ? Thus we must call IFileOperation::PerformOperations outside of the main UI thread so the user can continue to interact with the UI during the operation.
+        ? There is a constraint however: the IFileOperation object must be initialized on the same thread which will call PerformOperations.
+        ? This function will block until the IFileOperation initialization is completed so that we can report any error to the user.
+        ? After the worker thread signals that initialization is complete, we proceed with execution and let PerformOperations happen asynchronously.
+    */
+
+    bool initialization_done = false;
+    std::string initialization_error = {};
+    static std::mutex initialization_done_mutex = {};
+    static std::condition_variable initialization_done_cond = {};
+
+    global_state::thread_pool().push_task(perform_undelete_directory,
+        path_create(directory_path_in_recycle_bin_utf8),
+        path_create(destination_dir_path_utf8),
+        path_create(desination_full_path),
+        &initialization_done_mutex,
+        &initialization_done_cond,
+        &initialization_done,
+        &initialization_error);
+
+    {
+        std::unique_lock lock(initialization_done_mutex);
+        initialization_done_cond.wait(lock, [&]() { return initialization_done; });
+    }
+
+    return { initialization_error.empty(), initialization_error };
+}
+
 void swan_windows::render_file_operations(bool &open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::file_operations), &open)) {
@@ -195,10 +447,13 @@ void swan_windows::render_file_operations(bool &open) noexcept
         file_ops_table_col_count
     };
 
-    if (imgui::BeginTable("Activities", file_ops_table_col_count,
+    if (imgui::BeginTable("completed_file_operations", file_ops_table_col_count,
         ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|
         (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
     ) {
+        static completed_file_operation *right_clicked_row = nullptr;
+        u64 remove_idx = u64(-1);
+
         // imgui::TableSetupColumn("Action", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_action);
         imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
@@ -213,16 +468,18 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
         std::scoped_lock lock(mutex);
 
-        for (u64 i = 0; i < completed_operations.size(); ++i) {
-        // for (auto const &file_op : completed_operations) {
+        ImGuiListClipper clipper;
+        {
+            u64 num_rows_to_render = completed_operations.size();
+            assert(num_rows_to_render <= (u64)INT32_MAX);
+            clipper.Begin(s32(num_rows_to_render));
+        }
+
+        while (clipper.Step())
+        for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
             auto &file_op = completed_operations[i];
 
             imgui::TableNextRow();
-
-            // if (imgui::TableSetColumnIndex(file_ops_table_col_action)) {
-            //     imgui::ScopedDisable d(true);
-            //     imgui::SmallButton("Undo");
-            // }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_group)) {
                 if (file_op.group_id != 0) {
@@ -246,7 +503,25 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_completion_time)) {
                 auto when_completed_str = compute_when_str(file_op.completion_time, current_time_system());
+
+                ImVec2 cursor_start = imgui::GetCursorScreenPos();
                 imgui::TextUnformatted(when_completed_str.data());
+
+                if (file_op.undone()) {
+                    // strikethru completion time
+                    {
+                        ImVec2 text_size = imgui::CalcTextSize(when_completed_str.data());
+                        f32 line_pos_y = cursor_start.y + (text_size.y / 2);
+                        ImVec2 line_p1 = ImVec2(cursor_start.x, line_pos_y);
+                        ImVec2 line_p2 = ImVec2(cursor_start.x + text_size.x, line_pos_y);
+                        ImGui::GetWindowDrawList()->AddLine(line_p1, line_p2, IM_COL32(255, 0, 0, 255), 1.0f);
+                    }
+
+                    imgui::SameLine();
+
+                    auto when_undone_str = compute_when_str(file_op.undo_time, current_time_system());
+                    imgui::Text("Undone %s", when_undone_str.data());
+                }
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_src_path)) {
@@ -259,6 +534,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 if (imgui::IsItemClicked()) {
                     // TODO: find most appropriate explorer and spotlight the item
                 }
+                if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
+                    right_clicked_row = &file_op;
+                    imgui::OpenPopup("## completed_file_operations context");
+                }
             }
             imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_src_path, file_op.src_path.data());
 
@@ -269,6 +548,64 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 }
             }
             imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_dst_path, file_op.dst_path.data());
+        }
+
+        if (imgui::BeginPopup("## completed_file_operations context")) {
+            assert(right_clicked_row != nullptr);
+
+            if (!right_clicked_row->undone() && right_clicked_row->op_type == file_operation_type::del && imgui::Selectable("Undelete")) {
+                if (right_clicked_row->obj_type == basic_dirent::kind::directory) {
+                    swan_path_t restore_dir_utf8 = path_create(right_clicked_row->src_path.data(),
+                                                               get_everything_minus_file_name(right_clicked_row->src_path.data()).length());
+
+                    auto res = enqueue_undelete_directory(right_clicked_row->dst_path.data(), restore_dir_utf8.data(), right_clicked_row->src_path.data());
+
+                    if (!res.success) {
+                        std::string action = make_str("Undelete directory [%s].", right_clicked_row->src_path.data());
+                        swan_popup_modals::open_error(action.c_str(), res.error_or_utf8_path.c_str());
+                    }
+                }
+                else {
+                    auto res = undelete_file(right_clicked_row->dst_path.data());
+
+                    if (res.success()) {
+                        right_clicked_row->undo_time = current_time_system();
+                        right_clicked_row->selected = false;
+                        (void) global_state::save_completed_file_ops_to_disk(&lock);
+                    }
+                    else {
+                        std::string action = make_str("Undelete file [%s].", right_clicked_row->src_path.data());
+                        std::string failure;
+
+                        if      (!res.step0_convert_hardlink_path_to_utf16) failure = make_str("Failed to convert hardlink path [%s] from UTF-8 to UTF-16.", right_clicked_row->dst_path.data());
+                        else if (!res.step1_metadata_file_opened          ) failure = make_str("Failed to open metadata file corresponding to [%s], %s", right_clicked_row->dst_path.data(), get_last_winapi_error().formatted_message.c_str());
+                        else if (!res.step2_metadata_file_read            ) failure = make_str("Failed to read contents of metadata file corresponding to [%s]", right_clicked_row->dst_path.data());
+                        else if (!res.step3_new_hardlink_created          ) failure = make_str("Failed to create hardlink [%s], %s", right_clicked_row->src_path.data(), get_last_winapi_error().formatted_message.c_str());
+                        else if (!res.step4_old_hardlink_deleted          ) failure = make_str("Failed to delete hardlink [%s], %s", right_clicked_row->dst_path.data(), get_last_winapi_error().formatted_message.c_str());
+                        else if (!res.step5_metadata_file_deleted         ) failure = make_str("Failed to delete metadata file corresponding to [%s], %s", right_clicked_row->dst_path.data(), get_last_winapi_error().formatted_message.c_str());
+                        else                                                assert(false && "Bad code path");
+
+                        swan_popup_modals::open_error(action.c_str(), failure.c_str());
+
+                        if (res.step3_new_hardlink_created) {
+                            // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
+                            right_clicked_row->undo_time = current_time_system();
+                            (void) global_state::save_completed_file_ops_to_disk(&lock);
+                        }
+                    }
+                }
+            }
+
+            if (imgui::Selectable("Forget")) {
+                remove_idx = std::distance(&completed_operations.front(), right_clicked_row);
+            }
+
+            imgui::EndPopup();
+        }
+
+        if (remove_idx != u64(-1)) {
+            completed_operations.erase(completed_operations.begin() + remove_idx);
+            (void) global_state::save_completed_file_ops_to_disk(&lock);
         }
 
         imgui::EndTable();
@@ -304,296 +641,6 @@ void print_SIGDN_values(char const *func_label, char const *item_name, IShellIte
     }
 }
 
-HRESULT progress_sink::StartOperations() { print_debug_msg("StartOperations"); return S_OK; }
-HRESULT progress_sink::PauseTimer() { print_debug_msg("PauseTimer"); return S_OK; }
-HRESULT progress_sink::ResetTimer() { print_debug_msg("ResetTimer"); return S_OK; }
-HRESULT progress_sink::ResumeTimer() { print_debug_msg("ResumeTimer"); return S_OK; }
-
-HRESULT progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) { print_debug_msg("PostNewItem"); return S_OK; }
-HRESULT progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("PostRenameItem"); return S_OK; }
-
-HRESULT progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("PreCopyItem"); return S_OK; }
-HRESULT progress_sink::PreDeleteItem(DWORD, IShellItem *) { print_debug_msg("PreDeleteItem"); return S_OK; }
-HRESULT progress_sink::PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("PreMoveItem"); return S_OK; }
-HRESULT progress_sink::PreNewItem(DWORD, IShellItem *, LPCWSTR) { print_debug_msg("PreNewItem"); return S_OK; }
-HRESULT progress_sink::PreRenameItem(DWORD, IShellItem *, LPCWSTR) { print_debug_msg("PreRenameItem"); return S_OK; }
-
-HRESULT progress_sink::PostMoveItem(
-    [[maybe_unused]] DWORD flags,
-    [[maybe_unused]] IShellItem *src_item,
-    [[maybe_unused]] IShellItem *destination,
-    LPCWSTR new_name_utf16,
-    HRESULT result,
-    [[maybe_unused]] IShellItem *dst_item)
-{
-    if (!SUCCEEDED(result)) {
-        return S_OK;
-    }
-
-    SFGAOF attributes = {};
-    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER|SFGAO_LINK, &attributes))) {
-        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER|SFGAO_LINK)");
-        return S_OK;
-    }
-
-    wchar_t *src_path_utf16 = nullptr;
-    swan_path_t src_path_utf8;
-
-    if (FAILED(src_item->GetDisplayName(SIGDN_FILESYSPATH, &src_path_utf16))) {
-        return S_OK;
-    }
-    SCOPE_EXIT { CoTaskMemFree(src_path_utf16); };
-
-    if (!utf16_to_utf8(src_path_utf16, src_path_utf8.data(), src_path_utf8.max_size())) {
-        return S_OK;
-    }
-
-    wchar_t *dst_path_utf16 = nullptr;
-    swan_path_t dst_path_utf8;
-
-    if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {
-        return S_OK;
-    }
-    SCOPE_EXIT { CoTaskMemFree(dst_path_utf16); };
-
-    if (!utf16_to_utf8(dst_path_utf16, dst_path_utf8.data(), dst_path_utf8.max_size())) {
-        return S_OK;
-    }
-
-    print_debug_msg("PostMoveItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
-
-    swan_path_t new_name_utf8;
-
-    if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
-        return S_OK;
-    }
-
-    explorer_window &dst_expl = global_state::explorers()[this->dst_expl_id];
-
-    bool dst_expl_cwd_same = path_loosely_same(dst_expl.cwd, this->dst_expl_cwd_when_operation_started);
-
-    if (dst_expl_cwd_same) {
-        print_debug_msg("PostMoveItem [%s]", new_name_utf8.data());
-        std::scoped_lock lock(dst_expl.select_cwd_entries_on_next_update_mutex);
-        dst_expl.select_cwd_entries_on_next_update.push_back(new_name_utf8);
-    }
-
-    {
-        auto pair = global_state::completed_file_ops();
-        auto &completed_file_ops = *pair.first;
-        auto &mutex = *pair.second;
-
-        path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
-        path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
-
-        std::scoped_lock lock(mutex);
-
-        completed_file_ops.push_front();
-        completed_file_ops.front().completion_time = current_time_system();
-        completed_file_ops.front().src_path = src_path_utf8;
-        completed_file_ops.front().dst_path = dst_path_utf8;
-        completed_file_ops.front().op_type = file_operation_type::move;
-
-        if (attributes & SFGAO_LINK) {
-            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
-        } else {
-            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
-        }
-    }
-
-    return S_OK;
-}
-
-HRESULT progress_sink::PostDeleteItem(DWORD, IShellItem *item, HRESULT result, IShellItem *item_newly_created)
-{
-    if (FAILED(result)) {
-        return S_OK;
-    }
-
-    // print_SIGDN_values("PostDeleteItem", "item", item);
-    // print_SIGDN_values("PostDeleteItem", "item_newly_created", item_newly_created);
-
-    // Extract deleted item path, UTF16
-    wchar_t *deleted_item_path_utf16 = nullptr;
-    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &deleted_item_path_utf16))) {
-        return S_OK;
-    }
-    SCOPE_EXIT { CoTaskMemFree(deleted_item_path_utf16); };
-
-    // Convert deleted item path to UTF8
-    swan_path_t deleted_item_path_utf8;
-    if (!utf16_to_utf8(deleted_item_path_utf16, deleted_item_path_utf8.data(), deleted_item_path_utf8.max_size())) {
-        return S_OK;
-    }
-
-    // Extract recycle bin item path, UTF16
-    wchar_t *recycle_bin_hardlink_path_utf16 = nullptr;
-    if (FAILED(item_newly_created->GetDisplayName(SIGDN_FILESYSPATH, &recycle_bin_hardlink_path_utf16))) {
-        return S_OK;
-    }
-    SCOPE_EXIT { CoTaskMemFree(recycle_bin_hardlink_path_utf16); };
-
-    // Convert recycle bin item path to UTF8
-    swan_path_t recycle_bin_item_path_utf8;
-    if (!utf16_to_utf8(recycle_bin_hardlink_path_utf16, recycle_bin_item_path_utf8.data(), recycle_bin_item_path_utf8.max_size())) {
-        return S_OK;
-    }
-
-    SFGAOF attributes = {};
-    if (FAILED(item->GetAttributes(SFGAO_FOLDER|SFGAO_LINK, &attributes))) {
-        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER|SFGAO_LINK)");
-        return S_OK;
-    }
-
-    {
-        auto pair = global_state::completed_file_ops();
-        auto &completed_file_ops = *pair.first;
-        auto &mutex = *pair.second;
-
-        std::scoped_lock lock(mutex);
-
-        completed_file_ops.push_front();
-        completed_file_ops.front().completion_time = current_time_system();
-        completed_file_ops.front().src_path = deleted_item_path_utf8;
-        completed_file_ops.front().dst_path = recycle_bin_item_path_utf8;
-        completed_file_ops.front().op_type = file_operation_type::del;
-
-        if (attributes & SFGAO_LINK) {
-            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
-        } else {
-            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
-        }
-    }
-
-    print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
-
-    return S_OK;
-}
-
-HRESULT progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, LPCWSTR new_name_utf16, HRESULT result, IShellItem *dst_item)
-{
-    if (FAILED(result)) {
-        return S_OK;
-    }
-
-    SFGAOF attributes = {};
-    if (FAILED(src_item->GetAttributes(SFGAO_FOLDER|SFGAO_LINK, &attributes))) {
-        print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER|SFGAO_LINK)");
-        return S_OK;
-    }
-
-    wchar_t *src_path_utf16 = nullptr;
-    swan_path_t src_path_utf8;
-
-    if (FAILED(src_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &src_path_utf16))) {
-        return S_OK;
-    }
-    SCOPE_EXIT { CoTaskMemFree(src_path_utf16); };
-
-    if (!utf16_to_utf8(src_path_utf16, src_path_utf8.data(), src_path_utf8.max_size())) {
-        return S_OK;
-    }
-
-    wchar_t *dst_path_utf16 = nullptr;
-    swan_path_t dst_path_utf8;
-
-    if (FAILED(dst_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &dst_path_utf16))) {
-        return S_OK;
-    }
-    SCOPE_EXIT { CoTaskMemFree(dst_path_utf16); };
-
-    if (!utf16_to_utf8(dst_path_utf16, dst_path_utf8.data(), dst_path_utf8.max_size())) {
-        return S_OK;
-    }
-
-    print_debug_msg("PostCopyItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
-
-    swan_path_t new_name_utf8;
-
-    if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
-        return S_OK;
-    }
-
-    {
-        auto pair = global_state::completed_file_ops();
-        auto &completed_file_ops = *pair.first;
-        auto &mutex = *pair.second;
-
-        path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
-        path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
-
-        std::scoped_lock lock(mutex);
-
-        completed_file_ops.push_front();
-        completed_file_ops.front().completion_time = current_time_system();
-        completed_file_ops.front().src_path = src_path_utf8;
-        completed_file_ops.front().dst_path = dst_path_utf8;
-        completed_file_ops.front().op_type = file_operation_type::copy;
-
-        if (attributes & SFGAO_LINK) {
-            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
-        } else {
-            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
-        }
-    }
-
-    return S_OK;
-}
-
-HRESULT progress_sink::UpdateProgress(UINT work_total, UINT work_so_far)
-{
-    print_debug_msg("UpdateProgress %zu/%zu", work_so_far, work_total);
-    return S_OK;
-}
-
-HRESULT progress_sink::FinishOperations(HRESULT)
-{
-    print_debug_msg("FinishOperations");
-
-    if (this->contains_delete_operations) {
-        {
-            auto new_buffer = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
-
-            auto pair = global_state::recent_files();
-            auto &recent_files = *pair.first;
-            auto &mutex = *pair.second;
-
-            std::scoped_lock lock(mutex);
-
-            for (auto const &recent_file : recent_files) {
-                wchar_t recent_file_path_utf16[MAX_PATH];
-
-                if (utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16))) {
-                    if (PathFileExistsW(recent_file_path_utf16)) {
-                        new_buffer.push_back(recent_file);
-                    }
-                }
-            }
-
-            recent_files = new_buffer;
-        }
-
-        global_state::save_recent_files_to_disk();
-    }
-
-    (void) global_state::save_completed_file_ops_to_disk();
-
-    return S_OK;
-}
-
-ULONG progress_sink::AddRef() { return 1; }
-ULONG progress_sink::Release() { return 1; }
-
-HRESULT progress_sink::QueryInterface(const IID &riid, void **ppv)
-{
-    if (riid == IID_IUnknown || riid == IID_IFileOperationProgressSink) {
-        *ppv = static_cast<IFileOperationProgressSink*>(this);
-        return S_OK;
-    }
-    *ppv = nullptr;
-    return E_NOINTERFACE;
-}
-
 /// @brief Performs a sequence of file operations.
 /// @param destination_directory_utf16 The destination of the operations. For example, the place where we are copying files to.
 /// @param paths_to_execute_utf16 Single string of absolute paths to execute an operation against. Each path must be separated by a newline.
@@ -617,7 +664,7 @@ void perform_file_operations(
 
     std::replace(destination_directory_utf16.begin(), destination_directory_utf16.end(), L'/', L'\\');
 
-    auto set_init_error_and_notify = [&](char const *err) {
+    auto set_init_error_and_notify = [&](std::string const &err) {
         std::unique_lock lock(*init_done_mutex);
         *init_done = true;
         *init_error = err;
@@ -628,7 +675,7 @@ void perform_file_operations(
 
     result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(result)) {
-        return set_init_error_and_notify("CoInitializeEx(COINIT_APARTMENTTHREADED)");
+        return set_init_error_and_notify(make_str("CoInitializeEx(COINIT_APARTMENTTHREADED), %s", _com_error(result).ErrorMessage()));
     }
     SCOPE_EXIT { CoUninitialize(); };
 
@@ -636,13 +683,13 @@ void perform_file_operations(
 
     result = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&file_op));
     if (FAILED(result)) {
-        return set_init_error_and_notify("CoCreateInstance(CLSID_FileOperation)");
+        return set_init_error_and_notify(make_str("CoCreateInstance(CLSID_FileOperation), %s", _com_error(result).ErrorMessage()));
     }
     SCOPE_EXIT { file_op->Release(); };
 
     result = file_op->SetOperationFlags(FOF_RENAMEONCOLLISION | FOF_NOCONFIRMATION | FOF_ALLOWUNDO);
     if (FAILED(result)) {
-        return set_init_error_and_notify("IFileOperation::SetOperationFlags");
+        return set_init_error_and_notify(make_str("IFileOperation::SetOperationFlags, %s", _com_error(result).ErrorMessage()));
     }
 
     IShellItem *destination = nullptr;
@@ -675,7 +722,7 @@ void perform_file_operations(
                 error.append("SHCreateItemFromParsingName failed for [").append(destination_utf8.data()).append("]");
             }
 
-            return set_init_error_and_notify(error.c_str());
+            return set_init_error_and_notify(error);
         }
     }
 
@@ -683,7 +730,7 @@ void perform_file_operations(
         paths_to_execute_utf16.pop_back();
     }
 
-    progress_sink prog_sink = {};
+    explorer_file_op_progress_sink prog_sink = {};
     prog_sink.dst_expl_id = dst_expl_id;
     prog_sink.dst_expl_cwd_when_operation_started = global_state::explorers()[dst_expl_id].cwd;
 
@@ -770,26 +817,26 @@ void perform_file_operations(
         std::string errors = err.str();
         if (!errors.empty()) {
             errors.pop_back(); // remove trailing '\n'
-            return set_init_error_and_notify(errors.c_str());
+            return set_init_error_and_notify(errors);
         }
     }
 
     DWORD cookie = {};
     result = file_op->Advise(&prog_sink, &cookie);
     if (FAILED(result)) {
-        return set_init_error_and_notify("IFileOperation::Advise(IFileOperationProgressSink *pfops, DWORD *pdwCookie)");
+        return set_init_error_and_notify(make_str("IFileOperation::Advise, %s", _com_error(result).ErrorMessage()));
     }
-    print_debug_msg("IFileOperation::Advise(%d)", cookie);
+    print_debug_msg("IFileOperation::Advise(%d), %s", cookie, _com_error(result).ErrorMessage());
 
     set_init_error_and_notify(""); // init succeeded, no error
 
     result = file_op->PerformOperations();
     if (FAILED(result)) {
-        print_debug_msg("FAILED IFileOperation::PerformOperations()");
+        print_debug_msg("FAILED IFileOperation::PerformOperations, %s", _com_error(result).ErrorMessage());
     }
 
     file_op->Unadvise(cookie);
     if (FAILED(result)) {
-        print_debug_msg("FAILED IFileOperation::Unadvise(%d)", cookie);
+        print_debug_msg("FAILED IFileOperation::Unadvise(%d), %s", cookie, _com_error(result).ErrorMessage());
     }
 }

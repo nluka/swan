@@ -3,9 +3,11 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
 
-[[nodiscard]] swan_path_t path_create(char const *data, u64 count = u64(-1)) noexcept;
+struct swan_path_t; // Microsoft IntelliSense generates nonsensical errors without this declaration, despite the compiler not complaining.
 
-[[nodiscard]] u16 path_length(swan_path_t const &path) noexcept;
+swan_path_t path_create(char const *data, u64 count = u64(-1)) noexcept;
+
+u16 path_length(swan_path_t const &path) noexcept;
 
 bool path_ends_with(swan_path_t const &path, char const *end) noexcept;
 

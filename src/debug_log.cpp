@@ -66,7 +66,7 @@ void swan_windows::render_debug_log(bool &open) noexcept
 
         // second line
 
-        imgui::Text("%-5s %10s %18s:%-5s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
+        imgui::Text("%-5s %10s %24s:%-6s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
         imgui::Separator();
 
         // third line

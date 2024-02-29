@@ -350,6 +350,28 @@ wchar_t *get_file_name(wchar_t *path) noexcept
     return just_the_file_name;
 }
 
+wchar_t const *cget_file_name(wchar_t const *path) noexcept
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                  ^^^^^^^^^^^^^^^^^^^ what we are after
+    // src/swan.cpp
+    //     ^^^^^^^^ what we are after
+
+    assert(path != nullptr);
+
+    wchar_t const *just_the_file_name = path;
+
+    std::wstring_view view(just_the_file_name);
+
+    u64 last_sep_pos = view.find_last_of(L"\\/");
+
+    if (last_sep_pos != std::string::npos) {
+        just_the_file_name += last_sep_pos + 1;
+    }
+
+    return just_the_file_name;
+}
+
 char const *cget_file_name(char const *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
