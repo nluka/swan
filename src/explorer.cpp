@@ -2327,9 +2327,25 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
 
     if (imgui::Button(buffer)) {
         if (already_pinned) {
-            print_debug_msg("[ %d ] pin_idx = %zu", expl.id, pin_idx);
-            scoped_timer<timer_unit::MICROSECONDS> unpin_timer(&expl.unpin_us);
-            global_state::remove_pin(pin_idx);
+            imgui::OpenConfirmationModalWithCallback(
+                swan_confirm_id_explorer_unpin_directory,
+                [pin_idx]() {
+                    auto const &pin = global_state::pins()[pin_idx];
+
+                    imgui::TextUnformatted("Are you sure you want to delete the following pin?");
+                    imgui::Spacing(2);
+
+                    imgui::SameLineSpaced(1); // indent
+                    imgui::TextColored(pin.color, pin.label.c_str());
+                    imgui::Spacing();
+
+                    imgui::TextUnformatted("This action cannot be undone.");
+                },
+                [pin_idx, &expl]() {
+                    scoped_timer<timer_unit::MICROSECONDS> unpin_timer(&expl.unpin_us);
+                    global_state::remove_pin(pin_idx);
+                }
+            );
         }
         else {
             swan_popup_modals::open_new_pin(expl.cwd, false);

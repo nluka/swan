@@ -15,9 +15,11 @@ bool imgui::HaveActiveConfirmationModal() noexcept
 
 void imgui::OpenConfirmationModal(s32 confirmation_id, char const *message) noexcept
 {
-    assert(s_current_confirm_id == -1 && "Don't call OpenConfirmationModal when there is already an active modal");
-    assert(s_current_confirm_id != confirmation_id && "Don't call OpenConfirmationModal repeatedly for the same confirmation_id");
-    assert(message != nullptr && "Don't pass message == nullptr to OpenConfirmationModal");
+    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+
+    assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
+    assert(message != nullptr && "Don't pass `message` == nullptr to " __FUNCTIONW__);
 
     s_current_confirm_id = confirmation_id;
     s_confirmation_content = message;
@@ -26,9 +28,11 @@ void imgui::OpenConfirmationModal(s32 confirmation_id, char const *message) noex
 
 void imgui::OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn) noexcept
 {
-    assert(s_current_confirm_id == -1 && "Don't call OpenConfirmationModal when there is already an active modal");
-    assert(s_current_confirm_id != confirmation_id && "Don't call OpenConfirmationModal repeatedly for the same confirmation_id");
-    assert(content_render_fn != nullptr && "Don't pass content_render_fn == nullptr to OpenConfirmationModal");
+    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+
+    assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
+    assert(content_render_fn != nullptr && "Don't pass `content_render_fn` == nullptr to " __FUNCTIONW__);
 
     s_current_confirm_id = confirmation_id;
     s_confirmation_content = content_render_fn;
@@ -39,10 +43,28 @@ void imgui::OpenConfirmationModalWithCallback(s32 confirmation_id, char const *m
 {
     assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
     assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
-    assert(callback != nullptr && "Don't pass callback == nullptr to " __FUNCTIONW__);
+
+    assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
+    assert(message != nullptr && "Don't pass `message` == nullptr to " __FUNCTIONW__);
+    assert(callback != nullptr && "Don't pass `callback` == nullptr to " __FUNCTIONW__);
 
     s_current_confirm_id = confirmation_id;
     s_confirmation_content = message;
+    s_confirmation_response = std::nullopt;
+    s_on_ok_callback = callback;
+}
+
+void imgui::OpenConfirmationModalWithCallback(s32 confirmation_id, std::function<void ()> content_render_fn, std::function<void ()> callback) noexcept
+{
+    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+
+    assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
+    assert(content_render_fn != nullptr && "Don't pass `content_render_fn` == nullptr to OpenConfirmationModal");
+    assert(callback != nullptr && "Don't pass `callback` == nullptr to " __FUNCTIONW__);
+
+    s_current_confirm_id = confirmation_id;
+    s_confirmation_content = content_render_fn;
     s_confirmation_response = std::nullopt;
     s_on_ok_callback = callback;
 }

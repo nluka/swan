@@ -19,9 +19,11 @@ namespace ImGui
 
     void RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, char const *tooltip_content = nullptr) noexcept;
 
-    void OpenConfirmationModal(s32 confirmation_id, char const *message) noexcept;
+    void OpenConfirmationModal(s32 confirmation_id, char const *message                     ) noexcept;
     void OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn) noexcept;
-    void OpenConfirmationModalWithCallback(s32 confirmation_id, char const *message, std::function<void ()> callback) noexcept;
+
+    void OpenConfirmationModalWithCallback(s32 confirmation_id, char const *message,                      std::function<void ()> callback) noexcept;
+    void OpenConfirmationModalWithCallback(s32 confirmation_id, std::function<void ()> content_render_fn, std::function<void ()> callback) noexcept;
 
     std::optional<bool> GetConfirmationStatus(s32 confirmation_id) noexcept;
 

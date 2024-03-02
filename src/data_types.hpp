@@ -516,5 +516,6 @@ enum swan_confirmation_id : s32
     swan_confirm_id_clear_recent_files,
     swan_confirm_id_delete_pin,
     swan_confirm_id_explorer_execute_delete,
+    swan_confirm_id_explorer_unpin_directory,
     swan_confirm_id_count
 };
