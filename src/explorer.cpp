@@ -3424,7 +3424,7 @@ void render_table_rows_for_cwd_entries(
 
             imgui::TableNextRow();
 
-            SCOPE_EXIT { dirent.spotlight_frames_remaining -= 1 * (dirent.spotlight_frames_remaining > 0); };
+            // SCOPE_EXIT { dirent.spotlight_frames_remaining -= 1 * (dirent.spotlight_frames_remaining > 0); };
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_number)) {
                 imgui::Text("%zu", i + 1);
@@ -3782,6 +3782,8 @@ void render_table_rows_for_cwd_entries(
                 auto [result, buffer] = filetime_to_string(&dirent.basic.last_write_time_raw);
                 imgui::TextUnformatted(buffer.data());
             }
+
+            dirent.spotlight_frames_remaining -= 1 * (dirent.spotlight_frames_remaining > 0);
         }
     }
 }
@@ -3837,11 +3839,11 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     std::string_view parent_dir = get_everything_minus_file_name(lnk_data.target_path_utf8.data());
                     expl.cwd = path_create(parent_dir.data(), parent_dir.size());
 
-                    swan_path_t to_select = path_create(get_file_name(lnk_data.target_path_utf8.data()));
+                    swan_path_t select_name_utf8 = path_create(get_file_name(lnk_data.target_path_utf8.data()));
                     {
                         std::scoped_lock lock(expl.select_cwd_entries_on_next_update_mutex);
                         expl.select_cwd_entries_on_next_update.clear();
-                        expl.select_cwd_entries_on_next_update.push_back(to_select);
+                        expl.select_cwd_entries_on_next_update.push_back(select_name_utf8);
                     }
 
                     expl.push_history_item(expl.cwd);

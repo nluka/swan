@@ -464,7 +464,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
         auto &completed_operations = *pair.first;
         auto &mutex = *pair.second;
 
-        std::scoped_lock lock(mutex);
+        std::scoped_lock completed_file_ops_lock(mutex);
 
         ImGuiListClipper clipper;
         {
@@ -544,6 +544,35 @@ void swan_windows::render_file_operations(bool &open) noexcept
         if (imgui::BeginPopup("## completed_file_operations context")) {
             assert(right_clicked_row != nullptr);
 
+            auto reveal = [](swan_path_t const &full_path) noexcept {
+                explorer_window &expl = global_state::explorers()[0];
+
+                swan_path_t reveal_name_utf8 = path_create(cget_file_name(full_path.data()));
+                std::string_view path_no_name_utf8 = get_everything_minus_file_name(full_path.data());
+
+                {
+                    std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
+                    expl.select_cwd_entries_on_next_update.clear();
+                    expl.select_cwd_entries_on_next_update.push_back(reveal_name_utf8);
+                }
+
+                expl.cwd = path_create(path_no_name_utf8.data(), path_no_name_utf8.size());
+                [[maybe_unused]] bool file_directory_exists = expl.update_cwd_entries(full_refresh, expl.cwd.data());
+
+                expl.scroll_to_nth_selected_entry_next_frame = 0;
+            };
+
+            if (right_clicked_row->op_type == file_operation_type::del && right_clicked_row->undone()) {
+                if (imgui::Selectable("Reveal source path (undo result) in Explorer 1")) {
+                    reveal(right_clicked_row->src_path);
+                }
+            }
+            else {
+                if (imgui::Selectable("Reveal destination path (result) in Explorer 1")) {
+                    reveal(right_clicked_row->dst_path);
+                }
+            }
+
             if (!right_clicked_row->undone() && right_clicked_row->op_type == file_operation_type::del && imgui::Selectable("Undelete")) {
                 if (right_clicked_row->obj_type == basic_dirent::kind::directory) {
                     swan_path_t restore_dir_utf8 = path_create(right_clicked_row->src_path.data(),
@@ -562,7 +591,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     if (res.success()) {
                         right_clicked_row->undo_time = current_time_system();
                         right_clicked_row->selected = false;
-                        (void) global_state::save_completed_file_ops_to_disk(&lock);
+                        (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
                     }
                     else {
                         std::string action = make_str("Undelete file [%s].", right_clicked_row->src_path.data());
@@ -581,7 +610,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                         if (res.step3_new_hardlink_created) {
                             // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
                             right_clicked_row->undo_time = current_time_system();
-                            (void) global_state::save_completed_file_ops_to_disk(&lock);
+                            (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
                         }
                     }
                 }
@@ -596,7 +625,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
         if (remove_idx != u64(-1)) {
             completed_operations.erase(completed_operations.begin() + remove_idx);
-            (void) global_state::save_completed_file_ops_to_disk(&lock);
+            (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
         }
 
         imgui::EndTable();

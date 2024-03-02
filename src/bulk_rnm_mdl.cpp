@@ -318,10 +318,12 @@ void swan_popup_modals::render_bulk_rename() noexcept
                                 std::scoped_lock lock(expl.select_cwd_entries_on_next_update_mutex);
                                 expl.select_cwd_entries_on_next_update.clear();
                                 expl.select_cwd_entries_on_next_update.push_back(c.dest_dirent->path);
-                                expl.scroll_to_nth_selected_entry_next_frame = 0;
                             }
+
                             expl.deselect_all_cwd_entries();
                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+                            expl.scroll_to_nth_selected_entry_next_frame = 0;
+
                             cleanup_and_close_popup();
                         }
                     }
