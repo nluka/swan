@@ -188,7 +188,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
     wchar_t *src_path_utf16 = nullptr;
     swan_path_t src_path_utf8;
 
-    if (FAILED(src_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &src_path_utf16))) {
+    if (FAILED(src_item->GetDisplayName(SIGDN_FILESYSPATH, &src_path_utf16))) {
         return S_OK;
     }
     SCOPE_EXIT { CoTaskMemFree(src_path_utf16); };
@@ -200,7 +200,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
     wchar_t *dst_path_utf16 = nullptr;
     swan_path_t dst_path_utf8;
 
-    if (FAILED(dst_item->GetDisplayName(SIGDN_PARENTRELATIVEEDITING, &dst_path_utf16))) {
+    if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {
         return S_OK;
     }
     SCOPE_EXIT { CoTaskMemFree(dst_path_utf16); };

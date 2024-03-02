@@ -33,7 +33,7 @@ void apply_swan_style_overrides() noexcept
     style.TabBorderSize           = 0;
     style.ChildBorderSize         = 0;
     style.FrameBorderSize         = 0;
-    style.PopupBorderSize         = 0;
+    style.PopupBorderSize         = 1;
     style.WindowBorderSize        = 1;
     style.SeparatorTextBorderSize = 0;
     style.ScrollbarRounding       = 0;

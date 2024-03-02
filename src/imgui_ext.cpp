@@ -6,6 +6,7 @@
 static s32 s_current_confirm_id = -1;
 static std::variant<std::string, std::function<void ()>> s_confirmation_content = "";
 static std::optional<bool> s_confirmation_response = std::nullopt;
+static std::function<void ()> s_on_ok_callback = nullptr;
 
 bool imgui::HaveActiveConfirmationModal() noexcept
 {
@@ -32,6 +33,18 @@ void imgui::OpenConfirmationModal(s32 confirmation_id, std::function<void ()> co
     s_current_confirm_id = confirmation_id;
     s_confirmation_content = content_render_fn;
     s_confirmation_response = std::nullopt;
+}
+
+void imgui::OpenConfirmationModalWithCallback(s32 confirmation_id, char const *message, std::function<void ()> callback) noexcept
+{
+    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+    assert(callback != nullptr && "Don't pass callback == nullptr to " __FUNCTIONW__);
+
+    s_current_confirm_id = confirmation_id;
+    s_confirmation_content = message;
+    s_confirmation_response = std::nullopt;
+    s_on_ok_callback = callback;
 }
 
 std::optional<bool> imgui::GetConfirmationStatus(s32 confirmation_id) noexcept
@@ -61,12 +74,17 @@ void imgui::RenderConfirmationModal() noexcept
 
     if (imgui::BeginPopupModal("Confirm ## RenderConfirmationModal", 0, ImGuiWindowFlags_NoResize)) {
         auto cleanup_and_close_popup = []() noexcept {
-            //? defer cleanup to GetConfirmationStatus
-            // s_current_confirm_id = -1;
-            // s_confirmation_content = "";
-            // s_confirmation_response = std::nullopt;
-
-            imgui::CloseCurrentPopup();
+            if (s_on_ok_callback != nullptr) {
+                s_on_ok_callback = nullptr;
+                s_current_confirm_id = -1;
+                s_confirmation_content = "";
+                s_confirmation_response = std::nullopt;
+            } else {
+                //? defer cleanup to GetConfirmationStatus
+                // s_current_confirm_id = -1;
+                // s_confirmation_content = "";
+                // s_confirmation_response = std::nullopt;
+            }
         };
 
         if (std::holds_alternative<std::string>(s_confirmation_content)) {
@@ -80,6 +98,9 @@ void imgui::RenderConfirmationModal() noexcept
 
         if (imgui::Button("OK")) {
             s_confirmation_response = true;
+            if (s_on_ok_callback != nullptr) {
+                s_on_ok_callback();
+            }
             cleanup_and_close_popup();
         }
 

@@ -438,7 +438,6 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
     enum file_ops_table_col : s32
     {
-        // file_ops_table_col_action,
         file_ops_table_col_group,
         file_ops_table_col_op_type,
         file_ops_table_col_completion_time,
@@ -454,7 +453,6 @@ void swan_windows::render_file_operations(bool &open) noexcept
         static completed_file_operation *right_clicked_row = nullptr;
         u64 remove_idx = u64(-1);
 
-        // imgui::TableSetupColumn("Action", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_action);
         imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
         imgui::TableSetupColumn("Completed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_completion_time);
@@ -529,11 +527,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 (void) snprintf(buffer, lengthof(buffer), "%s##%zu", file_op.src_path.data(), i);
 
                 imgui::Selectable(buffer, &file_op.selected, ImGuiSelectableFlags_SpanAllColumns);
-                // imgui::TextUnformatted(file_op.src_path.data());
 
-                if (imgui::IsItemClicked()) {
-                    // TODO: find most appropriate explorer and spotlight the item
-                }
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
                     right_clicked_row = &file_op;
                     imgui::OpenPopup("## completed_file_operations context");
@@ -543,9 +537,6 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_dst_path)) {
                 imgui::TextUnformatted(file_op.dst_path.data());
-                if (imgui::IsItemClicked()) {
-                    // TODO: find most appropriate explorer and spotlight the item
-                }
             }
             imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_dst_path, file_op.dst_path.data());
         }

@@ -172,7 +172,7 @@ struct explorer_window
     typedef static_vector<ImGuiTableColumnSortSpecs, cwd_entries_table_col_count> cwd_entries_column_sort_specs_t;
 
     static u64 const NO_SELECTION = UINT64_MAX;
-    static u64 const MAX_WD_HISTORY_SIZE = 30;
+    static u64 const MAX_WD_HISTORY_SIZE = 100;
     bool save_to_disk() const noexcept;
     bool load_from_disk(char dir_separator) noexcept;
     void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
@@ -515,5 +515,6 @@ enum swan_confirmation_id : s32
 {
     swan_confirm_id_clear_recent_files,
     swan_confirm_id_delete_pin,
+    swan_confirm_id_explorer_execute_delete,
     swan_confirm_id_count
 };
