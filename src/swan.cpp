@@ -115,7 +115,7 @@ try {
                 print_debug_msg("[%s] save_to_disk: %d", expl.name, save_result);
             }
 
-            bool starting_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            auto [starting_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
             if (starting_dir_exists) {
                 expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());

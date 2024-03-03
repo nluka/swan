@@ -256,6 +256,11 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
             return set_init_error_and_notify(make_str("IFileOperation::SetOperationFlags, %s", _com_error(result).ErrorMessage()));
         }
 
+        explorer_file_op_progress_sink prog_sink;
+        prog_sink.contains_delete_operations = true;
+        prog_sink.dst_expl_id = -1;
+        prog_sink.dst_expl_cwd_when_operation_started = path_create("");
+
         // add items (IShellItem) for exec to IFileOperation
         {
             auto items_to_delete = std::wstring_view(paths_to_delete_utf16.data()) | std::ranges::views::split('\n');
@@ -264,7 +269,10 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
 
             full_path_to_delete_utf16.reserve((global_state::page_size() / 2) - 1);
 
+            u64 i = 0;
             for (auto item_utf16 : items_to_delete) {
+                SCOPE_EXIT { ++i; };
+
                 full_path_to_delete_utf16.clear();
                 full_path_to_delete_utf16.append(working_directory_utf16);
                 std::wstring_view view(item_utf16.begin(), item_utf16.end());
@@ -323,10 +331,11 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                 errors.pop_back(); // remove trailing '\n'
                 return set_init_error_and_notify(errors);
             }
+
+            bool compound_operation = i > 1;
+            prog_sink.group_id = compound_operation ? global_state::next_group_id() : 0;
         }
 
-        explorer_file_op_progress_sink prog_sink;
-        prog_sink.contains_delete_operations = true;
         DWORD cookie = {};
 
         result = file_op->Advise(&prog_sink, &cookie);
@@ -779,11 +788,13 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
     return first_filtered_dirent;
 }
 
-bool explorer_window::update_cwd_entries(
+explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
     update_cwd_entries_actions actions,
     std::string_view parent_dir,
     std::source_location sloc) noexcept
 {
+    update_cwd_entries_result retval = {};
+
     print_debug_msg("[ %d ] expl.update_cwd_entries(%d) called from [%s:%d]", this->id, actions, cget_file_name(sloc.file_name()), sloc.line());
 
     this->scroll_to_nth_selected_entry_next_frame = u64(-1);
@@ -791,7 +802,6 @@ bool explorer_window::update_cwd_entries(
     update_cwd_entries_timers timers = {};
     SCOPE_EXIT { this->update_cwd_entries_timing_samples.push_back(timers); };
 
-    bool parent_dir_exists = false; // retval
     char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
 
     {
@@ -837,7 +847,7 @@ bool explorer_window::update_cwd_entries(
                     char utf8_buffer[2048]; init_empty_cstr(utf8_buffer);
 
                     if (!utf16_to_utf8(search_path_utf16, utf8_buffer, lengthof(utf8_buffer))) {
-                        return parent_dir_exists;
+                        return retval;
                     }
 
                     print_debug_msg("[ %d ] querying filesystem, search_path = [%s]", this->id, utf8_buffer);
@@ -859,11 +869,9 @@ bool explorer_window::update_cwd_entries(
 
                 if (find_handle == INVALID_HANDLE_VALUE) {
                     print_debug_msg("[ %d ] find_handle == INVALID_HANDLE_VALUE", this->id);
-                    parent_dir_exists = false;
-                    return parent_dir_exists;
-                } else {
-                    parent_dir_exists = true;
+                    return retval;
                 }
+                retval.parent_dir_exists = true;
 
                 u32 entry_id = 0;
 
@@ -929,6 +937,7 @@ bool explorer_window::update_cwd_entries(
                             bool was_selected_before_refresh = path_equals_exactly(entry.basic.path, *prev_selected_entry);
                             if (was_selected_before_refresh) {
                                 entry.is_selected = true;
+                                retval.num_entries_selected += 1;
                                 std::swap(*prev_selected_entry, selected_entries.back());
                                 selected_entries.pop_back();
                                 break;
@@ -941,7 +950,6 @@ bool explorer_window::update_cwd_entries(
                             f64 search_us = 0;
                             scoped_timer<timer_unit::MICROSECONDS> search_timer(&search_us);
 
-                        #if 1
                             bool found = std::binary_search(select_cwd_entries_on_next_update.begin(), select_cwd_entries_on_next_update.end(), entry.basic.path);
                             if (found) {
                                 auto lower_it = std::lower_bound(select_cwd_entries_on_next_update.begin(), select_cwd_entries_on_next_update.end(), entry.basic.path);
@@ -949,17 +957,8 @@ bool explorer_window::update_cwd_entries(
                                 std::swap(*actual_found_thing, select_cwd_entries_on_next_update.back());
                                 select_cwd_entries_on_next_update.pop_back();
                                 entry.is_selected = true;
+                                retval.num_entries_selected += 1;
                             }
-                        #else
-                            for (auto entry_to_select = this->select_cwd_entries_on_next_update.begin(); entry_to_select != this->select_cwd_entries_on_next_update.end(); ++entry_to_select) {
-                                if (path_equals_exactly(*entry_to_select, entry.basic.path.data())) {
-                                    entry.is_selected = true;
-                                    std::swap(*entry_to_select, this->select_cwd_entries_on_next_update.back());
-                                    this->select_cwd_entries_on_next_update.pop_back();
-                                    break;
-                                }
-                            }
-                        #endif
 
                             timers.entries_to_select_search += search_us;
                         }
@@ -1061,7 +1060,7 @@ bool explorer_window::update_cwd_entries(
 
     this->frame_count_when_cwd_entries_updated = imgui::GetFrameCount();
 
-    return parent_dir_exists;
+    return retval;
 }
 
 bool explorer_window::save_to_disk() const noexcept
@@ -1275,7 +1274,7 @@ ascend_result try_ascend_directory(explorer_window &expl) noexcept
     // remove anything between end and final separator
     while (path_pop_back_if_not(res.parent_dir, dir_sep_utf8));
 
-    bool parent_dir_exists = expl.update_cwd_entries(query_filesystem, res.parent_dir.data());
+    auto [parent_dir_exists, _] = expl.update_cwd_entries(query_filesystem, res.parent_dir.data());
     res.success = parent_dir_exists;
     print_debug_msg("[ %d ] try_ascend_directory parent_dir=[%s] res.success=%d", expl.id, res.parent_dir.data(), res.success);
 
@@ -1351,7 +1350,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
         return res;
     }
 
-    bool cwd_exists = expl.update_cwd_entries(query_filesystem, new_cwd_canoncial_utf8.data());
+    auto [cwd_exists, _] = expl.update_cwd_entries(query_filesystem, new_cwd_canoncial_utf8.data());
 
     if (!cwd_exists) {
         print_debug_msg("[ %d ] target directory not found", expl.id);
@@ -1662,7 +1661,7 @@ void render_back_to_prev_valid_cwd_button(explorer_window &expl) noexcept
         }
 
         expl.cwd = expl.wd_history[expl.wd_history_pos];
-        bool back_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+        auto [back_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
         if (back_dir_exists) {
             expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
             (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -1689,7 +1688,7 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
         }
 
         expl.cwd = expl.wd_history[expl.wd_history_pos];
-        bool forward_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+        auto [forward_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
         if (forward_dir_exists) {
             expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
             (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -1818,7 +1817,7 @@ void render_pins_popup(explorer_window &expl) noexcept
                             make_str("Pin path [%s] does not exit.", pin.path.data()).c_str());
                     }
                     else {
-                        bool pin_is_valid_dir = expl.update_cwd_entries(query_filesystem, pin.path.data());
+                        auto [pin_is_valid_dir, _] = expl.update_cwd_entries(query_filesystem, pin.path.data());
                         if (pin_is_valid_dir) {
                             expl.cwd = pin.path;
                             expl.push_history_item(pin.path);
@@ -2000,7 +1999,7 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
                     expl.cwd = expl.latest_valid_cwd = path_create(root);
                     expl.set_latest_valid_cwd(expl.cwd);
                     expl.push_history_item(expl.cwd);
-                    bool drive_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                    auto [drive_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
                     if (drive_exists) {
                         (void) expl.update_cwd_entries(filter, expl.cwd.data());
                         (void) expl.save_to_disk();
@@ -2489,7 +2488,8 @@ void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, c
             expl.cwd = path_squish_adjacent_separators(cwd_input);
             path_force_separator(expl.cwd, dir_sep_utf8);
 
-            cwd_exists_after_edit = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            auto [cwd_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            cwd_exists_after_edit = cwd_exists;
 
             if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
                 if (path_is_empty(expl.latest_valid_cwd) || !path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
@@ -2606,7 +2606,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                     }
 
                     expl.cwd = expl.wd_history[expl.wd_history_pos];
-                    bool back_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                    auto [back_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
                     if (back_dir_exists) {
                         expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                         (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -2626,7 +2626,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                     }
 
                     expl.cwd = expl.wd_history[expl.wd_history_pos];
-                    bool forward_dir_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                    auto [forward_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
                     if (forward_dir_exists) {
                         expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                         (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -2686,8 +2686,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     // refresh logic start
     {
         auto refresh = [&](update_cwd_entries_actions actions, std::source_location sloc = std::source_location::current()) {
-            cwd_exists_before_edit = expl.update_cwd_entries(actions, expl.cwd.data(), sloc);
-            cwd_exists_after_edit = cwd_exists_before_edit;
+            auto [cwd_exists, _] = expl.update_cwd_entries(actions, expl.cwd.data(), sloc);
+            cwd_exists_before_edit = cwd_exists_after_edit = cwd_exists;
         };
 
         if (expl.update_request_from_outside != nil) {
@@ -2857,7 +2857,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
 
             if (history_item_clicked) {
-                bool history_item_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                auto [history_item_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
                 if (history_item_exists) {
                     expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                     (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -3212,7 +3212,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
         bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_after_edit, false);
 
         if (history_item_clicked) {
-            bool history_item_exists = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            auto [history_item_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
             if (history_item_exists) {
                 expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());

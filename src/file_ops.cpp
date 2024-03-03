@@ -8,11 +8,30 @@
 #undef max
 
 static std::mutex s_completed_file_ops_mutex = {};
-static circular_buffer<completed_file_operation> s_completed_file_ops(1000);
+static std::deque<completed_file_operation> s_completed_file_ops(1000);
 
-std::pair<circular_buffer<completed_file_operation> *, std::mutex *> global_state::completed_file_ops() noexcept
+std::pair<std::deque<completed_file_operation> *, std::mutex *> global_state::completed_file_ops() noexcept
 {
     return std::make_pair(&s_completed_file_ops, &s_completed_file_ops_mutex);
+}
+
+u32 global_state::next_group_id() noexcept
+{
+    u32 max_group_id = 0;
+
+    std::scoped_lock lock(s_completed_file_ops_mutex);
+
+    for (auto const &file_op : s_completed_file_ops) {
+        if (file_op.group_id > max_group_id) {
+            max_group_id = file_op.group_id;
+        }
+    }
+
+    if (max_group_id == std::numeric_limits<decltype(max_group_id)>::max()) {
+        return 1; // wrap around, skip 0 because it's a reserved value
+    } else {
+        return max_group_id + 1;
+    }
 }
 
 bool global_state::save_completed_file_ops_to_disk(std::scoped_lock<std::mutex> *supplied_lock) noexcept
@@ -42,6 +61,7 @@ try {
             out
                 << std::put_time(&tm_completion, "%Y-%m-%d %H:%M:%S") << ' '
                 << std::put_time(&tm_undo, "%Y-%m-%d %H:%M:%S") << ' '
+                << u32(file_op.group_id) << ' '
                 << char(file_op.op_type) << ' '
                 << s32(file_op.obj_type) << ' '
                 << path_length(file_op.src_path) << ' '
@@ -85,6 +105,7 @@ try {
     while (std::getline(in, line)) {
         std::istringstream iss(line);
 
+        u32 stored_group_id = 0;
         char stored_op_type = 0;
         s32 stored_obj_type = 0;
         u64 stored_src_path_len = 0;
@@ -100,6 +121,9 @@ try {
         std::tm tm_undo = {};
         iss >> std::get_time(&tm_undo, "%Y-%m-%d %H:%M:%S");
         system_time_point_t stored_time_undo = std::chrono::system_clock::from_time_t(std::mktime(&tm_undo));
+        iss.ignore(1);
+
+        iss >> stored_group_id;
         iss.ignore(1);
 
         iss >> stored_op_type;
@@ -122,14 +146,7 @@ try {
         path_force_separator(stored_src_path, dir_separator);
         path_force_separator(stored_dst_path, dir_separator);
 
-        completed_operations.push_back();
-        completed_operations.back().completion_time = stored_time_completion;
-        completed_operations.back().undo_time = stored_time_undo;
-        completed_operations.back().src_path = stored_src_path;
-        completed_operations.back().dst_path = stored_dst_path;
-        completed_operations.back().op_type = file_operation_type(stored_op_type);
-        completed_operations.back().obj_type = basic_dirent::kind(stored_obj_type);
-
+        completed_operations.emplace_back(stored_time_completion, file_operation_type(stored_op_type), stored_src_path.data(), stored_dst_path.data(), basic_dirent::kind(stored_obj_type), stored_group_id);
         ++num_loaded_successfully;
 
         line.clear();
@@ -152,8 +169,9 @@ completed_file_operation::completed_file_operation() noexcept // for boost::circ
 {
 }
 
-completed_file_operation::completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept // for boost::circular_buffer
+completed_file_operation::completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id) noexcept // for boost::circular_buffer
     : completion_time(completion_time)
+    , group_id(group_id)
     , src_path(path_create(src))
     , dst_path(path_create(dst))
     , op_type(op_type)
@@ -163,6 +181,8 @@ completed_file_operation::completed_file_operation(system_time_point_t completio
 
 completed_file_operation::completed_file_operation(completed_file_operation const &other) noexcept // for boost::circular_buffer
     : completion_time(other.completion_time)
+    , undo_time(other.undo_time)
+    , group_id(other.group_id)
     , src_path(other.src_path)
     , dst_path(other.dst_path)
     , op_type(other.op_type)
@@ -173,6 +193,8 @@ completed_file_operation::completed_file_operation(completed_file_operation cons
 completed_file_operation &completed_file_operation::operator=(completed_file_operation const &other) noexcept // for boost::circular_buffer
 {
     this->completion_time = other.completion_time;
+    this->undo_time = other.undo_time;
+    this->group_id = other.group_id;
     this->src_path = other.src_path;
     this->dst_path = other.dst_path;
     this->op_type = other.op_type;
@@ -434,7 +456,29 @@ void swan_windows::render_file_operations(bool &open) noexcept
         global_state::save_focused_window(swan_windows::file_operations);
     }
 
+    auto pair = global_state::completed_file_ops();
+    auto &completed_operations = *pair.first;
+    auto &mutex = *pair.second;
+
     [[maybe_unused]] auto &io = imgui::GetIO();
+
+    imgui::Text("%zu completed operations", completed_operations.size());
+    imgui::SameLine();
+    {
+        imgui::ScopedDisable d(completed_operations.empty());
+
+        if (imgui::SmallButton("Clear")) {
+            imgui::OpenConfirmationModalWithCallback(
+                swan_confirm_id_clear_completed_file_operations,
+                "Are you sure you want to clear your file operations history? This action cannot be undone.",
+                [&mutex, &completed_operations]() {
+                    std::scoped_lock lock(mutex);
+                    completed_operations.clear();
+                    (void) global_state::save_completed_file_ops_to_disk(&lock);
+                }
+            );
+        }
+    }
 
     enum file_ops_table_col : s32
     {
@@ -450,8 +494,11 @@ void swan_windows::render_file_operations(bool &open) noexcept
         ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|
         (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
     ) {
-        static completed_file_operation *right_clicked_row = nullptr;
-        u64 remove_idx = u64(-1);
+        static std::optional< std::deque<completed_file_operation>::iterator > elem_right_clicked_iter = std::nullopt;
+
+        std::deque<completed_file_operation>::iterator remove_single_it        = completed_operations.end();
+        std::deque<completed_file_operation>::iterator remove_group_begin_iter = completed_operations.end();
+        std::deque<completed_file_operation>::iterator remove_group_end_iter   = completed_operations.end();
 
         imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
@@ -459,10 +506,6 @@ void swan_windows::render_file_operations(bool &open) noexcept
         imgui::TableSetupColumn("Source Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
         imgui::TableSetupColumn("Destination Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dst_path);
         imgui::TableHeadersRow();
-
-        auto pair = global_state::completed_file_ops();
-        auto &completed_operations = *pair.first;
-        auto &mutex = *pair.second;
 
         std::scoped_lock completed_file_ops_lock(mutex);
 
@@ -476,6 +519,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
         while (clipper.Step())
         for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
             auto &file_op = completed_operations[i];
+            auto elem_iter = completed_operations.begin() + i;
 
             imgui::TableNextRow();
 
@@ -518,7 +562,8 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     imgui::SameLine();
 
                     auto when_undone_str = compute_when_str(file_op.undo_time, current_time_system());
-                    imgui::Text("Undone %s", when_undone_str.data());
+                    char const *verb = file_op.op_type == file_operation_type::del ? "Restored" : "Undone";
+                    imgui::Text("%s %s", verb, when_undone_str.data());
                 }
             }
 
@@ -529,7 +574,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 imgui::Selectable(buffer, &file_op.selected, ImGuiSelectableFlags_SpanAllColumns);
 
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                    right_clicked_row = &file_op;
+                    elem_right_clicked_iter = elem_iter;
                     imgui::OpenPopup("## completed_file_operations context");
                 }
             }
@@ -542,89 +587,158 @@ void swan_windows::render_file_operations(bool &open) noexcept
         }
 
         if (imgui::BeginPopup("## completed_file_operations context")) {
-            assert(right_clicked_row != nullptr);
+            assert(elem_right_clicked_iter.has_value());
+            assert(elem_right_clicked_iter.value() != completed_operations.end());
+            completed_file_operation &context_elem = *elem_right_clicked_iter.value();
 
-            auto reveal = [](swan_path_t const &full_path) noexcept {
-                explorer_window &expl = global_state::explorers()[0];
+            {
+                auto reveal = [](swan_path_t const &full_path) noexcept {
+                    explorer_window &expl = global_state::explorers()[0];
 
-                swan_path_t reveal_name_utf8 = path_create(cget_file_name(full_path.data()));
-                std::string_view path_no_name_utf8 = get_everything_minus_file_name(full_path.data());
+                    swan_path_t reveal_name_utf8 = path_create(cget_file_name(full_path.data()));
+                    std::string_view path_no_name_utf8 = get_everything_minus_file_name(full_path.data());
 
-                {
-                    std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
-                    expl.select_cwd_entries_on_next_update.clear();
-                    expl.select_cwd_entries_on_next_update.push_back(reveal_name_utf8);
-                }
-
-                expl.cwd = path_create(path_no_name_utf8.data(), path_no_name_utf8.size());
-                [[maybe_unused]] bool file_directory_exists = expl.update_cwd_entries(full_refresh, expl.cwd.data());
-
-                expl.scroll_to_nth_selected_entry_next_frame = 0;
-            };
-
-            if (right_clicked_row->op_type == file_operation_type::del && right_clicked_row->undone()) {
-                if (imgui::Selectable("Reveal source path (undo result) in Explorer 1")) {
-                    reveal(right_clicked_row->src_path);
-                }
-            }
-            else {
-                if (imgui::Selectable("Reveal destination path (result) in Explorer 1")) {
-                    reveal(right_clicked_row->dst_path);
-                }
-            }
-
-            if (!right_clicked_row->undone() && right_clicked_row->op_type == file_operation_type::del && imgui::Selectable("Undelete")) {
-                if (right_clicked_row->obj_type == basic_dirent::kind::directory) {
-                    swan_path_t restore_dir_utf8 = path_create(right_clicked_row->src_path.data(),
-                                                               get_everything_minus_file_name(right_clicked_row->src_path.data()).length());
-
-                    auto res = enqueue_undelete_directory(right_clicked_row->dst_path.data(), restore_dir_utf8.data(), right_clicked_row->src_path.data());
-
-                    if (!res.success) {
-                        std::string action = make_str("Undelete directory [%s].", right_clicked_row->src_path.data());
-                        swan_popup_modals::open_error(action.c_str(), res.error_or_utf8_path.c_str());
+                    expl.deselect_all_cwd_entries();
+                    {
+                        std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
+                        expl.select_cwd_entries_on_next_update.clear();
+                        expl.select_cwd_entries_on_next_update.push_back(reveal_name_utf8);
                     }
-                }
-                else {
-                    auto res = undelete_file(right_clicked_row->dst_path.data());
 
-                    if (res.success()) {
-                        right_clicked_row->undo_time = current_time_system();
-                        right_clicked_row->selected = false;
-                        (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                    swan_path_t containing_dir_utf8 = path_create(path_no_name_utf8.data(), path_no_name_utf8.size());
+                    auto [containing_dir_exists, num_selected] = expl.update_cwd_entries(full_refresh, containing_dir_utf8.data());
+
+                    if (!containing_dir_exists) {
+                        std::string action = make_str("Reveal [%s] in Explorer 1.", full_path.data());
+                        swan_popup_modals::open_error(action.c_str(), "Containing directory not found. It was renamed, moved or deleted after the operation was logged.");
+                        (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
+                    }
+                    else if (num_selected == 0) {
+                        std::string action = make_str("Reveal [%s] in Explorer 1.", full_path.data());
+                        swan_popup_modals::open_error(action.c_str(), "File or directory to be revealed was not found. It was renamed, moved, or deleted after the operation was logged.");
+                        (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
                     }
                     else {
-                        std::string action = make_str("Undelete file [%s].", right_clicked_row->src_path.data());
-                        std::string failure;
+                        expl.cwd              = containing_dir_utf8;
+                        expl.latest_valid_cwd = containing_dir_utf8;
+                        expl.scroll_to_nth_selected_entry_next_frame = 0;
+                        (void) expl.save_to_disk();
 
-                        if      (!res.step0_convert_hardlink_path_to_utf16) failure = make_str("Failed to convert hardlink path [%s] from UTF-8 to UTF-16.", right_clicked_row->dst_path.data());
-                        else if (!res.step1_metadata_file_opened          ) failure = make_str("Failed to open metadata file corresponding to [%s], %s", right_clicked_row->dst_path.data(), get_last_winapi_error().formatted_message.c_str());
-                        else if (!res.step2_metadata_file_read            ) failure = make_str("Failed to read contents of metadata file corresponding to [%s]", right_clicked_row->dst_path.data());
-                        else if (!res.step3_new_hardlink_created          ) failure = make_str("Failed to create hardlink [%s], %s", right_clicked_row->src_path.data(), get_last_winapi_error().formatted_message.c_str());
-                        else if (!res.step4_old_hardlink_deleted          ) failure = make_str("Failed to delete hardlink [%s], %s", right_clicked_row->dst_path.data(), get_last_winapi_error().formatted_message.c_str());
-                        else if (!res.step5_metadata_file_deleted         ) failure = make_str("Failed to delete metadata file corresponding to [%s], %s", right_clicked_row->dst_path.data(), get_last_winapi_error().formatted_message.c_str());
-                        else                                                assert(false && "Bad code path");
+                        global_state::settings().show.explorer_0 = true;
+                        (void) global_state::settings().save_to_disk();
+                    }
+                };
 
-                        swan_popup_modals::open_error(action.c_str(), failure.c_str());
+                if (context_elem.op_type == file_operation_type::del && context_elem.undone()) {
+                    if (imgui::Selectable("Reveal source path (undo result) in Explorer 1")) {
+                        reveal(context_elem.src_path);
+                    }
+                }
+                else if (!path_is_empty(context_elem.dst_path)) {
+                    if (imgui::Selectable("Reveal destination path (result) in Explorer 1")) {
+                        reveal(context_elem.dst_path);
+                    }
+                }
+            }
 
-                        if (res.step3_new_hardlink_created) {
-                            // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
-                            right_clicked_row->undo_time = current_time_system();
+            if (!context_elem.undone() && context_elem.op_type == file_operation_type::del && !path_is_empty(context_elem.dst_path)) {
+                if (imgui::Selectable("Undelete single")) {
+                    if (context_elem.obj_type == basic_dirent::kind::directory) {
+                        swan_path_t restore_dir_utf8 = path_create(context_elem.src_path.data(),
+                                                                   get_everything_minus_file_name(context_elem.src_path.data()).length());
+
+                        auto res = enqueue_undelete_directory(context_elem.dst_path.data(), restore_dir_utf8.data(), context_elem.src_path.data());
+
+                        if (!res.success) {
+                            std::string action = make_str("Undelete directory [%s].", context_elem.src_path.data());
+                            swan_popup_modals::open_error(action.c_str(), res.error_or_utf8_path.c_str());
+                        }
+                    }
+                    else {
+                        auto res = undelete_file(context_elem.dst_path.data());
+
+                        if (res.success()) {
+                            context_elem.undo_time = current_time_system();
+                            context_elem.selected = false;
                             (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                        }
+                        else {
+                            std::string action = make_str("Undelete file [%s].", context_elem.src_path.data());
+                            std::string failure;
+                            auto winapi_err = get_last_winapi_error().formatted_message.c_str();
+
+                            if      (!res.step0_convert_hardlink_path_to_utf16) failure = make_str("Failed to convert hardlink path [%s] from UTF-8 to UTF-16.", context_elem.dst_path.data());
+                            else if (!res.step1_metadata_file_opened          ) failure = make_str("Failed to open metadata file corresponding to [%s], %s", context_elem.dst_path.data(), winapi_err);
+                            else if (!res.step2_metadata_file_read            ) failure = make_str("Failed to read contents of metadata file corresponding to [%s]", context_elem.dst_path.data());
+                            else if (!res.step3_new_hardlink_created          ) failure = make_str("Failed to create hardlink [%s], %s The backup hardlink [%s] was probably deleted.", context_elem.src_path.data(), winapi_err, context_elem.dst_path.data());
+                            else if (!res.step4_old_hardlink_deleted          ) failure = make_str("Failed to delete hardlink [%s], %s", context_elem.dst_path.data(), winapi_err);
+                            else if (!res.step5_metadata_file_deleted         ) failure = make_str("Failed to delete metadata file corresponding to [%s], %s", context_elem.dst_path.data(), winapi_err);
+                            else                                                assert(false && "Bad code path");
+
+                            swan_popup_modals::open_error(action.c_str(), failure.c_str());
+
+                            if (res.step3_new_hardlink_created) {
+                                // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
+                                context_elem.undo_time = current_time_system();
+                                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                            }
                         }
                     }
                 }
+                // if (right_clicked_row->group_id != 0 && imgui::Selectable("Undelete group")) {
+
+                // }
             }
 
-            if (imgui::Selectable("Forget")) {
-                remove_idx = std::distance(&completed_operations.front(), right_clicked_row);
+            if (imgui::Selectable("Forget single")) {
+                remove_single_it = elem_right_clicked_iter.value();
+            }
+
+            if (imgui::Selectable("Forget selection")) {
+                u64 num_selected = std::count_if(completed_operations.begin(), completed_operations.end(),
+                                                    [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
+
+                if (num_selected > 0) {
+                    imgui::OpenConfirmationModalWithCallback(
+                        swan_confirm_id_clear_completed_file_operations,
+                        make_str("Are you sure you want to forget the %zu selected file operation(s)? This action cannot be undone.", num_selected).c_str(),
+                        [&mutex, &completed_operations]() noexcept {
+                            std::scoped_lock lock(mutex);
+
+                            completed_operations.erase(std::remove_if(completed_operations.begin(), completed_operations.end(),
+                                                                        [](completed_file_operation const &cfo) { return cfo.selected; }));
+
+                            for (auto &elem : completed_operations)
+                                elem.selected = false;
+
+                            (void) global_state::save_completed_file_ops_to_disk(&lock);
+                        }
+                    );
+                }
+            }
+
+            if (context_elem.group_id != 0 && imgui::Selectable("Forget group")) {
+                auto predicate_same_group = [&context_elem](completed_file_operation const &cfo) noexcept { return cfo.group_id == context_elem.group_id; };
+
+                remove_group_begin_iter = std::find_if    (completed_operations.begin(), completed_operations.end(), predicate_same_group);
+                remove_group_end_iter   = std::find_if_not(remove_group_begin_iter,      completed_operations.end(), predicate_same_group);
             }
 
             imgui::EndPopup();
         }
 
-        if (remove_idx != u64(-1)) {
-            completed_operations.erase(completed_operations.begin() + remove_idx);
+        if (remove_single_it != completed_operations.end()) {
+            completed_operations.erase(remove_single_it);
+            (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+        }
+        else if (remove_group_begin_iter != completed_operations.end()) {
+        #if 1
+            completed_operations.erase(remove_group_begin_iter, remove_group_end_iter);
+        #else
+            for (auto it = first; it != last; ++it) {
+                completed_operations.erase(it);
+            }
+        #endif
             (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
         }
 
@@ -839,6 +953,9 @@ void perform_file_operations(
             errors.pop_back(); // remove trailing '\n'
             return set_init_error_and_notify(errors);
         }
+
+        bool compound_operation = i > 1;
+        prog_sink.group_id = compound_operation ? global_state::next_group_id() : 0;
     }
 
     DWORD cookie = {};

@@ -183,7 +183,13 @@ struct explorer_window
     void reset_filter() noexcept;
     cwd_entries_column_sort_specs_t copy_column_sort_specs(ImGuiTableSortSpecs const *sort_specs) noexcept;
 
-    bool update_cwd_entries(
+    struct update_cwd_entries_result
+    {
+        bool parent_dir_exists;
+        u64 num_entries_selected;
+    };
+
+    update_cwd_entries_result update_cwd_entries(
         update_cwd_entries_actions actions,
         std::string_view parent_dir,
         std::source_location sloc = std::source_location::current()) noexcept;
@@ -343,7 +349,7 @@ struct completed_file_operation
 
     bool undone() noexcept { return undo_time != system_time_point_t(); }
 
-    completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type) noexcept;
+    completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id = 0) noexcept;
 
     completed_file_operation() noexcept; // for boost::circular_buffer
     completed_file_operation(completed_file_operation const &other) noexcept; // for boost::circular_buffer
@@ -352,6 +358,7 @@ struct completed_file_operation
 
 struct explorer_file_op_progress_sink : public IFileOperationProgressSink
 {
+    u32 group_id;
     s32 dst_expl_id;
     swan_path_t dst_expl_cwd_when_operation_started;
     bool contains_delete_operations;
@@ -517,5 +524,6 @@ enum swan_confirmation_id : s32
     swan_confirm_id_delete_pin,
     swan_confirm_id_explorer_execute_delete,
     swan_confirm_id_explorer_unpin_directory,
+    swan_confirm_id_clear_completed_file_operations,
     swan_confirm_id_count
 };

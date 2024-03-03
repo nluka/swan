@@ -269,10 +269,11 @@ void swan_windows::render_recent_files(bool &open) noexcept
                         expl.deselect_all_cwd_entries();
                         {
                             std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
+                            expl.select_cwd_entries_on_next_update.clear();
                             expl.select_cwd_entries_on_next_update.push_back(path_create(file_name));
                         }
 
-                        bool file_directory_exists = expl.update_cwd_entries(full_refresh, file_directory.data());
+                        auto [file_directory_exists, _] = expl.update_cwd_entries(full_refresh, file_directory.data());
 
                         if (!file_directory_exists) {
                             swan_popup_modals::open_error(make_str("Open file location [%s].", full_path).c_str(),

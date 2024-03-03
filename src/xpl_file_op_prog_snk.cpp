@@ -2,6 +2,15 @@
 #include "data_types.hpp"
 #include "imgui_specific.hpp"
 
+basic_dirent::kind derive_obj_type(DWORD attributes) noexcept
+{
+    if (attributes & SFGAO_LINK) {
+        return basic_dirent::kind::symlink_ambiguous;
+    } else {
+        return attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
+    }
+}
+
 HRESULT explorer_file_op_progress_sink::StartOperations() { print_debug_msg("explorer_file_op_progress_sink :: StartOperations"); return S_OK; }
 HRESULT explorer_file_op_progress_sink::PauseTimer()      { print_debug_msg("explorer_file_op_progress_sink :: PauseTimer");      return S_OK; }
 HRESULT explorer_file_op_progress_sink::ResetTimer()      { print_debug_msg("explorer_file_op_progress_sink :: ResetTimer");      return S_OK; }
@@ -90,17 +99,9 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
 
         std::scoped_lock lock(mutex);
 
-        completed_file_ops.push_front();
-        completed_file_ops.front().completion_time = current_time_system();
-        completed_file_ops.front().src_path = src_path_utf8;
-        completed_file_ops.front().dst_path = dst_path_utf8;
-        completed_file_ops.front().op_type = file_operation_type::move;
-
-        if (attributes & SFGAO_LINK) {
-            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
-        } else {
-            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
-        }
+        basic_dirent::kind obj_type = derive_obj_type(attributes);
+        auto completion_time = current_time_system();
+        completed_file_ops.emplace_front(completion_time, file_operation_type::move, src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 
     return S_OK;
@@ -155,17 +156,9 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
 
         std::scoped_lock lock(mutex);
 
-        completed_file_ops.push_front();
-        completed_file_ops.front().completion_time = current_time_system();
-        completed_file_ops.front().src_path = deleted_item_path_utf8;
-        completed_file_ops.front().dst_path = recycle_bin_item_path_utf8;
-        completed_file_ops.front().op_type = file_operation_type::del;
-
-        if (attributes & SFGAO_LINK) {
-            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
-        } else {
-            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
-        }
+        basic_dirent::kind obj_type = derive_obj_type(attributes);
+        auto completion_time = current_time_system();
+        completed_file_ops.emplace_front(completion_time, file_operation_type::del, deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
     }
 
     print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
@@ -227,17 +220,9 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
 
         std::scoped_lock lock(mutex);
 
-        completed_file_ops.push_front();
-        completed_file_ops.front().completion_time = current_time_system();
-        completed_file_ops.front().src_path = src_path_utf8;
-        completed_file_ops.front().dst_path = dst_path_utf8;
-        completed_file_ops.front().op_type = file_operation_type::copy;
-
-        if (attributes & SFGAO_LINK) {
-            completed_file_ops.front().obj_type = basic_dirent::kind::symlink_ambiguous;
-        } else {
-            completed_file_ops.front().obj_type = attributes & SFGAO_FOLDER ? basic_dirent::kind::directory : basic_dirent::kind::file;
-        }
+        basic_dirent::kind obj_type = derive_obj_type(attributes);
+        auto completion_time = current_time_system();
+        completed_file_ops.emplace_front(completion_time, file_operation_type::copy, src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 
     return S_OK;
