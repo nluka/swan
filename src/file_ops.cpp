@@ -4,8 +4,6 @@
 #include "imgui_specific.hpp"
 #include "path.hpp"
 
-#undef min
-#undef max
 
 static std::mutex s_completed_file_ops_mutex = {};
 static std::deque<completed_file_operation> s_completed_file_ops(1000);
@@ -314,7 +312,7 @@ void perform_undelete_directory(
     bool *init_done,
     std::string *init_error) noexcept
 {
-    auto set_init_error_and_notify = [&](std::string const &err) {
+    auto set_init_error_and_notify = [&](std::string const &err) noexcept {
         std::unique_lock lock(*init_done_mutex);
         *init_done = true;
         *init_error = err;
@@ -439,7 +437,7 @@ generic_result enqueue_undelete_directory(char const *directory_path_in_recycle_
 
     {
         std::unique_lock lock(initialization_done_mutex);
-        initialization_done_cond.wait(lock, [&]() { return initialization_done; });
+        initialization_done_cond.wait(lock, [&]() noexcept { return initialization_done; });
     }
 
     return { initialization_error.empty(), initialization_error };
@@ -469,13 +467,15 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
         if (imgui::SmallButton("Clear")) {
             imgui::OpenConfirmationModalWithCallback(
-                swan_confirm_id_clear_completed_file_operations,
-                "Are you sure you want to clear your file operations history? This action cannot be undone.",
-                [&mutex, &completed_operations]() {
+                swan_id_confirm_completed_file_operations_forget_all,
+                "Are you sure you want to delete your ENTIRE file operations history? This action cannot be undone.",
+                [&mutex, &completed_operations]() noexcept {
                     std::scoped_lock lock(mutex);
                     completed_operations.clear();
                     (void) global_state::save_completed_file_ops_to_disk(&lock);
-                }
+                    (void) global_state::settings().save_to_disk();
+                },
+                &global_state::settings().confirm_completed_file_operations_forget_all
             );
         }
     }
@@ -492,13 +492,11 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
     if (imgui::BeginTable("completed_file_operations", file_ops_table_col_count,
         ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|
-        (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
+        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
     ) {
         static std::optional< std::deque<completed_file_operation>::iterator > elem_right_clicked_iter = std::nullopt;
-
-        std::deque<completed_file_operation>::iterator remove_single_it        = completed_operations.end();
-        std::deque<completed_file_operation>::iterator remove_group_begin_iter = completed_operations.end();
-        std::deque<completed_file_operation>::iterator remove_group_end_iter   = completed_operations.end();
+        std::deque<completed_file_operation>::iterator remove_single_iter = completed_operations.end();
+        static u64 num_selected_when_context_menu_opened = 0;
 
         imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
@@ -574,8 +572,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 imgui::Selectable(buffer, &file_op.selected, ImGuiSelectableFlags_SpanAllColumns);
 
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                    elem_right_clicked_iter = elem_iter;
                     imgui::OpenPopup("## completed_file_operations context");
+                    elem_right_clicked_iter = elem_iter;
+                    num_selected_when_context_menu_opened = std::count_if(completed_operations.begin(), completed_operations.end(),
+                                                                          [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
                 }
             }
             imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_src_path, file_op.src_path.data());
@@ -585,6 +585,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
             imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_dst_path, file_op.dst_path.data());
         }
+
+        bool execute_forget_single_immediately = false;
+        bool execute_forget_group_immediately = false;
+        bool execute_forget_selection_immediately = false;
 
         if (imgui::BeginPopup("## completed_file_operations context")) {
             assert(elem_right_clicked_iter.has_value());
@@ -610,12 +614,14 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
                     if (!containing_dir_exists) {
                         std::string action = make_str("Reveal [%s] in Explorer 1.", full_path.data());
-                        swan_popup_modals::open_error(action.c_str(), "Containing directory not found. It was renamed, moved or deleted after the operation was logged.");
+                        char const *error = "Containing directory not found. It was renamed, moved or deleted after the operation was logged.";
+                        swan_popup_modals::open_error(action.c_str(), error);
                         (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
                     }
                     else if (num_selected == 0) {
                         std::string action = make_str("Reveal [%s] in Explorer 1.", full_path.data());
-                        swan_popup_modals::open_error(action.c_str(), "File or directory to be revealed was not found. It was renamed, moved, or deleted after the operation was logged.");
+                        char const *error = "File or directory to be revealed was not found. It was renamed, moved, or deleted after the operation was logged.";
+                        swan_popup_modals::open_error(action.c_str(), error);
                         (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
                     }
                     else {
@@ -691,55 +697,88 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
 
             if (imgui::Selectable("Forget single")) {
-                remove_single_it = elem_right_clicked_iter.value();
+                // remove_single_iter = elem_right_clicked_iter.value();
+
+                execute_forget_single_immediately = imgui::OpenConfirmationModal(
+                    swan_id_confirm_completed_file_operations_forget_single,
+                    "Are you sure you want to forget this single file operation? This action cannot be undone.",
+                    &global_state::settings().confirm_completed_file_operations_forget_single);
             }
 
-            if (imgui::Selectable("Forget selection")) {
-                u64 num_selected = std::count_if(completed_operations.begin(), completed_operations.end(),
-                                                    [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
+            if (num_selected_when_context_menu_opened > 0 && imgui::Selectable("Forget selection")) {
+                // u64 num_selected = std::count_if(completed_operations.begin(), completed_operations.end(),
+                //                                  [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
 
-                if (num_selected > 0) {
-                    imgui::OpenConfirmationModalWithCallback(
-                        swan_confirm_id_clear_completed_file_operations,
-                        make_str("Are you sure you want to forget the %zu selected file operation(s)? This action cannot be undone.", num_selected).c_str(),
-                        [&mutex, &completed_operations]() noexcept {
-                            std::scoped_lock lock(mutex);
-
-                            completed_operations.erase(std::remove_if(completed_operations.begin(), completed_operations.end(),
-                                                                        [](completed_file_operation const &cfo) { return cfo.selected; }));
-
-                            for (auto &elem : completed_operations)
-                                elem.selected = false;
-
-                            (void) global_state::save_completed_file_ops_to_disk(&lock);
-                        }
-                    );
-                }
+                // if (num_selected > 0) {
+                    execute_forget_selection_immediately = imgui::OpenConfirmationModal(
+                        swan_id_confirm_completed_file_operations_forget_selected,
+                        make_str("Are you sure you want to forget the %zu selected file operations? This action cannot be undone.", num_selected_when_context_menu_opened).c_str(),
+                        &global_state::settings().confirm_completed_file_operations_forget_selected);
+                // }
             }
 
             if (context_elem.group_id != 0 && imgui::Selectable("Forget group")) {
-                auto predicate_same_group = [&context_elem](completed_file_operation const &cfo) noexcept { return cfo.group_id == context_elem.group_id; };
-
-                remove_group_begin_iter = std::find_if    (completed_operations.begin(), completed_operations.end(), predicate_same_group);
-                remove_group_end_iter   = std::find_if_not(remove_group_begin_iter,      completed_operations.end(), predicate_same_group);
+                execute_forget_group_immediately = imgui::OpenConfirmationModal(
+                    swan_id_confirm_completed_file_operations_forget_group,
+                    "Are you sure you want to forget this group of file operations? This action cannot be undone.",
+                    &global_state::settings().confirm_completed_file_operations_forget_group);
             }
 
             imgui::EndPopup();
         }
-
-        if (remove_single_it != completed_operations.end()) {
-            completed_operations.erase(remove_single_it);
-            (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+        else {
+            num_selected_when_context_menu_opened = 0;
         }
-        else if (remove_group_begin_iter != completed_operations.end()) {
-        #if 1
-            completed_operations.erase(remove_group_begin_iter, remove_group_end_iter);
-        #else
-            for (auto it = first; it != last; ++it) {
-                completed_operations.erase(it);
+
+        {
+            auto status = imgui::GetConfirmationStatus(swan_id_confirm_completed_file_operations_forget_single);
+
+            if (execute_forget_single_immediately || status.value_or(false)) {
+                completed_operations.erase(elem_right_clicked_iter.value());
+
+                (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
+                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
             }
-        #endif
-            (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+        }
+
+        {
+            auto status = imgui::GetConfirmationStatus(swan_id_confirm_completed_file_operations_forget_group);
+
+            if (execute_forget_group_immediately || status.value_or(false)) {
+                // assert(elem_right_clicked_iter.has_value());
+                u32 group_id = elem_right_clicked_iter.value()->group_id;
+
+                auto predicate_same_group = [group_id](completed_file_operation const &cfo) noexcept { return cfo.group_id == group_id; };
+
+                auto remove_group_begin_iter = std::find_if    (completed_operations.begin(), completed_operations.end(), predicate_same_group);
+                auto remove_group_end_iter   = std::find_if_not(remove_group_begin_iter,      completed_operations.end(), predicate_same_group);
+
+                completed_operations.erase(remove_group_begin_iter, remove_group_end_iter);
+
+                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
+            }
+        }
+
+        {
+            auto status = imgui::GetConfirmationStatus(swan_id_confirm_completed_file_operations_forget_selected);
+
+            if (execute_forget_selection_immediately || status.value_or(false)) {
+                auto not_selected_end_iter = std::remove_if(completed_operations.begin(), completed_operations.end(),
+                                                            [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
+
+                completed_operations.erase(not_selected_end_iter, completed_operations.end());
+
+                // perplexingly, the unremoved elements (who were not selected prior) become selected after .erase(),
+                // hence this seemingly unnecessary operation. I suspect it has something to do with imgui::Selectable,
+                // but I don't have the time or will to go figure out the root case so I'm just going to fix it here.
+                // let the runtime parallelize it too, in hopes that for large containers it will be faster.
+                std::for_each(std::execution::par_unseq, completed_operations.begin(), completed_operations.end(),
+                              [](completed_file_operation &cfo) noexcept { cfo.selected = false; });
+
+                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
+            }
         }
 
         imgui::EndTable();
@@ -798,7 +837,7 @@ void perform_file_operations(
 
     std::replace(destination_directory_utf16.begin(), destination_directory_utf16.end(), L'/', L'\\');
 
-    auto set_init_error_and_notify = [&](std::string const &err) {
+    auto set_init_error_and_notify = [&](std::string const &err) noexcept {
         std::unique_lock lock(*init_done_mutex);
         *init_done = true;
         *init_error = err;

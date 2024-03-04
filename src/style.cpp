@@ -38,6 +38,7 @@ void apply_swan_style_overrides() noexcept
     style.SeparatorTextBorderSize = 0;
     style.ScrollbarRounding       = 0;
     style.FrameRounding           = 2;
+    style.TabRounding             = 0;
 
     style.Colors[ImGuiCol_FrameBg] = imgui::RGBA_to_ImVec4(35,40,45, 255);
     style.Colors[ImGuiCol_FrameBg] = imgui::RGBA_to_ImVec4(35,40,45, 255);

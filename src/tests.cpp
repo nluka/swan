@@ -348,7 +348,7 @@ try
     // bool squish_adjacent_spaces = false;
     swan_path_t after = {};
 
-    auto assert_failed_compile = [](char const *pattern, char const *expected_error, std::source_location sloc = std::source_location::current()) {
+    auto assert_failed_compile = [](char const *pattern, char const *expected_error, std::source_location sloc = std::source_location::current()) noexcept {
       auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, false);
       ntest::assert_bool(false, success, sloc);
       ntest::assert_cstr(expected_error, err_msg.data(), ntest::default_str_opts(), sloc);
@@ -379,7 +379,7 @@ try
       char const *expected_after;
     };
 
-    auto assert_successful_compile_and_transform = [](compile_and_transform_test_args args, std::source_location sloc = std::source_location::current()) {
+    auto assert_successful_compile_and_transform = [](compile_and_transform_test_args args, std::source_location sloc = std::source_location::current()) noexcept {
       auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(args.pattern, args.squish_adjacent_spaces);
       ntest::assert_bool(true, success_compile, sloc);
       ntest::assert_cstr("", err_msg_compile.data(), ntest::default_str_opts(), sloc);
@@ -461,7 +461,7 @@ try
                                               .pattern="<0,10> asdf", .size={}, .counter={}, .squish_adjacent_spaces=true,
                                               .expected_after="01-01-2023 asdf" });
 
-    auto assert_successful_compile_but_failed_transform = [](compile_and_transform_test_args args, std::source_location sloc = std::source_location::current()) {
+    auto assert_successful_compile_but_failed_transform = [](compile_and_transform_test_args args, std::source_location sloc = std::source_location::current()) noexcept {
       // using args.expected_after for expected error
 
       auto const [success_compile, compiled, err_msg_compile] = bulk_rename_compile_pattern(args.pattern, args.squish_adjacent_spaces);
@@ -913,7 +913,7 @@ try
 
   // ntest report output
   {
-    auto const res = ntest::generate_report("swan_tests", [](ntest::assertion const &a, bool const passed) {
+    auto const res = ntest::generate_report("swan_tests", [](ntest::assertion const &a, bool const passed) noexcept {
       if (!passed)
         printf(FG_RED, "failed: %s:%zu\n", a.loc.file_name(), a.loc.line());
     });

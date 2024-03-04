@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <boost/archive/xml_iarchive.hpp>
+#include <boost/archive/xml_oarchive.hpp>
 #include <boost/circular_buffer.hpp>
 #include <boost/container/static_vector.hpp>
 #include <boost/stacktrace.hpp>
@@ -14,6 +16,7 @@
 #include <comdef.h>
 #include <cstring>
 #include <dbghelp.h>
+#include <execution>
 #include <fileapi.h>
 #include <filesystem>
 #include <fstream>
@@ -39,6 +42,9 @@
 #include <vector>
 #include <windows.h>
 
+#undef min
+#undef max
+
 #define IMGUI_DEFINE_MATH_OPERATORS 1
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
@@ -60,6 +66,7 @@
 namespace imgui = ImGui;
 
 #include "primitives.hpp"
+
 #include "libs/thread_pool.hpp"
 #include "libs/on_scope_exit.hpp"
 #include "libs/on_scope_exit_2.hpp"

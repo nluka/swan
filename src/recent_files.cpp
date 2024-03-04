@@ -4,8 +4,6 @@
 #include "imgui_specific.hpp"
 #include "path.hpp"
 
-#undef min
-#undef max
 
 static circular_buffer<recent_file> s_recent_files = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
 static std::mutex s_recent_files_mutex = {};
@@ -164,11 +162,11 @@ void swan_windows::render_recent_files(bool &open) noexcept
         imgui::ScopedDisable d(s_recent_files.empty());
 
         if (imgui::Button("Clear##recent_files")) {
-            imgui::OpenConfirmationModal(swan_confirm_id_clear_recent_files, "Are you sure you want to clear your recent files? "
+            imgui::OpenConfirmationModal(swan_id_confirm_clear_recent_files, "Are you sure you want to clear your recent files? "
                                                                              "This action cannot be undone.");
         }
 
-        auto status = imgui::GetConfirmationStatus(swan_confirm_id_clear_recent_files);
+        auto status = imgui::GetConfirmationStatus(swan_id_confirm_clear_recent_files);
 
         if (status.value_or(false)) {
             std::scoped_lock lock(s_recent_files_mutex);
@@ -191,7 +189,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
     if (imgui::BeginTable("recent_files", 4,
         ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|ImGuiTableFlags_Hideable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Resizable|
-        (global_state::settings().cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)))
+        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)))
     {
         imgui::TableSetupColumn("#");
         imgui::TableSetupColumn("When");

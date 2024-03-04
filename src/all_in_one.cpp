@@ -12,6 +12,7 @@
 #include "file_ops.cpp"
 #include "focused_wndw.cpp"
 #include "icon_browser.cpp"
+#include "icon_library.cpp"
 #include "icons.cpp"
 #include "imgui_ext.cpp"
 #include "imgui_specific.cpp"

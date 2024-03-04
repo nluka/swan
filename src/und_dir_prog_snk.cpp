@@ -40,8 +40,9 @@ HRESULT undelete_directory_progress_sink::FinishOperations(HRESULT)
 
         std::scoped_lock lock(mutex);
 
-        auto found = std::find_if(completed_file_ops.begin(), completed_file_ops.end(),
-                                  [&](completed_file_operation const &cfo) { return path_equals_exactly(cfo.src_path, this->destination_full_path_utf8); });
+        auto found = std::find_if(completed_file_ops.begin(), completed_file_ops.end(), [&](completed_file_operation const &cfo) noexcept {
+            return path_equals_exactly(cfo.src_path, this->destination_full_path_utf8);
+        });
 
         if (found != completed_file_ops.end()) {
             found->undo_time = current_time_system();

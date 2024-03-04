@@ -116,10 +116,10 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
                     return result;
                 }
 
-                auto expr_equals = [&](char const *known_expr) {
+                auto expr_equals = [&](char const *known_expr) noexcept {
                     return StrCmpNIA(expr, known_expr, (s32)expr_len) == 0;
                 };
-                auto expr_begins_with = [&](char const *text) {
+                auto expr_begins_with = [&](char const *text) noexcept {
                     return StrCmpNIA(expr, text, (s32)strlen(text)) == 0;
                 };
 
@@ -402,7 +402,7 @@ void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> 
     //  [0,0,1,5,5,2] -> [5,5,0,0,2,1]
     // (I couldn't figure out how to do it in ascending order... descending will do.)
 
-    std::stable_sort(renames.begin(), renames.end(), [&](bulk_rename_op const &a, bulk_rename_op const &b) {
+    std::stable_sort(renames.begin(), renames.end(), [&](bulk_rename_op const &a, bulk_rename_op const &b) noexcept {
         s32 cmp = strcmp(a.after.data(), b.after.data());
         if (cmp == 0) {
             return false;
@@ -448,7 +448,7 @@ bulk_rename_find_collisions_result bulk_rename_find_collisions(
         return nullptr;
     };
 
-    auto adj_begin = std::adjacent_find(renames.begin(), renames.end(), [](bulk_rename_op const &r0, bulk_rename_op const &r1) {
+    auto adj_begin = std::adjacent_find(renames.begin(), renames.end(), [](bulk_rename_op const &r0, bulk_rename_op const &r1) noexcept {
         return path_equals_exactly(r0.after, r1.after);
     });
 

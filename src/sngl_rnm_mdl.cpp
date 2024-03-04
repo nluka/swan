@@ -46,7 +46,7 @@ void swan_popup_modals::render_single_rename() noexcept
     static swan_path_t new_name_utf8 = {};
     static std::string err_msg = {};
 
-    auto cleanup_and_close_popup = [&]() {
+    auto cleanup_and_close_popup = [&]() noexcept {
         s_single_rename_open = false;
         s_single_rename_expl = nullptr;
         s_single_rename_entry_to_be_renamed = nullptr;
@@ -58,7 +58,7 @@ void swan_popup_modals::render_single_rename() noexcept
         imgui::CloseCurrentPopup();
     };
 
-    auto attempt_rename = [&]() {
+    auto attempt_rename = [&]() noexcept {
         wchar_t buffer_cwd_utf16[MAX_PATH] = {};
         wchar_t buffer_old_name_utf16[MAX_PATH] = {};
         wchar_t buffer_new_name_utf16[MAX_PATH] = {};

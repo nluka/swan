@@ -19,11 +19,11 @@ namespace ImGui
 
     void RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, char const *tooltip_content = nullptr) noexcept;
 
-    void OpenConfirmationModal(s32 confirmation_id, char const *message                     ) noexcept;
-    void OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn) noexcept;
+    bool OpenConfirmationModal(s32 confirmation_id, char const *             content_message, bool *confirmation_enabled = nullptr) noexcept;
+    bool OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn, bool *confirmation_enabled = nullptr) noexcept;
 
-    void OpenConfirmationModalWithCallback(s32 confirmation_id, char const *message,                      std::function<void ()> callback) noexcept;
-    void OpenConfirmationModalWithCallback(s32 confirmation_id, std::function<void ()> content_render_fn, std::function<void ()> callback) noexcept;
+    void OpenConfirmationModalWithCallback(s32 confirmation_id, char const *             content_message, std::function<void ()> on_yes_callback, bool *confirmation_enabled = nullptr) noexcept;
+    void OpenConfirmationModalWithCallback(s32 confirmation_id, std::function<void ()> content_render_fn, std::function<void ()> on_yes_callback, bool *confirmation_enabled = nullptr) noexcept;
 
     std::optional<bool> GetConfirmationStatus(s32 confirmation_id) noexcept;
 
@@ -48,7 +48,7 @@ namespace ImGui
         ScopedAvailWidth(f32 subtract_amt = 0) noexcept
         {
             f32 avail_width = ImGui::GetContentRegionAvail().x;
-            ImGui::PushItemWidth(max(avail_width - subtract_amt, 0.f));
+            ImGui::PushItemWidth(std::max(avail_width - subtract_amt, 0.f));
         }
         ~ScopedAvailWidth() noexcept { ImGui::PopItemWidth(); }
     };

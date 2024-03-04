@@ -554,7 +554,7 @@ std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
 
     // for some reason, SHFormatDateTimeA will pad parts of the string with ASCII 63 (?)
     // when using LONGDATE or LONGTIME, we are discarding them
-    std::copy_if(buffer_raw.begin(), buffer_raw.end(), buffer_final.begin(), [](char ch) { return ch != '?'; });
+    std::copy_if(buffer_raw.begin(), buffer_raw.end(), buffer_final.begin(), [](char ch) noexcept { return ch != '?'; });
 
     // std::replace(buffer_final.begin(), buffer_final.end(), '-', ' ');
 

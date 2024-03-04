@@ -1,84 +1,130 @@
 #include "imgui_ext.hpp"
 
-#undef min
-#undef max
-
-static s32 s_current_confirm_id = -1;
-static std::variant<std::string, std::function<void ()>> s_confirmation_content = "";
-static std::optional<bool> s_confirmation_response = std::nullopt;
-static std::function<void ()> s_on_ok_callback = nullptr;
+namespace imgui_confirmation_global_state
+{
+    static s32 g_active_id = -1;
+    static std::variant<std::string, std::function<void ()>> g_content = "";
+    static std::optional<bool> g_response = std::nullopt;
+    static std::function<void ()> g_on_yes_callback = nullptr;
+    static bool *g_confirmation_enabled = nullptr;
+}
 
 bool imgui::HaveActiveConfirmationModal() noexcept
 {
-    return s_current_confirm_id != -1;
+    using namespace imgui_confirmation_global_state;
+
+    return g_active_id != -1;
 }
 
-void imgui::OpenConfirmationModal(s32 confirmation_id, char const *message) noexcept
+bool imgui::OpenConfirmationModal(s32 confirmation_id, char const *content_message, bool *confirmation_enabled) noexcept
 {
-    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
-    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+    using namespace imgui_confirmation_global_state;
+
+    assert(g_active_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(g_active_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
 
     assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
-    assert(message != nullptr && "Don't pass `message` == nullptr to " __FUNCTIONW__);
+    assert(content_message != nullptr && "Don't pass `content_message` == nullptr to " __FUNCTIONW__);
 
-    s_current_confirm_id = confirmation_id;
-    s_confirmation_content = message;
-    s_confirmation_response = std::nullopt;
+    if (*confirmation_enabled == false) {
+        // don't setup the modal for rendering and tell caller to execute operation immediately
+        return true;
+    }
+    else {
+        g_active_id = confirmation_id;
+        g_content = content_message;
+        g_response = std::nullopt;
+        g_confirmation_enabled = confirmation_enabled;
+        return false;
+    }
 }
 
-void imgui::OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn) noexcept
+bool imgui::OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn, bool *confirmation_enabled) noexcept
 {
-    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
-    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+    using namespace imgui_confirmation_global_state;
+
+    assert(g_active_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(g_active_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
 
     assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
     assert(content_render_fn != nullptr && "Don't pass `content_render_fn` == nullptr to " __FUNCTIONW__);
 
-    s_current_confirm_id = confirmation_id;
-    s_confirmation_content = content_render_fn;
-    s_confirmation_response = std::nullopt;
+    if (confirmation_enabled != nullptr && *confirmation_enabled == false) {
+        // don't setup the modal for rendering and tell caller to execute operation immediately
+        return true;
+    }
+    else {
+        g_active_id = confirmation_id;
+        g_content = content_render_fn;
+        g_response = std::nullopt;
+        g_confirmation_enabled = confirmation_enabled;
+        return false;
+    }
 }
 
-void imgui::OpenConfirmationModalWithCallback(s32 confirmation_id, char const *message, std::function<void ()> callback) noexcept
+void imgui::OpenConfirmationModalWithCallback(s32 confirmation_id, char const *content_message, std::function<void ()> on_yes_callback, bool *confirmation_enabled) noexcept
 {
-    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
-    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+    using namespace imgui_confirmation_global_state;
+
+    assert(g_active_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(g_active_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
 
     assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
-    assert(message != nullptr && "Don't pass `message` == nullptr to " __FUNCTIONW__);
-    assert(callback != nullptr && "Don't pass `callback` == nullptr to " __FUNCTIONW__);
+    assert(content_message != nullptr && "Don't pass `content_message` == nullptr to " __FUNCTIONW__);
+    assert(on_yes_callback != nullptr && "Don't pass `on_yes_callback` == nullptr to " __FUNCTIONW__);
 
-    s_current_confirm_id = confirmation_id;
-    s_confirmation_content = message;
-    s_confirmation_response = std::nullopt;
-    s_on_ok_callback = callback;
+    if (confirmation_enabled != nullptr && *confirmation_enabled == false) {
+        // don't setup the modal for rendering and execute operation immediately
+        on_yes_callback();
+    } else {
+        g_active_id = confirmation_id;
+        g_content = content_message;
+        g_response = std::nullopt;
+        g_on_yes_callback = on_yes_callback;
+        g_confirmation_enabled = confirmation_enabled;
+    }
 }
 
-void imgui::OpenConfirmationModalWithCallback(s32 confirmation_id, std::function<void ()> content_render_fn, std::function<void ()> callback) noexcept
+void imgui::OpenConfirmationModalWithCallback(
+    s32 confirmation_id,
+    std::function<void ()> content_render_fn,
+    std::function<void ()> on_yes_callback,
+    bool *confirmation_enabled) noexcept
 {
-    assert(s_current_confirm_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
-    assert(s_current_confirm_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
+    using namespace imgui_confirmation_global_state;
+
+    assert(g_active_id == -1 && "Don't call " __FUNCTIONW__ " when there is already an active modal");
+    assert(g_active_id != confirmation_id && "Don't call " __FUNCTIONW__ " repeatedly for the same confirmation_id");
 
     assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
-    assert(content_render_fn != nullptr && "Don't pass `content_render_fn` == nullptr to OpenConfirmationModal");
-    assert(callback != nullptr && "Don't pass `callback` == nullptr to " __FUNCTIONW__);
+    assert(content_render_fn != nullptr && "Don't pass `content_render_fn` == nullptr to " __FUNCTIONW__);
+    assert(on_yes_callback != nullptr && "Don't pass `on_yes_callback` == nullptr to " __FUNCTIONW__);
 
-    s_current_confirm_id = confirmation_id;
-    s_confirmation_content = content_render_fn;
-    s_confirmation_response = std::nullopt;
-    s_on_ok_callback = callback;
+    if (confirmation_enabled != nullptr && *confirmation_enabled == false) {
+        // don't setup the modal for rendering and execute operation immediately
+        on_yes_callback();
+    } else {
+        g_active_id = confirmation_id;
+        g_content = content_render_fn;
+        g_response = std::nullopt;
+        g_on_yes_callback = on_yes_callback;
+        g_confirmation_enabled = confirmation_enabled;
+    }
 }
 
 std::optional<bool> imgui::GetConfirmationStatus(s32 confirmation_id) noexcept
 {
-    if (confirmation_id != s_current_confirm_id) {
+    using namespace imgui_confirmation_global_state;
+
+    if (confirmation_id != g_active_id) {
         return std::nullopt;
     } else {
-        auto retval = s_confirmation_response;
+        auto retval = g_response;
         if (retval.has_value()) {
-            s_current_confirm_id = -1;
-            s_confirmation_content = "";
-            s_confirmation_response = std::nullopt;
+            g_active_id = -1;
+            g_content = "";
+            g_response = std::nullopt;
+            g_confirmation_enabled = nullptr;
         }
         return retval;
     }
@@ -86,7 +132,9 @@ std::optional<bool> imgui::GetConfirmationStatus(s32 confirmation_id) noexcept
 
 void imgui::RenderConfirmationModal() noexcept
 {
-    if (s_current_confirm_id == -1) {
+    using namespace imgui_confirmation_global_state;
+
+    if (!HaveActiveConfirmationModal()) {
         return;
     }
 
@@ -96,40 +144,41 @@ void imgui::RenderConfirmationModal() noexcept
 
     if (imgui::BeginPopupModal("Confirm ## RenderConfirmationModal", 0, ImGuiWindowFlags_NoResize)) {
         auto cleanup_and_close_popup = []() noexcept {
-            if (s_on_ok_callback != nullptr) {
-                s_on_ok_callback = nullptr;
-                s_current_confirm_id = -1;
-                s_confirmation_content = "";
-                s_confirmation_response = std::nullopt;
+            if (g_on_yes_callback != nullptr) {
+                g_on_yes_callback = nullptr;
+                g_active_id = -1;
+                g_content = "";
+                g_response = std::nullopt;
+                g_confirmation_enabled = nullptr;
             } else {
                 //? defer cleanup to GetConfirmationStatus
-                // s_current_confirm_id = -1;
-                // s_confirmation_content = "";
-                // s_confirmation_response = std::nullopt;
+                // g_active_id = -1;
+                // g_content = "";
+                // g_response = std::nullopt;
             }
         };
 
-        if (std::holds_alternative<std::string>(s_confirmation_content)) {
-            imgui::TextWrapped(std::get<std::string>(s_confirmation_content).c_str());
+        if (std::holds_alternative<std::string>(g_content)) {
+            imgui::TextWrapped(std::get<std::string>(g_content).c_str());
         } else {
-            auto user_defined_fn = std::get<std::function<void ()>>(s_confirmation_content);
-            user_defined_fn();
+            auto user_defined_render_fn = std::get<std::function<void ()>>(g_content);
+            user_defined_render_fn();
         }
 
         imgui::Spacing();
 
-        if (imgui::Button("OK")) {
-            s_confirmation_response = true;
-            if (s_on_ok_callback != nullptr) {
-                s_on_ok_callback();
+        if (imgui::Button("Yes")) {
+            g_response = true;
+            if (g_on_yes_callback != nullptr) {
+                g_on_yes_callback();
             }
             cleanup_and_close_popup();
         }
 
         imgui::SameLine();
 
-        if (imgui::Button("Cancel")) {
-            s_confirmation_response = false;
+        if (imgui::Button("No")) {
+            g_response = false;
             cleanup_and_close_popup();
         }
 
@@ -137,16 +186,22 @@ void imgui::RenderConfirmationModal() noexcept
 
         imgui::TextUnformatted("(?)");
         if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("[Enter]   OK\n"
-                              "[Escape]  Cancel");
+            imgui::SetTooltip("[Enter]   Yes\n"
+                              "[Escape]  No");
+        }
+
+        imgui::SameLineSpaced(1);
+
+        if (g_confirmation_enabled != nullptr) {
+            imgui::Checkbox("Ask for this operation", g_confirmation_enabled);
         }
 
         if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
-            s_confirmation_response = false;
+            g_response = false;
             cleanup_and_close_popup();
         }
         if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
-            s_confirmation_response = true;
+            g_response = true;
             cleanup_and_close_popup();
         }
 
@@ -181,12 +236,8 @@ void imgui::RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char co
 {
     // if hovering the path with at least 1 character's worth of content truncated, display full path as tooltip
     if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && imgui::TableGetHoveredColumn() == table_column_index) {
-        // auto const &style = imgui::GetStyle();
-
         f32 text_width = imgui::CalcTextSize(possibly_truncated_text).x;
         f32 column_width = imgui::GetColumnWidth(table_column_index);
-        // f32 space_width = imgui::CalcTextSize(" ").x;
-        // f32 total_content_width = text_width + style.ItemSpacing.x; // + (style.CellPadding.x * 2);
 
         if (text_width > column_width) {
             tooltip_content = tooltip_content ? tooltip_content : possibly_truncated_text;

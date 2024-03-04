@@ -35,14 +35,14 @@ void swan_windows::render_icon_font_browser(
         }
         else {
             for (auto const &icon : get_all_icons()) {
-                char name_buf[256];
-                (void) strncpy(name_buf, icon.name, lengthof(name_buf));
+                char icon_name_copy[256];
+                (void) strncpy(icon_name_copy, icon.name, lengthof(icon_name_copy));
 
-                char *name = name_buf + strlen(icon_prefix) - 1;
+                char *icon_name_no_prefix = icon_name_copy + strlen(icon_prefix) - 1;
 
                 boost::container::static_vector<char const *, 16> words = {};
                 {
-                    char const *word = strtok(name, "_");
+                    char const *word = strtok(icon_name_no_prefix, "_");
                     while (word != nullptr) {
                         words.push_back(word);
                         word = strtok(nullptr, "_");
@@ -50,7 +50,7 @@ void swan_windows::render_icon_font_browser(
                 }
 
                 bool any_words_matched = std::any_of(words.begin(), words.end(),
-                    [&](char const *word) { return StrCmpIA(word, browser.search_input) == 0; });
+                    [&](char const *word) noexcept { return StrCmpIA(word, browser.search_input) == 0; });
 
                 if (any_words_matched) {
                     browser.matches.push_back(icon);

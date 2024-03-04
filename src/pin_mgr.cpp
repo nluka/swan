@@ -27,9 +27,9 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
     static bool edit_enabled = false;
     static bool numbered_list = false;
 
-    if (imgui::Begin(swan_windows::get_name(swan_windows::pin_manager), &open)) {
+    if (imgui::Begin(swan_windows::get_name(swan_windows::pinned), &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::save_focused_window(swan_windows::pin_manager);
+            global_state::save_focused_window(swan_windows::pinned);
         }
 
         if (imgui::Button(ICON_CI_SYMBOL_NUMBER "##Numbered List")) {
@@ -75,14 +75,14 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                     (void) snprintf(buffer, lengthof(buffer), ICON_CI_TRASH "##pin%zu", i);
 
                     if (imgui::SmallButton(buffer)) {
-                        imgui::OpenConfirmationModal(swan_confirm_id_delete_pin, [&pin]() {
+                        imgui::OpenConfirmationModal(swan_id_confirm_delete_pin, [&pin]() noexcept {
                             imgui::TextUnformatted("Are you sure you want to delete the following pin?");
                             imgui::TextColored(pin.color, pin.label.c_str());
                             imgui::TextUnformatted("This action cannot be undone.");
                         });
                     }
 
-                    auto status = imgui::GetConfirmationStatus(swan_confirm_id_delete_pin);
+                    auto status = imgui::GetConfirmationStatus(swan_id_confirm_delete_pin);
 
                     if (status.value_or(false)) {
                         pin_to_delete_idx = i;
@@ -149,20 +149,18 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                 swan_popup_modals::open_edit_pin(context_target);
             }
             if (imgui::Selectable("Delete")) {
-                imgui::OpenConfirmationModal(swan_confirm_id_delete_pin, []() {
+                imgui::OpenConfirmationModal(swan_id_confirm_delete_pin, []() noexcept {
                     imgui::TextUnformatted("Are you sure you want to delete the following pin?");
                     imgui::TextColored(context_target->color, context_target->label.c_str());
                     imgui::TextUnformatted("This action cannot be undone.");
                 });
-                // imgui::OpenConfirmationModal(swan_confirm_id_delete_pin, make_str( "Are you sure you want to delete pin [%s]? "
-                //                                                                    "This action cannot be undone.", context_target->label.c_str() ).c_str());
             }
             imgui::TextUnformatted("(drag to reorder)");
 
             imgui::EndPopup();
         }
 
-        auto status = imgui::GetConfirmationStatus(swan_confirm_id_delete_pin);
+        auto status = imgui::GetConfirmationStatus(swan_id_confirm_delete_pin);
 
         if (status.value_or(false)) {
             pin_to_delete_idx = std::distance(&*pins.begin(), context_target);

@@ -1,8 +1,6 @@
 #include "stdafx.hpp"
 #include "path.hpp"
 
-#undef min
-#undef max
 
 swan_path_t path_create(char const *data, u64 count) noexcept
 {
@@ -204,11 +202,11 @@ bool path_loosely_same(char const *p1, char const *p2, u64 p1_len, u64 p2_len) n
         if (p1_len > p2_len) { // p1 is longer one
             all_rest_are_separators = std::all_of(p1 + p1_len - len_diff,
                                                   p1 + p1_len,
-                                                  [](char ch) { return strchr("\\/", ch); });
+                                                  [](char ch) noexcept { return strchr("\\/", ch); });
         } else { // p2 is longer one
             all_rest_are_separators = std::all_of(p2 + p2_len - len_diff,
                                                   p2 + p2_len,
-                                                  [](char ch) { return strchr("\\/", ch); });
+                                                  [](char ch) noexcept { return strchr("\\/", ch); });
         }
 
         return same_beginning && all_rest_are_separators;

@@ -71,18 +71,17 @@ namespace swan_windows
         explorer_1,
         explorer_2,
         explorer_3,
-        pin_manager,
+        pinned,
         file_operations,
         recent_files,
         analytics,
         debug_log,
         settings,
-    #if DEBUG_MODE
+        icon_library,
         icon_font_browser_font_awesome,
         icon_font_browser_codicon,
         icon_font_browser_material_design,
         imgui_demo,
-    #endif
         count
     };
 
@@ -93,18 +92,17 @@ namespace swan_windows
             case explorer_1: return " Explorer 2 ";
             case explorer_2: return " Explorer 3 ";
             case explorer_3: return " Explorer 4 ";
-            case pin_manager: return " Pinned ";
+            case pinned: return " Pinned ";
             case file_operations: return " File Operations ";
             case recent_files: return " Recent Files ";
             case analytics: return " Analytics ";
             case debug_log: return " Debug Log ";
             case settings: return " Settings ";
-        #if DEBUG_MODE
+            case icon_library: return " Icon Library ";
             case icon_font_browser_font_awesome: return " Font Awesome Icons ";
             case icon_font_browser_codicon: return " Codicon Icons ";
             case icon_font_browser_material_design: return " Material Design Icons ";
             case imgui_demo: return " ImGui Demo ";
-        #endif
             default: assert(false && "Window has no name"); return nullptr;
         }
     }
@@ -119,6 +117,8 @@ namespace swan_windows
 
     void render_recent_files(bool &open) noexcept;
 
+    void render_settings(GLFWwindow *window) noexcept;
+
     void render_icon_font_browser(
         s32 window_code,
         icon_font_browser_state &browser,
@@ -127,7 +127,7 @@ namespace swan_windows
         char const *icon_prefix,
         std::vector<icon_font_glyph> const &(*get_all_icons)() noexcept) noexcept;
 
-    void render_settings(GLFWwindow *window) noexcept;
+    void render_icon_library(bool &open) noexcept;
 
 } // namespace render_window
 

@@ -88,21 +88,31 @@ struct swan_settings
         explorer_refresh_mode_count
     };
 
-    s32 window_x = 0, window_y = 0; //! must be adjacent, y must always come after x in memory
+    s32 window_x = 10, window_y = 40; //! must be adjacent, y must always come after x in memory
     s32 window_w = 1280, window_h = 720; //! must be adjacent, h must always come after w in memory
     s32 size_unit_multiplier = 1024;
-    explorer_refresh_mode expl_refresh_mode = explorer_refresh_mode_automatic;
+    explorer_refresh_mode explorer_refresh_mode = explorer_refresh_mode_automatic;
     wchar_t dir_separator_utf16 = L'\\';
     char dir_separator_utf8 = '\\';
 
     bool show_debug_info = false;
-    bool show_dotdot_dir = false;
-    bool cwd_entries_table_alt_row_bg = true;
-    bool cwd_entries_table_borders_in_body = true;
-    bool clear_filter_on_cwd_change = true;
+    bool explorer_show_dotdot_dir = false;
+    bool explorer_cwd_entries_table_alt_row_bg = true;
+    bool explorer_cwd_entries_table_borders_in_body = true;
+    bool explorer_clear_filter_on_cwd_change = true;
 
-    bool start_with_window_maximized = true;
-    bool start_with_previous_window_pos_and_size = true;
+    bool startup_with_window_maximized = true;
+    bool startup_with_previous_window_pos_and_size = true;
+
+    bool confirm_explorer_delete_via_keybind = true;
+    bool confirm_explorer_delete_via_context_menu = true;
+    bool confirm_explorer_unpin_directory = true;
+    bool confirm_recent_files_clear = true;
+    bool confirm_delete_pin = true;
+    bool confirm_completed_file_operations_forget_single = true;
+    bool confirm_completed_file_operations_forget_group = true;
+    bool confirm_completed_file_operations_forget_selected = true;
+    bool confirm_completed_file_operations_forget_all = true;
 
     struct window_visibility
     {
@@ -110,21 +120,71 @@ struct swan_settings
         bool explorer_1 = false;
         bool explorer_2 = false;
         bool explorer_3 = false;
-        bool pin_manager = false;
+        bool pinned = false;
         bool file_operations = false;
         bool recent_files = false;
         bool analytics = false;
         bool debug_log = false;
         bool settings = false;
-    #if DEBUG_MODE
         bool imgui_demo = false;
+        bool icon_library = false;
         bool fa_icons = false;
         bool ci_icons = false;
         bool md_icons = false;
-    #endif
     };
 
     window_visibility show;
+
+#if 0
+private:
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, [[maybe_unused]] u32 version) noexcept
+    {
+        ar & BOOST_SERIALIZATION_NVP(show_debug_info);
+        ar & BOOST_SERIALIZATION_NVP(explorer_show_dotdot_dir);
+        ar & BOOST_SERIALIZATION_NVP(explorer_cwd_entries_table_alt_row_bg);
+        ar & BOOST_SERIALIZATION_NVP(explorer_cwd_entries_table_borders_in_body);
+        ar & BOOST_SERIALIZATION_NVP(explorer_clear_filter_on_cwd_change);
+
+        ar & BOOST_SERIALIZATION_NVP(startup_with_window_maximized);
+        ar & BOOST_SERIALIZATION_NVP(startup_with_previous_window_pos_and_size);
+
+        ar & BOOST_SERIALIZATION_NVP(confirm_explorer_delete_via_keybind);
+        ar & BOOST_SERIALIZATION_NVP(confirm_explorer_delete_via_context_menu);
+        ar & BOOST_SERIALIZATION_NVP(confirm_explorer_unpin_directory);
+        ar & BOOST_SERIALIZATION_NVP(confirm_recent_files_clear);
+        ar & BOOST_SERIALIZATION_NVP(confirm_delete_pin);
+        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_single);
+        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_group);
+        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_selected);
+        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_all);
+
+        ar & BOOST_SERIALIZATION_NVP(window_x);
+        ar & BOOST_SERIALIZATION_NVP(window_y);
+        ar & BOOST_SERIALIZATION_NVP(window_w);
+        ar & BOOST_SERIALIZATION_NVP(window_h);
+        ar & BOOST_SERIALIZATION_NVP(size_unit_multiplier);
+        ar & BOOST_SERIALIZATION_NVP(explorer_refresh_mode);
+        ar & BOOST_SERIALIZATION_NVP(dir_separator_utf16);
+        ar & BOOST_SERIALIZATION_NVP(dir_separator_utf8);
+
+        ar & boost::serialization::make_nvp("show_explorer_0", show.explorer_0);
+        ar & boost::serialization::make_nvp("show_explorer_1", show.explorer_1);
+        ar & boost::serialization::make_nvp("show_explorer_2", show.explorer_2);
+        ar & boost::serialization::make_nvp("show_explorer_3", show.explorer_3);
+        ar & boost::serialization::make_nvp("show_pin_manager", show.pinned);
+        ar & boost::serialization::make_nvp("show_file_operations", show.file_operations);
+        ar & boost::serialization::make_nvp("show_recent_files", show.recent_files);
+        ar & boost::serialization::make_nvp("show_analytics", show.analytics);
+        ar & boost::serialization::make_nvp("show_debug_log", show.debug_log);
+        ar & boost::serialization::make_nvp("show_settings", show.settings);
+        ar & boost::serialization::make_nvp("show_imgui_demo", show.imgui_demo);
+        ar & boost::serialization::make_nvp("show_fa_icons", show.fa_icons);
+        ar & boost::serialization::make_nvp("show_ci_icons", show.ci_icons);
+        ar & boost::serialization::make_nvp("show_md_icons", show.md_icons);
+    }
+#endif
 };
 
 enum update_cwd_entries_actions : u8
@@ -229,8 +289,8 @@ struct explorer_window
 
     // 24 byte alignment members
 
-    std::vector<dirent> cwd_entries = {};               // all direct children of the cwd
-    std::vector<swan_path_t> select_cwd_entries_on_next_update = {};    // entries to select on the next update of cwd_entries
+    std::vector<dirent> cwd_entries = {};                             // all direct children of the cwd
+    std::vector<swan_path_t> select_cwd_entries_on_next_update = {};  // entries to select on the next update of cwd_entries
 
     // 8 byte alignment members
 
@@ -507,8 +567,9 @@ struct bulk_rename_collision
 
 struct icon_font_glyph
 {
-    char const *name;
-    char const *content;
+    char const *name = nullptr;
+    char const *content = nullptr;
+    u64 lev_edit_distance = 0;
 };
 
 struct icon_font_browser_state
@@ -520,10 +581,17 @@ struct icon_font_browser_state
 
 enum swan_confirmation_id : s32
 {
-    swan_confirm_id_clear_recent_files,
-    swan_confirm_id_delete_pin,
-    swan_confirm_id_explorer_execute_delete,
-    swan_confirm_id_explorer_unpin_directory,
-    swan_confirm_id_clear_completed_file_operations,
-    swan_confirm_id_count
+    swan_id_confirm_clear_recent_files,
+
+    swan_id_confirm_delete_pin,
+
+    swan_id_confirm_explorer_execute_delete,
+    swan_id_confirm_explorer_unpin_directory,
+
+    swan_id_confirm_completed_file_operations_forget_single,
+    swan_id_confirm_completed_file_operations_forget_group,
+    swan_id_confirm_completed_file_operations_forget_selected,
+    swan_id_confirm_completed_file_operations_forget_all,
+
+    swan_id_confirm_count
 };

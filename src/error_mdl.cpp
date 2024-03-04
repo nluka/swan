@@ -55,7 +55,7 @@ void swan_popup_modals::render_error() noexcept
 
     assert(!s_error_failure.empty());
 
-    auto cleanup_and_close_popup = [&]() {
+    auto cleanup_and_close_popup = [&]() noexcept {
         s_error_open = false;
         s_error_action.clear();
         s_error_failure.clear();

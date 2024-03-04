@@ -19,10 +19,10 @@
     }
 }
 
-std::jthread expl_change_notif_thread_0([&]() { explorer_change_notif_thread_func(explorers[0], window_close_flag); });
-std::jthread expl_change_notif_thread_1([&]() { explorer_change_notif_thread_func(explorers[1], window_close_flag); });
-std::jthread expl_change_notif_thread_2([&]() { explorer_change_notif_thread_func(explorers[2], window_close_flag); });
-std::jthread expl_change_notif_thread_3([&]() { explorer_change_notif_thread_func(explorers[3], window_close_flag); });
+std::jthread expl_change_notif_thread_0([&]() noexcept { explorer_change_notif_thread_func(explorers[0], window_close_flag); });
+std::jthread expl_change_notif_thread_1([&]() noexcept { explorer_change_notif_thread_func(explorers[1], window_close_flag); });
+std::jthread expl_change_notif_thread_2([&]() noexcept { explorer_change_notif_thread_func(explorers[2], window_close_flag); });
+std::jthread expl_change_notif_thread_3([&]() noexcept { explorer_change_notif_thread_func(explorers[3], window_close_flag); });
 
 void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> const &window_close_flag) noexcept
 {
@@ -94,7 +94,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
             // latest_valid_cwd is invalid for some reason, wait for it to change.
             // during this time window visibility can change, but it doesn't matter.
             std::unique_lock lock(expl.latest_valid_cwd_mutex);
-            expl.latest_valid_cwd_cond.wait(lock, []() { return true; });
+            expl.latest_valid_cwd_cond.wait(lock, []() noexcept { return true; });
         }
         else {
             // latest_valid_cwd is in fact a valid directory, so sit here and wait for a change notification.

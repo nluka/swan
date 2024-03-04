@@ -34,7 +34,7 @@ void swan_popup_modals::render_edit_pin() noexcept
     static ImVec4 color_input = dir_color();
     static std::string err_msg = {};
 
-    auto cleanup_and_close_popup = [&]() {
+    auto cleanup_and_close_popup = [&]() noexcept {
         s_edit_pin_open = false;
         s_edit_pin = nullptr;
 

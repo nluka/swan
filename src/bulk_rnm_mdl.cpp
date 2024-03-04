@@ -94,7 +94,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     static f64 transform_us = {};
     static f64 collisions_us = {};
 
-    auto cleanup_and_close_popup = [&]() {
+    auto cleanup_and_close_popup = [&]() noexcept {
         rename_state.store(bulk_rename_state::nil);
         num_renames_success.store(0);
         num_renames_fail.store(0);
@@ -434,7 +434,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     }
 
     if (rename_button_pressed && pattern_compile_res.success && collisions.empty() && rename_state.load() == bulk_rename_state::nil) {
-        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops,  swan_path_t expl_cwd, wchar_t dir_sep_utf16) {
+        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops,  swan_path_t expl_cwd, wchar_t dir_sep_utf16) noexcept {
             rename_state.store(bulk_rename_state::in_progress);
             num_renames_total.store(rename_ops.size());
 

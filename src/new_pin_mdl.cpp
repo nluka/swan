@@ -33,7 +33,7 @@ void swan_popup_modals::render_new_pin() noexcept
     static ImVec4 color_input = dir_color();
     static std::string err_msg = {};
 
-    auto cleanup_and_close_popup = [&]() {
+    auto cleanup_and_close_popup = [&]() noexcept {
         s_new_pin_open = false;
         s_new_pin_enable_path_input = true;
         init_empty_cstr(s_new_pin_init_path.data());
