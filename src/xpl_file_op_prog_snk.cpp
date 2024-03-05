@@ -101,7 +101,8 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
-        completed_file_ops.emplace_front(completion_time, file_operation_type::move, src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
+        completed_file_ops.emplace_front(completion_time, system_time_point_t(), file_operation_type::move,
+                                         src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 
     return S_OK;
@@ -158,7 +159,8 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
-        completed_file_ops.emplace_front(completion_time, file_operation_type::del, deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
+        completed_file_ops.emplace_front(completion_time, system_time_point_t(), file_operation_type::del,
+                                         deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
     }
 
     print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
@@ -222,7 +224,8 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
-        completed_file_ops.emplace_front(completion_time, file_operation_type::copy, src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
+        completed_file_ops.emplace_front(completion_time, system_time_point_t(), file_operation_type::copy,
+                                         src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 
     return S_OK;

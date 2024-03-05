@@ -142,7 +142,8 @@ try {
         path_force_separator(stored_src_path, dir_separator);
         path_force_separator(stored_dst_path, dir_separator);
 
-        completed_operations.emplace_back(stored_time_completion, file_operation_type(stored_op_type), stored_src_path.data(), stored_dst_path.data(), basic_dirent::kind(stored_obj_type), stored_group_id);
+        completed_operations.emplace_back(stored_time_completion, stored_time_undo, file_operation_type(stored_op_type),
+                                          stored_src_path.data(), stored_dst_path.data(), basic_dirent::kind(stored_obj_type), stored_group_id);
         ++num_loaded_successfully;
 
         line.clear();
@@ -156,7 +157,7 @@ catch (...) {
     return { false, 0 };
 }
 
-completed_file_operation::completed_file_operation() noexcept // for boost::circular_buffer
+completed_file_operation::completed_file_operation() noexcept
     : completion_time()
     , src_path()
     , dst_path()
@@ -165,8 +166,10 @@ completed_file_operation::completed_file_operation() noexcept // for boost::circ
 {
 }
 
-completed_file_operation::completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id) noexcept // for boost::circular_buffer
+completed_file_operation::completed_file_operation(system_time_point_t completion_time, system_time_point_t undo_time, file_operation_type op_type,
+                                                   char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id) noexcept
     : completion_time(completion_time)
+    , undo_time(undo_time)
     , group_id(group_id)
     , src_path(path_create(src))
     , dst_path(path_create(dst))
@@ -175,7 +178,7 @@ completed_file_operation::completed_file_operation(system_time_point_t completio
 {
 }
 
-completed_file_operation::completed_file_operation(completed_file_operation const &other) noexcept // for boost::circular_buffer
+completed_file_operation::completed_file_operation(completed_file_operation const &other) noexcept
     : completion_time(other.completion_time)
     , undo_time(other.undo_time)
     , group_id(other.group_id)

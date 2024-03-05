@@ -415,7 +415,8 @@ struct completed_file_operation
 
     bool undone() noexcept { return undo_time != system_time_point_t(); }
 
-    completed_file_operation(system_time_point_t completion_time, file_operation_type op_type, char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id = 0) noexcept;
+    completed_file_operation(system_time_point_t completion_time, system_time_point_t undo_time, file_operation_type op_type,
+                             char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id = 0) noexcept;
 
     completed_file_operation() noexcept; // for boost::circular_buffer
     completed_file_operation(completed_file_operation const &other) noexcept; // for boost::circular_buffer
