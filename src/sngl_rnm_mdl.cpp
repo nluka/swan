@@ -1,45 +1,52 @@
-#include "imgui/imgui.h"
-
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
-static bool s_single_rename_open = false;
-static explorer_window *s_single_rename_expl = nullptr;
-static explorer_window::dirent const *s_single_rename_entry_to_be_renamed = nullptr;
-static std::function<void ()> s_single_rename_on_rename_finish_callback = {};
+namespace single_rename_modal_global_state
+{
+    static bool                             g_open = false;
+    static explorer_window *                g_expl_opened_from = nullptr;
+    static explorer_window::dirent const *  g_expl_dirent_to_rename = nullptr;
+    static std::function<void ()>           g_on_rename_callback = {};
+}
 
 void swan_popup_modals::open_single_rename(
     explorer_window &expl,
     explorer_window::dirent const &entry_to_be_renamed,
     std::function<void ()> on_rename_finish_callback) noexcept
 {
-    s_single_rename_open = true;
+    using namespace single_rename_modal_global_state;
 
-    assert(s_single_rename_entry_to_be_renamed == nullptr);
-    s_single_rename_entry_to_be_renamed = &entry_to_be_renamed;
+    g_open = true;
 
-    assert(s_single_rename_expl == nullptr);
-    s_single_rename_expl = &expl;
+    assert(g_expl_dirent_to_rename == nullptr);
+    g_expl_dirent_to_rename = &entry_to_be_renamed;
 
-    s_single_rename_on_rename_finish_callback = on_rename_finish_callback;
+    assert(g_expl_opened_from == nullptr);
+    g_expl_opened_from = &expl;
+
+    g_on_rename_callback = on_rename_finish_callback;
 }
 
 bool swan_popup_modals::is_open_single_rename() noexcept
 {
-    return s_single_rename_open;
+    using namespace single_rename_modal_global_state;
+
+    return g_open;
 }
 
 void swan_popup_modals::render_single_rename() noexcept
 {
-    if (s_single_rename_open) {
+    using namespace single_rename_modal_global_state;
+
+    if (g_open) {
         imgui::OpenPopup(swan_popup_modals::single_rename);
     }
     if (!imgui::BeginPopupModal(swan_popup_modals::single_rename, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
 
-    assert(s_single_rename_expl != nullptr);
-    assert(s_single_rename_entry_to_be_renamed != nullptr);
+    assert(g_expl_opened_from != nullptr);
+    assert(g_expl_dirent_to_rename != nullptr);
 
     wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
 
@@ -47,10 +54,10 @@ void swan_popup_modals::render_single_rename() noexcept
     static std::string err_msg = {};
 
     auto cleanup_and_close_popup = [&]() noexcept {
-        s_single_rename_open = false;
-        s_single_rename_expl = nullptr;
-        s_single_rename_entry_to_be_renamed = nullptr;
-        s_single_rename_on_rename_finish_callback = {};
+        g_open = false;
+        g_expl_opened_from = nullptr;
+        g_expl_dirent_to_rename = nullptr;
+        g_on_rename_callback = {};
 
         new_name_utf8[0] = L'\0';
         err_msg.clear();
@@ -66,12 +73,12 @@ void swan_popup_modals::render_single_rename() noexcept
         std::wstring new_path_utf16 = {};
         s32 result = {};
 
-        if (!utf8_to_utf16(s_single_rename_expl->cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16))) {
+        if (!utf8_to_utf16(g_expl_opened_from->cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16))) {
             cleanup_and_close_popup();
             return;
         }
 
-        if (!utf8_to_utf16(s_single_rename_entry_to_be_renamed->basic.path.data(), buffer_old_name_utf16, lengthof(buffer_old_name_utf16))) {
+        if (!utf8_to_utf16(g_expl_dirent_to_rename->basic.path.data(), buffer_old_name_utf16, lengthof(buffer_old_name_utf16))) {
             cleanup_and_close_popup();
             return;
         }
@@ -105,7 +112,7 @@ void swan_popup_modals::render_single_rename() noexcept
             }
         }
         else {
-            s_single_rename_on_rename_finish_callback();
+            g_on_rename_callback();
             cleanup_and_close_popup();
         }
     };
@@ -113,7 +120,7 @@ void swan_popup_modals::render_single_rename() noexcept
     // set initial focus on input text below
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
         imgui::SetKeyboardFocusHere(0);
-        new_name_utf8 = s_single_rename_entry_to_be_renamed->basic.path;
+        new_name_utf8 = g_expl_dirent_to_rename->basic.path;
     }
     {
         auto style = imgui::GetStyle();
@@ -133,12 +140,12 @@ void swan_popup_modals::render_single_rename() noexcept
     imgui::SameLine();
 
     if (imgui::Button(ICON_CI_DEBUG_RESTART "##reset_name")) {
-        new_name_utf8 = path_create(s_single_rename_entry_to_be_renamed->basic.path.data());
+        new_name_utf8 = path_create(g_expl_dirent_to_rename->basic.path.data());
     }
     if (imgui::IsItemHovered()) {
         if (imgui::BeginTooltip()) {
             imgui::TextUnformatted("Click to reset name");
-            imgui::TextColored(get_color(s_single_rename_entry_to_be_renamed->basic.type), s_single_rename_entry_to_be_renamed->basic.path.data());
+            imgui::TextColored(get_color(g_expl_dirent_to_rename->basic.type), g_expl_dirent_to_rename->basic.path.data());
             imgui::EndTooltip();
         }
     }

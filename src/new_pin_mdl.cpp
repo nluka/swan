@@ -3,25 +3,34 @@
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
-static bool s_new_pin_open = false;
-static bool s_new_pin_enable_path_input = true;
-static swan_path_t s_new_pin_init_path = {};
+namespace new_pin_modal_global_state
+{
+    static bool         g_open = false;
+    static bool         g_enable_path_text_input = true;
+    static swan_path_t  g_initial_path_value = {};
+}
 
 void swan_popup_modals::open_new_pin(swan_path_t const &init_path, bool mutable_path) noexcept
 {
-    s_new_pin_open = true;
-    s_new_pin_enable_path_input = mutable_path;
-    s_new_pin_init_path = init_path;
+    using namespace new_pin_modal_global_state;
+
+    g_open = true;
+    g_enable_path_text_input = mutable_path;
+    g_initial_path_value = init_path;
 }
 
 bool swan_popup_modals::is_open_new_pin() noexcept
 {
-    return s_new_pin_open;
+    using namespace new_pin_modal_global_state;
+
+    return g_open;
 }
 
 void swan_popup_modals::render_new_pin() noexcept
 {
-    if (s_new_pin_open) {
+    using namespace new_pin_modal_global_state;
+
+    if (g_open) {
         imgui::OpenPopup(swan_popup_modals::new_pin);
     }
     if (!imgui::BeginPopupModal(swan_popup_modals::new_pin, nullptr)) {
@@ -34,9 +43,9 @@ void swan_popup_modals::render_new_pin() noexcept
     static std::string err_msg = {};
 
     auto cleanup_and_close_popup = [&]() noexcept {
-        s_new_pin_open = false;
-        s_new_pin_enable_path_input = true;
-        init_empty_cstr(s_new_pin_init_path.data());
+        g_open = false;
+        g_enable_path_text_input = true;
+        init_empty_cstr(g_initial_path_value.data());
 
         init_empty_cstr(label_input);
         init_empty_cstr(path_input.data());
@@ -49,11 +58,11 @@ void swan_popup_modals::render_new_pin() noexcept
         // when modal just opened:
         imgui::SetKeyboardFocusHere(0); // set focus on label input
 
-        path_input = s_new_pin_init_path;
+        path_input = g_initial_path_value;
 
         // set initial label input value to filename if it fits
         {
-            char const *filename = get_file_name(s_new_pin_init_path.data());
+            char const *filename = get_file_name(g_initial_path_value.data());
             u64 filename_len = strlen(filename);
             if (filename_len <= pinned_path::LABEL_MAX_LEN) {
                 strncpy(label_input, filename, lengthof(label_input));
@@ -74,7 +83,7 @@ void swan_popup_modals::render_new_pin() noexcept
     imgui::Text("%zu/%zu", strlen(label_input), pinned_path::LABEL_MAX_LEN);
 
     {
-        [[maybe_unused]] imgui::ScopedDisable disabled(!s_new_pin_enable_path_input);
+        [[maybe_unused]] imgui::ScopedDisable disabled(!g_enable_path_text_input);
         [[maybe_unused]] imgui::ScopedAvailWidth width = {};
 
         if (imgui::InputTextWithHint("##pin_path", "Path...", path_input.data(), path_input.size(),

@@ -1,7 +1,6 @@
 #include "stdafx.hpp"
 #include "path.hpp"
 
-
 swan_path_t path_create(char const *data, u64 count) noexcept
 {
     swan_path_t p = {};

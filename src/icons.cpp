@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "data_types.hpp"
 #include "common_fns.hpp"
 

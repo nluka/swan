@@ -1,64 +1,74 @@
-#include "imgui/imgui.h"
-
+#include "stdafx.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
-static bool s_error_open = false;
-static std::string s_error_action = {};
-static std::string s_error_failure = {};
-
-void swan_popup_modals::open_error(char const *action, char const *failure) noexcept
+namespace error_modal_global_state
 {
-    s_error_open = true;
+    static bool         g_open = false;
+    static std::string  g_action = {};
+    static std::string  g_failure = {};
+}
+
+void swan_popup_modals::open_error(char const *action, char const *failure, bool beautify_action, bool beautify_failure) noexcept
+{
+    using namespace error_modal_global_state;
+
+    g_open = true;
 
     assert(action != nullptr);
-    s_error_action = action;
+    g_action = action;
 
     assert(failure != nullptr);
     assert(strlen(failure) > 0);
-    s_error_failure = failure;
+    g_failure = failure;
 
-#if 0
-    if (!s_error_action.empty()) {
-        // capitalize first letter
-        s_error_action.front() = (char)toupper(s_error_action.front());
+    if (beautify_action) {
+        if (!g_action.empty()) {
+            // capitalize first letter
+            g_action.front() = (char)toupper(g_action.front());
 
-        // ensure ends with period
-        if (s_error_action.back() != '.') {
-            s_error_action.push_back('.');
+            // ensure ends with period
+            if (g_action.back() != '.') {
+                g_action.push_back('.');
+            }
         }
     }
 
-    // capitalize first letter
-    s_error_failure.front() = (char)toupper(s_error_failure.front());
+    if (beautify_failure) {
+        // capitalize first letter
+        g_failure.front() = (char)toupper(g_failure.front());
 
-    // ensure ends with period
-    if (s_error_failure.back() != '.') {
-        s_error_failure.push_back('.');
+        // ensure ends with period
+        if (g_failure.back() != '.') {
+            g_failure.push_back('.');
+        }
     }
-#endif
 }
 
 bool swan_popup_modals::is_open_error() noexcept
 {
-    return s_error_open;
+    using namespace error_modal_global_state;
+
+    return g_open;
 }
 
 void swan_popup_modals::render_error() noexcept
 {
-    if (s_error_open) {
+    using namespace error_modal_global_state;
+
+    if (g_open) {
         imgui::OpenPopup(swan_popup_modals::error);
     }
-    if (!imgui::BeginPopupModal(swan_popup_modals::error, &s_error_open)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::error, &g_open)) {
         return;
     }
 
-    assert(!s_error_failure.empty());
+    assert(!g_failure.empty());
 
     auto cleanup_and_close_popup = [&]() noexcept {
-        s_error_open = false;
-        s_error_action.clear();
-        s_error_failure.clear();
+        g_open = false;
+        g_action.clear();
+        g_failure.clear();
 
         imgui::CloseCurrentPopup();
     };
@@ -67,14 +77,14 @@ void swan_popup_modals::render_error() noexcept
         ImGui::PushTextWrapPos(ImGui::GetContentRegionAvail().x);
         SCOPE_EXIT { imgui::PopTextWrapPos(); };
 
-        if (s_error_action.empty()) {
-            imgui::TextColored(red(), "%s", s_error_failure.c_str());
+        if (g_action.empty()) {
+            imgui::TextColored(red(), "%s", g_failure.c_str());
         }
         else {
             imgui::TextUnformatted("Failed:");
-            imgui::TextColored(orange(), "%s", s_error_action.c_str());
+            imgui::TextColored(orange(), "%s", g_action.c_str());
             imgui::TextUnformatted("Reason:");
-            imgui::TextColored(red(), "%s", s_error_failure.c_str());
+            imgui::TextColored(red(), "%s", g_failure.c_str());
         }
     }
 

@@ -1,9 +1,7 @@
 #include "stdafx.hpp"
-#include "data_types.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 #include "path.hpp"
-
 
 static std::mutex s_completed_file_ops_mutex = {};
 static std::deque<completed_file_operation> s_completed_file_ops(1000);

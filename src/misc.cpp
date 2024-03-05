@@ -4,17 +4,21 @@
 #include "imgui_specific.hpp"
 #include "path.hpp"
 
-static s32 s_page_size = 0;
-s32 &global_state::page_size() noexcept { return s_page_size; }
+namespace swan
+{
+    static s32                      g_page_size = 0;
+    static swan_thread_pool_t       g_thread_pool(1);
+    static bool                     g_move_dirents_payload_is_set = false;
+    static std::filesystem::path    g_execution_path = {};
+};
 
-static swan_thread_pool_t s_thread_pool(1);
-swan_thread_pool_t &global_state::thread_pool() noexcept { return s_thread_pool; }
+s32 &global_state::page_size() noexcept { return swan::g_page_size; }
 
-static bool s_move_dirents_payload_set = false;
-bool &global_state::move_dirents_payload_set() noexcept { return s_move_dirents_payload_set; }
+swan_thread_pool_t &global_state::thread_pool() noexcept { return swan::g_thread_pool; }
 
-static std::filesystem::path s_execution_path = {};
-std::filesystem::path &global_state::execution_path() noexcept { return s_execution_path; }
+bool &global_state::move_dirents_payload_set() noexcept { return swan::g_move_dirents_payload_is_set; }
+
+std::filesystem::path &global_state::execution_path() noexcept { return swan::g_execution_path; }
 
 bool basic_dirent::is_path_dotdot()          const noexcept { return path_equals_exactly(path, ".."); }
 bool basic_dirent::is_dotdot_dir()           const noexcept { return type == basic_dirent::kind::directory && path_equals_exactly(path, ".."); }

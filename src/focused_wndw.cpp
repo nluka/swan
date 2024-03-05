@@ -2,20 +2,30 @@
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
-static s32 s_focused_window = -1;
+namespace swan
+{
+    static s32 g_focused_window = -1;
+};
 
-s32 global_state::focused_window() noexcept { return s_focused_window; };
+s32 global_state::focused_window() noexcept
+{
+    using namespace swan;
+
+    return g_focused_window;
+};
 
 bool global_state::save_focused_window(s32 window_code) noexcept
 {
+    using namespace swan;
+
     bool success;
-    bool same_window_as_before = s_focused_window == window_code;
+    bool same_window_as_before = g_focused_window == window_code;
 
     if (same_window_as_before) {
         success = true;
     }
     else {
-        s_focused_window = window_code;
+        g_focused_window = window_code;
 
         std::filesystem::path file_path = global_state::execution_path() / "data\\focused_window.txt";
 
@@ -42,6 +52,8 @@ bool global_state::save_focused_window(s32 window_code) noexcept
 
 bool global_state::load_focused_window_from_disk(s32 &out) noexcept
 {
+    using namespace swan;
+
     std::filesystem::path file_path = global_state::execution_path() / "data\\focused_window.txt";
 
     try {
@@ -52,8 +64,8 @@ bool global_state::load_focused_window_from_disk(s32 &out) noexcept
             return false;
         }
 
-        in >> s_focused_window;
-        out = s_focused_window;
+        in >> g_focused_window;
+        out = g_focused_window;
 
         print_debug_msg("SUCCESS load_focused_window_from_disk");
         return true;

@@ -2,11 +2,11 @@
 
 namespace imgui_confirmation_global_state
 {
-    static s32 g_active_id = -1;
-    static std::variant<std::string, std::function<void ()>> g_content = "";
-    static std::optional<bool> g_response = std::nullopt;
-    static std::function<void ()> g_on_yes_callback = nullptr;
-    static bool *g_confirmation_enabled = nullptr;
+    static s32                                                g_active_id = -1;
+    static std::variant<std::string, std::function<void ()>>  g_content = "";
+    static std::optional<bool>                                g_response = std::nullopt;
+    static std::function<void ()>                             g_on_yes_callback = nullptr;
+    static bool *                                             g_confirmation_enabled = nullptr;
 }
 
 bool imgui::HaveActiveConfirmationModal() noexcept

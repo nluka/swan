@@ -19,6 +19,12 @@ struct generic_result
     std::string error_or_utf8_path;
 };
 
+struct winapi_error
+{
+    DWORD code;
+    std::string formatted_message;
+};
+
 struct swan_path_t final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
 {
     bool operator>(swan_path_t const &other) const noexcept { return lstrcmpiA(this->data(), other.data()) < 0; }
@@ -563,6 +569,12 @@ struct bulk_rename_collision
 
     bool operator!=(bulk_rename_collision const &other) const noexcept; // for ntest
     friend std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c); // for ntest
+};
+
+struct bulk_rename_find_collisions_result
+{
+    std::vector<bulk_rename_collision> collisions;
+    std::vector<bulk_rename_op> sorted_renames;
 };
 
 struct icon_font_glyph

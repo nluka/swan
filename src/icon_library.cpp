@@ -7,7 +7,7 @@ u64 compute_levenshtein_dist(char const *word1, u64 size1, char const *word2, u6
     // int size2 = word2.size();
 
     // int verif[size1 + 1][size2 + 1]; // Verification matrix i.e. 2D array which will store the calculated distance.
-    std::vector< std::vector< u64 > > verif;
+    std::vector< std::vector<u64> > verif;
     verif.resize(size1 + 1);
     for (auto &row : verif)
         row.resize(size2 + 1);

@@ -3,7 +3,7 @@
 #include "imgui_specific.hpp"
 #include "util.hpp"
 
-static std::vector<pinned_path> s_pins = {};
+static std::vector<pinned_path> g_pinned_paths = {};
 
 template <typename Ty>
 bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_idx) noexcept
@@ -178,7 +178,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
 
 std::vector<pinned_path> &global_state::pins() noexcept
 {
-    return s_pins;
+    return g_pinned_paths;
 }
 
 bool global_state::add_pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept
@@ -186,7 +186,7 @@ bool global_state::add_pin(ImVec4 color, char const *label, swan_path_t &path, c
     path_force_separator(path, dir_separator);
 
     try {
-        s_pins.emplace_back(color, label, path);
+        g_pinned_paths.emplace_back(color, label, path);
         return true;
     } catch (...) {
         return false;
@@ -195,11 +195,11 @@ bool global_state::add_pin(ImVec4 color, char const *label, swan_path_t &path, c
 
 void global_state::remove_pin(u64 pin_idx) noexcept
 {
-    [[maybe_unused]] u64 last_idx = s_pins.size() - 1;
+    [[maybe_unused]] u64 last_idx = g_pinned_paths.size() - 1;
 
     assert(pin_idx <= last_idx);
 
-    s_pins.erase(s_pins.begin() + pin_idx);
+    g_pinned_paths.erase(g_pinned_paths.begin() + pin_idx);
 }
 
 void global_state::swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
@@ -212,13 +212,13 @@ void global_state::swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
         pin2_idx = temp;
     }
 
-    std::swap(*(s_pins.begin() + pin1_idx), *(s_pins.begin() + pin2_idx));
+    std::swap(*(g_pinned_paths.begin() + pin1_idx), *(g_pinned_paths.begin() + pin2_idx));
 }
 
 u64 global_state::find_pin_idx(swan_path_t const &path) noexcept
 {
-    for (u64 i = 0; i < s_pins.size(); ++i) {
-        if (path_loosely_same(s_pins[i].path, path)) {
+    for (u64 i = 0; i < g_pinned_paths.size(); ++i) {
+        if (path_loosely_same(g_pinned_paths[i].path, path)) {
             return i;
         }
     }
@@ -258,7 +258,7 @@ catch (...) {
 
 void global_state::update_pin_dir_separators(char new_dir_separator) noexcept
 {
-    for (auto &pin : s_pins) {
+    for (auto &pin : g_pinned_paths) {
         path_force_separator(pin.path, new_dir_separator);
     }
 }
@@ -273,7 +273,7 @@ try {
         return { false, 0 };
     }
 
-    s_pins.clear();
+    g_pinned_paths.clear();
 
     std::string line = {};
     line.reserve(global_state::page_size() - 1);

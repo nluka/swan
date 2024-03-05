@@ -2,32 +2,41 @@
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 
-static bool s_edit_pin_open = false;
-static pinned_path *s_edit_pin = nullptr;
+namespace edit_pin_modal_global_state
+{
+    static bool             g_open = false;
+    static pinned_path *    g_target_pin = nullptr;
+}
 
 void swan_popup_modals::open_edit_pin(pinned_path *pin) noexcept
 {
-    s_edit_pin_open = true;
+    using namespace edit_pin_modal_global_state;
+
+    g_open = true;
 
     assert(pin != nullptr);
-    s_edit_pin = pin;
+    g_target_pin = pin;
 }
 
 bool swan_popup_modals::is_open_edit_pin() noexcept
 {
-    return s_edit_pin_open;
+    using namespace edit_pin_modal_global_state;
+
+    return g_open;
 }
 
 void swan_popup_modals::render_edit_pin() noexcept
 {
-    if (s_edit_pin_open) {
+    using namespace edit_pin_modal_global_state;
+
+    if (g_open) {
         imgui::OpenPopup(swan_popup_modals::edit_pin);
     }
     if (!imgui::BeginPopupModal(swan_popup_modals::edit_pin, nullptr)) {
         return;
     }
 
-    assert(s_edit_pin != nullptr);
+    assert(g_target_pin != nullptr);
 
     static char label_input[pinned_path::LABEL_MAX_LEN + 1] = {};
     static swan_path_t path_input = {};
@@ -35,8 +44,8 @@ void swan_popup_modals::render_edit_pin() noexcept
     static std::string err_msg = {};
 
     auto cleanup_and_close_popup = [&]() noexcept {
-        s_edit_pin_open = false;
-        s_edit_pin = nullptr;
+        g_open = false;
+        g_target_pin = nullptr;
 
         init_empty_cstr(label_input);
         init_empty_cstr(path_input.data());
@@ -50,9 +59,9 @@ void swan_popup_modals::render_edit_pin() noexcept
         imgui::SetKeyboardFocusHere(0);
 
         // init input fields
-        color_input = s_edit_pin->color;
-        path_input = s_edit_pin->path;
-        strncpy(label_input, s_edit_pin->label.c_str(), lengthof(label_input));
+        color_input = g_target_pin->color;
+        path_input = g_target_pin->path;
+        strncpy(label_input, g_target_pin->label.c_str(), lengthof(label_input));
     }
     {
         imgui::ScopedAvailWidth width(imgui::CalcTextSize(" 00/64").x);
@@ -84,9 +93,9 @@ void swan_popup_modals::render_edit_pin() noexcept
         swan_path_t path = path_squish_adjacent_separators(path_input);
         path_force_separator(path, global_state::settings().dir_separator_utf8);
 
-        s_edit_pin->color = color_input;
-        s_edit_pin->label = label_input;
-        s_edit_pin->path = path;
+        g_target_pin->color = color_input;
+        g_target_pin->label = label_input;
+        g_target_pin->path = path;
 
         bool success = global_state::save_pins_to_disk();
         print_debug_msg("save_pins_to_disk: %d", success);

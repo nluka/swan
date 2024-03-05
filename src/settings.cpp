@@ -1,11 +1,10 @@
 #include "stdafx.hpp"
-#include "data_types.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
 #include "path.hpp"
 
-static swan_settings s_settings = {};
-swan_settings &global_state::settings() noexcept { return s_settings; }
+static swan_settings g_settings = {};
+swan_settings &global_state::settings() noexcept { return g_settings; }
 
 void swan_windows::render_settings(GLFWwindow *window) noexcept
 {

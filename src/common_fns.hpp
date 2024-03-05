@@ -139,10 +139,10 @@ namespace swan_popup_modals
     constexpr char const *new_pin = "New Pin##popup_modal";
     constexpr char const *edit_pin = "Edit Pin##popup_modal";
 
-    void open_single_rename(explorer_window &expl, explorer_window::dirent const &target, std::function<void ()> on_rename_callback) noexcept;
-    void open_bulk_rename(explorer_window &, std::function<void ()> on_rename_callback) noexcept;
-    void open_error(char const *action, char const *failure) noexcept;
-    void open_new_pin(swan_path_t const &init_path, bool mutable_path) noexcept;
+    void open_single_rename(explorer_window &expl_opened_from, explorer_window::dirent const &rename_target, std::function<void ()> on_rename_callback) noexcept;
+    void open_bulk_rename(explorer_window &expl_opened_from, std::function<void ()> on_rename_callback) noexcept;
+    void open_error(char const *action, char const *failure, bool beautify_action = false, bool beautify_failure = false) noexcept;
+    void open_new_pin(swan_path_t const &initial_path_value, bool mutable_path) noexcept;
     void open_edit_pin(pinned_path *pin) noexcept;
 
     bool is_open_single_rename() noexcept;
@@ -174,12 +174,6 @@ recycle_bin_info query_recycle_bin() noexcept;
 
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin = false) noexcept;
 
-struct winapi_error
-{
-    DWORD code;
-    std::string formatted_message;
-};
-
 winapi_error get_last_winapi_error() noexcept;
 
 void perform_file_operations(
@@ -203,12 +197,6 @@ bulk_rename_transform_result bulk_rename_transform(
     u64 bytes) noexcept;
 
 void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> &renames) noexcept;
-
-struct bulk_rename_find_collisions_result
-{
-    std::vector<bulk_rename_collision> collisions;
-    std::vector<bulk_rename_op> sorted_renames;
-};
 
 // Slow function which allocates & deallocates memory. Cache the result, don't call this function every frame.
 bulk_rename_find_collisions_result bulk_rename_find_collisions(

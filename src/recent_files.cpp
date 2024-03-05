@@ -4,18 +4,17 @@
 #include "imgui_specific.hpp"
 #include "path.hpp"
 
+static circular_buffer<recent_file> g_recent_files = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
+static std::mutex g_recent_files_mutex = {};
 
-static circular_buffer<recent_file> s_recent_files = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
-static std::mutex s_recent_files_mutex = {};
-
-std::pair<circular_buffer<recent_file> *, std::mutex *> global_state::recent_files() noexcept { return std::make_pair(&s_recent_files, &s_recent_files_mutex); }
+std::pair<circular_buffer<recent_file> *, std::mutex *> global_state::recent_files() noexcept { return std::make_pair(&g_recent_files, &g_recent_files_mutex); }
 
 u64 global_state::find_recent_file_idx(char const *search_path) noexcept
 {
-    std::scoped_lock lock(s_recent_files_mutex);
+    std::scoped_lock lock(g_recent_files_mutex);
 
-    for (u64 i = 0; i < s_recent_files.size(); ++i) {
-        auto const &recent_file = s_recent_files[i];
+    for (u64 i = 0; i < g_recent_files.size(); ++i) {
+        auto const &recent_file = g_recent_files[i];
         if (path_loosely_same(recent_file.path.data(), search_path)) {
             return i;
         }
@@ -26,31 +25,31 @@ u64 global_state::find_recent_file_idx(char const *search_path) noexcept
 
 void global_state::move_recent_file_idx_to_front(u64 recent_file_idx, char const *new_action) noexcept
 {
-    std::scoped_lock lock(s_recent_files_mutex);
+    std::scoped_lock lock(g_recent_files_mutex);
 
-    auto temp = s_recent_files[recent_file_idx];
+    auto temp = g_recent_files[recent_file_idx];
     temp.action_time = current_time_system();
     if (new_action) {
         temp.action.clear();
         temp.action = new_action;
     }
 
-    s_recent_files.erase(s_recent_files.begin() + recent_file_idx);
-    s_recent_files.push_front(temp);
+    g_recent_files.erase(g_recent_files.begin() + recent_file_idx);
+    g_recent_files.push_front(temp);
 }
 
 void global_state::add_recent_file(char const *action, char const *full_file_path) noexcept
 {
     swan_path_t path = path_create(full_file_path);
 
-    std::scoped_lock lock(s_recent_files_mutex);
-    s_recent_files.push_front({ action, current_time_system(), path });
+    std::scoped_lock lock(g_recent_files_mutex);
+    g_recent_files.push_front({ action, current_time_system(), path });
 }
 
 void global_state::remove_recent_file(u64 recent_file_idx) noexcept
 {
-    std::scoped_lock lock(s_recent_files_mutex);
-    s_recent_files.erase(s_recent_files.begin() + recent_file_idx);
+    std::scoped_lock lock(g_recent_files_mutex);
+    g_recent_files.erase(g_recent_files.begin() + recent_file_idx);
 }
 
 bool global_state::save_recent_files_to_disk() noexcept
@@ -63,9 +62,9 @@ try {
         return false;
     }
 
-    std::scoped_lock lock(s_recent_files_mutex);
+    std::scoped_lock lock(g_recent_files_mutex);
 
-    for (auto const &file : s_recent_files) {
+    for (auto const &file : g_recent_files) {
         auto time_t = std::chrono::system_clock::to_time_t(file.action_time);
         std::tm tm = *std::localtime(&time_t);
 
@@ -94,9 +93,9 @@ try {
         return { false, 0 };
     }
 
-    std::scoped_lock lock(s_recent_files_mutex);
+    std::scoped_lock lock(g_recent_files_mutex);
 
-    s_recent_files.clear();
+    g_recent_files.clear();
 
     std::string line = {};
     line.reserve(global_state::page_size() - 1);
@@ -129,10 +128,10 @@ try {
 
         path_force_separator(stored_path, dir_separator);
 
-        s_recent_files.push_back();
-        s_recent_files.back().action = buffer;
-        s_recent_files.back().action_time = stored_time;
-        s_recent_files.back().path = stored_path;
+        g_recent_files.push_back();
+        g_recent_files.back().action = buffer;
+        g_recent_files.back().action_time = stored_time;
+        g_recent_files.back().path = stored_path;
 
         ++num_loaded_successfully;
 
@@ -159,7 +158,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
     }
 
     {
-        imgui::ScopedDisable d(s_recent_files.empty());
+        imgui::ScopedDisable d(g_recent_files.empty());
 
         if (imgui::Button("Clear##recent_files")) {
             imgui::OpenConfirmationModal(swan_id_confirm_clear_recent_files, "Are you sure you want to clear your recent files? "
@@ -169,8 +168,8 @@ void swan_windows::render_recent_files(bool &open) noexcept
         auto status = imgui::GetConfirmationStatus(swan_id_confirm_clear_recent_files);
 
         if (status.value_or(false)) {
-            std::scoped_lock lock(s_recent_files_mutex);
-            s_recent_files.clear();
+            std::scoped_lock lock(g_recent_files_mutex);
+            g_recent_files.clear();
             (void) global_state::save_recent_files_to_disk();
         }
     }
@@ -197,10 +196,10 @@ void swan_windows::render_recent_files(bool &open) noexcept
         imgui::TableSetupColumn("Full Path");
         imgui::TableHeadersRow();
 
-        std::scoped_lock lock(s_recent_files_mutex);
+        std::scoped_lock lock(g_recent_files_mutex);
 
         u64 n = 0;
-        for (auto &file : s_recent_files) {
+        for (auto &file : g_recent_files) {
             char *file_name = get_file_name(file.path.data());
             char const *full_path = file.path.data();
             auto directory = get_everything_minus_file_name(full_path);

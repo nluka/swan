@@ -3,14 +3,14 @@
 #include "imgui_specific.hpp"
 #include "util.hpp"
 
-static void glfw_error_callback(s32 error, char const *description) noexcept;
-static GLFWwindow *create_barebones_window() noexcept;
-static void set_window_icon(GLFWwindow *window) noexcept;
-static LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcept;
-static void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
-static void render_analytics() noexcept;
-static void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept;
-static void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept;
+static void         glfw_error_callback(s32 error, char const *description) noexcept;
+static GLFWwindow * create_barebones_window() noexcept;
+static void         set_window_icon(GLFWwindow *window) noexcept;
+static LONG WINAPI  custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcept;
+static void         render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
+static void         render_analytics() noexcept;
+static void         find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept;
+static void         load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept;
 
 #if defined(NDEBUG)
 #   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
@@ -710,7 +710,8 @@ void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcep
                 }
                 file.full_path = full_path.generic_string();
             }
-            all_essential_files_located = std::all_of(essential, essential + lengthof(essential), [](essential_file const &f) noexcept { return f.found; });
+            all_essential_files_located = std::all_of(essential, essential + lengthof(essential),
+                                                      [](essential_file const &f) noexcept { return f.found; });
         }
 
         if (all_essential_files_located) {
