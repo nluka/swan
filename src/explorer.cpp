@@ -1494,8 +1494,43 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
             imgui::TextUnformatted("No items in this directory.");
         }
         else {
-            imgui::Text("%zu total entries in this directory.", cnt.child_dirents);
+            // imgui::Text("%zu total entries in this directory.", cnt.child_dirents);
+            // imgui::Spacing();
 
+        #if 1
+            struct occupancy
+            {
+                char const *type_name = nullptr;
+                u64 my_count = 0;
+                u64 total_count = 0;
+                ImVec4 type_color = {};
+
+                bool operator>(occupancy const &other) const noexcept { return this->fraction() > other.fraction(); }
+                f32  fraction()                        const noexcept { return ( f32(my_count) / f32(total_count) ); }
+                f32  percentage()                      const noexcept { return this->fraction() * 100.0f; }
+            };
+
+            std::array<occupancy, 3> occup = {{
+                { .type_name = "directories",  .my_count = cnt.child_directories,  .total_count = cnt.child_dirents,  .type_color = get_color(basic_dirent::kind::directory) },
+                { .type_name = "symlinks   ",  .my_count = cnt.child_symlinks,     .total_count = cnt.child_dirents,  .type_color = get_color(basic_dirent::kind::symlink_ambiguous) },
+                { .type_name = "files      ",  .my_count = cnt.child_files,        .total_count = cnt.child_dirents,  .type_color = get_color(basic_dirent::kind::file) },
+            }};
+
+            std::sort(occup.begin(), occup.end(), std::greater<occupancy>());
+
+            // f32 values[] = { occup[0].fraction(), occup[1].fraction(), occup[2].fraction() };
+            // imgui::PlotHistogram("## occupancy", values, lengthof(values), 0, "", 0, 1, { 100, 200 });
+
+            for (auto const &entity : occup) {
+                // if (entity.my_count > 0) {
+                    imgui::ScopedStyle<ImVec4> c(imgui::GetStyle().Colors[ImGuiCol_PlotHistogram], entity.type_color);
+                    imgui::ProgressBar(entity.fraction(), {});
+                    imgui::SameLineSpaced(1);
+                    imgui::Text("%s   %zu ", entity.type_name, entity.my_count);
+                // }
+            }
+
+        #else
             f64 percent_dirs     = (f64(cnt.child_directories) / f64(cnt.child_dirents)) * 100.0;
             f64 percent_symlinks = (f64(cnt.child_symlinks)    / f64(cnt.child_dirents)) * 100.0;
             f64 percent_files    = (f64(cnt.child_files)       / f64(cnt.child_dirents)) * 100.0;
@@ -1509,6 +1544,7 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
             if (cnt.child_files > 0) {
                 imgui::TextColored(file_color(), "%zu (%.2lf %%) file%s.", cnt.child_files, percent_files, pluralized(cnt.child_files, "", "s"));
             }
+        #endif
         }
 
         imgui::EndTooltip();

@@ -429,54 +429,58 @@ struct explorer_file_op_progress_sink : public IFileOperationProgressSink
     swan_path_t dst_expl_cwd_when_operation_started;
     bool contains_delete_operations;
 
-    HRESULT FinishOperations(HRESULT) override;
-    HRESULT PauseTimer() override;
-    HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
-    HRESULT PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) override;
-    HRESULT PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
-    HRESULT PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override;
-    HRESULT PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
-    HRESULT PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
-    HRESULT PreDeleteItem(DWORD, IShellItem *) override;
-    HRESULT PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
-    HRESULT PreNewItem(DWORD, IShellItem *, LPCWSTR) override;
-    HRESULT PreRenameItem(DWORD, IShellItem *, LPCWSTR) override;
-    HRESULT ResetTimer() override;
-    HRESULT ResumeTimer() override;
-    HRESULT StartOperations() override;
-    HRESULT UpdateProgress(UINT work_total, UINT work_so_far) override;
+    HRESULT PauseTimer() noexcept override;
+    HRESULT ResetTimer() noexcept override;
+    HRESULT ResumeTimer() noexcept override;
+    HRESULT StartOperations() noexcept override;
+    HRESULT FinishOperations(HRESULT) noexcept override;
+    HRESULT UpdateProgress(UINT work_total, UINT work_so_far) noexcept override;
 
-    ULONG AddRef();
-    ULONG Release();
+    HRESULT PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept override;
+    HRESULT PreDeleteItem(DWORD, IShellItem *) noexcept override;
+    HRESULT PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept override;
+    HRESULT PreNewItem(DWORD, IShellItem *, LPCWSTR) noexcept override;
+    HRESULT PreRenameItem(DWORD, IShellItem *, LPCWSTR) noexcept override;
 
-    HRESULT QueryInterface(const IID &riid, void **ppv);
+    HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept override;
+
+    ULONG AddRef()  noexcept;
+    ULONG Release() noexcept;
+
+    HRESULT QueryInterface(const IID &riid, void **ppv) noexcept;
 };
 
 struct undelete_directory_progress_sink : public IFileOperationProgressSink
 {
     swan_path_t destination_full_path_utf8;
 
-    HRESULT FinishOperations(HRESULT) override;
-    HRESULT PauseTimer() override;
-    HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
-    HRESULT PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) override;
-    HRESULT PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
-    HRESULT PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override;
-    HRESULT PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override;
-    HRESULT PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
-    HRESULT PreDeleteItem(DWORD, IShellItem *) override;
-    HRESULT PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override;
-    HRESULT PreNewItem(DWORD, IShellItem *, LPCWSTR) override;
-    HRESULT PreRenameItem(DWORD, IShellItem *, LPCWSTR) override;
-    HRESULT ResetTimer() override;
-    HRESULT ResumeTimer() override;
-    HRESULT StartOperations() override;
-    HRESULT UpdateProgress(UINT work_total, UINT work_so_far) override;
+    HRESULT PauseTimer() noexcept override;
+    HRESULT ResetTimer() noexcept override;
+    HRESULT ResumeTimer() noexcept override;
+    HRESULT StartOperations() noexcept override;
+    HRESULT FinishOperations(HRESULT) noexcept override;
+    HRESULT UpdateProgress(UINT work_total, UINT work_so_far) noexcept override;
 
-    ULONG AddRef();
-    ULONG Release();
+    HRESULT PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept override;
+    HRESULT PreDeleteItem(DWORD, IShellItem *) noexcept override;
+    HRESULT PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept override;
+    HRESULT PreNewItem(DWORD, IShellItem *, LPCWSTR) noexcept override;
+    HRESULT PreRenameItem(DWORD, IShellItem *, LPCWSTR) noexcept override;
 
-    HRESULT QueryInterface(const IID &riid, void **ppv);
+    HRESULT PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) noexcept override;
+    HRESULT PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept override;
+
+    ULONG AddRef() noexcept;
+    ULONG Release() noexcept;
+
+    HRESULT QueryInterface(const IID &riid, void **ppv) noexcept;
 };
 
 struct move_dirents_drag_drop_payload

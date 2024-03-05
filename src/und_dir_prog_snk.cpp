@@ -2,31 +2,31 @@
 #include "data_types.hpp"
 #include "imgui_specific.hpp"
 
-HRESULT undelete_directory_progress_sink::StartOperations() { print_debug_msg("undelete_directory_progress_sink :: StartOperations"); return S_OK; }
-HRESULT undelete_directory_progress_sink::PauseTimer()      { print_debug_msg("undelete_directory_progress_sink :: PauseTimer");      return S_OK; }
-HRESULT undelete_directory_progress_sink::ResetTimer()      { print_debug_msg("undelete_directory_progress_sink :: ResetTimer");      return S_OK; }
-HRESULT undelete_directory_progress_sink::ResumeTimer()     { print_debug_msg("undelete_directory_progress_sink :: ResumeTimer");     return S_OK; }
+HRESULT undelete_directory_progress_sink::StartOperations() noexcept { print_debug_msg("undelete_directory_progress_sink :: StartOperations"); return S_OK; }
+HRESULT undelete_directory_progress_sink::PauseTimer()      noexcept { print_debug_msg("undelete_directory_progress_sink :: PauseTimer");      return S_OK; }
+HRESULT undelete_directory_progress_sink::ResetTimer()      noexcept { print_debug_msg("undelete_directory_progress_sink :: ResetTimer");      return S_OK; }
+HRESULT undelete_directory_progress_sink::ResumeTimer()     noexcept { print_debug_msg("undelete_directory_progress_sink :: ResumeTimer");     return S_OK; }
 
-HRESULT undelete_directory_progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) { print_debug_msg("undelete_directory_progress_sink :: PostNewItem");    return S_OK; }
-HRESULT undelete_directory_progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *)              { print_debug_msg("undelete_directory_progress_sink :: PostRenameItem"); return S_OK; }
+HRESULT undelete_directory_progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) noexcept { print_debug_msg("undelete_directory_progress_sink :: PostNewItem");    return S_OK; }
+HRESULT undelete_directory_progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *)              noexcept { print_debug_msg("undelete_directory_progress_sink :: PostRenameItem"); return S_OK; }
 
-HRESULT undelete_directory_progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("undelete_directory_progress_sink :: PreCopyItem");   return S_OK; }
-HRESULT undelete_directory_progress_sink::PreDeleteItem(DWORD, IShellItem *)                      { print_debug_msg("undelete_directory_progress_sink :: PreDeleteItem"); return S_OK; }
-HRESULT undelete_directory_progress_sink::PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) { print_debug_msg("undelete_directory_progress_sink :: PreMoveItem");   return S_OK; }
-HRESULT undelete_directory_progress_sink::PreNewItem(DWORD, IShellItem *, LPCWSTR)                { print_debug_msg("undelete_directory_progress_sink :: PreNewItem");    return S_OK; }
-HRESULT undelete_directory_progress_sink::PreRenameItem(DWORD, IShellItem *, LPCWSTR)             { print_debug_msg("undelete_directory_progress_sink :: PreRenameItem"); return S_OK; }
+HRESULT undelete_directory_progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept { print_debug_msg("undelete_directory_progress_sink :: PreCopyItem");   return S_OK; }
+HRESULT undelete_directory_progress_sink::PreDeleteItem(DWORD, IShellItem *)                      noexcept { print_debug_msg("undelete_directory_progress_sink :: PreDeleteItem"); return S_OK; }
+HRESULT undelete_directory_progress_sink::PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept { print_debug_msg("undelete_directory_progress_sink :: PreMoveItem");   return S_OK; }
+HRESULT undelete_directory_progress_sink::PreNewItem(DWORD, IShellItem *, LPCWSTR)                noexcept { print_debug_msg("undelete_directory_progress_sink :: PreNewItem");    return S_OK; }
+HRESULT undelete_directory_progress_sink::PreRenameItem(DWORD, IShellItem *, LPCWSTR)             noexcept { print_debug_msg("undelete_directory_progress_sink :: PreRenameItem"); return S_OK; }
 
-HRESULT undelete_directory_progress_sink::PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("undelete_directory_progress_sink :: PostMoveItem");   return S_OK; }
-HRESULT undelete_directory_progress_sink::PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *)                      { print_debug_msg("undelete_directory_progress_sink :: PostDeleteItem"); return S_OK; }
-HRESULT undelete_directory_progress_sink::PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) { print_debug_msg("undelete_directory_progress_sink :: PostCopyItem");   return S_OK; }
+HRESULT undelete_directory_progress_sink::PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept { print_debug_msg("undelete_directory_progress_sink :: PostMoveItem");   return S_OK; }
+HRESULT undelete_directory_progress_sink::PostDeleteItem(DWORD, IShellItem *, HRESULT, IShellItem *)                      noexcept { print_debug_msg("undelete_directory_progress_sink :: PostDeleteItem"); return S_OK; }
+HRESULT undelete_directory_progress_sink::PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) noexcept { print_debug_msg("undelete_directory_progress_sink :: PostCopyItem");   return S_OK; }
 
-HRESULT undelete_directory_progress_sink::UpdateProgress(UINT work_total, UINT work_so_far)
+HRESULT undelete_directory_progress_sink::UpdateProgress(UINT work_total, UINT work_so_far) noexcept
 {
     print_debug_msg("undelete_directory_progress_sink :: UpdateProgress %zu/%zu", work_so_far, work_total);
     return S_OK;
 }
 
-HRESULT undelete_directory_progress_sink::FinishOperations(HRESULT)
+HRESULT undelete_directory_progress_sink::FinishOperations(HRESULT) noexcept
 {
     print_debug_msg("undelete_directory_progress_sink :: FinishOperations");
 
@@ -53,10 +53,10 @@ HRESULT undelete_directory_progress_sink::FinishOperations(HRESULT)
     return S_OK;
 }
 
-ULONG undelete_directory_progress_sink::AddRef() { return 1; }
-ULONG undelete_directory_progress_sink::Release() { return 1; }
+ULONG undelete_directory_progress_sink::AddRef()  noexcept { return 1; }
+ULONG undelete_directory_progress_sink::Release() noexcept { return 1; }
 
-HRESULT undelete_directory_progress_sink::QueryInterface(const IID &riid, void **ppv)
+HRESULT undelete_directory_progress_sink::QueryInterface(const IID &riid, void **ppv) noexcept
 {
     print_debug_msg("undelete_directory_progress_sink :: QueryInterface");
 
