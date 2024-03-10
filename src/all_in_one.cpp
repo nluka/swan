@@ -10,6 +10,7 @@
 #include "error_mdl.cpp"
 #include "explorer.cpp"
 #include "file_ops.cpp"
+#include "finder.cpp"
 #include "focused_wndw.cpp"
 #include "icon_browser.cpp"
 #include "icon_library.cpp"

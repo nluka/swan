@@ -24,21 +24,33 @@ void apply_swan_style_overrides() noexcept
 {
     ImGuiStyle &style = ImGui::GetStyle();
 
-    style.WindowPadding    = ImVec2(12.0f, 12.0f);
-    style.FramePadding     = ImVec2(5.0f, 5.0f);
+    style.WindowBorderSize = 1;
+    style.WindowRounding = 5;
+    style.WindowPadding = ImVec2(12.0f, 12.0f);
+
+    style.ChildBorderSize = 0;
+
+    style.TabBorderSize = 0;
+    style.TabRounding = 5;
+
+    style.FrameBorderSize = 0;
+    style.FrameRounding = 2;
+    style.FramePadding = ImVec2(5.0f, 5.0f);
+
+    style.PopupBorderSize = 1;
+    style.PopupRounding = 2;
+
     style.CellPadding      = ImVec2(8.0f, 5.0f);
     style.ItemSpacing      = ImVec2(10.0f, 10.0f);
     style.ItemInnerSpacing = ImVec2(8.0f, 8.0f);
 
-    style.TabBorderSize           = 0;
-    style.ChildBorderSize         = 0;
-    style.FrameBorderSize         = 0;
-    style.PopupBorderSize         = 1;
-    style.WindowBorderSize        = 1;
+    style.Colors[ImGuiCol_DragDropTarget] = style.Colors[ImGuiCol_NavHighlight];
+
     style.SeparatorTextBorderSize = 0;
-    style.ScrollbarRounding       = 0;
-    style.FrameRounding           = 2;
-    style.TabRounding             = 0;
+    style.ScrollbarRounding = 0;
+
+    style.Colors[ImGuiCol_WindowBg].w = 1; // fully opaque windows
+    style.Colors[ImGuiCol_PopupBg].w = 1; // fully opaque popups
 
     style.Colors[ImGuiCol_FrameBg] = imgui::RGBA_to_ImVec4(35,40,45, 255);
     style.Colors[ImGuiCol_FrameBg] = imgui::RGBA_to_ImVec4(35,40,45, 255);

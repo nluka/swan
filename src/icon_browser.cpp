@@ -22,9 +22,8 @@ void swan_windows::render_icon_font_browser(
     bool update_list = false;
     {
         imgui::ScopedItemWidth width(imgui::CalcTextSize("1234567890").x * 3);
-        char buffer[256]; init_empty_cstr(buffer);
-        snprintf(buffer, lengthof(buffer), " Search##%s", icon_lib_name);
-        update_list = imgui::InputText(buffer, browser.search_input, sizeof(browser.search_input));
+        auto label = make_str_static<256>(" Search##%s", icon_lib_name);
+        update_list = imgui::InputText(label.data(), browser.search_input, sizeof(browser.search_input));
     }
 
     if (update_list) {
@@ -61,21 +60,17 @@ void swan_windows::render_icon_font_browser(
 
     {
         imgui::ScopedItemWidth width(imgui::CalcTextSize("1234567890").x * 3);
-        char buffer[256]; init_empty_cstr(buffer);
-        snprintf(buffer, lengthof(buffer), " Grid Width##%s", icon_lib_name);
-        imgui::SliderInt(buffer, &browser.grid_width, 1, 50);
+        auto label = make_str_static<256>(" Grid Width##%s", icon_lib_name);
+        imgui::SliderInt(label.data(), &browser.grid_width, 1, 50);
     }
 
     imgui::Separator();
 
-    char buffer1[256]; init_empty_cstr(buffer1);
-    char buffer2[256]; init_empty_cstr(buffer2);
+    auto label_child = make_str_static<256>("icons_matched_child_%s", icon_lib_name);
+    auto label_table = make_str_static<256>("icons_matched_tbl_%s", icon_lib_name);
 
-    snprintf(buffer1, lengthof(buffer1), "icons_matched_child_%s", icon_lib_name);
-    snprintf(buffer2, lengthof(buffer2), "icons_matched_tbl_%s", icon_lib_name);
-
-    if (imgui::BeginChild(buffer1)) {
-        if (imgui::BeginTable(buffer2, browser.grid_width, ImGuiTableFlags_SizingFixedFit)) {
+    if (imgui::BeginChild(label_child.data())) {
+        if (imgui::BeginTable(label_table.data(), browser.grid_width, ImGuiTableFlags_SizingFixedFit)) {
             for (auto const &icon : browser.matches) {
                 imgui::TableNextColumn();
 

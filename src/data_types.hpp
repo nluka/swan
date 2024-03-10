@@ -1,8 +1,6 @@
 #pragma once
 
 #include "stdafx.hpp"
-#include "path.hpp"
-#include "util.hpp"
 
 template <typename ElemTy>
 using circular_buffer = boost::circular_buffer<ElemTy>;
@@ -11,6 +9,10 @@ template <typename ElemTy, size_t Size>
 using static_vector = boost::container::static_vector<ElemTy, Size>;
 
 typedef BS::thread_pool swan_thread_pool_t;
+
+#include "path.hpp"
+#include "util.hpp"
+#include "progressive_task.hpp"
 
 struct generic_result
 {
@@ -126,6 +128,7 @@ struct swan_settings
         bool explorer_1 = false;
         bool explorer_2 = false;
         bool explorer_3 = false;
+        bool finder = false;
         bool pinned = false;
         bool file_operations = false;
         bool recent_files = false;
@@ -205,7 +208,7 @@ struct explorer_window
 {
     struct dirent
     {
-        basic_dirent basic;
+        basic_dirent basic = {};
         ptrdiff_t highlight_start_idx = 0;
         u64 highlight_len = 0;
         u32 spotlight_frames_remaining = 0;
@@ -357,7 +360,6 @@ struct explorer_window
     bool filter_show_invalid_symlinks = true;       // persisted in file
 
     bool show_filter_window = false;
-    bool show_function_buttons = false;
     bool cwd_latest_selected_dirent_idx_changed = false;
     bool highlight = false;
 
@@ -365,6 +367,30 @@ struct explorer_window
                                                                      signals to the explorer to call update_cwd_entries */
 
     mutable s8 latest_save_to_disk_result = -1;
+};
+
+struct finder_window
+{
+    struct search_directory
+    {
+        bool found;
+        swan_path_t path_utf8;
+    };
+
+    struct match
+    {
+        basic_dirent basic = {};
+        char const *file_name = nullptr;
+        ptrdiff_t highlight_start_idx = 0;
+        u64 highlight_len = 0;
+    };
+
+    progressive_task<std::vector<finder_window::match>> search_task = {};
+    std::array<char, 1024> search_value = {};
+    std::vector<search_directory> search_directories = {};
+    std::atomic<u64> num_entries_checked = 0;
+    bool detailed_symlinks = false;
+    bool focus_search_value_input = false;
 };
 
 struct symlink_data
@@ -534,7 +560,7 @@ struct bulk_rename_compiled_pattern
         bool explicit_first = false;
         bool explicit_last = false;
         u16 slice_first = 0;
-        u16 slice_last = 0;
+        u16 slice_last = UINT16_MAX;
 
         bool operator!=(op const &other) const noexcept; // for ntest
         friend std::ostream& operator<<(std::ostream &os, op const &r); // for ntest

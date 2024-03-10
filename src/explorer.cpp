@@ -1587,8 +1587,6 @@ void render_num_cwd_items_selected(explorer_window &expl, cwd_count_info const &
     imgui::Text("(%zu selected)", cnt.selected_dirents);
 
     if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
-        imgui::TextUnformatted("Click to see next selected entry.");
-
         if (cnt.selected_directories > 0) {
             imgui::TextColored(dir_color(), "%zu director%s selected.", cnt.selected_directories, pluralized(cnt.selected_directories, "y", "ies"));
         }
@@ -1598,6 +1596,10 @@ void render_num_cwd_items_selected(explorer_window &expl, cwd_count_info const &
         if (cnt.selected_files > 0) {
             imgui::TextColored(file_color(), "%zu file%s selected.", cnt.selected_files, pluralized(cnt.selected_files, "", "s"));
         }
+
+        imgui::Spacing();
+
+        imgui::TextUnformatted("Click to see next selected entry.");
 
         imgui::EndTooltip();
     }
@@ -1622,9 +1624,8 @@ static
 void render_file_op_payload_hint() noexcept
 {
     {
-        char buffer[64]; init_empty_cstr(buffer);
-        (void) snprintf(buffer, lengthof(buffer), "%s %zu", ICON_CI_COPY, s_file_op_payload.items.size());
-        if (imgui::Selectable(buffer, false, 0, imgui::CalcTextSize(buffer))) {
+        auto label = make_str_static<64>("%s %zu", ICON_CI_COPY, s_file_op_payload.items.size());
+        if (imgui::Selectable(label.data(), false, 0, imgui::CalcTextSize(label.data()))) {
             imgui::OpenPopup("File Operation Payload");
         }
     }
@@ -1632,10 +1633,10 @@ void render_file_op_payload_hint() noexcept
         s_file_op_payload.clear();
     }
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("File operation(s) ready\n""Left click to view\n""Right click to clear\n");
+        imgui::SetTooltip("File operations clipboard - left click to view, right click to clear.");
     }
     if (imgui::BeginPopup("File Operation Payload")) {
-        imgui::Text("%zu operation%s will be executed on next paste:",
+        imgui::Text("%zu operation%s will be executed on next paste.",
             s_file_op_payload.items.size(),
             s_file_op_payload.items.size() > 1 ? "s" : "");
 
@@ -1660,17 +1661,7 @@ void render_file_op_payload_hint() noexcept
                 imgui::TableNextColumn();
                 imgui::TextColored(get_color(item.type), get_icon(item.type));
                 imgui::SameLine();
-                #if 1
                 imgui::TextUnformatted(item.path.data());
-                #else
-                {
-                    char buffer[2048]; init_empty_cstr(buffer);
-                    (void) snprintf(buffer, lengthof(buffer), "%s##file_operation_command_buf.items[%zu]", item.path.data(), i);
-                    if (imgui::Selectable(buffer)) {
-                        // TODO: jump to dirent in explorer
-                    }
-                }
-                #endif
             }
 
             imgui::EndTable();
@@ -1704,6 +1695,10 @@ void render_back_to_prev_valid_cwd_button(explorer_window &expl) noexcept
             (void) expl.save_to_disk();
         }
     }
+
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("Back");
+    }
 }
 
 static
@@ -1729,6 +1724,21 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
             expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
             (void) expl.update_cwd_entries(filter, expl.cwd.data());
         }
+    }
+
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("Forward");
+    }
+}
+
+static
+void render_history_browser_button() noexcept
+{
+    if (imgui::Button(ICON_CI_HISTORY "##expl.wd_history")) {
+        imgui::OpenPopup("history_popup");
+    }
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("Open history");
     }
 }
 
@@ -1783,18 +1793,13 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
                 imgui::TableNextColumn();
                 imgui::Text("%3zu ", i_inverse + 1);
 
-                char buffer[2048]; init_empty_cstr(buffer);
-                {
-                    [[maybe_unused]] s32 written = snprintf(buffer, lengthof(buffer), "%s ##%zu", hist_path.data(), i);
-                    assert(written < lengthof(buffer));
-                }
-
                 imgui::TableNextColumn();
 
+                auto label = make_str_static<1200>("%s ##%zu", hist_path.data(), i);
                 bool pressed;
                 {
                     imgui::ScopedTextColor tc(dir_color());
-                    pressed = imgui::Selectable(buffer, false, ImGuiSelectableFlags_SpanAllColumns);
+                    pressed = imgui::Selectable(label.data(), false, ImGuiSelectableFlags_SpanAllColumns);
                 }
 
                 if (pressed) {
@@ -1848,9 +1853,9 @@ void render_pins_popup(explorer_window &expl) noexcept
 
                 if (imgui::Selectable(pin.label.c_str(), &selected)) {
                     if (!directory_exists(pin.path.data())) {
-                        swan_popup_modals::open_error(
-                            make_str("Open pin [%s].", pin.label.c_str()).c_str(),
-                            make_str("Pin path [%s] does not exit.", pin.path.data()).c_str());
+                        char const *action = make_str("Open pin [%s].", pin.label.c_str()).c_str();
+                        char const *failed = make_str("Pin path [%s] does not exit.", pin.path.data()).c_str();
+                        swan_popup_modals::open_error(action, failed);
                     }
                     else {
                         auto [pin_is_valid_dir, _] = expl.update_cwd_entries(query_filesystem, pin.path.data());
@@ -2087,7 +2092,7 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
 }
 
 static
-void render_filter_text_input(explorer_window &expl) noexcept
+void render_filter_text_input(explorer_window &expl, bool window_hovered, bool ctrl_key_down) noexcept
 {
     auto width = std::max(
         imgui::CalcTextSize(expl.filter_text.data()).x + (imgui::GetStyle().FramePadding.x * 2) + 10.f,
@@ -2099,6 +2104,10 @@ void render_filter_text_input(explorer_window &expl) noexcept
     if (imgui::InputTextWithHint("##filter", ICON_CI_FILTER, expl.filter_text.data(), expl.filter_text.size())) {
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
         (void) expl.save_to_disk();
+    }
+
+    if (window_hovered && ctrl_key_down && imgui::IsKeyPressed(ImGuiKey_F)) {
+        imgui::ActivateItemByID(imgui::GetID("##filter"));
     }
 }
 
@@ -2167,10 +2176,9 @@ void render_filter_mode_toggle(explorer_window &expl) noexcept
     static char const *current_mode = nullptr;
     current_mode = filter_modes[expl.filter_mode];
 
-    char buffer[64]; init_empty_cstr(buffer);
-    snprintf(buffer, lengthof(buffer), "%s##%zu", current_mode, expl.filter_mode);
+    auto label = make_str_static<64>("%s##%zu", current_mode, expl.filter_mode);
 
-    if (imgui::Button(buffer)) {
+    if (imgui::Button(label.data())) {
         inc_or_wrap<u64>((u64 &)expl.filter_mode, 0, u64(explorer_window::filter_mode::count) - 1);
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
         (void) expl.save_to_disk();
@@ -2357,18 +2365,15 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
     }
     bool already_pinned = pin_idx != std::string::npos;
 
-    char buffer[4] = {};
-    {
-        [[maybe_unused]] s32 written = snprintf(buffer, lengthof(buffer), "%s", already_pinned ? ICON_CI_STAR_FULL : ICON_CI_STAR_EMPTY);
-        assert(written < lengthof(buffer));
-    }
+    auto label = make_str_static<8>("%s", already_pinned ? ICON_CI_STAR_FULL : ICON_CI_STAR_EMPTY);
 
     imgui::ScopedDisable disabled(!cwd_exists_before_edit && !already_pinned);
 
-    if (imgui::Button(buffer)) {
+    if (imgui::Button(label.data())) {
         if (already_pinned) {
             imgui::OpenConfirmationModalWithCallback(
-                swan_id_confirm_explorer_unpin_directory,
+                /* confirmation_id  = */ swan_id_confirm_explorer_unpin_directory,
+                /* confirmation_msg = */
                 [pin_idx]() noexcept {
                     auto const &pin = global_state::pins()[pin_idx];
 
@@ -2381,12 +2386,13 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
 
                     imgui::TextUnformatted("This action cannot be undone.");
                 },
+                /* on_yes_callback = */
                 [pin_idx, &expl]() noexcept {
                     scoped_timer<timer_unit::MICROSECONDS> unpin_timer(&expl.unpin_us);
                     global_state::remove_pin(pin_idx);
                     (void) global_state::settings().save_to_disk();
                 },
-                &global_state::settings().confirm_explorer_unpin_directory
+                /* confirmation_enabled = */ &(global_state::settings().confirm_explorer_unpin_directory)
             );
         }
         else {
@@ -2419,8 +2425,98 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
             if (cwd_is_drive) {
                 path_clear(expl.cwd);
             } else {
-                swan_popup_modals::open_error(make_str("Ascend to directory [%s]", result.parent_dir.data()).c_str(), "Directory not found.");
+                char const *action = make_str("Ascend to directory [%s]", result.parent_dir.data()).c_str();
+                char const *failed = "Directory not found.";
+                swan_popup_modals::open_error(action, failed);
             }
+        }
+    }
+
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("Up to parent directory");
+    }
+}
+
+static
+void render_help_icon() noexcept
+{
+    imgui::AlignTextToFramePadding();
+    imgui::TextUnformatted("(?)");
+
+    if (imgui::IsItemHovered()) {
+        if (imgui::BeginTooltip()) {
+            imgui::ScopedStyle<ImVec2> s(imgui::GetStyle().CellPadding, { 15.f, 6.f });
+
+            if (imgui::BeginTable("help_icon_table", 3, ImGuiTableFlags_SizingFixedFit)) {
+                struct tooltip_table_row
+                {
+                    char const *keybind = nullptr;
+                    char const *action = nullptr;
+                    char const *description = nullptr;
+                };
+
+                tooltip_table_row const table_row_data[] = {
+                    { "Ctrl F", "(F)ilter", "Toggle controls to filter (hide/find) entries in the current working directory." },
+                    { "Ctrl Shift F", "(F)inder", "Open current working directory in Finder." },
+                    { "Ctrl Shift A F", "(A)dd to (F)inder", "Add current working directory to Finder." },
+                    { "Ctrl C", "(C)opy selected entries to clipboard", "Add copy operation to the clipboard for each selected entry in the current working directory." },
+                    { "Ctrl X", "Cut selected entries to clipboard", "Add move operation to the clipboard for each selected entry in the current working directory." },
+                    { "Ctrl V", "Paste", "Execute file operations from the clipboard into the current working directory." },
+                    { "Del", "(Del)ete selected entries", "Initiate revertable delete operation for all selected entries in the current working directory, including filtered ones." },
+                    { "Escape", "Deselect all entries", "Deselect all entries in the current working directory, including filtered ones." },
+                    { "Ctrl A", "Select (a)ll visible entries", "Select all visible entries in the current working directory." },
+                    { "Ctrl I", "(I)nvert selection", "Invert selection state of all visible entries in the current working directory." },
+                    { "Ctrl R, F2", "(R)ename selected entries", "Open bulk rename modal if multiple entries are selected, or the simpler single rename modal if only one entry is selected." },
+                    { "Ctrl N F", "(N)ew (f)ile", "Open modal for creating a new empty file." },
+                    { "Ctrl N D", "(N)ew (d)irectory", "Open modal for creating a new empty directory." },
+                    { "Ctrl H", "Open (h)istory", "Open history modal where you can view and navigate to previous working directories." },
+                    { "Ctrl P", "(P)in current working directory", "Open modal to pin the current working directory, or modify the existing pin." },
+                    { "Ctrl O", "(O)pen pins", "Open modal where pinned directories can be accessed." },
+                };
+
+                imgui::TableSetupColumn("[Keybind]", {}, {}, 0);
+                imgui::TableSetupColumn("[Action]", {}, {}, 1);
+                imgui::TableSetupColumn("[Description]", {}, {}, 2);
+                imgui::TableHeadersRow();
+
+                for (auto const &table_row : table_row_data) {
+                    imgui::TableNextRow();
+
+                    imgui::TableNextColumn();
+                    imgui::Text(" %s", table_row.keybind);
+
+                    imgui::TableNextColumn();
+                    imgui::Text(" %s", table_row.action);
+
+                    imgui::TableNextColumn();
+                    imgui::Text(" %s ", table_row.description);
+                }
+
+                imgui::EndTable();
+            }
+
+            imgui::Spacing();
+
+            imgui::TextUnformatted("[General navigation]");
+            imgui::TextUnformatted(" - Left click an entry to toggle it's selection state (all other entries will be deselected).");
+            imgui::TextUnformatted(" - Shift left click an entry to select a range starting from previously selected entry, or the first entry if none have been selected yet.");
+            imgui::TextUnformatted(" - Ctrl left click an entry to toggle it's selection state without altering other selections.");
+            imgui::TextUnformatted(" - Double left click a file to open it.");
+            imgui::TextUnformatted(" - Double left click a directory to enter it.");
+            imgui::TextUnformatted(" - Double left click a symlink to open or enter it.");
+            imgui::TextUnformatted(" - Right click an entry to open the context menu for selected entries, or the hovered entry if none are selected.");
+
+            imgui::Spacing();
+
+            imgui::TextUnformatted("[Terminology]");
+            imgui::TextUnformatted(" - Directory: Known as a folder in the Windows File Explorer. Contains other entries.");
+            imgui::TextUnformatted(" - File: Anything that isn't a directory or symlink. Contains data.");
+            imgui::TextUnformatted(" - Symlink: Known as a shortcut in the Windows File Explorer. Points to an entry, possibly in a different directory.");
+            imgui::TextUnformatted(" - Entry: Generic term for a directory, file, or symlink.");
+
+            imgui::Spacing();
+
+            imgui::EndTooltip();
         }
     }
 }
@@ -2492,10 +2588,9 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
     {
         u64 i = 0;
         for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it, ++i) {
-            char buffer[1024]; init_empty_cstr(buffer);
-            snprintf(buffer, lengthof(buffer), "%s##slice%zu", *slice_it, i);
+            auto label = make_str_static<1200>("%s##slice%zu", *slice_it, i);
 
-            if (imgui::Button(buffer)) {
+            if (imgui::Button(label.data())) {
                 print_debug_msg("[ %d ] clicked slice [%s]", expl.id, *slice_it);
                 cd_to_slice(*slice_it);
             }
@@ -2511,11 +2606,9 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
 #endif
 
 static
-void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, char dir_sep_utf8, wchar_t dir_sep_utf16) noexcept
+void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, char dir_sep_utf8, wchar_t dir_sep_utf16, f32 avail_width_subtract_amt) noexcept
 {
-    // f32 button_space = imgui::CalcTextSize(ICON_CI_BLANK).x + imgui::GetStyle().ItemSpacing.x + (imgui::GetStyle().FramePadding.x * 2);
-    f32 button_space = 0;
-    imgui::ScopedAvailWidth w(button_space);
+    imgui::ScopedAvailWidth w(avail_width_subtract_amt);
 
     static swan_path_t cwd_input = {};
     cwd_input = expl.cwd;
@@ -2546,34 +2639,40 @@ void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, c
     }
 }
 
-void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
+void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_window &finder) noexcept
 {
     ImVec4 window_bg_color = imgui::GetStyle().Colors[ImGuiCol_WindowBg];
     if (expl.highlight) {
         expl.highlight = false;
-        imgui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.15f, 0.06f, 0.06f, 0.94f);
+        imgui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.15f, 0.06f, 0.06f, 1);
     }
     SCOPE_EXIT { imgui::GetStyle().Colors[ImGuiCol_WindowBg] = window_bg_color; };
 
+    // ImVec2 usual_window_padding = imgui::GetStyle().WindowPadding;
+    // imgui::ScopedStyle<ImVec2> no_window_padding(imgui::GetStyle().WindowPadding, { 0, 0 });
+
     {
-        bool is_explorer_visible = imgui::Begin(expl.name, &open);
+        bool is_explorer_visible = imgui::Begin(expl.name, &open, ImGuiWindowFlags_NoCollapse);
         if (!is_explorer_visible) {
             imgui::End();
             return;
         }
     }
 
-    char child_name[64];
-    (void) snprintf(child_name, lengthof(child_name), "%s##main_child", expl.name);
-
     ImVec2 base_window_pos = imgui::GetCursorScreenPos();
 
-    if (imgui::BeginChild(child_name)) {
+    // no_window_padding.~ScopedStyle();
+    // imgui::ScopedStyle<ImVec2> usual_window_padding_scoped(imgui::GetStyle().WindowPadding, usual_window_padding);
+
+    auto label_child = make_str_static<64>("%s##main_child", expl.name);
+    if (imgui::BeginChild(label_child.data(), {}, false)) {
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
         assert(expl.id >= 0);
         global_state::save_focused_window(swan_windows::explorer_0 + expl.id);
     }
+
+    bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
 
     auto &io = imgui::GetIO();
     auto &style = imgui::GetStyle();
@@ -2599,36 +2698,49 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
     static explorer_window::dirent const *dirent_to_be_renamed = nullptr;
 
-    // handle [Del], [F2], [Ctrl-X], [Ctrl-C], [Ctrl-V]
-    if (window_focused && !any_popups_open) {
-        if (imgui::IsKeyPressed(ImGuiKey_Delete)) {
+    if (!any_popups_open) {
+        // handle most keybinds here. The redundant checks for `window_focused` and `io.KeyCtrl` are intentional,
+        // a tiny performance penalty for much easier to read code.
+
+        auto handle_file_op_failure = [](char const *operation, generic_result const &result) noexcept {
+            if (!result.success) {
+                u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
+                char const *action = make_str("%s %zu items.", operation, num_failed).c_str();
+                char const *failed = result.error_or_utf8_path.c_str();
+                swan_popup_modals::open_error(action, failed);
+            }
+        };
+
+        if (window_focused && imgui::IsKeyPressed(ImGuiKey_Delete)) {
             u64 num_entries_selected = std::count_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
                                                      [](explorer_window::dirent const &e) noexcept { return e.is_selected; });
 
             if (num_entries_selected > 0) {
                 imgui::OpenConfirmationModalWithCallback(
-                    swan_id_confirm_explorer_execute_delete,
-                    make_str("Are you sure you want to delete the %zu selected file(s) from Explorer %d?", num_entries_selected, expl.id+1).c_str(),
+                    /* confirmation_id  = */ swan_id_confirm_explorer_execute_delete,
+                    /* confirmation_msg = */ make_str("Are you sure you want to delete the %zu selected file(s) from Explorer %d?", num_entries_selected, expl.id+1).c_str(),
+                    /* on_yes_callback  = */
                     [&]() noexcept {
                         auto result = delete_selected_entries(expl);
 
                         if (!result.success) {
                             u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                            swan_popup_modals::open_error(make_str("Delete %zu items.", num_failed).c_str(), result.error_or_utf8_path.c_str());
+                            char const *action = make_str("Delete %zu items.", num_failed).c_str();
+                            char const *failed = result.error_or_utf8_path.c_str();
+                            swan_popup_modals::open_error(action, failed);
                         }
                         (void) global_state::settings().save_to_disk();
                     },
-                    &global_state::settings().confirm_explorer_delete_via_keybind
+                    /* confirmation_enabled = */ &(global_state::settings().confirm_explorer_delete_via_keybind)
                 );
             }
         }
-
-        if (imgui::IsKeyPressed(ImGuiKey_F2)) {
+        else if (window_hovered && (imgui::IsKeyPressed(ImGuiKey_F2) || (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)))) {
             u64 num_entries_selected = std::count_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
                                                      [](explorer_window::dirent const &e) noexcept { return e.is_selected; });
 
             if (num_entries_selected == 0) {
-                swan_popup_modals::open_error("Keybind for rename [F2] was pressed.", "Nothing is selected.");
+                // swan_popup_modals::open_error("Keybind for rename was pressed.", "Nothing is selected.");
             }
             else if (num_entries_selected == 1) {
                 auto selected_dirent = std::find_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
@@ -2640,91 +2752,91 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                 open_bulk_rename_popup = true;
             }
         }
+        else if (window_hovered && imgui::IsKeyPressed(ImGuiKey_Backspace)) {
+            if (expl.wd_history_pos > 0) {
+                if (io.KeyShift) {
+                    expl.wd_history_pos = 0;
+                } else {
+                    expl.wd_history_pos -= 1;
+                }
 
-        if (io.KeyCtrl) {
-            if (imgui::IsKeyPressed(ImGuiKey_L)) {
-                if (expl.wd_history_pos > 0) {
-                    if (io.KeyShift) {
-                        expl.wd_history_pos = 0;
-                    } else {
-                        expl.wd_history_pos -= 1;
-                    }
-
-                    expl.cwd = expl.wd_history[expl.wd_history_pos];
-                    auto [back_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                    if (back_dir_exists) {
-                        expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                        (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                        (void) expl.save_to_disk();
-                    }
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                auto [back_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                if (back_dir_exists) {
+                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                    (void) expl.save_to_disk();
                 }
             }
+        }
+        else if (window_hovered && io.KeyShift && imgui::IsKeyPressed(ImGuiKey_Backspace)) {
+            u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
 
-            if (imgui::IsKeyPressed(ImGuiKey_R)) {
-                u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
+            if (expl.wd_history_pos != wd_history_last_idx) {
+                if (io.KeyShift) {
+                    expl.wd_history_pos = wd_history_last_idx;
+                } else {
+                    expl.wd_history_pos += 1;
+                }
 
-                if (expl.wd_history_pos != wd_history_last_idx) {
-                    if (io.KeyShift) {
-                        expl.wd_history_pos = wd_history_last_idx;
-                    } else {
-                        expl.wd_history_pos += 1;
-                    }
-
-                    expl.cwd = expl.wd_history[expl.wd_history_pos];
-                    auto [forward_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                    if (forward_dir_exists) {
-                        expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                        (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                    }
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                auto [forward_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                if (forward_dir_exists) {
+                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
                 }
             }
-
-            if (imgui::IsKeyPressed(ImGuiKey_I)) {
-                expl.invert_selection_on_visible_cwd_entries();
-            }
-
-            if (imgui::IsKeyPressed(ImGuiKey_H)) {
-                // expl.show_filter_window = false;
-                imgui::OpenPopup("History");
-            }
-
-            if (imgui::IsKeyDown(ImGuiKey_N)) {
-                if (imgui::IsKeyPressed(ImGuiKey_F)) {
-                    // expl.show_filter_window = false;
-                    imgui::OpenPopup("Create file");
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_I)) {
+            expl.invert_selection_on_visible_cwd_entries();
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_H)) {
+            imgui::OpenPopup("History");
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyDown(ImGuiKey_N) && imgui::IsKeyPressed(ImGuiKey_F)) {
+            imgui::OpenPopup("Create file");
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyDown(ImGuiKey_N) && imgui::IsKeyPressed(ImGuiKey_D)) {
+            imgui::OpenPopup("Create directory");
+        }
+        else if (window_hovered && io.KeyCtrl && io.KeyShift && imgui::IsKeyPressed(ImGuiKey_F)) {
+            if (cwd_exists_before_edit) {
+                if (finder.search_task.active_token.load() == true) {
+                    finder.search_task.cancellation_token.store(true);
                 }
-                else if (imgui::IsKeyPressed(ImGuiKey_D)) {
-                    // expl.show_filter_window = false;
-                    imgui::OpenPopup("Create directory");
-                }
-            }
-            else if (imgui::IsKeyPressed(ImGuiKey_F) /* && !any_popups_open */) {
-                // expl.show_filter_window = true;
-                flip_bool(expl.show_filter_window);
-            }
 
-            auto handle_failure = [](char const *operation, generic_result const &result) noexcept {
-                if (!result.success) {
-                    u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                    swan_popup_modals::open_error(
-                        make_str("%s %zu items.", operation, num_failed).c_str(),
-                        result.error_or_utf8_path.c_str());
+                if (!imgui::IsKeyDown(ImGuiKey_A)) {
+                    finder.search_directories.clear();
                 }
-            };
+                finder.search_directories.push_back({ cwd_exists_before_edit, expl.cwd });
 
-            if (imgui::IsKeyPressed(ImGuiKey_X)) {
-                s_file_op_payload.clear();
-                auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
-                handle_failure("cut", result);
+                init_empty_cstr(finder.search_value.data());
+                finder.focus_search_value_input = true;
+
+                global_state::settings().show.finder = true;
+                (void) global_state::settings().save_to_disk();
+
+                imgui::SetWindowFocus(swan_windows::get_name(swan_windows::finder));
             }
-            if (imgui::IsKeyPressed(ImGuiKey_C)) {
-                s_file_op_payload.clear();
-                auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
-                handle_failure("copy", result);
-            }
-            if (imgui::IsKeyPressed(ImGuiKey_V) && !s_file_op_payload.items.empty()) {
-                s_file_op_payload.execute(expl);
-            }
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
+            flip_bool(expl.show_filter_window);
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_A) && !io.KeyShift /* to prevent this from firing when doing [Ctrl Shift A F] */) {
+            expl.select_all_visible_cwd_entries();
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_X)) {
+            s_file_op_payload.clear();
+            auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
+            handle_file_op_failure("cut", result);
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_C)) {
+            s_file_op_payload.clear();
+            auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
+            handle_file_op_failure("copy", result);
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_V) && !s_file_op_payload.items.empty()) {
+            s_file_op_payload.execute(expl);
         }
     }
 
@@ -2739,10 +2851,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             refresh(expl.update_request_from_outside);
             expl.update_request_from_outside = nil;
         }
-        // else if (window_focused && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_R)) {
-        //     print_debug_msg("[ %d ] Ctrl-R, refresh triggered", expl.id);
-        //     refresh(full_refresh);
-        // }
         else if (global_state::settings().explorer_refresh_mode != swan_settings::explorer_refresh_mode_manual && cwd_exists_before_edit) {
             auto issue_read_dir_changes = [&]() noexcept {
                 wchar_t cwd_utf16[MAX_PATH];
@@ -2837,134 +2945,68 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     // refresh logic end
 
     if (global_state::settings().show_debug_info) {
-        char buffer[64];
-        (void) snprintf(buffer, lengthof(buffer), " Explorer %d Debug Info ", expl.id + 1);
-        if (imgui::Begin(buffer, nullptr)) {
+        auto window_name = make_str_static<64>(" Explorer %d Debug Info ", expl.id + 1);
+        if (imgui::Begin(window_name.data(), nullptr)) {
             render_debug_info(expl, size_unit_multiplier);
         }
         imgui::End();
     }
 
+    // header controls
     {
-        // char const *icon = expl.show_function_buttons ? ICON_CI_LAYOUT_PANEL : ICON_CI_LAYOUT_PANEL_OFF;
-        char const *icon = expl.show_function_buttons ? ICON_CI_CHEVRON_DOWN : ICON_CI_CHEVRON_RIGHT;
+        render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
 
-        if (imgui::Button(icon)) {
-            flip_bool(expl.show_function_buttons);
-        }
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("%s extra function buttons", expl.show_function_buttons ? "Hide" : "Show");
-        }
-    }
-
-    imgui::SameLine();
-
-    render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
-    if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Up to parent directory");
-    }
-
-    imgui::SameLine();
-
-    render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16);
-
-    imgui::Spacing();
-
-    if (expl.show_function_buttons) {
-        SCOPE_EXIT { imgui::Spacing(); };
-
-        render_button_pin_cwd(expl, cwd_exists_before_edit);
-
-        imgui::SameLineSpaced(2);
+        imgui::SameLine();
 
         render_back_to_prev_valid_cwd_button(expl);
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("Back");
-        }
 
         imgui::SameLine();
 
         render_forward_to_next_valid_cwd_button(expl);
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("Forward");
-        }
 
         imgui::SameLine();
 
-        if (imgui::Button(ICON_CI_HISTORY "##expl.wd_history")) {
-            imgui::OpenPopup("history_popup");
-        }
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("Open history");
-        }
-        if (imgui::BeginPopup("history_popup")) {
-            swan_path_t backup = expl.cwd;
-            bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
+        // render_history_browser_button();
 
-            if (history_item_clicked) {
-                auto [history_item_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                if (history_item_exists) {
-                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                    (void) expl.save_to_disk();
-                } else {
-                    swan_popup_modals::open_error(make_str("Navigate to history item [%s]", expl.cwd.data()).c_str(), "Path not found, maybe it was renamed or deleted?");
-                    expl.cwd = backup;
-                    (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
-                }
+        // imgui::SameLine();
+
+        f32 avail_width_subtract_amt = imgui::CalcTextSize("(?)").x + imgui::GetStyle().ItemSpacing.x; // for help icon
+        render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, avail_width_subtract_amt);
+
+        imgui::SameLine();
+
+        render_help_icon();
+    }
+
+    if (imgui::BeginPopup("history_popup")) {
+        swan_path_t backup = expl.cwd;
+        bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
+
+        if (history_item_clicked) {
+            auto [history_item_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            if (history_item_exists) {
+                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                (void) expl.save_to_disk();
+            } else {
+                char const *action = make_str("Navigate to history item [%s]", expl.cwd.data()).c_str();
+                char const *failed = "Path not found, maybe it was renamed or deleted?";
+                swan_popup_modals::open_error(action, failed);
+
+                expl.cwd = backup;
+                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
             }
-        }
-
-        imgui::SameLineSpaced(2);
-
-        if (imgui::Button(ICON_CI_BOOKMARK "##pins")) {
-            imgui::OpenPopup("pins_popup");
-        }
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("Open pins");
-        }
-        if (imgui::BeginPopup("pins_popup")) {
-            render_pins_popup(expl);
-            imgui::EndPopup();
-        }
-
-        imgui::SameLine();
-
-        if (imgui::Button(ICON_CI_SYMBOL_NULL "##invert_selection")) {
-            expl.invert_selection_on_visible_cwd_entries();
-        }
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("Invert selection");
-        }
-
-        imgui::SameLine();
-
-        if (imgui::Button(ICON_CI_NEW_FOLDER "##+dir")) {
-            imgui::OpenPopup("Create directory");
-        }
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("Create directory");
-        }
-
-        imgui::SameLine();
-
-        if (imgui::Button(ICON_CI_NEW_FILE "##+file")) {
-            imgui::OpenPopup("Create file");
-        }
-        if (imgui::IsItemHovered()) {
-            imgui::SetTooltip("Create file");
         }
     }
 
     if (expl.show_filter_window) {
+        imgui::Spacing();
+
         render_filter_reset_button(expl);
 
         imgui::SameLine();
 
-        render_filter_text_input(expl);
-        if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
-            imgui::ActivateItemByID(imgui::GetID("##filter"));
-        }
+        render_filter_text_input(expl, window_hovered, io.KeyCtrl);
 
         {
             imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
@@ -3163,9 +3205,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
 
                 imgui::EndTable();
             }
-            if (ImGui::IsItemHovered() && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_A)) {
-                expl.select_all_visible_cwd_entries();
-            }
+
             cwd_entries_table_size = imgui::GetItemRectSize();
             cwd_entries_table_min = imgui::GetItemRectMin();
             cwd_entries_table_max = imgui::GetItemRectMax();
@@ -3184,7 +3224,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     ImVec2 leftovers_rect_min(cwd_entries_child_min.x, cwd_entries_table_max.y);
     ImVec2 leftovers_rect_max = cwd_entries_child_max;
 
-    if (window_focused && imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max) && imgui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max) && imgui::IsKeyPressed(ImGuiKey_Escape)) {
         expl.deselect_all_cwd_entries();
     }
     if (imgui::IsMouseHoveringRect(leftovers_rect_min, leftovers_rect_max) && imgui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -3263,7 +3303,10 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
                 (void) expl.save_to_disk();
             } else {
-                swan_popup_modals::open_error(make_str("Navigate to history item [%s]", expl.cwd.data()).c_str(), "Path not found, maybe it was renamed or deleted?");
+                char const *action = make_str("Navigate to history item [%s]", expl.cwd.data()).c_str();
+                char const *failed = "Path not found, maybe it was renamed or deleted?";
+                swan_popup_modals::open_error(action, failed);
+
                 expl.cwd = backup;
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
             }
@@ -3283,10 +3326,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     {
         imgui::ScopedColor c(ImGuiCol_WindowBg, window_bg_color);
 
-        char buffer[32];
-        (void) snprintf(buffer, lengthof(buffer), "Filter##%d", expl.id);
+        auto label = make_str_static<32>("Filter##%d", expl.id);
 
-        if (expl.show_filter_window && imgui::Begin(buffer, nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoTitleBar)) {
+        if (expl.show_filter_window && imgui::Begin(label.data(), nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoTitleBar)) {
             if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
                 flip_bool(expl.show_filter_window);
                 expl.reset_filter();
@@ -3308,9 +3350,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
                 imgui::SameLine();
 
                 render_filter_text_input(expl);
-                if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
-                    imgui::ActivateItemByID(imgui::GetID("##filter"));
-                }
 
                 {
                     imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
@@ -3349,7 +3388,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
     imgui::EndChild();
 
     if (imgui::BeginDragDropTarget()) {
-        auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name());
+        auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name(), {}, ImVec2(6.5, 6.5));
 
         if (payload_wrapper != nullptr) {
             assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
@@ -3362,9 +3401,12 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open) noexcept
             auto result = try_descend_to_directory(expl, pin.path.data());
 
             if (!result.success) {
+                char const *action = make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1).c_str();
+                char const *failed = result.err_msg.c_str();
+                swan_popup_modals::open_error(action, failed);
+
                 expl.cwd = initial_cwd;
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
-                swan_popup_modals::open_error(make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1).c_str(), result.err_msg.c_str());
             }
         }
 
@@ -3500,13 +3542,12 @@ void render_table_rows_for_cwd_entries(
 
                 ImVec2 path_text_rect_min = imgui::GetCursorScreenPos();
 
-                char buffer[2048]; init_empty_cstr(buffer);
-                snprintf(buffer, lengthof(buffer), "%s##dirent%zu", path, i);
+                auto label = make_str_static<1200>("%s##dirent%zu", path, i);
 
                 {
                     imgui::ScopedTextColor tc(dirent.spotlight_frames_remaining > 0 ? red() : white());
 
-                    if (imgui::Selectable(buffer, dirent.is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
+                    if (imgui::Selectable(label.data(), dirent.is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
                         bool selection_before_deselect = dirent.is_selected;
 
                         if (!io.KeyCtrl && !io.KeyShift) {
@@ -3563,8 +3604,11 @@ void render_table_rows_for_cwd_entries(
                                         auto result = try_ascend_directory(expl);
 
                                         if (!result.success) {
+                                            char const *action = make_str("Ascend to directory [%s].", result.parent_dir.data()).c_str();
+                                            char const *failed = "Directory not found.";
+                                            swan_popup_modals::open_error(action, failed);
+
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_ascend_directory
-                                            swan_popup_modals::open_error(make_str("Ascend to directory [%s].", result.parent_dir.data()).c_str(), "Could not find directory.");
                                         }
 
                                         return;
@@ -3574,8 +3618,11 @@ void render_table_rows_for_cwd_entries(
                                         auto result = try_descend_to_directory(expl, target);
 
                                         if (!result.success) {
+                                            char const *action = make_str("Descend to directory [%s].", target).c_str();
+                                            char const *failed = result.err_msg.c_str();
+                                            swan_popup_modals::open_error(action, failed);
+
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
-                                            swan_popup_modals::open_error(make_str("Descend to directory [%s].", target).c_str(), result.err_msg.c_str());
                                         }
 
                                         return;
@@ -3608,7 +3655,9 @@ void render_table_rows_for_cwd_entries(
                                             (void) global_state::save_recent_files_to_disk();
                                         }
                                     } else {
-                                        swan_popup_modals::open_error(make_str("Open symlink [%s].", dirent.basic.path.data()).c_str(), res.error_or_utf8_path.c_str());
+                                        char const *action = make_str("Open symlink [%s].", dirent.basic.path.data()).c_str();
+                                        char const *failed = res.error_or_utf8_path.c_str();
+                                        swan_popup_modals::open_error(action, failed);
                                     }
                                 }
                                 else {
@@ -3628,7 +3677,9 @@ void render_table_rows_for_cwd_entries(
                                         }
                                         (void) global_state::save_recent_files_to_disk();
                                     } else {
-                                        swan_popup_modals::open_error(make_str("Open file [%s].", dirent.basic.path.data()).c_str(), res.error_or_utf8_path.c_str());
+                                        char const *action = make_str("Open file [%s].", dirent.basic.path.data()).c_str();
+                                        char const *failed = res.error_or_utf8_path.c_str();
+                                        swan_popup_modals::open_error(action, failed);
                                     }
                                 }
                             }
@@ -3644,36 +3695,14 @@ void render_table_rows_for_cwd_entries(
 
                     } // imgui::Selectable
 
-                    // if hovering the path with at least 1 character's worth of content truncated, display full path as tooltip
-                    if (imgui::IsItemHovered(0, 0.7f) && imgui::TableGetHoveredColumn() == explorer_window::cwd_entries_table_col_path) {
-                        auto const &style = imgui::GetStyle();
-                        f32 icon_text_width = imgui::CalcTextSize(icon).x;
-                        f32 path_text_width = imgui::CalcTextSize(path).x;
-                        f32 space_width = imgui::CalcTextSize(" ").x;
-                        f32 total_content_width = icon_text_width + style.ItemSpacing.x + path_text_width; // + (style.CellPadding.x * 2);
-
-                        f32 path_column_width = imgui::GetColumnWidth(explorer_window::cwd_entries_table_col_path);
-                        if (total_content_width - 1.5f*space_width > path_column_width) {
-                            imgui::SetTooltip(path);
-                        }
+                    {
+                        f32 offset_for_icon_and_space = imgui::CalcTextSize(icon).x + imgui::CalcTextSize(" ").x;
+                        imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_path, path, offset_for_icon_and_space);
                     }
                 }
 
-                // draw rectangle to highlight filter match
                 if (dirent.highlight_len > 0) {
-                    ImVec2 min = path_text_rect_min;
-                    ImVec2 max = path_text_rect_min + imgui::CalcTextSize(dirent.basic.path.data());
-
-                    // at this point min & max draw a rectangle around the entire path
-
-                    // move forward min.x to skip characters before highlight begins
-                    min.x += imgui::CalcTextSize(dirent.basic.path.data(),
-                                                 dirent.basic.path.data() + dirent.highlight_start_idx).x;
-
-                    // move backward max.x to eliminate characters after the highlight ends
-                    max.x -= imgui::CalcTextSize(dirent.basic.path.data() + dirent.highlight_start_idx + dirent.highlight_len).x;
-
-                    ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 100, 0, 60));
+                    imgui::HighlightTextRegion(path_text_rect_min, dirent.basic.path.data(), dirent.highlight_start_idx, dirent.highlight_len);
                 }
 
                 if (dirent.basic.is_path_dotdot()) {
@@ -3866,8 +3895,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     }
                     (void) global_state::save_recent_files_to_disk();
                 } else {
-                    swan_popup_modals::open_error(make_str("Open file as administrator [%s].", expl.right_clicked_ent->basic.path.data()).c_str(),
-                                                  res.error_or_utf8_path.c_str());
+                    char const *action = make_str("Open file as administrator [%s].", expl.right_clicked_ent->basic.path.data()).c_str();
+                    char const *failed = res.error_or_utf8_path.c_str();
+                    swan_popup_modals::open_error(action, failed);
                 }
             }
 
@@ -3876,8 +3906,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 auto extract_result = lnk_data.extract(expl.right_clicked_ent->basic.path.data(), expl.cwd.data());
 
                 if (!extract_result.success) {
-                    swan_popup_modals::open_error(make_str("Open file location of [%s].", expl.right_clicked_ent->basic.path.data()).c_str(),
-                                                  extract_result.error_or_utf8_path.c_str());
+                    char const *action = make_str("Open file location of [%s].", expl.right_clicked_ent->basic.path.data()).c_str();
+                    char const *failed = extract_result.error_or_utf8_path.c_str();
+                    swan_popup_modals::open_error(action, failed);
                 } else {
                     // no error checking because symlink_data::extract has already validated things
 
@@ -3904,8 +3935,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             if (imgui::Selectable("Copy full path")) {
                 swan_path_t full_path = path_create(expl.cwd.data());
                 if (!path_append(full_path, expl.right_clicked_ent->basic.path.data(), settings.dir_separator_utf8, true)) {
-                    swan_popup_modals::open_error(make_str("Copy full path of [%s].", expl.right_clicked_ent->basic.path.data()).c_str(),
-                                                  "Max path length exceeded when appending name to current working directory path.");
+                    char const *action = make_str("Copy full path of [%s].", expl.right_clicked_ent->basic.path.data()).c_str();
+                    char const *failed = "Max path length exceeded when appending name to current working directory path.";
+                    swan_popup_modals::open_error(action, failed);
                 } else {
                     imgui::SetClipboardText(full_path.data());
                 }
@@ -3922,9 +3954,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             if (imgui::Selectable("Reveal in File Explorer")) {
                 auto res = reveal_in_file_explorer(*expl.right_clicked_ent, expl);
                 if (!res.success) {
-                    swan_popup_modals::open_error(
-                        make_str("Reveal [%s] in File Explorer.", expl.right_clicked_ent->basic.path.data()).c_str(),
-                        res.error_or_utf8_path.c_str());
+                    char const *action = make_str("Reveal [%s] in File Explorer.", expl.right_clicked_ent->basic.path.data()).c_str();
+                    char const *failed = res.error_or_utf8_path.c_str();
+                    swan_popup_modals::open_error(action, failed);
                 }
             }
 
@@ -3932,9 +3964,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
             auto handle_failure = [&](char const *operation, generic_result const &result) noexcept {
                 if (!result.success) {
-                    std::string action = make_str("%s [%s].", operation, expl.right_clicked_ent->basic.path.data());
-                    std::string const &failure = result.error_or_utf8_path;
-                    swan_popup_modals::open_error(action.c_str(), failure.c_str());
+                    char const *action = make_str("%s [%s].", operation, expl.right_clicked_ent->basic.path.data()).c_str();
+                    char const *failed = result.error_or_utf8_path.c_str();
+                    swan_popup_modals::open_error(action, failed);
                 }
             };
 
@@ -3966,18 +3998,21 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 expl.right_clicked_ent->is_selected = true;
 
                 imgui::OpenConfirmationModalWithCallback(
-                    swan_id_confirm_explorer_execute_delete,
-                    make_str("Are you sure you want to delete the %zu selected file(s) from Explorer %d?", 1, expl.id+1).c_str(),
+                    /* confirmation_id  = */ swan_id_confirm_explorer_execute_delete,
+                    /* confirmation_msg = */ make_str("Are you sure you want to delete the %zu selected file(s) from Explorer %d?", 1, expl.id+1).c_str(),
+                    /* on_yes_callback  = */
                     [&]() noexcept {
                         auto result = delete_selected_entries(expl);
 
                         if (!result.success) {
                             u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                            swan_popup_modals::open_error(make_str("Delete %zu items.", num_failed).c_str(), result.error_or_utf8_path.c_str());
+                            char const *action = make_str("Delete %zu items.", num_failed).c_str();
+                            char const *failed = result.error_or_utf8_path.c_str();
+                            swan_popup_modals::open_error(action, failed);
                         }
                         (void) global_state::settings().save_to_disk();
                     },
-                    &global_state::settings().confirm_explorer_delete_via_context_menu
+                    /* confirmation_enabled = */ &(global_state::settings().confirm_explorer_delete_via_context_menu)
                 );
             }
             if (imgui::Selectable("Rename##single")) {
@@ -4005,8 +4040,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     if (dirent.is_selected && !dirent.is_filtered_out) {
                         swan_path_t full_path = path_create(expl.cwd.data());
                         if (!path_append(full_path, dirent.basic.path.data(), settings.dir_separator_utf8, true)) {
-                            swan_popup_modals::open_error(make_str("Copy full path of [%s].", dirent.basic.path.data()).c_str(),
-                                                            "Max path length exceeded when appending name to current working directory path.");
+                            char const *action = make_str("Copy full path of [%s].", dirent.basic.path.data()).c_str();
+                            char const *failed = "Max path length exceeded when appending name to current working directory path.";
+                            swan_popup_modals::open_error(action, failed);
                             break;
                         }
                         clipboard += full_path.data();
@@ -4022,7 +4058,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             auto handle_failure = [](char const *operation, generic_result const &result) noexcept {
                 if (!result.success) {
                     u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                    swan_popup_modals::open_error(make_str("%s %zu items.", operation, num_failed).c_str(), result.error_or_utf8_path.c_str());
+                    char const *action = make_str("%s %zu items.", operation, num_failed).c_str();
+                    char const *failed = result.error_or_utf8_path.c_str();
+                    swan_popup_modals::open_error(action, failed);
                 }
             };
 

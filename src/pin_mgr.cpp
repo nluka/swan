@@ -62,19 +62,17 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
 
             if (edit_enabled) {
                 {
-                    char buffer[32];
-                    (void) snprintf(buffer, lengthof(buffer), ICON_CI_EDIT "##pin%zu", i);
+                    auto label = make_str_static<64>(ICON_CI_EDIT "##pin%zu", i);
 
-                    if (imgui::SmallButton(buffer)) {
+                    if (imgui::SmallButton(label.data())) {
                         swan_popup_modals::open_edit_pin(&pin);
                     }
                 }
                 imgui::SameLine();
                 {
-                    char buffer[32];
-                    (void) snprintf(buffer, lengthof(buffer), ICON_CI_TRASH "##pin%zu", i);
+                    auto label = make_str_static<64>(ICON_CI_TRASH "##pin%zu", i);
 
-                    if (imgui::SmallButton(buffer)) {
+                    if (imgui::SmallButton(label.data())) {
                         imgui::OpenConfirmationModal(swan_id_confirm_delete_pin, [&pin]() noexcept {
                             imgui::TextUnformatted("Are you sure you want to delete the following pin?");
                             imgui::TextColored(pin.color, pin.label.c_str());
@@ -97,11 +95,9 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
             }
 
             {
-                char buffer[pinned_path::LABEL_MAX_LEN + 16];
-                snprintf(buffer, lengthof(buffer), "%s##%zu", pin.label.c_str(), i);
-
                 imgui::ScopedTextColor tc(pin.color);
-                imgui::Selectable(buffer, false/*, ImGuiSelectableFlags_SpanAllColumns*/);
+                auto label = make_str_static<pinned_path::LABEL_MAX_LEN + 32>("%s##%zu", pin.label.c_str(), i);
+                imgui::Selectable(label.data(), false/*, ImGuiSelectableFlags_SpanAllColumns*/);
             }
 
             if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {

@@ -342,29 +342,25 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                     if (imgui::TableSetColumnIndex(collisions_table_col_before)) {
                         for (u64 j = first; j <= last; ++j) {
-                            char buffer[64];
-                            (void) snprintf(buffer, lengthof(buffer), "##before_%zu", j);
-
-                            char buffer2[64];
-                            (void) snprintf(buffer2, lengthof(buffer2), "... %zu more", last - j + 1);
-
                             f32 width = imgui::CalcTextSize(sorted_renames[j].before->path.data()).x + (imgui::GetStyle().FramePadding.x * 2);
-                            f32 width_more = imgui::CalcTextSize(buffer2).x;
+                            auto more_msg = make_str_static<64>("... %zu more", last - j + 1);
+                            f32 width_more = imgui::CalcTextSize(more_msg.data()).x;
 
                             if ((width + width_more) > imgui::GetContentRegionAvail().x) {
                                 imgui::AlignTextToFramePadding();
-                                imgui::TextUnformatted(buffer2);
+                                imgui::TextUnformatted(more_msg.data());
                                 break;
                             }
 
                             imgui::ScopedTextColor tc(get_color(sorted_renames[j].before->type));
                             imgui::ScopedItemWidth w(width);
 
-                            imgui::InputText(buffer, sorted_renames[j].before->path.data(), sorted_renames[j].before->path.max_size(), ImGuiInputTextFlags_ReadOnly);
+                            auto label = make_str_static<64>("##before_%zu", j);
+                            imgui::InputText(label.data(), sorted_renames[j].before->path.data(), sorted_renames[j].before->path.max_size(), ImGuiInputTextFlags_ReadOnly);
                             imgui::SameLine();
 
                             if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                                ImGuiInputTextState *input_txt_state = imgui::GetInputTextState(imgui::GetID(buffer));
+                                ImGuiInputTextState *input_txt_state = imgui::GetInputTextState(imgui::GetID(label.data()));
                                 if (input_txt_state->HasSelection()) {
                                     set_clipboard_to_slice(input_txt_state);
                                 }
@@ -406,16 +402,14 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                     imgui::TableNextColumn();
                     {
-                        char buffer[64];
-                        (void) snprintf(buffer, lengthof(buffer), "##before_%zu", i);
-
                         imgui::ScopedAvailWidth w = {};
                         imgui::ScopedTextColor tc(color);
 
-                        imgui::InputText(buffer, before.path.data(), before.path.max_size(), ImGuiInputTextFlags_ReadOnly);
+                        auto label = make_str_static<64>("##before_%zu", i);
+                        imgui::InputText(label.data(), before.path.data(), before.path.max_size(), ImGuiInputTextFlags_ReadOnly);
 
                         if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                            ImGuiInputTextState *input_txt_state = imgui::GetInputTextState(imgui::GetID(buffer));
+                            ImGuiInputTextState *input_txt_state = imgui::GetInputTextState(imgui::GetID(label.data()));
                             if (input_txt_state->HasSelection()) {
                                 set_clipboard_to_slice(input_txt_state);
                             }
@@ -424,13 +418,11 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                     imgui::TableNextColumn();
                     {
-                        char buffer[64];
-                        (void) snprintf(buffer, lengthof(buffer), "##after_%zu", i);
-
                         imgui::ScopedAvailWidth w = {};
                         imgui::ScopedTextColor tc(color);
 
-                        imgui::InputText(buffer, after.data(), after.max_size(), ImGuiInputTextFlags_ReadOnly);
+                        auto label = make_str_static<64>("##after_%zu", i);
+                        imgui::InputText(label.data(), after.data(), after.max_size(), ImGuiInputTextFlags_ReadOnly);
                     }
                 }
 

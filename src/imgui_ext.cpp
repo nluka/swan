@@ -232,16 +232,58 @@ void imgui::SetInitialFocusOnNextWidget() noexcept
     }
 }
 
-void imgui::RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, char const *tooltip_content) noexcept
+bool imgui::RenderTooltipWhenColumnTextTruncated(s32 table_column_index,
+                                                 char const *possibly_truncated_text,
+                                                 f32 possibly_truncated_text_offset_x,
+                                                 char const *tooltip_content) noexcept
 {
     // if hovering the path with at least 1 character's worth of content truncated, display full path as tooltip
-    if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && imgui::TableGetHoveredColumn() == table_column_index) {
+    if (imgui::IsItemHovered({}, 0.7) && imgui::TableGetHoveredColumn() == table_column_index) {
         f32 text_width = imgui::CalcTextSize(possibly_truncated_text).x;
         f32 column_width = imgui::GetColumnWidth(table_column_index);
 
-        if (text_width > column_width) {
+        if (text_width > column_width - possibly_truncated_text_offset_x + imgui::GetStyle().CellPadding.x) {
             tooltip_content = tooltip_content ? tooltip_content : possibly_truncated_text;
             imgui::SetTooltip(tooltip_content);
+            return true;
         }
     }
+
+    return false;
+}
+
+void imgui::TableDrawCellBorderTop(ImVec2 cell_rect_min, f32 cell_width) noexcept
+{
+    ImGuiWindow *window = ImGui::GetCurrentWindow();
+    if (window == NULL)
+        return;
+
+    ImDrawList *drawList = window->DrawList;
+    if (drawList == NULL)
+        return;
+
+    ImVec2 const &min = cell_rect_min;
+    ImVec2 max = min;
+    max.x += cell_width;
+
+    float thickness = 1.0f; // Border thickness
+    ImU32 color = ImGui::GetColorU32(ImGuiCol_Border); // Border color
+
+    drawList->AddLine(ImVec2(min.x, min.y), ImVec2(max.x, min.y), color, thickness);
+}
+
+void imgui::HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u64 highlight_start_idx, u64 highlight_len) noexcept
+{
+    ImVec2 min = text_rect_min;
+    ImVec2 max = min + imgui::CalcTextSize(text);
+
+    // at this point min & max draw a rectangle around the entire path
+
+    // move forward min.x to skip characters before highlight begins
+    min.x += imgui::CalcTextSize(text, text + highlight_start_idx).x;
+
+    // move backward max.x to eliminate characters after the highlight ends
+    max.x -= imgui::CalcTextSize(text + highlight_start_idx + highlight_len).x;
+
+    ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 100, 0, 60));
 }

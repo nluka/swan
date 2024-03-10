@@ -157,10 +157,18 @@ void swan_windows::render_recent_files(bool &open) noexcept
         global_state::save_focused_window(swan_windows::recent_files);
     }
 
+    imgui::TextUnformatted("(?)");
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("[L click]  row  Open file\n"
+                          "[R click]  row  Reveal file in Explorer 1");
+    }
+
+    imgui::SameLine();
+
     {
         imgui::ScopedDisable d(g_recent_files.empty());
 
-        if (imgui::Button("Clear##recent_files")) {
+        if (imgui::SmallButton("Clear##recent_files")) {
             imgui::OpenConfirmationModal(swan_id_confirm_clear_recent_files, "Are you sure you want to clear your recent files? "
                                                                              "This action cannot be undone.");
         }
@@ -172,14 +180,6 @@ void swan_windows::render_recent_files(bool &open) noexcept
             g_recent_files.clear();
             (void) global_state::save_recent_files_to_disk();
         }
-    }
-
-    imgui::SameLine();
-
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("[L click]  row  Open file\n"
-                          "[R click]  row  Reveal file in Explorer 1");
     }
 
     system_time_point_t current_time = current_time_system();
@@ -224,17 +224,15 @@ void swan_windows::render_recent_files(bool &open) noexcept
             }
             imgui::SameLine();
             {
-                char buffer[2048];
-                (void) snprintf(buffer, lengthof(buffer), "%s##recent_file_%zu", file_name, n);
-                imgui::Selectable(buffer, &left_clicked, ImGuiSelectableFlags_SpanAllColumns);
+                auto label = make_str_static<1200>("%s##recent_file_%zu", file_name, n);
+                imgui::Selectable(label.data(), &left_clicked, ImGuiSelectableFlags_SpanAllColumns);
                 right_clicked = imgui::IsItemClicked(ImGuiMouseButton_Right);
             }
 
             imgui::TableNextColumn();
             {
-                char buffer[2048];
-                (void) snprintf(buffer, lengthof(buffer), "%s##recent_file_%zu", full_path, n);
-                imgui::Selectable(buffer, &left_clicked, ImGuiSelectableFlags_SpanAllColumns);
+                auto label = make_str_static<1200>("%s##recent_file_%zu", full_path, n);
+                imgui::Selectable(label.data(), &left_clicked, ImGuiSelectableFlags_SpanAllColumns);
                 right_clicked = imgui::IsItemClicked(ImGuiMouseButton_Right);
             }
 

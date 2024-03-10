@@ -101,16 +101,30 @@ char *rtrim(char *szX) noexcept;
 
 bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept;
 
-std::string make_str(char const *fmt, ...) noexcept;
-
 struct build_mode
 {
     bool debug;
     bool release;
     char const *str;
 };
-
 build_mode get_build_mode() noexcept;
+
+std::string make_str(char const *fmt, ...) noexcept;
+
+template <u64 Size>
+std::array<char, Size> make_str_static(char const *fmt, ...) noexcept
+{
+    std::array<char, Size> retval;
+
+    va_list args;
+    va_start(args, fmt);
+    [[maybe_unused]] s32 cnt = vsnprintf(retval.data(), retval.max_size(), fmt, args);
+    assert(cnt > 0);
+    assert(cnt < retval.max_size());
+    va_end(args);
+
+    return retval;
+}
 
 template <typename Ty>
 char const *pluralized(Ty num, char const *if_single, char const *if_zero_or_multiple) noexcept

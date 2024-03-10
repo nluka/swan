@@ -316,10 +316,9 @@ bulk_rename_transform_result bulk_rename_transform(
                 break;
             }
             case op_type::insert_size: {
-                char buffer[21]; init_empty_cstr(buffer);
-                written = snprintf(buffer, lengthof(buffer), "%zu", bytes);
+                auto buffer = make_str_static<21>("%zu", bytes);
                 if (written <= space_left) {
-                    (void) strcat(out, buffer);
+                    (void) strcat(out, buffer.data());
                     after_insert_idx += written;
                 } else {
                     result.success = false;
@@ -329,10 +328,9 @@ bulk_rename_transform_result bulk_rename_transform(
                 break;
             }
             case op_type::insert_counter: {
-                char buffer[11]; init_empty_cstr(buffer);
-                written = snprintf(buffer, lengthof(buffer), "%d", counter);
+                auto buffer = make_str_static<11>("%d", counter);
                 if (written <= space_left) {
-                    (void) strcat(out, buffer);
+                    (void) strcat(out, buffer.data());
                     after_insert_idx += written;
                 } else {
                     result.success = false;
@@ -373,7 +371,7 @@ bulk_rename_transform_result bulk_rename_transform(
                 }
 
                 if (len <= space_left) {
-                    (void) memcpy(out, full.data() + op.slice_first, len);
+                    (void) strncat(out, full.data() + op.slice_first, len);
                     after_insert_idx += len;
                 } else {
                     result.success = false;

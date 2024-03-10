@@ -17,7 +17,11 @@ namespace ImGui
 
     void SetInitialFocusOnNextWidget() noexcept;
 
-    void RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, char const *tooltip_content = nullptr) noexcept;
+    void TableDrawCellBorderTop(ImVec2 cell_rect_min, f32 cell_width) noexcept;
+
+    void HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u64 highlight_start_idx, u64 highlight_len) noexcept;
+
+    bool RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, f32 possibly_truncated_text_offset_x = 0, char const *tooltip_content = nullptr) noexcept;
 
     bool OpenConfirmationModal(s32 confirmation_id, char const *             content_message, bool *confirmation_enabled = nullptr) noexcept;
     bool OpenConfirmationModal(s32 confirmation_id, std::function<void ()> content_render_fn, bool *confirmation_enabled = nullptr) noexcept;
@@ -61,8 +65,9 @@ namespace ImGui
 
     struct ScopedDisable
     {
-        ScopedDisable(bool disabled) noexcept { ImGui::BeginDisabled(disabled); }
-        ~ScopedDisable()             noexcept { ImGui::EndDisabled(); }
+        bool state;
+        ScopedDisable(bool disabled) noexcept : state(disabled) { ImGui::BeginDisabled(disabled); }
+        ~ScopedDisable()             noexcept                   { ImGui::EndDisabled(); }
     };
 
     struct ScopedTextColor

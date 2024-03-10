@@ -168,7 +168,7 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
     return S_OK;
 }
 
-HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, LPCWSTR new_name_utf16, HRESULT result, IShellItem *dst_item) noexcept
+HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, LPCWSTR, HRESULT result, IShellItem *dst_item) noexcept
 {
     if (FAILED(result)) {
         return S_OK;
@@ -193,24 +193,22 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
     }
 
     wchar_t *dst_path_utf16 = nullptr;
-    swan_path_t dst_path_utf8;
+    bool dst_path_utf16_needs_free = false;
+    swan_path_t dst_path_utf8 = path_create("");
 
-    if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {
-        return S_OK;
-    }
-    SCOPE_EXIT { CoTaskMemFree(dst_path_utf16); };
+    if (dst_item != nullptr) {
+        if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {
+            return S_OK;
+        }
+        dst_path_utf16_needs_free = true;
 
-    if (!utf16_to_utf8(dst_path_utf16, dst_path_utf8.data(), dst_path_utf8.max_size())) {
-        return S_OK;
+        if (!utf16_to_utf8(dst_path_utf16, dst_path_utf8.data(), dst_path_utf8.max_size())) {
+            return S_OK;
+        }
     }
+    SCOPE_EXIT { if (dst_path_utf16_needs_free) CoTaskMemFree(dst_path_utf16); };
 
     print_debug_msg("PostCopyItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
-
-    swan_path_t new_name_utf8;
-
-    if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
-        return S_OK;
-    }
 
     path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
     path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);

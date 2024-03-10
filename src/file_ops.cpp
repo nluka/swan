@@ -468,15 +468,16 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
         if (imgui::SmallButton("Clear")) {
             imgui::OpenConfirmationModalWithCallback(
-                swan_id_confirm_completed_file_operations_forget_all,
-                "Are you sure you want to delete your ENTIRE file operations history? This action cannot be undone.",
+                /* confirmation_id  = */ swan_id_confirm_completed_file_operations_forget_all,
+                /* confirmation_msg = */ "Are you sure you want to delete your ENTIRE file operations history? This action cannot be undone.",
+                /* on_yes_callback  = */
                 [&mutex, &completed_operations]() noexcept {
                     std::scoped_lock lock(mutex);
                     completed_operations.clear();
                     (void) global_state::save_completed_file_ops_to_disk(&lock);
                     (void) global_state::settings().save_to_disk();
                 },
-                &global_state::settings().confirm_completed_file_operations_forget_all
+                /* confirmation_enabled = */ &(global_state::settings().confirm_completed_file_operations_forget_all)
             );
         }
     }
@@ -492,7 +493,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
     };
 
     if (imgui::BeginTable("completed_file_operations", file_ops_table_col_count,
-        ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|
+        ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Resizable|ImGuiTableFlags_BordersV|ImGuiTableFlags_Reorderable |
         (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
     ) {
         static std::optional< std::deque<completed_file_operation>::iterator > elem_right_clicked_iter = std::nullopt;
@@ -515,6 +516,8 @@ void swan_windows::render_file_operations(bool &open) noexcept
             clipper.Begin(s32(num_rows_to_render));
         }
 
+        u32 group_block = 0;
+
         while (clipper.Step())
         for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
             auto &file_op = completed_operations[i];
@@ -523,6 +526,15 @@ void swan_windows::render_file_operations(bool &open) noexcept
             imgui::TableNextRow();
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_group)) {
+                bool new_group_block = group_block != file_op.group_id;
+                group_block = file_op.group_id;
+
+                if (new_group_block) {
+                    ImVec2 cell_rect_min = imgui::GetCursorScreenPos() - imgui::GetStyle().CellPadding;
+                    f32 cell_width = imgui::GetColumnWidth() + (2 * imgui::GetStyle().CellPadding.x);
+                    imgui::TableDrawCellBorderTop(cell_rect_min, cell_width);
+                }
+
                 if (file_op.group_id != 0) {
                     imgui::Text("%zu", file_op.group_id);
                 }
@@ -567,10 +579,8 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_src_path)) {
-                char buffer[2048];
-                (void) snprintf(buffer, lengthof(buffer), "%s##%zu", file_op.src_path.data(), i);
-
-                imgui::Selectable(buffer, &file_op.selected, ImGuiSelectableFlags_SpanAllColumns);
+                auto label = make_str_static<1200>("%s##%zu", file_op.src_path.data(), i);
+                imgui::Selectable(label.data(), &file_op.selected, ImGuiSelectableFlags_SpanAllColumns);
 
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
                     imgui::OpenPopup("## completed_file_operations context");
@@ -633,6 +643,8 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
                         global_state::settings().show.explorer_0 = true;
                         (void) global_state::settings().save_to_disk();
+
+                        imgui::SetWindowFocus(expl.name);
                     }
                 };
 

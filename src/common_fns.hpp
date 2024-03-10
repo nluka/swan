@@ -67,10 +67,12 @@ namespace global_state
 namespace swan_windows
 {
     enum window_id : s32 {
+        nil_window = 0,
         explorer_0,
         explorer_1,
         explorer_2,
         explorer_3,
+        finder,
         pinned,
         file_operations,
         recent_files,
@@ -92,6 +94,7 @@ namespace swan_windows
             case explorer_1: return " Explorer 2 ";
             case explorer_2: return " Explorer 3 ";
             case explorer_3: return " Explorer 4 ";
+            case finder: return " Finder ";
             case pinned: return " Pinned ";
             case file_operations: return " File Operations ";
             case recent_files: return " Recent Files ";
@@ -107,7 +110,9 @@ namespace swan_windows
         }
     }
 
-    void render_explorer(explorer_window &, bool &open) noexcept;
+    void render_explorer(explorer_window &, bool &open, finder_window &) noexcept;
+
+    void render_finder(finder_window &, bool &open) noexcept;
 
     void render_pin_manager(std::array<explorer_window, 4> &, bool &open) noexcept;
 

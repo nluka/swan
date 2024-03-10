@@ -20,6 +20,7 @@
 #include <fileapi.h>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <list>
 #include <mutex>

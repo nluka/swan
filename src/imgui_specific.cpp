@@ -40,17 +40,14 @@ bool imgui::EnumButton::Render(s32 &enum_value, s32 enum_first, s32 enum_count, 
 
     this->current_label = labels[enum_value];
 
-    char buffer[128]; init_empty_cstr(buffer);
-    [[maybe_unused]] s32 written = snprintf(buffer, lengthof(buffer), "%s##%zu-%zu", this->current_label, this->rand_1, this->rand_2);
-    assert(written > 0);
-
     if (this->name != nullptr && !strempty(this->name)) {
         imgui::AlignTextToFramePadding();
         imgui::TextUnformatted(this->name);
         imgui::SameLine();
     }
 
-    bool activated = imgui::Button(buffer);
+    auto label = make_str_static<128>("%s##%zu-%zu", this->current_label, this->rand_1, this->rand_2);
+    bool activated = imgui::Button(label.data());
 
     if (activated) {
         inc_or_wrap(enum_value, enum_first, enum_count - 1);

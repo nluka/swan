@@ -123,23 +123,34 @@ try {
         }
     }
 
-    std::array<s32, swan_windows::count> window_render_order = {
+    finder_window finder = {
+        .search_directories = { { false, path_create("") } }
+    };
+
+    std::array<s32, swan_windows::count - 1> window_render_order = {
         swan_windows::explorer_0,
         swan_windows::explorer_1,
         swan_windows::explorer_2,
         swan_windows::explorer_3,
+        swan_windows::finder,
         swan_windows::pinned,
         swan_windows::file_operations,
         swan_windows::recent_files,
         swan_windows::analytics,
         swan_windows::debug_log,
         swan_windows::settings,
-        swan_windows::imgui_demo,
         swan_windows::icon_library,
         swan_windows::icon_font_browser_font_awesome,
         swan_windows::icon_font_browser_codicon,
         swan_windows::icon_font_browser_material_design,
+        swan_windows::imgui_demo,
     };
+
+#if DEBUG_MODE
+    for (auto const &window_id : window_render_order) {
+        assert(window_id != (s32)swan_windows::nil_window && "Forgot to add window id to initializer list of `window_render_order`");
+    }
+#endif
 
     {
         s32 last_focused_window;
@@ -220,25 +231,31 @@ try {
             switch (window_code) {
                 case swan_windows::explorer_0: {
                     if (window_visib.explorer_0) {
-                        swan_windows::render_explorer(explorers[0], window_visib.explorer_0);
+                        swan_windows::render_explorer(explorers[0], window_visib.explorer_0, finder);
                     }
                     break;
                 }
                 case swan_windows::explorer_1: {
                     if (window_visib.explorer_1) {
-                        swan_windows::render_explorer(explorers[1], window_visib.explorer_1);
+                        swan_windows::render_explorer(explorers[1], window_visib.explorer_1, finder);
                     }
                     break;
                 }
                 case swan_windows::explorer_2: {
                     if (window_visib.explorer_2) {
-                        swan_windows::render_explorer(explorers[2], window_visib.explorer_2);
+                        swan_windows::render_explorer(explorers[2], window_visib.explorer_2, finder);
                     }
                     break;
                 }
                 case swan_windows::explorer_3: {
                     if (window_visib.explorer_3) {
-                        swan_windows::render_explorer(explorers[3], window_visib.explorer_3);
+                        swan_windows::render_explorer(explorers[3], window_visib.explorer_3, finder);
+                    }
+                    break;
+                }
+                case swan_windows::finder: {
+                    if (window_visib.finder) {
+                        swan_windows::render_finder(finder, window_visib.finder);
                     }
                     break;
                 }
@@ -525,6 +542,7 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             setting_change |= imgui::MenuItem(explorers[2].name, nullptr, &global_state::settings().show.explorer_2);
             setting_change |= imgui::MenuItem(explorers[3].name, nullptr, &global_state::settings().show.explorer_3);
 
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::finder), nullptr, &global_state::settings().show.finder);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::pinned), nullptr, &global_state::settings().show.pinned);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::file_operations), nullptr, &global_state::settings().show.file_operations);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::recent_files), nullptr, &global_state::settings().show.recent_files);
@@ -667,7 +685,7 @@ void render_analytics() noexcept
         }
 
         auto &io = imgui::GetIO();
-        imgui::Text("Build mode : %s", get_build_mode());
+        imgui::Text("Build mode : %s", get_build_mode().str);
         imgui::Text("FPS        : %.1f FPS", io.Framerate);
         imgui::Text("ms/frame   : %.3f", 1000.0f / io.Framerate);
     }
