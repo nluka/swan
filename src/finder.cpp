@@ -153,7 +153,7 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
         return;
     }
 
-    auto &io = imgui::GetIO();
+    // auto &io = imgui::GetIO();
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
         global_state::save_focused_window(swan_windows::finder);
@@ -245,8 +245,8 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
             imgui::ActivateItemByID(imgui::GetID("## finder search_value"));
         }
 
-        bool search_val_changed = imgui::InputTextWithHint("## finder search_value", "Search for...", finder.search_value.data(), finder.search_value.max_size(),
-                                                           ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_path_chars());
+        imgui::InputTextWithHint("## finder search_value", "Search for...", finder.search_value.data(), finder.search_value.max_size(),
+                                 ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_path_chars());
 
         if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
             swan_finder::g_thread_pool.push_task([&finder]() {
@@ -306,7 +306,7 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
         }
     }
 
-    imgui::Spacing(2);
+    imgui::Spacing(1);
 
     // imgui::Text("Status: %s", progressive_task_status_cstr(finder.search_task.status()));
 
@@ -318,16 +318,24 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
         matches_table_col_count
     };
 
+    s32 table_flags =
+        ImGuiTableFlags_SizingStretchProp|
+        ImGuiTableFlags_Hideable|
+        ImGuiTableFlags_Resizable|
+        ImGuiTableFlags_Reorderable|
+        ImGuiTableFlags_BordersV|
+        ImGuiTableFlags_ScrollY|
+        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+        (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
+    ;
+
     if (imgui::BeginChild("## finder matches child")) {
-        if (imgui::BeginTable("## finder matches table", matches_table_col_count, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|
-                                                                                  ImGuiTableFlags_Reorderable|ImGuiTableFlags_BordersV|
-                                                                                  (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
-                                                                                  (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)))
-        {
+        if (imgui::BeginTable("## finder matches table", matches_table_col_count, table_flags)) {
             imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, matches_table_col_number);
-            imgui::TableSetupColumn("ID", ImGuiTableColumnFlags_NoSort, 0.0f, matches_table_col_id);
+            imgui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_id);
             imgui::TableSetupColumn("Name", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_name);
             imgui::TableSetupColumn("Full Path", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_parent);
+            ImGui::TableSetupScrollFreeze(0, 1);
             imgui::TableHeadersRow();
 
             auto &matches = finder.search_task.result;

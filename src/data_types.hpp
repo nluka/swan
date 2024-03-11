@@ -35,7 +35,7 @@ struct swan_path_t final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
 struct basic_dirent
 {
     enum class kind : s8 {
-        nil = -1,
+        nil,
         directory,
         file,
         symlink_to_directory,

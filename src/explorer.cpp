@@ -707,82 +707,66 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
         return ent.is_filtered_out;
     });
 
-    // preliminary sort to ensure deterministic behaviour regardless of initial state.
-    // necessary or else auto refresh can cause unexpected reordering of directory entries.
-    std::sort(cwd_entries.begin(), first_filtered_dirent, [](dir_ent_t const &left, dir_ent_t const &right) noexcept {
-        return left.basic.id < right.basic.id;
-    });
-
-    // comparator needs to return true when left < right
-    std::sort(cwd_entries.begin(), first_filtered_dirent, [&](dir_ent_t const &left, dir_ent_t const &right) noexcept {
-        bool left_lt_right = false;
+    std::sort(cwd_entries.begin(), first_filtered_dirent, [&](dir_ent_t const &left, dir_ent_t const &right) noexcept -> bool {
+        s64 delta = 0;
 
         for (auto const &col_sort_spec : expl.column_sort_specs) {
-            // comparing with this variable using == will handle the sort direction
-            bool direction_flipper = col_sort_spec.SortDirection == ImGuiSortDirection_Ascending ? false : true;
-
             switch (col_sort_spec.ColumnUserID) {
                 default:
                 case explorer_window::cwd_entries_table_col_id: {
-                    left_lt_right = (left.basic.id < right.basic.id) == direction_flipper;
+                    delta = left.basic.id - right.basic.id;
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_path: {
-                    left_lt_right = (lstrcmpiA(left.basic.path.data(), right.basic.path.data()) < 0) == direction_flipper;
+                    delta = lstrcmpiA(left.basic.path.data(), right.basic.path.data());
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_type: {
-                    auto compute_precedence = [](explorer_window::dirent const &ent) -> u32 {
-                        // larger values have greater precedence
-                        enum class precedence : u32
-                        {
-                            everything_else,
-                            symlink_invalid,
-                            // symlink_ambiguous,
-                            symlink_file,
-                            file,
-                            symlink_directory,
-                            directory,
-                        };
-
-                        if      (ent.basic.is_directory())            return (u32)precedence::directory;
-                        else if (ent.basic.is_file())                 return (u32)precedence::file;
-                        else if (ent.basic.is_symlink_to_directory()) return (u32)precedence::symlink_directory;
-                        else if (ent.basic.is_symlink_to_file())      return (u32)precedence::symlink_file;
-                        // else if (ent.basic.is_symlink_ambiguous())    return (u32)precedence::symlink_ambiguous;
-                        else if (ent.basic.is_symlink())              return (u32)precedence::symlink_invalid;
-                        else                                          return (u32)precedence::everything_else;
+                    s32 precedence_table[(u64)basic_dirent::kind::count] = {
+                        4,  // nil
+                        10, // directory
+                        8,  // file
+                        9,  // symlink_to_directory
+                        7,  // symlink_to_file
+                        6,  // symlink_ambiguous
+                        5,  // invalid_symlink
                     };
 
-                    u32 left_precedence = compute_precedence(left);
-                    u32 right_precedence = compute_precedence(right);
-
-                    left_lt_right = (left_precedence > right_precedence) == direction_flipper;
+                    delta = precedence_table[(u64)left.basic.type] - precedence_table[(u64)right.basic.type];
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_size_pretty:
                 case explorer_window::cwd_entries_table_col_size_bytes: {
-                    if (left.basic.is_directory() && right.basic.is_file() && right.basic.size == 0) {
-                        left_lt_right = true == direction_flipper;
-                    } else {
-                        left_lt_right = (left.basic.size < right.basic.size) == direction_flipper;
-                    }
+                    delta = left.basic.size - right.basic.size;
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_creation_time: {
-                    s32 cmp = CompareFileTime(&left.basic.creation_time_raw, &right.basic.creation_time_raw);
-                    left_lt_right = (cmp <= 0) == direction_flipper;
+                    delta = CompareFileTime(&left.basic.creation_time_raw, &right.basic.creation_time_raw);
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_last_write_time: {
-                    s32 cmp = CompareFileTime(&left.basic.last_write_time_raw, &right.basic.last_write_time_raw);
-                    left_lt_right = (cmp <= 0) == direction_flipper;
+                    delta = CompareFileTime(&left.basic.last_write_time_raw, &right.basic.last_write_time_raw);
                     break;
                 }
             }
+
+            if (delta > 0) {
+                return col_sort_spec.SortDirection == ImGuiSortDirection_Ascending;
+            }
+            else if (delta < 0) {
+                return col_sort_spec.SortDirection != ImGuiSortDirection_Ascending;
+            }
+            else { // delta == 0
+                continue; // go to next sort spec
+            }
         }
 
-        return left_lt_right;
+        if (delta == 0) {
+            return left.basic.id < right.basic.id;
+        }
+        else {
+            return delta;
+        }
     });
 
     return first_filtered_dirent;
@@ -2015,17 +1999,23 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         drive_table_col_id_count,
     };
 
-    if (imgui::BeginTable("drives", drive_table_col_id_count, ImGuiTableFlags_SizingStretchSame|ImGuiTableFlags_BordersInnerV |
-                                                              ImGuiTableFlags_Reorderable|ImGuiTableFlags_Resizable|ImGuiTableFlags_BordersV |
-                                                              (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody) |
-                                                              (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)))
-    {
+    s32 table_flags =
+        ImGuiTableFlags_SizingStretchSame|
+        ImGuiTableFlags_BordersInnerV|
+        ImGuiTableFlags_Reorderable|
+        ImGuiTableFlags_Resizable|ImGuiTableFlags_BordersV|
+        (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)|
+        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
+    ;
+
+    if (imgui::BeginTable("drives", drive_table_col_id_count, table_flags)) {
         imgui::TableSetupColumn("Drive", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_letter);
         imgui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_name);
         imgui::TableSetupColumn("Filesystem", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_filesystem);
         imgui::TableSetupColumn("Total Space", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_total_space);
         imgui::TableSetupColumn("Usage", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_used_percent);
         imgui::TableSetupColumn("Free Space", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_free_space);
+        ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();
 
         for (auto &drive : drives) {
@@ -2114,7 +2104,7 @@ void render_filter_text_input(explorer_window &expl, bool window_hovered, bool c
 static
 void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
 {
-    std::tuple<basic_dirent::kind, bool &, char const *> button_defs[(u64)basic_dirent::kind::count - 1] = {
+    std::tuple<basic_dirent::kind, bool &, char const *> button_defs[] = {
         { basic_dirent::kind::directory,             expl.filter_show_directories,          "directories"         },
         { basic_dirent::kind::symlink_to_directory,  expl.filter_show_symlink_directories,  "directory shortcuts" },
         { basic_dirent::kind::file,                  expl.filter_show_files,                "files"               },
@@ -3132,6 +3122,20 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 }
             }
 
+            s32 table_flags =
+                ImGuiTableFlags_SizingStretchProp|
+                ImGuiTableFlags_Hideable|
+                ImGuiTableFlags_Resizable|
+                ImGuiTableFlags_Reorderable|
+                ImGuiTableFlags_Sortable|
+                ImGuiTableFlags_BordersV|
+                ImGuiTableFlags_ScrollY|
+                ImGuiTableFlags_SortMulti|
+                ImGuiTableFlags_SortTristate|
+                (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+                (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
+            ;
+
             if (expl.cwd_entries.empty()) {
                 imgui::Spacing(3);
                 imgui::SameLineSpaced(1); // indent
@@ -3153,20 +3157,16 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     imgui::SetTooltip("Click to expose filter.");
                 }
             }
-            else if (cnt.filtered_dirents < expl.cwd_entries.size() && imgui::BeginTable("cwd_entries", explorer_window::cwd_entries_table_col_count,
-                ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Hideable|ImGuiTableFlags_Resizable|
-                ImGuiTableFlags_Reorderable|ImGuiTableFlags_Sortable|ImGuiTableFlags_BordersV|
-                (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
-                (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
-            )) {
-                imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, explorer_window::cwd_entries_table_col_number);
-                imgui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_id);
-                imgui::TableSetupColumn("Name", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_path);
-                imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_type);
-                imgui::TableSetupColumn("Size", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_size_pretty);
-                imgui::TableSetupColumn("Bytes", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_size_bytes);
-                imgui::TableSetupColumn("Created", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_creation_time);
-                imgui::TableSetupColumn("Modified", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_last_write_time);
+            else if (cnt.filtered_dirents < expl.cwd_entries.size() && imgui::BeginTable("cwd_entries", explorer_window::cwd_entries_table_col_count, table_flags)) {
+                imgui::TableSetupColumn("#",        ImGuiTableColumnFlags_NoSort,                                                   0.0f, explorer_window::cwd_entries_table_col_number);
+                imgui::TableSetupColumn("ID",       ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortAscending,    0.0f, explorer_window::cwd_entries_table_col_id);
+                imgui::TableSetupColumn("Name",     ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortAscending,    0.0f, explorer_window::cwd_entries_table_col_path);
+                imgui::TableSetupColumn("Type",     ImGuiTableColumnFlags_DefaultSort,                                              0.0f, explorer_window::cwd_entries_table_col_type);
+                imgui::TableSetupColumn("Size",     ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortDescending,   0.0f, explorer_window::cwd_entries_table_col_size_pretty);
+                imgui::TableSetupColumn("Bytes",    ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortDescending,   0.0f, explorer_window::cwd_entries_table_col_size_bytes);
+                imgui::TableSetupColumn("Created",  ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortAscending,    0.0f, explorer_window::cwd_entries_table_col_creation_time);
+                imgui::TableSetupColumn("Modified", ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortAscending,    0.0f, explorer_window::cwd_entries_table_col_last_write_time);
+                ImGui::TableSetupScrollFreeze(0, 1);
                 imgui::TableHeadersRow();
 
                 //? ImGui does not allow you to hold a ImGuiTableSortSpecs pointer over multiple frames,

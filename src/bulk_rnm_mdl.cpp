@@ -292,13 +292,21 @@ void swan_popup_modals::render_bulk_rename() noexcept
             collisions_table_col_count,
         };
 
+        s32 table_flags =
+            ImGuiTableFlags_SizingStretchProp|
+            ImGuiTableFlags_BordersV|
+            ImGuiTableFlags_BordersH|
+            ImGuiTableFlags_Resizable|
+            ImGuiTableFlags_Reorderable|
+            ImGuiTableFlags_ScrollY
+        ;
+
         if (imgui::BeginChild("bulk_rename_collisions_child")) {
-            if (imgui::BeginTable("bulk_rename_collisions", collisions_table_col_count, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|
-                                                                                        ImGuiTableFlags_Resizable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_BordersH))
-            {
+            if (imgui::BeginTable("bulk_rename_collisions", collisions_table_col_count, table_flags)) {
                 imgui::TableSetupColumn("Problem");
                 imgui::TableSetupColumn("After");
                 imgui::TableSetupColumn("Before");
+                ImGui::TableSetupScrollFreeze(0, 1);
                 imgui::TableHeadersRow();
 
                 ImGuiListClipper clipper;
@@ -384,9 +392,10 @@ void swan_popup_modals::render_bulk_rename() noexcept
     }
     else { // show preview
         if (imgui::BeginChild("bulk_rename_child")) {
-            if (imgui::BeginTable("bulk_rename_preview", 2, ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp)) {
+            if (imgui::BeginTable("bulk_rename_preview", 2, ImGuiTableFlags_Resizable|ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_ScrollY)) {
                 imgui::TableSetupColumn("Before");
                 imgui::TableSetupColumn("After");
+                ImGui::TableSetupScrollFreeze(0, 1);
                 imgui::TableHeadersRow();
 
                 ImGuiListClipper clipper;

@@ -492,10 +492,16 @@ void swan_windows::render_file_operations(bool &open) noexcept
         file_ops_table_col_count
     };
 
-    if (imgui::BeginTable("completed_file_operations", file_ops_table_col_count,
-        ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_Resizable|ImGuiTableFlags_BordersV|ImGuiTableFlags_Reorderable |
-        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0))
-    ) {
+    s32 table_flags =
+        ImGuiTableFlags_SizingStretchProp|
+        ImGuiTableFlags_Resizable|
+        ImGuiTableFlags_BordersV|
+        ImGuiTableFlags_Reorderable|
+        ImGuiTableFlags_ScrollY|
+        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
+    ;
+
+    if (imgui::BeginTable("completed_file_operations", file_ops_table_col_count, table_flags)) {
         static std::optional< std::deque<completed_file_operation>::iterator > elem_right_clicked_iter = std::nullopt;
         std::deque<completed_file_operation>::iterator remove_single_iter = completed_operations.end();
         static u64 num_selected_when_context_menu_opened = 0;
@@ -505,6 +511,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
         imgui::TableSetupColumn("Completed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_completion_time);
         imgui::TableSetupColumn("Source Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
         imgui::TableSetupColumn("Destination Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dst_path);
+        ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();
 
         std::scoped_lock completed_file_ops_lock(mutex);

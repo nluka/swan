@@ -186,14 +186,22 @@ void swan_windows::render_recent_files(bool &open) noexcept
     u64 remove_idx = u64(-1);
     u64 move_to_front_idx = u64(-1);
 
-    if (imgui::BeginTable("recent_files", 4,
-        ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersV|ImGuiTableFlags_Hideable|ImGuiTableFlags_Reorderable|ImGuiTableFlags_Resizable|
-        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)))
-    {
+    s32 table_flags =
+        ImGuiTableFlags_SizingStretchProp|
+        ImGuiTableFlags_BordersV|
+        ImGuiTableFlags_Hideable|
+        ImGuiTableFlags_Reorderable|
+        ImGuiTableFlags_Resizable|
+        ImGuiTableFlags_ScrollY|
+        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
+    ;
+
+    if (imgui::BeginTable("recent_files", 4, table_flags)) {
         imgui::TableSetupColumn("#");
         imgui::TableSetupColumn("When");
         imgui::TableSetupColumn("File Name");
         imgui::TableSetupColumn("Full Path");
+        ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();
 
         std::scoped_lock lock(g_recent_files_mutex);
