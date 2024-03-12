@@ -312,7 +312,7 @@ struct explorer_window
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
     precise_time_point_t read_dir_changes_refresh_request_time = {};
     precise_time_point_t last_filesystem_query_time = {};
-    dirent *right_clicked_ent = nullptr;
+    dirent *context_menu_target = nullptr;
 
     static u64 const num_timing_samples = 10;
 

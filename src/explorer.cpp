@@ -479,51 +479,6 @@ generic_result handle_drag_drop_onto_dirent(
     }
 }
 
-static
-generic_result reveal_in_file_explorer(explorer_window::dirent const &entry, explorer_window &expl) noexcept
-{
-    swan_path_t cwd_path_utf8 = expl.cwd;
-    swan_path_t entry_path_utf8 = entry.basic.path;
-
-    // Windows File Explorer does not like unix separator
-    path_force_separator(cwd_path_utf8, '\\');
-    path_force_separator(entry_path_utf8, '\\');
-
-    wchar_t select_path_cwd_buffer_utf16[MAX_PATH];     init_empty_cstr(select_path_cwd_buffer_utf16);
-    wchar_t select_path_dirent_buffer_utf16[MAX_PATH];  init_empty_cstr(select_path_dirent_buffer_utf16);
-    std::wstring select_command = {};
-
-    select_command.reserve(1024);
-
-    if (!utf8_to_utf16(cwd_path_utf8.data(), select_path_cwd_buffer_utf16, lengthof(select_path_cwd_buffer_utf16))) {
-        return { false, "Conversion of cwd path from UTF-8 to UTF-16." };
-    }
-
-    select_command += L"/select,";
-    select_command += L'"';
-    select_command += select_path_cwd_buffer_utf16;
-    if (!select_command.ends_with(L'\\')) {
-        select_command += L'\\';
-    }
-
-    if (!utf8_to_utf16(entry_path_utf8.data(), select_path_dirent_buffer_utf16, lengthof(select_path_dirent_buffer_utf16))) {
-        return { false, "Conversion of selected entry's path from UTF-8 to UTF-16." };
-    }
-
-    select_command += select_path_dirent_buffer_utf16;
-    select_command += L'"';
-
-    WCOUT_IF_DEBUG("select_command: [" << select_command.c_str() << "]\n");
-
-    HINSTANCE result = ShellExecuteW(nullptr, L"open", L"explorer.exe", select_command.c_str(), nullptr, SW_SHOWNORMAL);
-
-    if ((intptr_t)result > HINSTANCE_ERROR) {
-        return { true, "" };
-    } else {
-        return { false, get_last_winapi_error().formatted_message };
-    }
-}
-
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin) noexcept
 {
     swan_path_t target_full_path_utf8 = path_create(file_directory);
@@ -1837,9 +1792,9 @@ void render_pins_popup(explorer_window &expl) noexcept
 
                 if (imgui::Selectable(pin.label.c_str(), &selected)) {
                     if (!directory_exists(pin.path.data())) {
-                        char const *action = make_str("Open pin [%s].", pin.label.c_str()).c_str();
-                        char const *failed = make_str("Pin path [%s] does not exit.", pin.path.data()).c_str();
-                        swan_popup_modals::open_error(action, failed);
+                        std::string action = make_str("Open pin [%s].", pin.label.c_str());
+                        std::string failed = make_str("Pin path [%s] does not exit.", pin.path.data());
+                        swan_popup_modals::open_error(action.c_str(), failed.c_str());
                     }
                     else {
                         auto [pin_is_valid_dir, _] = expl.update_cwd_entries(query_filesystem, pin.path.data());
@@ -2415,9 +2370,9 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
             if (cwd_is_drive) {
                 path_clear(expl.cwd);
             } else {
-                char const *action = make_str("Ascend to directory [%s]", result.parent_dir.data()).c_str();
+                std::string action = make_str("Ascend to directory [%s]", result.parent_dir.data());
                 char const *failed = "Directory not found.";
-                swan_popup_modals::open_error(action, failed);
+                swan_popup_modals::open_error(action.c_str(), failed);
             }
         }
     }
@@ -2695,9 +2650,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         auto handle_file_op_failure = [](char const *operation, generic_result const &result) noexcept {
             if (!result.success) {
                 u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                char const *action = make_str("%s %zu items.", operation, num_failed).c_str();
+                std::string action = make_str("%s %zu items.", operation, num_failed);
                 char const *failed = result.error_or_utf8_path.c_str();
-                swan_popup_modals::open_error(action, failed);
+                swan_popup_modals::open_error(action.c_str(), failed);
             }
         };
 
@@ -2715,9 +2670,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
                         if (!result.success) {
                             u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                            char const *action = make_str("Delete %zu items.", num_failed).c_str();
+                            std::string action = make_str("Delete %zu items.", num_failed);
                             char const *failed = result.error_or_utf8_path.c_str();
-                            swan_popup_modals::open_error(action, failed);
+                            swan_popup_modals::open_error(action.c_str(), failed);
                         }
                         (void) global_state::settings().save_to_disk();
                     },
@@ -2979,9 +2934,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
                 (void) expl.save_to_disk();
             } else {
-                char const *action = make_str("Navigate to history item [%s]", expl.cwd.data()).c_str();
+                std::string action = make_str("Navigate to history item [%s]", expl.cwd.data());
                 char const *failed = "Path not found, maybe it was renamed or deleted?";
-                swan_popup_modals::open_error(action, failed);
+                swan_popup_modals::open_error(action.c_str(), failed);
 
                 expl.cwd = backup;
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
@@ -3095,7 +3050,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 // stop spotlighting any dirents ahead which could linger if we just wrapped the spotlight back to the top,
                 // looks better this way when rapidly advancing the spotlighted dirent.
                 // without it multiple dirents can be spotlighted at the same time which is visually distracting and possible confusing.
-                std::for_each(scrolled_to_dirent + 1, expl.cwd_entries.end(), [](explorer_window::dirent &e) noexcept { return e.spotlight_frames_remaining = 0; });
+                std::for_each(scrolled_to_dirent + 1, expl.cwd_entries.end(),
+                              [](explorer_window::dirent &e) noexcept { return e.spotlight_frames_remaining = 0; });
             }
 
             expl.scroll_to_nth_selected_entry_next_frame = u64(-1);
@@ -3118,7 +3074,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 } else {
                     f32 half_window_height = window_height / 2.0f;
                     f32 half_dirent_row_height = ImGui::GetTextLineHeightWithSpacing() / 2.0f;
-                    imgui::SetScrollY(scrolled_to_dirent_offset_y.value() + imgui::TableGetHeaderRowHeight() - half_window_height + half_dirent_row_height);
+                    f32 scroll_target_y = scrolled_to_dirent_offset_y.value() + imgui::TableGetHeaderRowHeight() - half_window_height + half_dirent_row_height;
+                    imgui::SetScrollY(scroll_target_y); // TODO: doesn't work with ScrollY table flag
                 }
             }
 
@@ -3129,7 +3086,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 ImGuiTableFlags_Reorderable|
                 ImGuiTableFlags_Sortable|
                 ImGuiTableFlags_BordersV|
-                ImGuiTableFlags_ScrollY|
+                // ImGuiTableFlags_ScrollY|
                 ImGuiTableFlags_SortMulti|
                 ImGuiTableFlags_SortTristate|
                 (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
@@ -3303,9 +3260,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
                 (void) expl.save_to_disk();
             } else {
-                char const *action = make_str("Navigate to history item [%s]", expl.cwd.data()).c_str();
+                std::string action = make_str("Navigate to history item [%s]", expl.cwd.data());
                 char const *failed = "Path not found, maybe it was renamed or deleted?";
-                swan_popup_modals::open_error(action, failed);
+                swan_popup_modals::open_error(action.c_str(), failed);
 
                 expl.cwd = backup;
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
@@ -3401,9 +3358,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             auto result = try_descend_to_directory(expl, pin.path.data());
 
             if (!result.success) {
-                char const *action = make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1).c_str();
+                std::string action = make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1);
                 char const *failed = result.err_msg.c_str();
-                swan_popup_modals::open_error(action, failed);
+                swan_popup_modals::open_error(action.c_str(), failed);
 
                 expl.cwd = initial_cwd;
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
@@ -3604,9 +3561,9 @@ void render_table_rows_for_cwd_entries(
                                         auto result = try_ascend_directory(expl);
 
                                         if (!result.success) {
-                                            char const *action = make_str("Ascend to directory [%s].", result.parent_dir.data()).c_str();
+                                            std::string action = make_str("Ascend to directory [%s].", result.parent_dir.data());
                                             char const *failed = "Directory not found.";
-                                            swan_popup_modals::open_error(action, failed);
+                                            swan_popup_modals::open_error(action.c_str(), failed);
 
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_ascend_directory
                                         }
@@ -3618,9 +3575,9 @@ void render_table_rows_for_cwd_entries(
                                         auto result = try_descend_to_directory(expl, target);
 
                                         if (!result.success) {
-                                            char const *action = make_str("Descend to directory [%s].", target).c_str();
+                                            std::string action = make_str("Descend to directory [%s].", target);
                                             char const *failed = result.err_msg.c_str();
-                                            swan_popup_modals::open_error(action, failed);
+                                            swan_popup_modals::open_error(action.c_str(), failed);
 
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
                                         }
@@ -3655,9 +3612,9 @@ void render_table_rows_for_cwd_entries(
                                             (void) global_state::save_recent_files_to_disk();
                                         }
                                     } else {
-                                        char const *action = make_str("Open symlink [%s].", dirent.basic.path.data()).c_str();
+                                        std::string action = make_str("Open symlink [%s].", dirent.basic.path.data());
                                         char const *failed = res.error_or_utf8_path.c_str();
-                                        swan_popup_modals::open_error(action, failed);
+                                        swan_popup_modals::open_error(action.c_str(), failed);
                                     }
                                 }
                                 else {
@@ -3677,9 +3634,9 @@ void render_table_rows_for_cwd_entries(
                                         }
                                         (void) global_state::save_recent_files_to_disk();
                                     } else {
-                                        char const *action = make_str("Open file [%s].", dirent.basic.path.data()).c_str();
+                                        std::string action = make_str("Open file [%s].", dirent.basic.path.data());
                                         char const *failed = res.error_or_utf8_path.c_str();
-                                        swan_popup_modals::open_error(action, failed);
+                                        swan_popup_modals::open_error(action.c_str(), failed);
                                     }
                                 }
                             }
@@ -3712,7 +3669,7 @@ void render_table_rows_for_cwd_entries(
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right) && !any_popups_open && !dirent.basic.is_path_dotdot()) {
                     print_debug_msg("[ %d ] right clicked [%s]", expl.id, dirent.basic.path.data());
                     imgui::OpenPopup("Context");
-                    expl.right_clicked_ent = &dirent;
+                    expl.context_menu_target = &dirent;
                 }
 
             } // path column
@@ -3871,17 +3828,17 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
     if (imgui::BeginPopup("Context")) {
         if (cnt.selected_dirents <= 1) {
-            assert(expl.right_clicked_ent != nullptr);
+            assert(expl.context_menu_target != nullptr);
 
-            imgui::TextColored(get_color(expl.right_clicked_ent->basic.type), "%s", expl.right_clicked_ent->basic.path.data());
+            imgui::TextColored(get_color(expl.context_menu_target->basic.type), "%s", expl.context_menu_target->basic.path.data());
             imgui::Separator();
 
-            // bool is_directory = expl.right_clicked_ent->basic.is_directory();
+            // bool is_directory = expl.context_menu_target->basic.is_directory();
 
-            if ((path_ends_with(expl.right_clicked_ent->basic.path, ".exe") || path_ends_with(expl.right_clicked_ent->basic.path, ".bat"))
+            if ((path_ends_with(expl.context_menu_target->basic.path, ".exe") || path_ends_with(expl.context_menu_target->basic.path, ".bat"))
                 && imgui::Selectable("Run as administrator"))
             {
-                auto res = open_file(expl.right_clicked_ent->basic.path.data(), expl.cwd.data(), true);
+                auto res = open_file(expl.context_menu_target->basic.path.data(), expl.cwd.data(), true);
 
                 if (res.success) {
                     char const *full_file_path = res.error_or_utf8_path.c_str();
@@ -3895,20 +3852,20 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     }
                     (void) global_state::save_recent_files_to_disk();
                 } else {
-                    char const *action = make_str("Open file as administrator [%s].", expl.right_clicked_ent->basic.path.data()).c_str();
+                    std::string action = make_str("Open file as administrator [%s].", expl.context_menu_target->basic.path.data());
                     char const *failed = res.error_or_utf8_path.c_str();
-                    swan_popup_modals::open_error(action, failed);
+                    swan_popup_modals::open_error(action.c_str(), failed);
                 }
             }
 
-            if (expl.right_clicked_ent->basic.is_symlink_to_file() && imgui::Selectable("Open file location")) {
+            if (expl.context_menu_target->basic.is_symlink_to_file() && imgui::Selectable("Open file location")) {
                 symlink_data lnk_data = {};
-                auto extract_result = lnk_data.extract(expl.right_clicked_ent->basic.path.data(), expl.cwd.data());
+                auto extract_result = lnk_data.extract(expl.context_menu_target->basic.path.data(), expl.cwd.data());
 
                 if (!extract_result.success) {
-                    char const *action = make_str("Open file location of [%s].", expl.right_clicked_ent->basic.path.data()).c_str();
+                    std::string action = make_str("Open file location of [%s].", expl.context_menu_target->basic.path.data());
                     char const *failed = extract_result.error_or_utf8_path.c_str();
-                    swan_popup_modals::open_error(action, failed);
+                    swan_popup_modals::open_error(action.c_str(), failed);
                 } else {
                     // no error checking because symlink_data::extract has already validated things
 
@@ -3930,33 +3887,41 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 }
             }
             if (imgui::Selectable("Copy name")) {
-                imgui::SetClipboardText(expl.right_clicked_ent->basic.path.data());
+                imgui::SetClipboardText(expl.context_menu_target->basic.path.data());
             }
             if (imgui::Selectable("Copy full path")) {
                 swan_path_t full_path = path_create(expl.cwd.data());
-                if (!path_append(full_path, expl.right_clicked_ent->basic.path.data(), settings.dir_separator_utf8, true)) {
-                    char const *action = make_str("Copy full path of [%s].", expl.right_clicked_ent->basic.path.data()).c_str();
+                if (!path_append(full_path, expl.context_menu_target->basic.path.data(), settings.dir_separator_utf8, true)) {
+                    std::string action = make_str("Copy full path of [%s].", expl.context_menu_target->basic.path.data());
                     char const *failed = "Max path length exceeded when appending name to current working directory path.";
-                    swan_popup_modals::open_error(action, failed);
+                    swan_popup_modals::open_error(action.c_str(), failed);
                 } else {
                     imgui::SetClipboardText(full_path.data());
                 }
             }
             if (imgui::Selectable("Copy size (bytes)")) {
-                imgui::SetClipboardText(std::to_string(expl.right_clicked_ent->basic.size).c_str());
+                imgui::SetClipboardText(std::to_string(expl.context_menu_target->basic.size).c_str());
             }
             if (imgui::Selectable("Copy size (pretty)")) {
                 char buffer[32]; init_empty_cstr(buffer);
-                format_file_size(expl.right_clicked_ent->basic.size, buffer, lengthof(buffer), settings.size_unit_multiplier);
+                format_file_size(expl.context_menu_target->basic.size, buffer, lengthof(buffer), settings.size_unit_multiplier);
                 imgui::SetClipboardText(buffer);
             }
 
             if (imgui::Selectable("Reveal in File Explorer")) {
-                auto res = reveal_in_file_explorer(*expl.right_clicked_ent, expl);
-                if (!res.success) {
-                    char const *action = make_str("Reveal [%s] in File Explorer.", expl.right_clicked_ent->basic.path.data()).c_str();
-                    char const *failed = res.error_or_utf8_path.c_str();
-                    swan_popup_modals::open_error(action, failed);
+                swan_path_t full_path = expl.cwd;
+                if (!path_append(full_path, expl.context_menu_target->basic.path.data(), L'\\', true)) {
+                    std::string action = make_str("Reveal [%s] in File Explorer.", expl.context_menu_target->basic.path.data());
+                    char const *failed = "Append name to current working directory exceeds maximum path length.";
+                    swan_popup_modals::open_error(action.c_str(), failed);
+                }
+                else {
+                    auto res = reveal_in_windows_file_explorer(full_path);
+                    if (!res.success) {
+                        std::string action = make_str("Reveal [%s] in File Explorer.", expl.context_menu_target->basic.path.data());
+                        char const *failed = res.error_or_utf8_path.c_str();
+                        swan_popup_modals::open_error(action.c_str(), failed);
+                    }
                 }
             }
 
@@ -3964,9 +3929,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
             auto handle_failure = [&](char const *operation, generic_result const &result) noexcept {
                 if (!result.success) {
-                    char const *action = make_str("%s [%s].", operation, expl.right_clicked_ent->basic.path.data()).c_str();
+                    std::string action = make_str("%s [%s].", operation, expl.context_menu_target->basic.path.data());
                     char const *failed = result.error_or_utf8_path.c_str();
-                    swan_popup_modals::open_error(action, failed);
+                    swan_popup_modals::open_error(action.c_str(), failed);
                 }
             };
 
@@ -3975,7 +3940,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     s_file_op_payload.clear();
                 }
                 expl.deselect_all_cwd_entries();
-                expl.right_clicked_ent->is_selected = true;
+                expl.context_menu_target->is_selected = true;
                 auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("cut", result);
             }
@@ -3985,7 +3950,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 }
 
                 expl.deselect_all_cwd_entries();
-                expl.right_clicked_ent->is_selected = true;
+                expl.context_menu_target->is_selected = true;
 
                 auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
                 handle_failure("copy", result);
@@ -3995,7 +3960,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
             if (imgui::Selectable("Delete##single")) {
                 expl.deselect_all_cwd_entries();
-                expl.right_clicked_ent->is_selected = true;
+                expl.context_menu_target->is_selected = true;
 
                 imgui::OpenConfirmationModalWithCallback(
                     /* confirmation_id  = */ swan_id_confirm_explorer_execute_delete,
@@ -4006,9 +3971,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
                         if (!result.success) {
                             u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                            char const *action = make_str("Delete %zu items.", num_failed).c_str();
+                            std::string action = make_str("Delete %zu items.", num_failed);
                             char const *failed = result.error_or_utf8_path.c_str();
-                            swan_popup_modals::open_error(action, failed);
+                            swan_popup_modals::open_error(action.c_str(), failed);
                         }
                         (void) global_state::settings().save_to_disk();
                     },
@@ -4017,7 +3982,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             }
             if (imgui::Selectable("Rename##single")) {
                 retval.open_single_rename_popup = true;
-                retval.single_dirent_to_be_renamed = expl.right_clicked_ent;
+                retval.single_dirent_to_be_renamed = expl.context_menu_target;
             }
         }
         else { // right click when > 1 dirents selected
@@ -4040,9 +4005,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     if (dirent.is_selected && !dirent.is_filtered_out) {
                         swan_path_t full_path = path_create(expl.cwd.data());
                         if (!path_append(full_path, dirent.basic.path.data(), settings.dir_separator_utf8, true)) {
-                            char const *action = make_str("Copy full path of [%s].", dirent.basic.path.data()).c_str();
+                            std::string action = make_str("Copy full path of [%s].", dirent.basic.path.data());
                             char const *failed = "Max path length exceeded when appending name to current working directory path.";
-                            swan_popup_modals::open_error(action, failed);
+                            swan_popup_modals::open_error(action.c_str(), failed);
                             break;
                         }
                         clipboard += full_path.data();
@@ -4058,9 +4023,9 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             auto handle_failure = [](char const *operation, generic_result const &result) noexcept {
                 if (!result.success) {
                     u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                    char const *action = make_str("%s %zu items.", operation, num_failed).c_str();
+                    std::string action = make_str("%s %zu items.", operation, num_failed);
                     char const *failed = result.error_or_utf8_path.c_str();
-                    swan_popup_modals::open_error(action, failed);
+                    swan_popup_modals::open_error(action.c_str(), failed);
                 }
             };
 

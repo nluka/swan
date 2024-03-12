@@ -248,3 +248,35 @@ recycle_bin_info query_recycle_bin() noexcept
 
     return retval;
 }
+
+generic_result reveal_in_windows_file_explorer(swan_path_t const &full_path_in) noexcept
+{
+    swan_path_t full_path_utf8 = full_path_in;
+
+    // Windows File Explorer does not like unix separator
+    path_force_separator(full_path_utf8, '\\');
+
+    wchar_t select_path_utf16[MAX_PATH];
+
+    if (!utf8_to_utf16(full_path_utf8.data(), select_path_utf16, lengthof(select_path_utf16))) {
+        return { false, "Conversion of path from UTF-8 to UTF-16." };
+    }
+
+    std::wstring select_command = {};
+    select_command.reserve(1024);
+
+    select_command += L"/select,";
+    select_command += L'"';
+    select_command += select_path_utf16;
+    select_command += L'"';
+
+    WCOUT_IF_DEBUG("select_command: [" << select_command.c_str() << "]\n");
+
+    HINSTANCE result = ShellExecuteW(nullptr, L"open", L"explorer.exe", select_command.c_str(), nullptr, SW_SHOWNORMAL);
+
+    if ((intptr_t)result > HINSTANCE_ERROR) {
+        return { true, "" };
+    } else {
+        return { false, get_last_winapi_error().formatted_message };
+    }
+}

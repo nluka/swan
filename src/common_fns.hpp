@@ -165,6 +165,7 @@ namespace swan_popup_modals
 } // namespace swan_popup_modals
 
 void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexcept;
+
 void clean_COM_for_explorers() noexcept;
 
 void apply_swan_style_overrides() noexcept;
@@ -178,6 +179,8 @@ drive_list_t query_drive_list() noexcept;
 recycle_bin_info query_recycle_bin() noexcept;
 
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin = false) noexcept;
+
+generic_result reveal_in_windows_file_explorer(swan_path_t const &full_path) noexcept;
 
 winapi_error get_last_winapi_error() noexcept;
 

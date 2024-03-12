@@ -185,6 +185,16 @@ void swan_windows::render_recent_files(bool &open) noexcept
     system_time_point_t current_time = current_time_system();
     u64 remove_idx = u64(-1);
     u64 move_to_front_idx = u64(-1);
+    static recent_file *s_context_menu_target = nullptr;
+    static u64 s_context_menu_target_idx = u64(-1);
+
+    enum recent_files_table_col : s32 {
+        recent_files_table_col_number,
+        recent_files_table_col_when,
+        recent_files_table_col_file_name,
+        recent_files_table_col_full_path,
+        recent_files_table_col_count
+    };
 
     s32 table_flags =
         ImGuiTableFlags_SizingStretchProp|
@@ -196,7 +206,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
         (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
     ;
 
-    if (imgui::BeginTable("recent_files", 4, table_flags)) {
+    if (imgui::BeginTable("recent_files", recent_files_table_col_count, table_flags)) {
         imgui::TableSetupColumn("#");
         imgui::TableSetupColumn("When");
         imgui::TableSetupColumn("File Name");
@@ -206,58 +216,80 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
         std::scoped_lock lock(g_recent_files_mutex);
 
-        u64 n = 0;
-        for (auto &file : g_recent_files) {
-            char *file_name = get_file_name(file.path.data());
-            char const *full_path = file.path.data();
+        ImGuiListClipper clipper;
+        assert(g_recent_files.size() <= (u64)INT32_MAX);
+        clipper.Begin((s32)g_recent_files.size());
+
+        while (clipper.Step())
+        for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+            auto &file = g_recent_files[i];
+            char *full_path = file.path.data();
+            char *file_name = get_file_name(full_path);
             auto directory = get_everything_minus_file_name(full_path);
             swan_path_t file_directory = path_create(directory.data(), directory.size());
 
             bool left_clicked = false;
             bool right_clicked = false;
+            bool double_clicked = false;
 
-            imgui::TableNextColumn();
-            imgui::Text("%zu", ++n);
+            imgui::TableNextRow();
 
-            imgui::TableNextColumn();
-            {
+            if (imgui::TableSetColumnIndex(recent_files_table_col_number)) {
+                imgui::Text("%zu", i+1);
+            }
+
+            if (imgui::TableSetColumnIndex(recent_files_table_col_when)) {
                 auto when = compute_when_str(file.action_time, current_time);
                 imgui::Text("%s %s", file.action.c_str(), when.data());
             }
 
-            imgui::TableNextColumn();
-            {
+            if (imgui::TableSetColumnIndex(recent_files_table_col_file_name)) {
                 file_name_extension_splitter splitter(file_name);
                 imgui::TextColored(get_color(basic_dirent::kind::file), get_icon_for_extension(splitter.ext));
-            }
-            imgui::SameLine();
-            {
-                auto label = make_str_static<1200>("%s##recent_file_%zu", file_name, n);
-                imgui::Selectable(label.data(), &left_clicked, ImGuiSelectableFlags_SpanAllColumns);
-                right_clicked = imgui::IsItemClicked(ImGuiMouseButton_Right);
-            }
 
-            imgui::TableNextColumn();
-            {
-                auto label = make_str_static<1200>("%s##recent_file_%zu", full_path, n);
-                imgui::Selectable(label.data(), &left_clicked, ImGuiSelectableFlags_SpanAllColumns);
-                right_clicked = imgui::IsItemClicked(ImGuiMouseButton_Right);
+                imgui::SameLine();
+
+                auto label = make_str_static<1200>("%s##recent_file_%zu", file_name, i);
+                if (imgui::Selectable(label.data(), &left_clicked, ImGuiSelectableFlags_SpanAllColumns|ImGuiSelectableFlags_AllowDoubleClick)) {
+                    double_clicked |= imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+                }
+                right_clicked |= imgui::IsItemClicked(ImGuiMouseButton_Right);
             }
 
-            if (left_clicked) {
-                print_debug_msg("left clicked recent file #%zu [%s]", n, full_path);
+            if (imgui::TableSetColumnIndex(recent_files_table_col_full_path)) {
+                auto label = make_str_static<1200>("%s##recent_file_%zu", full_path, i);
+                if (imgui::Selectable(label.data(), &left_clicked, ImGuiSelectableFlags_SpanAllColumns|ImGuiSelectableFlags_AllowDoubleClick)) {
+                    double_clicked |= imgui::IsItemHovered() && imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+                }
+                right_clicked |= imgui::IsItemClicked(ImGuiMouseButton_Right);
+            }
 
+            if (double_clicked) {
                 auto res = open_file(file_name, file_directory.data());
 
                 if (res.success) {
-                    move_to_front_idx = n-1;
+                    move_to_front_idx = i;
                 } else {
                     swan_popup_modals::open_error(make_str("Open file [%s].", full_path).c_str(), res.error_or_utf8_path.c_str());
-                    remove_idx = n-1;
+                    remove_idx = i;
                 }
             }
             if (right_clicked) {
+                s_context_menu_target = &g_recent_files[i];
+                s_context_menu_target_idx = i;
+                imgui::OpenPopup("## recent_files context_menu");
+            }
+        }
+
+        if (imgui::BeginPopup("## recent_files context_menu")) {
+            bool selected = false;
+
+            if (imgui::Selectable("Reveal in Explorer 1", selected)) {
                 auto &expl = global_state::explorers()[0];
+                char *full_path = s_context_menu_target->path.data();
+                char *file_name = get_file_name(full_path);
+                auto directory = get_everything_minus_file_name(full_path);
+                swan_path_t file_directory = path_create(directory.data(), directory.size());
 
                 wchar_t file_path_utf16[MAX_PATH];
 
@@ -265,8 +297,10 @@ void swan_windows::render_recent_files(bool &open) noexcept
                     auto file_exists = PathFileExistsW(file_path_utf16);
 
                     if (!file_exists) {
-                        swan_popup_modals::open_error(make_str("Open file location [%s].", full_path).c_str(), "File not found.");
-                        remove_idx = n-1;
+                        std::string action = make_str("Open file location [%s].", full_path);
+                        char const *failure = "File not found.";
+                        swan_popup_modals::open_error(action.c_str(), failure);
+                        remove_idx = s_context_menu_target_idx;
                     }
                     else {
                         expl.deselect_all_cwd_entries();
@@ -279,9 +313,10 @@ void swan_windows::render_recent_files(bool &open) noexcept
                         auto [file_directory_exists, _] = expl.update_cwd_entries(full_refresh, file_directory.data());
 
                         if (!file_directory_exists) {
-                            swan_popup_modals::open_error(make_str("Open file location [%s].", full_path).c_str(),
-                                                          make_str("Directory [%s] not found.", file_directory.data()).c_str());
-                            remove_idx = n-1;
+                            std::string action = make_str("Open file location [%s].", full_path);
+                            std::string failure = make_str("Directory [%s] not found.", file_directory.data());
+                            swan_popup_modals::open_error(action.c_str(), failure.c_str());
+                            remove_idx = s_context_menu_target_idx;
                         }
                         else {
                             expl.cwd = path_create(file_directory.data());
@@ -302,9 +337,26 @@ void swan_windows::render_recent_files(bool &open) noexcept
                     }
                 }
             }
+            if (imgui::Selectable("Reveal in File Explorer", selected)) {
+                swan_path_t const &full_path = s_context_menu_target->path;
+                auto res = reveal_in_windows_file_explorer(full_path);
+                if (!res.success) {
+                    std::string action = make_str("Reveal [%s] in File Explorer.", full_path.data());
+                    char const *failed = res.error_or_utf8_path.c_str();
+                    swan_popup_modals::open_error(action.c_str(), failed);
+                }
+            }
+            if (imgui::Selectable("Forget", selected)) {
+                remove_idx = s_context_menu_target_idx;
+            }
+
+            imgui::EndPopup();
         }
+
         imgui::EndTable();
     }
+
+
 
     if (remove_idx != u64(-1)) {
         (void) global_state::remove_recent_file(remove_idx);
