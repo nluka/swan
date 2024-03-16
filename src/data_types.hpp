@@ -12,7 +12,17 @@ typedef BS::thread_pool swan_thread_pool_t;
 
 #include "path.hpp"
 #include "util.hpp"
-#include "progressive_task.hpp"
+
+/// Bundle of state for a "progressive" task - a cancellable async function.
+/// Provides a facility to safely query the result as the task progresses, and cancel the task.
+template <typename Result>
+struct progressive_task
+{
+    Result result = {};
+    std::mutex result_mutex = {};
+    std::atomic_bool cancellation_token = false;
+    std::atomic_bool active_token = false;
+};
 
 struct generic_result
 {
@@ -245,7 +255,7 @@ struct explorer_window
     bool save_to_disk() const noexcept;
     bool load_from_disk(char dir_separator) noexcept;
     void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
-    void deselect_all_cwd_entries() noexcept;
+    u64 deselect_all_cwd_entries() noexcept;
     void invert_selection_on_visible_cwd_entries() noexcept;
     void set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept;
     void uncut() noexcept;
