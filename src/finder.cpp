@@ -1,7 +1,7 @@
 #include "stdafx.hpp"
+#include "data_types.hpp"
 #include "common_fns.hpp"
 #include "imgui_specific.hpp"
-#include "progressive_task.hpp"
 
 namespace swan_finder
 {
@@ -334,7 +334,7 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
             imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, matches_table_col_number);
             imgui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_id);
             imgui::TableSetupColumn("Name", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_name);
-            imgui::TableSetupColumn("Full Path", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_parent);
+            imgui::TableSetupColumn("Location", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_parent);
             ImGui::TableSetupScrollFreeze(0, 1);
             imgui::TableHeadersRow();
 
