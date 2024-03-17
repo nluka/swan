@@ -103,6 +103,8 @@ try {
     write_bool("confirm_explorer_delete_via_context_menu", this->confirm_explorer_delete_via_context_menu);
     write_bool("confirm_explorer_unpin_directory", this->confirm_explorer_unpin_directory);
     write_bool("confirm_recent_files_clear", this->confirm_recent_files_clear);
+    write_bool("confirm_recent_files_reveal_selected_in_win_file_expl", this->confirm_recent_files_reveal_selected_in_win_file_expl);
+    write_bool("confirm_recent_files_forget_selected", this->confirm_recent_files_forget_selected);
     write_bool("confirm_delete_pin", this->confirm_delete_pin);
     write_bool("confirm_completed_file_operations_forget_single", this->confirm_completed_file_operations_forget_single);
     write_bool("confirm_completed_file_operations_forget_group", this->confirm_completed_file_operations_forget_group);
@@ -246,6 +248,12 @@ try {
         }
         else if (property == "confirm_recent_files_clear") {
             this->confirm_recent_files_clear = extract_bool();
+        }
+        else if (property == "confirm_recent_files_reveal_selected_in_win_file_expl") {
+            this->confirm_recent_files_reveal_selected_in_win_file_expl = extract_bool();
+        }
+        else if (property == "confirm_recent_files_forget_selected") {
+            this->confirm_recent_files_forget_selected = extract_bool();
         }
         else if (property == "confirm_delete_pin") {
             this->confirm_delete_pin = extract_bool();

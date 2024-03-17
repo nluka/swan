@@ -155,6 +155,8 @@ struct swan_settings
     bool confirm_explorer_delete_via_context_menu = true;
     bool confirm_explorer_unpin_directory = true;
     bool confirm_recent_files_clear = true;
+    bool confirm_recent_files_reveal_selected_in_win_file_expl = true;
+    bool confirm_recent_files_forget_selected = true;
     bool confirm_delete_pin = true;
     bool confirm_completed_file_operations_forget_single = true;
     bool confirm_completed_file_operations_forget_group = true;
@@ -664,7 +666,9 @@ struct icon_font_browser_state
 
 enum swan_confirmation_id : s32
 {
-    swan_id_confirm_clear_recent_files,
+    swan_id_confirm_recent_files_clear,
+    swan_id_confirm_recent_files_reveal_selected_in_win_file_expl,
+    swan_id_confirm_recent_files_forget_selected,
 
     swan_id_confirm_delete_pin,
 

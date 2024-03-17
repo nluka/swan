@@ -657,11 +657,13 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             }
 
             if (imgui::BeginMenu("Confirmations")) {
-                setting_change |= imgui::MenuItem("Clear [Recent Files]", nullptr, &global_state::settings().confirm_recent_files_clear);
+                setting_change |= imgui::MenuItem("Clear  [Recent Files]", nullptr, &global_state::settings().confirm_recent_files_clear);
+                setting_change |= imgui::MenuItem("Reveal [Recent Files] selection in File Explorer", nullptr, &global_state::settings().confirm_recent_files_reveal_selected_in_win_file_expl);
+                setting_change |= imgui::MenuItem("Forget [Recent Files] selection", nullptr, &global_state::settings().confirm_recent_files_forget_selected);
                 setting_change |= imgui::MenuItem("Delete [Pinned] pin", nullptr, &global_state::settings().confirm_delete_pin);
                 setting_change |= imgui::MenuItem("Delete [Explorer] via context menu", nullptr, &global_state::settings().confirm_explorer_delete_via_context_menu);
                 setting_change |= imgui::MenuItem("Delete [Explorer] via Del key", nullptr, &global_state::settings().confirm_explorer_delete_via_keybind);
-                setting_change |= imgui::MenuItem("Unpin [Explorer] working directory", nullptr, &global_state::settings().confirm_explorer_unpin_directory);
+                setting_change |= imgui::MenuItem("Unpin  [Explorer] working directory", nullptr, &global_state::settings().confirm_explorer_unpin_directory);
                 setting_change |= imgui::MenuItem("Forget [File Operations] single", nullptr, &global_state::settings().confirm_completed_file_operations_forget_single);
                 setting_change |= imgui::MenuItem("Forget [File Operations] group", nullptr, &global_state::settings().confirm_completed_file_operations_forget_group);
                 setting_change |= imgui::MenuItem("Forget [File Operations] selection", nullptr, &global_state::settings().confirm_completed_file_operations_forget_selected);
