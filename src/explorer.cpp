@@ -1825,7 +1825,7 @@ void render_pins_popup(explorer_window &expl) noexcept
                     }
                 }
             }
-            if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            if (imgui::IsItemHovered()) {
                 imgui::SetTooltip("%s", pin.path.data());
             }
         }
@@ -2539,6 +2539,28 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_V) && !s_file_op_payload.items.empty()) {
             s_file_op_payload.execute(expl);
         }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_P)) {
+            u64 pin_idx;
+            {
+                scoped_timer<timer_unit::MICROSECONDS> check_if_pinned_timer(&expl.check_if_pinned_us);
+                pin_idx = global_state::find_pin_idx(expl.cwd);
+            }
+            bool already_pinned = pin_idx != std::string::npos;
+
+            if (already_pinned) {
+                swan_popup_modals::open_edit_pin(&global_state::pins()[pin_idx]);
+            } else {
+                swan_popup_modals::open_new_pin(expl.cwd, false);
+            }
+        }
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_O)) {
+            imgui::OpenPopup("## pins");
+        }
+    }
+
+    if (imgui::BeginPopup("## pins")) {
+        render_pins_popup(expl);
+        imgui::EndPopup();
     }
 
     // refresh logic start
