@@ -78,21 +78,21 @@ void swan_windows::render_icon_library(bool &open) noexcept
     };
     static std::vector<icon_match> matches = {};
 
-    static char search_input[64] = {};
+    static char s_search_input[64] = {};
     bool search_update = false;
     {
         imgui::ScopedAvailWidth w = {};
-        search_update = imgui::InputTextWithHint("## icon_font_finder search", "Search", search_input, lengthof(search_input));
+        search_update = imgui::InputTextWithHint("## icon_font_finder search", "Search", s_search_input, lengthof(s_search_input));
     }
 
     if (search_update) {
         matches.clear();
 
-        u64 search_input_len = strnlen(search_input, lengthof(search_input));
+        u64 search_input_len = strnlen(s_search_input, lengthof(s_search_input));
 
         char search_input_upper[64] = {};
 
-        std::transform(search_input, search_input + search_input_len,
+        std::transform(s_search_input, s_search_input + search_input_len,
                        search_input_upper, [](char ch) noexcept { return (char)toupper(ch); });
 
         if (search_input_len > 0) {

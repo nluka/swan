@@ -353,7 +353,7 @@ struct explorer_window
     precise_time_point_t last_filesystem_query_time = {};
     dirent *context_menu_target = nullptr;
 
-    static u64 const num_timing_samples = 10;
+    static u64 const NUM_TIMING_SAMPLES = 10;
 
     struct update_cwd_entries_timers
     {
@@ -366,10 +366,10 @@ struct explorer_window
         f64 entries_to_select_search = 0;
     };
 
-    mutable circular_buffer<update_cwd_entries_timers> update_cwd_entries_timing_samples = circular_buffer<update_cwd_entries_timers>(num_timing_samples);
-    mutable circular_buffer<f64> sort_timing_samples                                     = circular_buffer<f64>(num_timing_samples);
-    mutable circular_buffer<f64> save_to_disk_timing_samples                             = circular_buffer<f64>(num_timing_samples);
-    mutable circular_buffer<f64> find_first_filtered_cwd_dirent_timing_samples           = circular_buffer<f64>(num_timing_samples);
+    mutable circular_buffer<update_cwd_entries_timers> update_cwd_entries_timing_samples = circular_buffer<update_cwd_entries_timers>(NUM_TIMING_SAMPLES);
+    mutable circular_buffer<f64> sort_timing_samples                                     = circular_buffer<f64>(NUM_TIMING_SAMPLES);
+    mutable circular_buffer<f64> save_to_disk_timing_samples                             = circular_buffer<f64>(NUM_TIMING_SAMPLES);
+    mutable circular_buffer<f64> find_first_filtered_cwd_dirent_timing_samples           = circular_buffer<f64>(NUM_TIMING_SAMPLES);
 
     mutable u64 num_file_finds = 0;
     mutable f64 check_if_pinned_us = 0;

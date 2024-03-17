@@ -4,20 +4,20 @@
 #include "util.hpp"
 #include "imgui_dependent_functions.hpp"
 
-static u64 s_fast_rand_seed = {};
+static u64 g_fast_rand_seed = {};
 void seed_fast_rand(u64 v) noexcept
 {
-    s_fast_rand_seed = v;
+    g_fast_rand_seed = v;
 }
 
 u64 fast_rand(u64 min, u64 max) noexcept
 {
-    s_fast_rand_seed ^= (s_fast_rand_seed << 21);
-    s_fast_rand_seed ^= (s_fast_rand_seed >> 35);
-    s_fast_rand_seed ^= (s_fast_rand_seed << 4);
+    g_fast_rand_seed ^= (g_fast_rand_seed << 21);
+    g_fast_rand_seed ^= (g_fast_rand_seed >> 35);
+    g_fast_rand_seed ^= (g_fast_rand_seed << 4);
 
     u64 range = static_cast<uint64_t>(max - min) + 1;
-    u64 rand_num = s_fast_rand_seed % range;
+    u64 rand_num = g_fast_rand_seed % range;
 
     return rand_num;
 }
@@ -515,16 +515,16 @@ bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_st
 std::string make_str(char const *fmt, ...) noexcept
 {
     s32 const buf_len = 1024;
-    static char buffer[buf_len];
+    static char s_buffer[buf_len];
 
     va_list args;
     va_start(args, fmt);
-    [[maybe_unused]] s32 cnt = vsnprintf(buffer, sizeof(buffer), fmt, args);
+    [[maybe_unused]] s32 cnt = vsnprintf(s_buffer, sizeof(s_buffer), fmt, args);
     assert(cnt > 0);
     assert(cnt < buf_len);
     va_end(args);
 
-    return std::string(buffer);
+    return std::string(s_buffer);
 }
 
 build_mode get_build_mode() noexcept

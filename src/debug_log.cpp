@@ -15,7 +15,7 @@ void swan_windows::render_debug_log(bool &open) noexcept
             global_state::save_focused_window(swan_windows::debug_log);
         }
 
-        static bool auto_scroll = true;
+        static bool s_auto_scroll = true;
 
         // first line
 
@@ -50,7 +50,7 @@ void swan_windows::render_debug_log(bool &open) noexcept
 
         imgui::SameLineSpaced(1);
 
-        imgui::Checkbox("Auto-scroll at bottom", &auto_scroll);
+        imgui::Checkbox("Auto-scroll at bottom", &s_auto_scroll);
 
         imgui::SameLineSpaced(1);
 
@@ -81,7 +81,7 @@ void swan_windows::render_debug_log(bool &open) noexcept
             if ( jump_to_top ) {
                 imgui::SetScrollHereY(0.0f);
             }
-            else if ( jump_to_bottom || ( auto_scroll && imgui::GetScrollY() >= imgui::GetScrollMaxY() ) ) {
+            else if ( jump_to_bottom || ( s_auto_scroll && imgui::GetScrollY() >= imgui::GetScrollMaxY() ) ) {
                 imgui::SetScrollHereY(1.0f);
             }
         }

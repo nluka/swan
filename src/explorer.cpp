@@ -6,12 +6,12 @@
 #include "scoped_timer.hpp"
 #include "util.hpp"
 
-static IShellLinkW *s_shell_link = nullptr;
-static IPersistFile *s_persist_file_interface = nullptr;
-static std::array<explorer_window, global_constants::num_explorers> s_explorers = {};
-static file_operation_command_buf s_file_op_payload = {};
+static IShellLinkW *g_shell_link = nullptr;
+static IPersistFile *g_persist_file_interface = nullptr;
+static std::array<explorer_window, global_constants::num_explorers> g_explorers = {};
+static file_operation_command_buf g_file_op_payload = {};
 
-std::array<explorer_window, global_constants::num_explorers> &global_state::explorers() noexcept { return s_explorers; }
+std::array<explorer_window, global_constants::num_explorers> &global_state::explorers() noexcept { return g_explorers; }
 
 void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexcept
 {
@@ -30,16 +30,16 @@ void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexc
                 what_failed = "CoInitialize";
             }
             else {
-                result = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&s_shell_link);
+                result = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&g_shell_link);
 
                 if (FAILED(result)) {
                     what_failed = "CoCreateInstance(CLSID_ShellLink, ..., CLSCTX_INPROC_SERVER, IID_IShellLinkW, ...)";
                 }
                 else {
-                    result = s_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&s_persist_file_interface);
+                    result = g_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&g_persist_file_interface);
 
                     if (FAILED(result)) {
-                        s_persist_file_interface->Release();
+                        g_persist_file_interface->Release();
                         CoUninitialize();
                         what_failed = "IUnknown::QueryInterface(IID_IPersistFile, ...)";
                     }
@@ -66,8 +66,8 @@ void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexc
 
 void clean_COM_for_explorers() noexcept
 try {
-    s_persist_file_interface->Release();
-    s_shell_link->Release();
+    g_persist_file_interface->Release();
+    g_shell_link->Release();
     CoUninitialize();
 }
 catch (...) {}
@@ -208,7 +208,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
         swan_path src = expl.cwd;
 
         if (path_append(src, dirent.basic.path.data(), global_state::settings().dir_separator_utf8, true)) {
-            s_file_op_payload.items.push_back({ operation_desc, operation_type, dirent.basic.type, src });
+            g_file_op_payload.items.push_back({ operation_desc, operation_type, dirent.basic.type, src });
         } else {
             err << "Current working directory path + [" << src.data() << "] exceeds max allowed path length.\n";
         }
@@ -549,13 +549,13 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
         return { false, "Conversion of symlink path from UTF-8 to UTF-16." };
     }
 
-    com_handle = s_persist_file_interface->Load(lnk_file_path_utf16, STGM_READ);
+    com_handle = g_persist_file_interface->Load(lnk_file_path_utf16, STGM_READ);
 
     if (com_handle != S_OK) {
         return { false, "IPersistFile::Load(..., STGM_READ)." };
     }
 
-    com_handle = s_shell_link->GetIDList(&item_id_list);
+    com_handle = g_shell_link->GetIDList(&item_id_list);
 
     if (com_handle != S_OK) {
         auto err = get_last_winapi_error().formatted_message;
@@ -571,19 +571,19 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
         return { false, "Conversion of symlink target path from UTF-16 to UTF-8." };
     }
 
-    com_handle = s_shell_link->GetWorkingDirectory(this->working_directory_path_utf16, MAX_PATH);
+    com_handle = g_shell_link->GetWorkingDirectory(this->working_directory_path_utf16, MAX_PATH);
 
     if (com_handle != S_OK) {
         return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetWorkingDirectory)." };
     }
 
-    com_handle = s_shell_link->GetArguments(this->arguments_utf16, 1024);
+    com_handle = g_shell_link->GetArguments(this->arguments_utf16, 1024);
 
     if (com_handle != S_OK) {
         return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetArguments)." };
     }
 
-    com_handle = s_shell_link->GetShowCmd(&this->show_cmd);
+    com_handle = g_shell_link->GetShowCmd(&this->show_cmd);
 
     if (com_handle != S_OK) {
         return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetShowCmd)" };
@@ -851,14 +851,14 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                         full_path_utf16.append(find_data.cFileName);
 
                         // Load the shortcut
-                        HRESULT com_handle = s_persist_file_interface->Load(full_path_utf16.c_str(), STGM_READ);
+                        HRESULT com_handle = g_persist_file_interface->Load(full_path_utf16.c_str(), STGM_READ);
                         if (FAILED(com_handle)) {
                             WCOUT_IF_DEBUG("FAILED IPersistFile::Load [" << full_path_utf16.c_str() << "]\n");
                         }
                         else {
                             // Get the target path
                             wchar_t target_path_utf16[MAX_PATH];
-                            com_handle = s_shell_link->GetPath(target_path_utf16, lengthof(target_path_utf16), NULL, SLGP_RAWPATH);
+                            com_handle = g_shell_link->GetPath(target_path_utf16, lengthof(target_path_utf16), NULL, SLGP_RAWPATH);
                             if (FAILED(com_handle)) {
                                 WCOUT_IF_DEBUG("FAILED IShellLinkW::GetPath [" << full_path_utf16.c_str() << "]\n");
                             }
@@ -1396,7 +1396,7 @@ void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
             "remainder_us",
         };
 
-        constexpr u64 rows = explorer_window::num_timing_samples;
+        constexpr u64 rows = explorer_window::NUM_TIMING_SAMPLES;
         constexpr u64 cols = lengthof(labels);
 
         f64 matrix[rows][cols] = {};
@@ -1575,13 +1575,13 @@ static
 void render_file_op_payload_hint() noexcept
 {
     {
-        auto label = make_str_static<64>("%s %zu", ICON_CI_COPY, s_file_op_payload.items.size());
+        auto label = make_str_static<64>("%s %zu", ICON_CI_COPY, g_file_op_payload.items.size());
         if (imgui::Selectable(label.data(), false, 0, imgui::CalcTextSize(label.data()))) {
             imgui::OpenPopup("File Operation Payload");
         }
     }
     if (imgui::IsItemHovered() && imgui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        s_file_op_payload.clear();
+        g_file_op_payload.clear();
     }
     if (imgui::IsItemHovered()) {
         imgui::SetTooltip("File operations ready to be executed.\n"
@@ -1591,8 +1591,8 @@ void render_file_op_payload_hint() noexcept
     }
     if (imgui::BeginPopup("File Operation Payload")) {
         imgui::Text("%zu operation%s will be executed on next paste.",
-            s_file_op_payload.items.size(),
-            s_file_op_payload.items.size() > 1 ? "s" : "");
+            g_file_op_payload.items.size(),
+            g_file_op_payload.items.size() > 1 ? "s" : "");
 
         imgui::Spacing();
         imgui::Separator();
@@ -1600,14 +1600,14 @@ void render_file_op_payload_hint() noexcept
         if (imgui::BeginTable("file_operation_command_buf", 2)) {
             ImGuiListClipper clipper;
             {
-                u64 num_dirents_to_render = s_file_op_payload.items.size();
+                u64 num_dirents_to_render = g_file_op_payload.items.size();
                 assert(num_dirents_to_render <= (u64)INT32_MAX);
                 clipper.Begin(s32(num_dirents_to_render));
             }
 
             while (clipper.Step())
             for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-                auto const &item = s_file_op_payload.items[i];
+                auto const &item = g_file_op_payload.items[i];
 
                 imgui::TableNextColumn();
                 imgui::TextUnformatted(item.operation_desc);
@@ -1848,16 +1848,16 @@ void render_filter_reset_button(explorer_window &expl) noexcept
 static
 void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit_multiplier) noexcept
 {
-    static precise_time_point_t last_refresh_time = {};
-    static drive_list_t drives = {};
+    static precise_time_point_t s_last_refresh_time = {};
+    static drive_list_t s_drives = {};
 
     // refresh drives occasionally
     {
         precise_time_point_t now = current_time_precise();
-        s64 diff_ms = compute_diff_ms(last_refresh_time, now);
+        s64 diff_ms = compute_diff_ms(s_last_refresh_time, now);
         if (diff_ms >= 1000) {
-            drives = query_drive_list();
-            last_refresh_time = current_time_precise();
+            s_drives = query_drive_list();
+            s_last_refresh_time = current_time_precise();
         }
     }
 
@@ -1891,7 +1891,7 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();
 
-        for (auto &drive : drives) {
+        for (auto &drive : s_drives) {
             imgui::TableNextRow();
 
             if (imgui::TableSetColumnIndex(drive_table_col_id_letter)) {
@@ -2028,18 +2028,18 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
 static
 void render_filter_mode_toggle(explorer_window &expl) noexcept
 {
-    static char const *filter_modes[] = {
+    static char const *s_filter_modes[] = {
         ICON_CI_WHOLE_WORD,
         ICON_CI_REGEX,
         // "(" ICON_CI_REGEX ")",
     };
 
-    static_assert(lengthof(filter_modes) == (u64)explorer_window::filter_mode::count);
+    static_assert(lengthof(s_filter_modes) == (u64)explorer_window::filter_mode::count);
 
-    static char const *current_mode = nullptr;
-    current_mode = filter_modes[expl.filter_mode];
+    static char const *s_current_mode = nullptr;
+    s_current_mode = s_filter_modes[expl.filter_mode];
 
-    auto label = make_str_static<64>("%s##%zu", current_mode, expl.filter_mode);
+    auto label = make_str_static<64>("%s##%zu", s_current_mode, expl.filter_mode);
 
     if (imgui::Button(label.data())) {
         inc_or_wrap<u64>((u64 &)expl.filter_mode, 0, u64(explorer_window::filter_mode::count) - 1);
@@ -2365,18 +2365,18 @@ void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, c
 {
     imgui::ScopedAvailWidth w(avail_width_subtract_amt);
 
-    static swan_path cwd_input = {};
-    cwd_input = expl.cwd;
+    static swan_path s_cwd_input = {};
+    s_cwd_input = expl.cwd;
 
-    cwd_text_input_callback_user_data user_data = { expl.id, dir_sep_utf16, false, cwd_input.data() };
+    cwd_text_input_callback_user_data user_data = { expl.id, dir_sep_utf16, false, s_cwd_input.data() };
 
-    imgui::InputText("##cwd", cwd_input.data(), cwd_input.size(),
+    imgui::InputText("##cwd", s_cwd_input.data(), s_cwd_input.size(),
         ImGuiInputTextFlags_CallbackCharFilter|ImGuiInputTextFlags_CallbackEdit,
         cwd_text_input_callback, (void *)&user_data);
 
     if (user_data.edit_occurred) {
-        if (!path_loosely_same(expl.cwd, cwd_input)) {
-            expl.cwd = path_squish_adjacent_separators(cwd_input);
+        if (!path_loosely_same(expl.cwd, s_cwd_input)) {
+            expl.cwd = path_squish_adjacent_separators(s_cwd_input);
             path_force_separator(expl.cwd, dir_sep_utf8);
 
             auto [cwd_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
@@ -2427,7 +2427,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
     bool any_popups_open = global_state::any_popup_modals_open() || imgui::IsPopupOpen("History");
 
-    static explorer_window::dirent const *dirent_to_be_renamed = nullptr;
+    static explorer_window::dirent const *s_dirent_to_be_renamed = nullptr;
 
     if (window_focused) {
         assert(expl.id >= 0);
@@ -2485,7 +2485,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 auto selected_dirent = std::find_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
                                                     [](explorer_window::dirent const &e) noexcept { return e.is_selected; });
                 open_single_rename_popup = true;
-                dirent_to_be_renamed = &(*selected_dirent);
+                s_dirent_to_be_renamed = &(*selected_dirent);
             }
             else if (num_entries_selected > 1) {
                 open_bulk_rename_popup = true;
@@ -2527,17 +2527,17 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             expl.select_all_visible_cwd_entries();
         }
         else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_X)) {
-            s_file_op_payload.clear();
+            g_file_op_payload.clear();
             auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
             handle_file_op_failure("cut", result);
         }
         else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_C)) {
-            s_file_op_payload.clear();
+            g_file_op_payload.clear();
             auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
             handle_file_op_failure("copy", result);
         }
-        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_V) && !s_file_op_payload.items.empty()) {
-            s_file_op_payload.execute(expl);
+        else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_V) && !g_file_op_payload.items.empty()) {
+            g_file_op_payload.execute(expl);
         }
         else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_P)) {
             u64 pin_idx;
@@ -2935,7 +2935,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 open_bulk_rename_popup   |= result.open_bulk_rename_popup;
                 open_single_rename_popup |= result.open_single_rename_popup;
                 if (result.single_dirent_to_be_renamed) {
-                    dirent_to_be_renamed = result.single_dirent_to_be_renamed;
+                    s_dirent_to_be_renamed = result.single_dirent_to_be_renamed;
                 }
 
                 imgui::EndTable();
@@ -3012,8 +3012,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         imgui::OpenPopup("## cwd_entries_child_leftovers context_menu");
     }
     if (imgui::BeginPopup("## cwd_entries_child_leftovers context_menu")) {
-        if (!s_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
-            auto result = s_file_op_payload.execute(expl);
+        if (!g_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
+            auto result = g_file_op_payload.execute(expl);
             // TODO: why is result unused?
         }
 
@@ -3032,9 +3032,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         if (!path_is_empty(expl.cwd) && cwd_exists_after_edit) {
             imgui::OpenPopupOnItemClick("##explorer_footer_context", ImGuiPopupFlags_MouseButtonRight);
-            if (!s_file_op_payload.items.empty() && imgui::BeginPopup("##explorer_footer_context")) {
+            if (!g_file_op_payload.items.empty() && imgui::BeginPopup("##explorer_footer_context")) {
                 if (imgui::Selectable("Paste")) {
-                    auto result = s_file_op_payload.execute(expl);
+                    auto result = g_file_op_payload.execute(expl);
                 }
                 imgui::EndPopup();
             }
@@ -3042,7 +3042,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
 
     if (open_single_rename_popup) {
-        swan_popup_modals::open_single_rename(expl, *dirent_to_be_renamed, [&expl]() noexcept {
+        swan_popup_modals::open_single_rename(expl, *s_dirent_to_be_renamed, [&expl]() noexcept {
             /* on rename finished: */
             if (global_state::settings().explorer_refresh_mode == swan_settings::explorer_refresh_mode_manual) {
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
@@ -3177,7 +3177,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
 void file_operation_command_buf::clear() noexcept
 {
-    s_file_op_payload.items.clear();
+    g_file_op_payload.items.clear();
 
     auto &all_explorers = global_state::explorers();
     for (auto &expl : all_explorers) {
@@ -3338,14 +3338,15 @@ void render_table_rows_for_cwd_entries(
                         }
                         else { // not shift click, check for double click
 
-                            static f64 last_click_time = 0;
-                            static swan_path last_click_path = {};
+                            static f64 s_last_click_time = 0;
+                            static swan_path s_last_click_path = {};
+
                             swan_path const &current_click_path = dirent.basic.path;
                             f64 const double_click_window_sec = 0.3;
                             f64 current_time_precise = imgui::GetTime();
-                            f64 seconds_between_clicks = current_time_precise - last_click_time;
+                            f64 seconds_between_clicks = current_time_precise - s_last_click_time;
 
-                            if (seconds_between_clicks <= double_click_window_sec && !io.KeyCtrl && path_equals_exactly(current_click_path, last_click_path)) {
+                            if (seconds_between_clicks <= double_click_window_sec && !io.KeyCtrl && path_equals_exactly(current_click_path, s_last_click_path)) {
                                 if (dirent.basic.is_directory()) {
                                     print_debug_msg("[ %d ] double clicked directory [%s]", expl.id, dirent.basic.path.data());
 
@@ -3436,8 +3437,8 @@ void render_table_rows_for_cwd_entries(
                                 print_debug_msg("[ %d ] selected [%s]", expl.id, dirent.basic.path.data());
                             }
 
-                            last_click_time = current_time_precise;
-                            last_click_path = current_click_path;
+                            s_last_click_time = current_time_precise;
+                            s_last_click_path = current_click_path;
                             expl.cwd_latest_selected_dirent_idx = i;
                             expl.cwd_latest_selected_dirent_idx_changed = true;
                         }
@@ -3729,7 +3730,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
             if (imgui::Selectable("Cut##single")) {
                 if (!io.KeyShift) {
-                    s_file_op_payload.clear();
+                    g_file_op_payload.clear();
                 }
                 expl.deselect_all_cwd_entries();
                 expl.context_menu_target->is_selected = true;
@@ -3738,7 +3739,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             }
             if (imgui::Selectable("Copy##single")) {
                 if (!io.KeyShift) {
-                    s_file_op_payload.clear();
+                    g_file_op_payload.clear();
                 }
 
                 expl.deselect_all_cwd_entries();
@@ -3823,14 +3824,14 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
             if (imgui::Selectable("Cut##multi")) {
                 if (!io.KeyShift) {
-                    s_file_op_payload.clear();
+                    g_file_op_payload.clear();
                 }
                 auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("Cut", result);
             }
             if (imgui::Selectable("Copy##multi")) {
                 if (!io.KeyShift) {
-                    s_file_op_payload.clear();
+                    g_file_op_payload.clear();
                 }
                 auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
                 handle_failure("Copy", result);
@@ -3927,7 +3928,7 @@ void render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle 
                 render_num_cwd_items_selected(expl, cnt);
             }
 
-            if (!s_file_op_payload.items.empty()) {
+            if (!g_file_op_payload.items.empty()) {
                 imgui::SameLineSpaced(1);
                 render_file_op_payload_hint();
             }

@@ -679,7 +679,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
         if (imgui::BeginPopup("## completed_file_operations context_menu")) {
             assert(context_menu_target_iter.has_value());
             assert(context_menu_target_iter.value() != completed_operations.end());
-            completed_file_operation &context_elem = *context_menu_target_iter.value();
+            completed_file_operation &context_target = *context_menu_target_iter.value();
 
             {
                 auto reveal = [](swan_path const &full_path) noexcept {
@@ -723,14 +723,14 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     }
                 };
 
-                if (context_elem.op_type == file_operation_type::del && context_elem.undone()) {
+                if (context_target.op_type == file_operation_type::del && context_target.undone()) {
                     if (imgui::Selectable("Reveal source path (undo result) in Explorer 1")) {
-                        reveal(context_elem.src_path);
+                        reveal(context_target.src_path);
                     }
                 }
-                else if (!path_is_empty(context_elem.dst_path)) {
+                else if (!path_is_empty(context_target.dst_path)) {
                     if (imgui::Selectable("Reveal destination path (result) in Explorer 1")) {
-                        reveal(context_elem.dst_path);
+                        reveal(context_target.dst_path);
                     }
                 }
             }
@@ -738,47 +738,47 @@ void swan_windows::render_file_operations(bool &open) noexcept
             imgui::Separator();
 
             {
-                bool can_be_undeleted = context_elem.op_type == file_operation_type::del && !context_elem.undone();
-                bool has_recycle_bin_entry = !path_is_empty(context_elem.dst_path);
+                bool can_be_undeleted = context_target.op_type == file_operation_type::del && !context_target.undone();
+                bool has_recycle_bin_entry = !path_is_empty(context_target.dst_path);
 
                 if (can_be_undeleted && has_recycle_bin_entry && imgui::Selectable("Undelete this one")) {
-                    if (context_elem.obj_type == basic_dirent::kind::directory) {
-                        swan_path restore_dir_utf8 = path_create(context_elem.src_path.data(),
-                                                                   get_everything_minus_file_name(context_elem.src_path.data()).length());
+                    if (context_target.obj_type == basic_dirent::kind::directory) {
+                        swan_path restore_dir_utf8 = path_create(context_target.src_path.data(),
+                                                                   get_everything_minus_file_name(context_target.src_path.data()).length());
 
-                        auto res = enqueue_undelete_directory(context_elem.dst_path.data(), restore_dir_utf8.data(), context_elem.src_path.data());
+                        auto res = enqueue_undelete_directory(context_target.dst_path.data(), restore_dir_utf8.data(), context_target.src_path.data());
 
                         if (!res.success) {
-                            std::string action = make_str("Undelete directory [%s].", context_elem.src_path.data());
+                            std::string action = make_str("Undelete directory [%s].", context_target.src_path.data());
                             swan_popup_modals::open_error(action.c_str(), res.error_or_utf8_path.c_str());
                         }
                     }
                     else {
-                        auto res = undelete_file(context_elem.dst_path.data());
+                        auto res = undelete_file(context_target.dst_path.data());
 
                         if (res.success()) {
-                            context_elem.undo_time = current_time_system();
-                            context_elem.selected = false;
+                            context_target.undo_time = current_time_system();
+                            context_target.selected = false;
                             (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
                         }
                         else {
-                            std::string action = make_str("Undelete file [%s].", context_elem.src_path.data());
+                            std::string action = make_str("Undelete file [%s].", context_target.src_path.data());
                             std::string failure;
                             auto winapi_err = get_last_winapi_error().formatted_message.c_str();
 
-                            if      (!res.step0_convert_hardlink_path_to_utf16) failure = make_str("Failed to convert hardlink path [%s] from UTF-8 to UTF-16.", context_elem.dst_path.data());
-                            else if (!res.step1_metadata_file_opened          ) failure = make_str("Failed to open metadata file corresponding to [%s], %s", context_elem.dst_path.data(), winapi_err);
-                            else if (!res.step2_metadata_file_read            ) failure = make_str("Failed to read contents of metadata file corresponding to [%s]", context_elem.dst_path.data());
-                            else if (!res.step3_new_hardlink_created          ) failure = make_str("Failed to create hardlink [%s], %s The backup hardlink [%s] was probably deleted.", context_elem.src_path.data(), winapi_err, context_elem.dst_path.data());
-                            else if (!res.step4_old_hardlink_deleted          ) failure = make_str("Failed to delete hardlink [%s], %s", context_elem.dst_path.data(), winapi_err);
-                            else if (!res.step5_metadata_file_deleted         ) failure = make_str("Failed to delete metadata file corresponding to [%s], %s", context_elem.dst_path.data(), winapi_err);
+                            if      (!res.step0_convert_hardlink_path_to_utf16) failure = make_str("Failed to convert hardlink path [%s] from UTF-8 to UTF-16.", context_target.dst_path.data());
+                            else if (!res.step1_metadata_file_opened          ) failure = make_str("Failed to open metadata file corresponding to [%s], %s", context_target.dst_path.data(), winapi_err);
+                            else if (!res.step2_metadata_file_read            ) failure = make_str("Failed to read contents of metadata file corresponding to [%s]", context_target.dst_path.data());
+                            else if (!res.step3_new_hardlink_created          ) failure = make_str("Failed to create hardlink [%s], %s The backup hardlink [%s] was probably deleted.", context_target.src_path.data(), winapi_err, context_target.dst_path.data());
+                            else if (!res.step4_old_hardlink_deleted          ) failure = make_str("Failed to delete hardlink [%s], %s", context_target.dst_path.data(), winapi_err);
+                            else if (!res.step5_metadata_file_deleted         ) failure = make_str("Failed to delete metadata file corresponding to [%s], %s", context_target.dst_path.data(), winapi_err);
                             else                                                assert(false && "Bad code path");
 
                             swan_popup_modals::open_error(action.c_str(), failure.c_str());
 
                             if (res.step3_new_hardlink_created) {
                                 // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
-                                context_elem.undo_time = current_time_system();
+                                context_target.undo_time = current_time_system();
                                 (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
                             }
                         }
@@ -787,7 +787,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
 
             {
-                bool disabled = true; // s_num_deletes_in_group_when_context_menu_opened > 0 && context_elem.group_id != 0;
+                bool disabled = true; // s_num_deletes_in_group_when_context_menu_opened > 0 && context_target.group_id != 0;
                 {
                     imgui::ScopedDisable d(disabled);
 
@@ -800,7 +800,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     imgui::TextDisabled("(?)");
                     if (imgui::IsItemHovered()) {
                         imgui::SetTooltip("Not implemented.");
-                        // if (context_elem.group_id == 0) {
+                        // if (context_target.group_id == 0) {
                         //     imgui::SetTooltip("Target has no group");
                         // } else {
                         //     imgui::SetTooltip("Target's group has no delete operations to undo");
@@ -831,35 +831,62 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
             if (s_num_selected_when_context_menu_opened == 0) {
                 if (imgui::Selectable("Copy source name")) {
-                    char const *name = cget_file_name(context_elem.src_path.data());
+                    char const *name = cget_file_name(context_target.src_path.data());
                     imgui::SetClipboardText(name);
                 }
                 if (imgui::Selectable("Copy source location")) {
-                    std::string_view location = get_everything_minus_file_name(context_elem.src_path.data());
+                    std::string_view location = get_everything_minus_file_name(context_target.src_path.data());
                     std::string location_str(location);
                     imgui::SetClipboardText(location_str.c_str());
                 }
                 if (imgui::Selectable("Copy source full path")) {
-                    imgui::SetClipboardText(context_elem.src_path.data());
+                    imgui::SetClipboardText(context_target.src_path.data());
                 }
 
                 imgui::Separator();
 
-                if (!path_is_empty(context_elem.dst_path)) {
+                if (!path_is_empty(context_target.dst_path)) {
                     if (imgui::Selectable("Copy destination name")) {
-                        char const *name = cget_file_name(context_elem.dst_path.data());
+                        char const *name = cget_file_name(context_target.dst_path.data());
                         imgui::SetClipboardText(name);
                     }
                     if (imgui::Selectable("Copy destination location")) {
-                        std::string_view location = get_everything_minus_file_name(context_elem.dst_path.data());
+                        std::string_view location = get_everything_minus_file_name(context_target.dst_path.data());
                         std::string location_str(location);
                         imgui::SetClipboardText(location_str.c_str());
                     }
                     if (imgui::Selectable("Copy destination full path")) {
-                        imgui::SetClipboardText(context_elem.dst_path.data());
+                        imgui::SetClipboardText(context_target.dst_path.data());
                     }
                 }
             }
+        #if 0
+            else {
+                if (imgui::Selectable("Copy selection source names")) {
+
+                }
+                if (imgui::Selectable("Copy selection source locations")) {
+
+                }
+                if (imgui::Selectable("Copy selection source full paths")) {
+
+                }
+
+                imgui::Separator();
+
+                if (!path_is_empty(context_target.dst_path)) {
+                    if (imgui::Selectable("Copy selection destination names")) {
+
+                    }
+                    if (imgui::Selectable("Copy selection destination locations")) {
+
+                    }
+                    if (imgui::Selectable("Copy selection destination full paths")) {
+
+                    }
+                }
+            }
+        #endif
 
             imgui::Separator();
 
@@ -869,7 +896,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     "Are you sure you want to forget this single file operation? This action cannot be undone.",
                     &global_state::settings().confirm_completed_file_operations_forget_single);
             }
-            if (context_elem.group_id != 0 && imgui::Selectable("Forget group")) {
+            if (context_target.group_id != 0 && imgui::Selectable("Forget group")) {
                 execute_forget_group_immediately = imgui::OpenConfirmationModal(
                     swan_id_confirm_completed_file_operations_forget_group,
                     "Are you sure you want to forget this group of file operations? This action cannot be undone.",
