@@ -183,7 +183,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
         if (imgui::SmallButton("Clear##recent_files")) {
             char const *confirmation_msg = "Are you sure you want to clear your recent files? This action cannot be undone.";
-            imgui::OpenConfirmationModal(swan_id_confirm_recent_files_clear, confirmation_msg);
+            imgui::OpenConfirmationModal(swan_id_confirm_recent_files_clear, confirmation_msg, &(global_state::settings().confirm_recent_files_clear));
         }
 
         auto status = imgui::GetConfirmationStatus(swan_id_confirm_recent_files_clear);
@@ -284,8 +284,10 @@ void swan_windows::render_recent_files(bool &open) noexcept
             }
 
             if (imgui::TableSetColumnIndex(recent_files_table_col_file_name)) {
-                file_name_extension_splitter splitter(file_name);
-                imgui::TextColored(get_color(basic_dirent::kind::file), get_icon_for_extension(splitter.ext));
+                {
+                    file_name_extension_splitter splitter(file_name);
+                    imgui::TextColored(get_color(basic_dirent::kind::file), get_icon_for_extension(splitter.ext));
+                }
 
                 imgui::SameLine();
 

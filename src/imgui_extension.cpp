@@ -26,7 +26,7 @@ bool imgui::OpenConfirmationModal(s32 confirmation_id, char const *content_messa
     assert(confirmation_id != -1 && "Don't pass `confirmation_id` == -1 to " __FUNCTIONW__);
     assert(content_message != nullptr && "Don't pass `content_message` == nullptr to " __FUNCTIONW__);
 
-    if (*confirmation_enabled == false) {
+    if (confirmation_enabled != nullptr && *confirmation_enabled == false) {
         // don't setup the modal for rendering and tell caller to execute operation immediately
         return true;
     }

@@ -6,8 +6,8 @@
 namespace bulk_rename_modal_global_state
 {
     static bool                                 g_open = false;
-    static explorer_window *                    g_expl_opened_from = nullptr;
-    static std::vector<explorer_window::dirent> g_expl_dirents_selected = {};
+    static explorer_window *                    g_initiating_expl = nullptr;
+    static std::vector<explorer_window::dirent> g_initiating_expl_selected_dirents = {};
     static std::function<void ()>               g_on_rename_callback = {};
 }
 
@@ -18,15 +18,15 @@ void swan_popup_modals::open_bulk_rename(explorer_window &expl_opened_from, std:
     g_open = true;
     bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_bulk_rename);
 
-    g_expl_dirents_selected.clear();
+    g_initiating_expl_selected_dirents.clear();
     for (auto const &dirent : expl_opened_from.cwd_entries) {
         if (dirent.is_selected) {
-            g_expl_dirents_selected.push_back(dirent);
+            g_initiating_expl_selected_dirents.push_back(dirent);
         }
     }
 
-    assert(g_expl_opened_from == nullptr);
-    g_expl_opened_from = &expl_opened_from;
+    assert(g_initiating_expl == nullptr);
+    g_initiating_expl = &expl_opened_from;
 
     g_on_rename_callback = on_rename_callback;
 }
@@ -57,6 +57,59 @@ void set_clipboard_to_slice(ImGuiInputTextState *state) noexcept
     imgui::SetClipboardText(slice);
 }
 
+struct path_comparator
+{
+    char dir_sep_utf8;
+    swan_path bulk_rename_parent_dir;
+
+    bool operator()(bulk_rename_op const &lhs, recent_file const &rhs) const noexcept
+    {
+        swan_path lhs_full_path = bulk_rename_parent_dir;
+        bool success = path_append(lhs_full_path, lhs.before->path.data(), dir_sep_utf8, true);
+        assert(success);
+        return strcmp(lhs_full_path.data(), rhs.path.data()) < 0;
+    }
+    bool operator()(recent_file const &lhs, bulk_rename_op const &rhs) const noexcept
+    {
+        swan_path rhs_full_path = bulk_rename_parent_dir;
+        bool success = path_append(rhs_full_path, rhs.before->path.data(), dir_sep_utf8, true);
+        assert(success);
+        return strcmp(lhs.path.data(), rhs_full_path.data()) < 0;
+    }
+};
+
+static
+void update_recent_files(std::vector<bulk_rename_op> &renames, swan_path const &renames_parent_path) noexcept
+{
+    std::sort(renames.begin(), renames.end(), [](bulk_rename_op const &lhs, bulk_rename_op const &rhs) noexcept {
+        return strcmp(lhs.before->path.data(), rhs.before->path.data()) < 0;
+    });
+
+    auto pair = global_state::recent_files();
+    auto &recent_files = *pair.first;
+    auto &mutex = *pair.second;
+
+    path_comparator comparator = { global_state::settings().dir_separator_utf8, renames_parent_path };
+
+    {
+        std::scoped_lock recent_files_lock(mutex);
+
+        for (auto &rf : recent_files) {
+            auto range = std::equal_range(renames.begin(), renames.end(), rf, comparator);
+
+            if (range.first != renames.end()) {
+                bulk_rename_op const &matching_rnm = *range.first;
+                swan_path rf_new_full_path = comparator.bulk_rename_parent_dir;
+                if (path_append(rf_new_full_path, matching_rnm.after.data(), comparator.dir_sep_utf8, true)) {
+                    rf.path = rf_new_full_path;
+                }
+            }
+        }
+    }
+
+    (void) global_state::save_recent_files_to_disk();
+}
+
 void swan_popup_modals::render_bulk_rename() noexcept
 {
     using namespace bulk_rename_modal_global_state;
@@ -83,11 +136,11 @@ void swan_popup_modals::render_bulk_rename() noexcept
         return;
     }
 
-    assert(g_expl_opened_from != nullptr);
-    assert(!g_expl_dirents_selected.empty());
+    assert(g_initiating_expl != nullptr);
+    assert(!g_initiating_expl_selected_dirents.empty());
 
-    auto &expl = *g_expl_opened_from;
-    auto &selection = g_expl_dirents_selected;
+    auto &expl = *g_initiating_expl;
+    auto &selection = g_initiating_expl_selected_dirents;
 
     wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
 
@@ -133,8 +186,8 @@ void swan_popup_modals::render_bulk_rename() noexcept
         g_open = false;
         bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_bulk_rename);
 
-        g_expl_opened_from = nullptr;
-        g_expl_dirents_selected.clear();
+        g_initiating_expl = nullptr;
+        g_initiating_expl_selected_dirents.clear();
         g_on_rename_callback = {};
 
         imgui::CloseCurrentPopup();
@@ -242,6 +295,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     else {
         if (imgui::Button("Exit##bulk_rename")) {
             if (state == bulk_rename_state::done) {
+                update_recent_files(s_renames, g_initiating_expl->cwd);
                 g_on_rename_callback();
             }
             cleanup_and_close_popup();
@@ -268,6 +322,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                 imgui::SameLine();
                 imgui::ProgressBar(progress);
             } else {
+                update_recent_files(s_renames, g_initiating_expl->cwd);
                 g_on_rename_callback();
                 cleanup_and_close_popup();
             }
@@ -462,7 +517,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     }
 
     if (rename_button_pressed && s_pattern_compile_res.success && s_collisions.empty() && s_rename_state.load() == bulk_rename_state::nil) {
-        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops,  swan_path expl_cwd, wchar_t dir_sep_utf16) noexcept {
+        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops, swan_path expl_cwd, wchar_t dir_sep_utf16) noexcept {
             s_rename_state.store(bulk_rename_state::in_progress);
             s_num_renames_total.store(rename_ops.size());
 
@@ -546,6 +601,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape) && s_rename_state.load() != bulk_rename_state::in_progress) {
         if (state == bulk_rename_state::done) {
+            update_recent_files(s_renames, g_initiating_expl->cwd);
             g_on_rename_callback();
         }
         cleanup_and_close_popup();

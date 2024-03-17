@@ -49,6 +49,7 @@ void swan_popup_modals::render_single_rename() noexcept
     assert(g_expl_opened_from != nullptr);
     assert(g_expl_dirent_to_rename != nullptr);
 
+    char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
     wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
 
     static swan_path s_new_name_utf8 = {};
@@ -75,6 +76,18 @@ void swan_popup_modals::render_single_rename() noexcept
         std::wstring old_path_utf16 = {};
         std::wstring new_path_utf16 = {};
         s32 result = {};
+
+        swan_path old_path_utf8 = g_expl_opened_from->cwd;
+        if (!path_append(old_path_utf8, g_expl_dirent_to_rename->basic.path.data(), dir_sep_utf8, true)) {
+            cleanup_and_close_popup();
+            return;
+        }
+
+        swan_path new_path_utf8 = g_expl_opened_from->cwd;
+        if (!path_append(new_path_utf8, s_new_name_utf8.data(), dir_sep_utf8, true)) {
+            cleanup_and_close_popup();
+            return;
+        }
 
         if (!utf8_to_utf16(g_expl_opened_from->cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16))) {
             cleanup_and_close_popup();
@@ -115,6 +128,23 @@ void swan_popup_modals::render_single_rename() noexcept
             }
         }
         else {
+            auto pair = global_state::recent_files();
+            auto &recent_files = *pair.first;
+            auto &mutex = *pair.second;
+
+            {
+                std::scoped_lock recent_files_lock(mutex);
+
+                for (auto &rf : recent_files) {
+                    if (path_loosely_same(rf.path, old_path_utf8)) {
+                        rf.path = new_path_utf8;
+                        break;
+                    }
+                }
+            }
+
+            (void) global_state::save_recent_files_to_disk();
+
             g_on_rename_callback();
             cleanup_and_close_popup();
         }
