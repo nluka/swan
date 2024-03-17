@@ -1,4 +1,4 @@
-#include "common_fns.hpp"
+#include "common_functions.hpp"
 #include "path.hpp"
 
 bool bulk_rename_op::operator!=(bulk_rename_op const &other) const noexcept // for ntest
@@ -239,7 +239,7 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
 
 bulk_rename_transform_result bulk_rename_transform(
     bulk_rename_compiled_pattern compiled_pattern,
-    swan_path_t &after,
+    swan_path &after,
     char const *name,
     char const *ext,
     s32 counter,
@@ -340,7 +340,7 @@ bulk_rename_transform_result bulk_rename_transform(
                 break;
             }
             case op_type::insert_slice: {
-                swan_path_t full = path_create(name);
+                swan_path full = path_create(name);
 
                 if (ext != nullptr) {
                     [[maybe_unused]] auto success1 = path_append(full, ".");

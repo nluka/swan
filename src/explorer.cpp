@@ -1,7 +1,7 @@
 
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "path.hpp"
 #include "scoped_timer.hpp"
 #include "util.hpp"
@@ -148,7 +148,7 @@ void explorer_window::invert_selection_on_visible_cwd_entries() noexcept
     }
 }
 
-void explorer_window::set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept
+void explorer_window::set_latest_valid_cwd(swan_path const &new_latest_valid_cwd) noexcept
 {
     if (global_state::settings().explorer_clear_filter_on_cwd_change) {
         this->reset_filter();
@@ -205,7 +205,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
             continue;
         }
 
-        swan_path_t src = expl.cwd;
+        swan_path src = expl.cwd;
 
         if (path_append(src, dirent.basic.path.data(), global_state::settings().dir_separator_utf8, true)) {
             s_file_op_payload.items.push_back({ operation_desc, operation_type, dirent.basic.type, src });
@@ -288,7 +288,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                 // shlwapi doesn't like '/', force them all to '\'
                 std::replace(full_path_to_delete_utf16.begin(), full_path_to_delete_utf16.end(), L'/', L'\\');
 
-                swan_path_t item_path_utf8 = path_create("");
+                swan_path item_path_utf8 = path_create("");
 
                 IShellItem *to_delete = nullptr;
                 result = SHCreateItemFromParsingName(full_path_to_delete_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_delete));
@@ -420,7 +420,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
     return { initialization_error.empty(), initialization_error };
 }
 
-generic_result move_files_into(swan_path_t const &destination_utf8, explorer_window &expl, move_dirents_drag_drop_payload &payload) noexcept
+generic_result move_files_into(swan_path const &destination_utf8, explorer_window &expl, move_dirents_drag_drop_payload &payload) noexcept
 {
     /*
         ? The process of moving files via the shlwapi is a blocking operation.
@@ -468,7 +468,7 @@ generic_result handle_drag_drop_onto_dirent(
 {
     auto payload_data = (move_dirents_drag_drop_payload *)payload_wrapper->Data;
     assert(payload_data != nullptr);
-    swan_path_t destination_utf8 = expl.cwd;
+    swan_path destination_utf8 = expl.cwd;
 
     if (target_dirent.basic.is_dotdot_dir()) {
         // we cannot simply append ".." to `destination_utf8` and give that to `move_files_into`,
@@ -488,7 +488,7 @@ generic_result handle_drag_drop_onto_dirent(
 
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin) noexcept
 {
-    swan_path_t target_full_path_utf8 = path_create(file_directory);
+    swan_path target_full_path_utf8 = path_create(file_directory);
 
     if (!path_append(target_full_path_utf8, file_name, global_state::settings().dir_separator_utf8, true)) {
         print_debug_msg("FAILED path_append, file_directory = [%s], file_name = [\\%s]", file_directory, file_name);
@@ -530,7 +530,7 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
 {
     assert(lnk_file_path_utf8 != nullptr);
 
-    swan_path_t lnk_file_full_path_utf8;
+    swan_path lnk_file_full_path_utf8;
     wchar_t lnk_file_path_utf16[MAX_PATH]; init_empty_cstr(lnk_file_path_utf16);
     HRESULT com_handle = {};
     LPITEMIDLIST item_id_list = nullptr;
@@ -754,7 +754,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
         scoped_timer<timer_unit::MICROSECONDS> function_timer(&timers.total_us);
 
         if (actions & query_filesystem) {
-            static std::vector<swan_path_t> selected_entries = {};
+            static std::vector<swan_path> selected_entries = {};
             selected_entries.clear();
 
             for (auto const &dirent : this->cwd_entries) {
@@ -775,7 +775,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                     while (*(&parent_dir.back() - num_trailing_spaces) == ' ') {
                         ++num_trailing_spaces;
                     }
-                    swan_path_t parent_dir_trimmed = {};
+                    swan_path parent_dir_trimmed = {};
                     strncpy(parent_dir_trimmed.data(), parent_dir.data(), parent_dir.size() - num_trailing_spaces);
 
                     (void) utf8_to_utf16(parent_dir_trimmed.data(), search_path_utf16, lengthof(search_path_utf16));
@@ -803,7 +803,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                 {
                     std::scoped_lock lock(select_cwd_entries_on_next_update_mutex);
                     scoped_timer<timer_unit::MICROSECONDS> sort_timer(&timers.entries_to_select_sort);
-                    std::sort(select_cwd_entries_on_next_update.begin(), select_cwd_entries_on_next_update.end(), std::greater<swan_path_t>());
+                    std::sort(select_cwd_entries_on_next_update.begin(), select_cwd_entries_on_next_update.end(), std::greater<swan_path>());
                 }
                 #endif
 
@@ -1170,11 +1170,11 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
     return true;
 }
 
-void explorer_window::push_history_item(swan_path_t const &new_latest_entry) noexcept
+void explorer_window::push_history_item(swan_path const &new_latest_entry) noexcept
 {
     char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
 
-    swan_path_t new_latest_entry_clean = new_latest_entry;
+    swan_path new_latest_entry_clean = new_latest_entry;
     path_force_separator(new_latest_entry_clean, dir_sep_utf8);
 
     path_pop_back_if(new_latest_entry_clean, dir_sep_utf8);
@@ -1205,7 +1205,7 @@ void explorer_window::push_history_item(swan_path_t const &new_latest_entry) noe
 struct ascend_result
 {
     bool success;
-    swan_path_t parent_dir;
+    swan_path parent_dir;
 };
 
 static
@@ -1251,7 +1251,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
 {
     char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
 
-    swan_path_t new_cwd_utf8 = expl.cwd;
+    swan_path new_cwd_utf8 = expl.cwd;
 
     bool prepend_separator = path_length(expl.cwd) > 0;
     if (!path_append(new_cwd_utf8, target_utf8, dir_sep_utf8, prepend_separator)) {
@@ -1287,7 +1287,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
         }
     }
 
-    swan_path_t new_cwd_canoncial_utf8;
+    swan_path new_cwd_canoncial_utf8;
 
     if (!utf16_to_utf8(new_cwd_canonical_utf16, new_cwd_canoncial_utf8.data(), new_cwd_canoncial_utf8.size())) {
         descend_result res;
@@ -1356,7 +1356,7 @@ void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
 {
 #if 1
     {
-        u64 bytes_occupied = expl.cwd_entries.size() * sizeof(swan_path_t);
+        u64 bytes_occupied = expl.cwd_entries.size() * sizeof(swan_path);
         u64 bytes_actually_used = 0;
 
         for (auto const &dirent : expl.cwd_entries) {
@@ -1737,7 +1737,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
 
             for (auto iter = expl.wd_history.rbegin(); iter != expl.wd_history.rend(); ++iter, --i, ++i_inverse) {
                 imgui::TableNextRow();
-                swan_path_t const &hist_path = *iter;
+                swan_path const &hist_path = *iter;
 
                 imgui::TableNextColumn();
                 if (i == expl.wd_history_pos) {
@@ -1829,103 +1829,6 @@ void render_pins_popup(explorer_window &expl) noexcept
                 imgui::SetTooltip("%s", pin.path.data());
             }
         }
-    }
-}
-
-static
-void render_create_directory_popup(explorer_window &expl, wchar_t dir_sep_utf16) noexcept
-{
-    static char dir_name_utf8[MAX_PATH] = {};
-    static std::string err_msg = {};
-
-    auto cleanup_and_close_popup = [&]() noexcept {
-        dir_name_utf8[0] = L'\0';
-        err_msg.clear();
-        imgui::CloseCurrentPopup();
-    };
-
-    auto attempt_create = [&]() noexcept {
-        if (strempty(dir_name_utf8)) {
-            err_msg = "Directory name cannot be blank.";
-            return;
-        }
-
-        wchar_t cwd_utf16[MAX_PATH];        init_empty_cstr(cwd_utf16);
-        wchar_t dir_name_utf16[MAX_PATH];   init_empty_cstr(dir_name_utf16);
-        std::wstring create_path = {};
-        BOOL result = {};
-
-        if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
-            cleanup_and_close_popup();
-            return;
-        }
-
-        if (!utf8_to_utf16(dir_name_utf8, dir_name_utf16, lengthof(dir_name_utf16))) {
-            cleanup_and_close_popup();
-            return;
-        }
-
-        create_path.reserve(1024);
-
-        create_path = cwd_utf16;
-        if (!create_path.ends_with(dir_sep_utf16)) {
-            create_path += dir_sep_utf16;
-        }
-        create_path += dir_name_utf16;
-
-        SECURITY_ATTRIBUTES security = {};
-        security.nLength = sizeof(security);
-        security.lpSecurityDescriptor = nullptr; // allow all access
-        security.bInheritHandle = FALSE;
-
-        WCOUT_IF_DEBUG("CreateDirectoryW [" << create_path << "]\n");
-        result = CreateDirectoryW(create_path.c_str(), nullptr);
-
-        if (result == 0) {
-            auto error = GetLastError();
-            switch (error) {
-                case ERROR_ALREADY_EXISTS: err_msg = "File or directory with same name already exists."; break;
-                case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist. This is probably a bug. Sorry!"; break;
-                default: err_msg = get_last_winapi_error().formatted_message; break;
-            }
-            print_debug_msg("[ %d ] FAILED CreateDirectoryW: %d, %s", expl.id, result, err_msg.c_str());
-        } else {
-            {
-                expl.deselect_all_cwd_entries();
-                std::scoped_lock lock(expl.select_cwd_entries_on_next_update_mutex);
-                expl.select_cwd_entries_on_next_update.push_back(path_create(dir_name_utf8));
-            }
-            cleanup_and_close_popup();
-        }
-    };
-
-    imgui::SetKeyboardFocusHere(0);
-    {
-        imgui::ScopedAvailWidth w(imgui::CalcTextSize("(?)").x + imgui::GetStyle().ItemSpacing.x);
-
-        if (imgui::InputTextWithHint("##dir_name_input", "Directory name", dir_name_utf8, lengthof(dir_name_utf8),
-                                     ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars()))
-        {
-            err_msg.clear();
-        }
-    }
-    if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
-        attempt_create();
-    }
-
-    imgui::SameLine();
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("[Enter]   Create\n"
-                          "[Escape]  Exit");
-    }
-
-    if (!err_msg.empty()) {
-        imgui::TextColored(red(), "Error: %s", err_msg.c_str());
-    }
-
-    if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
-        cleanup_and_close_popup();
     }
 }
 
@@ -2208,114 +2111,6 @@ void render_filter_polarity_button(explorer_window &expl) noexcept
 // }
 
 static
-void render_create_file_popup(explorer_window &expl, wchar_t dir_sep_utf16) noexcept
-{
-    static char file_name_utf8[MAX_PATH] = {};
-    static std::string err_msg = {};
-
-    auto cleanup_and_close_popup = [&]() noexcept {
-        file_name_utf8[0] = L'\0';
-        err_msg.clear();
-        imgui::CloseCurrentPopup();
-    };
-
-    auto attempt_create = [&]() noexcept {
-        if (strempty(file_name_utf8)) {
-            err_msg = "File name cannot be blank.";
-            return;
-        }
-
-        wchar_t cwd_utf16[MAX_PATH];        init_empty_cstr(cwd_utf16);
-        wchar_t file_name_utf16[MAX_PATH];  init_empty_cstr(file_name_utf16);
-        std::wstring create_path_utf16 = {};
-        HANDLE result = {};
-
-        if (!utf8_to_utf16(expl.cwd.data(), cwd_utf16, lengthof(cwd_utf16))) {
-            cleanup_and_close_popup();
-            return;
-        }
-
-        if (!utf8_to_utf16(file_name_utf8, file_name_utf16, lengthof(file_name_utf16))) {
-            cleanup_and_close_popup();
-            return;
-        }
-
-        create_path_utf16.reserve(1024);
-
-        create_path_utf16 = cwd_utf16;
-        if (!create_path_utf16.ends_with(dir_sep_utf16)) {
-            create_path_utf16 += dir_sep_utf16;
-        }
-        create_path_utf16 += file_name_utf16;
-
-        WCOUT_IF_DEBUG("CreateFileW [" << create_path_utf16 << "]\n");
-        result = CreateFileW(
-            create_path_utf16.c_str(),
-            GENERIC_READ | GENERIC_WRITE,
-            FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
-            nullptr,
-            CREATE_NEW,
-            FILE_ATTRIBUTE_NORMAL,
-            nullptr
-        );
-
-        if (result == INVALID_HANDLE_VALUE) {
-            auto error = GetLastError();
-            switch (error) {
-                case ERROR_ALREADY_EXISTS: err_msg = "File or directory with same name already exists."; break;
-                case ERROR_PATH_NOT_FOUND: err_msg = "One or more intermediate directories do not exist; probably a bug. Sorry!"; break;
-                default: err_msg = get_last_winapi_error().formatted_message; break;
-            }
-            print_debug_msg("[ %d ] FAILED CreateFileW: %d, %s", expl.id, result, err_msg.c_str());
-        } else {
-            swan_path_t create_path_utf8;
-
-            if (utf16_to_utf8(create_path_utf16.c_str(), create_path_utf8.data(), create_path_utf8.max_size())) {
-                global_state::add_recent_file("Created", create_path_utf8.data());
-                (void) global_state::save_recent_files_to_disk();
-            }
-
-            {
-                expl.deselect_all_cwd_entries();
-                std::scoped_lock lock(expl.select_cwd_entries_on_next_update_mutex);
-                expl.select_cwd_entries_on_next_update.push_back(path_create(file_name_utf8));
-            }
-
-            cleanup_and_close_popup();
-        }
-    };
-
-    imgui::SetKeyboardFocusHere(0);
-    {
-        imgui::ScopedAvailWidth w(imgui::CalcTextSize("(?)").x + imgui::GetStyle().ItemSpacing.x);
-
-        if (imgui::InputTextWithHint("##file_name_input", "File name", file_name_utf8, lengthof(file_name_utf8),
-                                    ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars()))
-        {
-            err_msg.clear();
-        }
-    }
-    if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
-        attempt_create();
-    }
-
-    imgui::SameLine();
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("[Enter]   Create\n"
-                          "[Escape]  Exit");
-    }
-
-    if (!err_msg.empty()) {
-        imgui::TextColored(red(), "Error: %s", err_msg.c_str());
-    }
-
-    if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
-        cleanup_and_close_popup();
-    }
-}
-
-static
 void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) noexcept
 {
     u64 pin_idx;
@@ -2570,7 +2365,7 @@ void render_cwd_text_input(explorer_window &expl, bool &cwd_exists_after_edit, c
 {
     imgui::ScopedAvailWidth w(avail_width_subtract_amt);
 
-    static swan_path_t cwd_input = {};
+    static swan_path cwd_input = {};
     cwd_input = expl.cwd;
 
     cwd_text_input_callback_user_data user_data = { expl.id, dir_sep_utf16, false, cwd_input.data() };
@@ -2608,6 +2403,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
     SCOPE_EXIT { imgui::GetStyle().Colors[ImGuiCol_WindowBg] = window_bg_color; };
 
+    imgui::SetNextWindowSize({ 1280, 720 }, ImGuiCond_Appearing);
+
     {
         bool is_explorer_visible = imgui::Begin(expl.name, &open, ImGuiWindowFlags_NoCollapse);
         if (!is_explorer_visible) {
@@ -2629,12 +2426,14 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
     bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
 
-    bool any_popups_open = swan_popup_modals::is_open_bulk_rename() || swan_popup_modals::is_open_error() ||
-                           swan_popup_modals::is_open_single_rename() || swan_popup_modals::is_open_edit_pin() ||
+    bool any_popups_open = swan_popup_modals::is_open_bulk_rename() ||
+                           swan_popup_modals::is_open_error() ||
+                           swan_popup_modals::is_open_single_rename() ||
+                           swan_popup_modals::is_open_edit_pin() ||
                            swan_popup_modals::is_open_new_pin() ||
-                           imgui::IsPopupOpen("History") ||
-                           imgui::IsPopupOpen("Create file") ||
-                           imgui::IsPopupOpen("Create directory")
+                           swan_popup_modals::is_open_new_file() ||
+                           swan_popup_modals::is_open_new_directory() ||
+                           imgui::IsPopupOpen("History")
                            ;
 
     static explorer_window::dirent const *dirent_to_be_renamed = nullptr;
@@ -2705,10 +2504,10 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             imgui::OpenPopup("History");
         }
         else if (window_hovered && io.KeyCtrl && imgui::IsKeyDown(ImGuiKey_N) && imgui::IsKeyPressed(ImGuiKey_F)) {
-            imgui::OpenPopup("Create file");
+            swan_popup_modals::open_new_file(expl.cwd.data(), expl.id);
         }
         else if (window_hovered && io.KeyCtrl && imgui::IsKeyDown(ImGuiKey_N) && imgui::IsKeyPressed(ImGuiKey_D)) {
-            imgui::OpenPopup("Create directory");
+            swan_popup_modals::open_new_directory(expl.cwd.data(), expl.id);
         }
         else if (window_hovered && io.KeyCtrl && io.KeyShift && imgui::IsKeyPressed(ImGuiKey_F)) {
             if (cwd_exists_before_edit) {
@@ -2890,7 +2689,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
 
     if (imgui::BeginPopup("history_popup")) {
-        swan_path_t backup = expl.cwd;
+        swan_path backup = expl.cwd;
         bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
 
         if (history_item_clicked) {
@@ -3054,7 +2853,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 ImGuiTableFlags_BordersV|
                 // ImGuiTableFlags_ScrollY|
                 ImGuiTableFlags_SortMulti|
-                ImGuiTableFlags_SortTristate|
+                // ImGuiTableFlags_SortTristate|
                 (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
                 (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
             ;
@@ -3147,7 +2946,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     ImVec2 leftovers_rect_min(cwd_entries_child_min.x, cwd_entries_table_max.y);
     ImVec2 leftovers_rect_max = cwd_entries_child_max;
 
-    if (imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max)) {
+    if (!any_popups_open && imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max)) {
         if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
             expl.deselect_all_cwd_entries();
         }
@@ -3196,36 +2995,23 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             expl.invert_selection_on_visible_cwd_entries();
         }
     }
-    if (imgui::IsMouseHoveringRect(leftovers_rect_min, leftovers_rect_max) && imgui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        imgui::OpenPopup("##cwd_entries_child_leftovers");
+    if (imgui::IsMouseClicked(ImGuiMouseButton_Right) && imgui::IsMouseHoveringRect(leftovers_rect_min, leftovers_rect_max)) {
+        imgui::OpenPopup("## cwd_entries_child_leftovers context_menu");
     }
-    {
-        // can't open another popup from within a popup, hence we need these
-        bool open_create_file_popup = false;
-        bool open_create_dir_popup = false;
-
-        if (imgui::BeginPopup("##cwd_entries_child_leftovers")) {
-            if (!s_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
-                auto result = s_file_op_payload.execute(expl);
-                // TODO: why is result unused?
-            }
-
-            if (imgui::Selectable("New file")) {
-                open_create_file_popup = true;
-            }
-            if (imgui::Selectable("New directory")) {
-                open_create_dir_popup = true;
-            }
-
-            imgui::EndPopup();
+    if (imgui::BeginPopup("## cwd_entries_child_leftovers context_menu")) {
+        if (!s_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
+            auto result = s_file_op_payload.execute(expl);
+            // TODO: why is result unused?
         }
 
-        if (open_create_file_popup) {
-            imgui::OpenPopup("Create file");
+        if (imgui::Selectable("New file")) {
+            swan_popup_modals::open_new_file(expl.cwd.data(), expl.id);
         }
-        if (open_create_dir_popup) {
-            imgui::OpenPopup("Create directory");
+        if (imgui::Selectable("New directory")) {
+            swan_popup_modals::open_new_directory(expl.cwd.data(), expl.id);
         }
+
+        imgui::EndPopup();
     }
 
     if (!drives_table_rendered) {
@@ -3262,7 +3048,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Appearing);
 
     if (imgui::BeginPopupModal("History", nullptr, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_AlwaysAutoResize)) {
-        swan_path_t backup = expl.cwd;
+        swan_path backup = expl.cwd;
         bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_after_edit, false);
 
         if (history_item_clicked) {
@@ -3280,15 +3066,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
             }
         }
-    }
-
-    if (imgui::BeginPopupModal("Create directory", nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
-        render_create_directory_popup(expl, dir_sep_utf16);
-        imgui::EndPopup();
-    }
-    if (imgui::BeginPopupModal("Create file", nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
-        render_create_file_popup(expl, dir_sep_utf16);
-        imgui::EndPopup();
     }
 
     #if 0
@@ -3364,7 +3141,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
             auto const &pin = global_state::pins()[payload_data->pin_idx];
 
-            swan_path_t initial_cwd = expl.cwd;
+            swan_path initial_cwd = expl.cwd;
             expl.cwd = path_create("");
 
             auto result = try_descend_to_directory(expl, pin.path.data());
@@ -3549,8 +3326,8 @@ void render_table_rows_for_cwd_entries(
                         else { // not shift click, check for double click
 
                             static f64 last_click_time = 0;
-                            static swan_path_t last_click_path = {};
-                            swan_path_t const &current_click_path = dirent.basic.path;
+                            static swan_path last_click_path = {};
+                            swan_path const &current_click_path = dirent.basic.path;
                             f64 const double_click_window_sec = 0.3;
                             f64 current_time_precise = imgui::GetTime();
                             f64 seconds_between_clicks = current_time_precise - last_click_time;
@@ -3874,7 +3651,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                     std::string_view parent_dir = get_everything_minus_file_name(lnk_data.target_path_utf8.data());
                     expl.cwd = path_create(parent_dir.data(), parent_dir.size());
 
-                    swan_path_t select_name_utf8 = path_create(get_file_name(lnk_data.target_path_utf8.data()));
+                    swan_path select_name_utf8 = path_create(get_file_name(lnk_data.target_path_utf8.data()));
                     {
                         std::scoped_lock lock(expl.select_cwd_entries_on_next_update_mutex);
                         expl.select_cwd_entries_on_next_update.clear();
@@ -3892,7 +3669,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
                 imgui::SetClipboardText(expl.context_menu_target->basic.path.data());
             }
             if (imgui::Selectable("Copy full path")) {
-                swan_path_t full_path = path_create(expl.cwd.data());
+                swan_path full_path = path_create(expl.cwd.data());
                 if (!path_append(full_path, expl.context_menu_target->basic.path.data(), settings.dir_separator_utf8, true)) {
                     std::string action = make_str("Copy full path of [%s].", expl.context_menu_target->basic.path.data());
                     char const *failed = "Max path length exceeded when appending name to current working directory path.";
@@ -3911,7 +3688,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
             }
 
             if (imgui::Selectable("Reveal in File Explorer")) {
-                swan_path_t full_path = expl.cwd;
+                swan_path full_path = expl.cwd;
                 if (!path_append(full_path, expl.context_menu_target->basic.path.data(), L'\\', true)) {
                     std::string action = make_str("Reveal [%s] in File Explorer.", expl.context_menu_target->basic.path.data());
                     char const *failed = "Append name to current working directory exceeds maximum path length.";
@@ -4005,7 +3782,7 @@ render_dirent_right_click_context_menu(explorer_window &expl, cwd_count_info con
 
                 for (auto const &dirent : expl.cwd_entries) {
                     if (dirent.is_selected && !dirent.is_filtered_out) {
-                        swan_path_t full_path = path_create(expl.cwd.data());
+                        swan_path full_path = path_create(expl.cwd.data());
                         if (!path_append(full_path, dirent.basic.path.data(), settings.dir_separator_utf8, true)) {
                             std::string action = make_str("Copy full path of [%s].", dirent.basic.path.data());
                             char const *failed = "Max path length exceeded when appending name to current working directory path.";

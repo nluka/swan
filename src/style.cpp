@@ -1,7 +1,7 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_ext.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_extension.hpp"
+#include "imgui_dependent_functions.hpp"
 
 // https://github.com/ocornut/imgui/issues/5102
 ImVec4 imgui::RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept {

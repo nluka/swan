@@ -1,5 +1,5 @@
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 
 namespace single_rename_modal_global_state
 {
@@ -50,7 +50,7 @@ void swan_popup_modals::render_single_rename() noexcept
 
     wchar_t dir_sep_utf16 = global_state::settings().dir_separator_utf16;
 
-    static swan_path_t new_name_utf8 = {};
+    static swan_path new_name_utf8 = {};
     static std::string err_msg = {};
 
     auto cleanup_and_close_popup = [&]() noexcept {

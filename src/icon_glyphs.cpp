@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
-#include "common_fns.hpp"
+#include "common_functions.hpp"
 
 static std::vector<icon_font_glyph> s_font_awesome_icons = {
     { "ICON_FA_AD", "\xef\x99\x81" }, // U+f641

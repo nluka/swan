@@ -1,3 +1,7 @@
+/// (Almost) all data types, defined in this file. The starting point for understanding how Swan works.
+/// "Show me your data structures, and I won't usually need your code; it'll be obvious." - Fred Brooks
+/// "Bad programmers worry about the code. Good programmers worry about data structures and their relationships." - Linus Torvalds
+
 #pragma once
 
 #include "stdafx.hpp"
@@ -37,9 +41,34 @@ struct winapi_error
     std::string formatted_message;
 };
 
-struct swan_path_t final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
+struct swan_path final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
 {
-    bool operator>(swan_path_t const &other) const noexcept { return lstrcmpiA(this->data(), other.data()) < 0; }
+    // static swan_path create(char const *data, u64 count = u64(-1)) noexcept;
+
+    // u64 length() noexcept;
+
+    // bool ends_with(char const *end) noexcept;
+
+    // bool ends_with_one_of(char const *chars) noexcept;
+
+    // bool is_empty() noexcept;
+
+    // void clear() noexcept;
+
+    // void convert_separators(char new_dir_separator) noexcept;
+
+    // char pop_back() noexcept;
+    // bool pop_back_if(char if_ch) noexcept;
+    // bool pop_back_if_one_of(char const *chars_list) noexcept;
+    // bool pop_back_if_not(char if_not_ch) noexcept;
+
+    // u64 append(char const *append_data, char dir_separator = 0, bool prepend_slash = false, bool postpend_slash = false) noexcept;
+
+    // swan_path reconstruct_with_squished_separators() noexcept;
+
+    // swan_path reconstruct_canonically(char dir_sep_utf8) noexcept;
+
+    bool operator>(swan_path const &other) const noexcept { return strcmp(this->data(), other.data()) > 0; }
 };
 
 struct basic_dirent
@@ -60,7 +89,7 @@ struct basic_dirent
     FILETIME last_write_time_raw = {};
     u32 id = {};
     kind type = kind::nil;
-    swan_path_t path = {};
+    swan_path path = {};
 
     bool is_path_dotdot() const noexcept;
     bool is_dotdot_dir() const noexcept;
@@ -257,7 +286,7 @@ struct explorer_window
     void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
     u64 deselect_all_cwd_entries() noexcept;
     void invert_selection_on_visible_cwd_entries() noexcept;
-    void set_latest_valid_cwd(swan_path_t const &new_latest_valid_cwd) noexcept;
+    void set_latest_valid_cwd(swan_path const &new_latest_valid_cwd) noexcept;
     void uncut() noexcept;
     void reset_filter() noexcept;
     cwd_entries_column_sort_specs_t copy_column_sort_specs(ImGuiTableSortSpecs const *sort_specs) noexcept;
@@ -273,7 +302,7 @@ struct explorer_window
         std::string_view parent_dir,
         std::source_location sloc = std::source_location::current()) noexcept;
 
-    void push_history_item(swan_path_t const &new_latest_entry) noexcept;
+    void push_history_item(swan_path const &new_latest_entry) noexcept;
 
     // 104 byte alignment members
 
@@ -297,7 +326,7 @@ struct explorer_window
     // };
 
     // history for working directories, persisted in file
-    circular_buffer<swan_path_t> wd_history = circular_buffer<swan_path_t>(MAX_WD_HISTORY_SIZE);
+    circular_buffer<swan_path> wd_history = circular_buffer<swan_path>(MAX_WD_HISTORY_SIZE);
 
     // 32 byte alignment members
 
@@ -309,7 +338,7 @@ struct explorer_window
     // 24 byte alignment members
 
     std::vector<dirent> cwd_entries = {};                             // all direct children of the cwd
-    std::vector<swan_path_t> select_cwd_entries_on_next_update = {};  // entries to select on the next update of cwd_entries
+    std::vector<swan_path> select_cwd_entries_on_next_update = {};  // entries to select on the next update of cwd_entries
 
     // 8 byte alignment members
 
@@ -357,9 +386,9 @@ struct explorer_window
 
     // 1 byte alignment members
 
-    swan_path_t latest_valid_cwd = {};              // latest value of cwd which was a valid directory
-    swan_path_t cwd = {};                           // current working directory, persisted in file
-    swan_path_t read_dir_changes_target = {};       // value of current working directory when ReadDirectoryChangesW was called
+    swan_path latest_valid_cwd = {};              // latest value of cwd which was a valid directory
+    swan_path cwd = {};                           // current working directory, persisted in file
+    swan_path read_dir_changes_target = {};       // value of current working directory when ReadDirectoryChangesW was called
     std::array<char, 256> filter_text = {};         // persisted in file
     bool filter_case_sensitive = false;             // persisted in file
     bool filter_polarity = true;                    // persisted in file
@@ -384,7 +413,7 @@ struct finder_window
     struct search_directory
     {
         bool found;
-        swan_path_t path_utf8;
+        swan_path path_utf8;
     };
 
     struct match
@@ -407,7 +436,7 @@ struct symlink_data
 {
     s32 show_cmd;
     wchar_t target_path_utf16[MAX_PATH];
-    swan_path_t target_path_utf8;
+    swan_path target_path_utf8;
     wchar_t working_directory_path_utf16[MAX_PATH];
     wchar_t arguments_utf16[1024];
 
@@ -429,7 +458,7 @@ struct file_operation_command_buf
         char const *operation_desc;
         file_operation_type operation_type;
         basic_dirent::kind type;
-        swan_path_t path;
+        swan_path path;
     };
 
     std::vector<item> items = {};
@@ -443,8 +472,8 @@ struct completed_file_operation
     system_time_point_t completion_time = {};
     system_time_point_t undo_time = {};
     u32 group_id = {};
-    swan_path_t src_path = {};
-    swan_path_t dst_path = {};
+    swan_path src_path = {};
+    swan_path dst_path = {};
     file_operation_type op_type = file_operation_type::nil;
     basic_dirent::kind obj_type = basic_dirent::kind::nil;
     bool selected = false;
@@ -463,7 +492,7 @@ struct explorer_file_op_progress_sink : public IFileOperationProgressSink
 {
     u32 group_id;
     s32 dst_expl_id;
-    swan_path_t dst_expl_cwd_when_operation_started;
+    swan_path dst_expl_cwd_when_operation_started;
     bool contains_delete_operations;
 
     HRESULT PauseTimer() noexcept override;
@@ -493,7 +522,7 @@ struct explorer_file_op_progress_sink : public IFileOperationProgressSink
 
 struct undelete_directory_progress_sink : public IFileOperationProgressSink
 {
-    swan_path_t destination_full_path_utf8;
+    swan_path destination_full_path_utf8;
 
     HRESULT PauseTimer() noexcept override;
     HRESULT ResetTimer() noexcept override;
@@ -538,7 +567,7 @@ struct pinned_path
 
     ImVec4 color;
     boost::static_string<LABEL_MAX_LEN> label;
-    swan_path_t path;
+    swan_path path;
 };
 
 struct recent_file
@@ -547,7 +576,7 @@ struct recent_file
 
     boost::static_string<ACTION_MAX_LEN> action;
     system_time_point_t action_time;
-    swan_path_t path;
+    swan_path path;
 };
 
 struct bulk_rename_compiled_pattern
@@ -596,7 +625,7 @@ struct bulk_rename_transform_result
 struct bulk_rename_op
 {
     basic_dirent *before;
-    swan_path_t after;
+    swan_path after;
 
     bool operator!=(bulk_rename_op const &other) const noexcept; // for ntest
     friend std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r); // for ntest

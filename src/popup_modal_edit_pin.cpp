@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 
 namespace edit_pin_modal_global_state
 {
@@ -39,7 +39,7 @@ void swan_popup_modals::render_edit_pin() noexcept
     assert(g_target_pin != nullptr);
 
     static char label_input[pinned_path::LABEL_MAX_LEN + 1] = {};
-    static swan_path_t path_input = {};
+    static swan_path path_input = {};
     static ImVec4 color_input = dir_color();
     static std::string err_msg = {};
 
@@ -90,7 +90,7 @@ void swan_popup_modals::render_edit_pin() noexcept
     imgui::SameLineSpaced(1);
 
     auto apply_changes = [&]() noexcept {
-        swan_path_t path = path_squish_adjacent_separators(path_input);
+        swan_path path = path_squish_adjacent_separators(path_input);
         path_force_separator(path, global_state::settings().dir_separator_utf8);
 
         g_target_pin->color = color_input;

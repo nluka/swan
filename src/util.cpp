@@ -2,7 +2,7 @@
 
 #include "stdafx.hpp"
 #include "util.hpp"
-#include "imgui_specific.hpp"
+#include "imgui_dependent_functions.hpp"
 
 static u64 s_fast_rand_seed = {};
 void seed_fast_rand(u64 v) noexcept

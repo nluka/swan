@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 
 namespace error_modal_global_state
 {

@@ -1,5 +1,5 @@
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 
 bool debug_log_package::s_logging_enabled = true;
 ImGuiTextBuffer debug_log_package::s_buffer = {};
@@ -46,7 +46,7 @@ void swan_windows::render_debug_log(bool &open) noexcept
 
         imgui::SameLineSpaced(1);
 
-        imgui::Checkbox("Logging Enabled", &debug_log_package::s_logging_enabled);
+        imgui::Checkbox("Logging enabled", &debug_log_package::s_logging_enabled);
 
         imgui::SameLineSpaced(1);
 
@@ -66,7 +66,7 @@ void swan_windows::render_debug_log(bool &open) noexcept
 
         // second line
 
-        imgui::Text("%-5s %10s %24s:%-6s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
+        imgui::Text("%-5s %10s %40s:%-6s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
         imgui::Separator();
 
         // third line

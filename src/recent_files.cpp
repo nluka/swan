@@ -1,7 +1,7 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "path.hpp"
 
 static circular_buffer<recent_file> g_recent_files = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
@@ -40,7 +40,7 @@ void global_state::move_recent_file_idx_to_front(u64 recent_file_idx, char const
 
 void global_state::add_recent_file(char const *action, char const *full_file_path) noexcept
 {
-    swan_path_t path = path_create(full_file_path);
+    swan_path path = path_create(full_file_path);
 
     std::scoped_lock lock(g_recent_files_mutex);
     g_recent_files.push_front({ action, current_time_system(), path });
@@ -107,7 +107,7 @@ try {
 
         u64 stored_action_len = 0;
         u64 stored_path_len = 0;
-        swan_path_t stored_path = {};
+        swan_path stored_path = {};
 
         iss >> stored_action_len;
         iss.ignore(1);
@@ -159,8 +159,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
     imgui::TextUnformatted("(?)");
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("[L click]  row  Open file\n"
-                          "[R click]  row  Reveal file in Explorer 1");
+        imgui::SetTooltip("Newly created and recently opened files are tracked here.\n");
     }
 
     imgui::SameLine();
@@ -226,7 +225,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
             char *full_path = file.path.data();
             char *file_name = get_file_name(full_path);
             auto directory = get_everything_minus_file_name(full_path);
-            swan_path_t file_directory = path_create(directory.data(), directory.size());
+            swan_path file_directory = path_create(directory.data(), directory.size());
 
             bool left_clicked = false;
             bool right_clicked = false;
@@ -289,7 +288,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
                 char *full_path = s_context_menu_target->path.data();
                 char *file_name = get_file_name(full_path);
                 auto directory = get_everything_minus_file_name(full_path);
-                swan_path_t file_directory = path_create(directory.data(), directory.size());
+                swan_path file_directory = path_create(directory.data(), directory.size());
 
                 wchar_t file_path_utf16[MAX_PATH];
 
@@ -338,7 +337,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
                 }
             }
             if (imgui::Selectable("Reveal in File Explorer", selected)) {
-                swan_path_t const &full_path = s_context_menu_target->path;
+                swan_path const &full_path = s_context_menu_target->path;
                 auto res = reveal_in_windows_file_explorer(full_path);
                 if (!res.success) {
                     std::string action = make_str("Reveal [%s] in File Explorer.", full_path.data());
@@ -355,8 +354,6 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
         imgui::EndTable();
     }
-
-
 
     if (remove_idx != u64(-1)) {
         (void) global_state::remove_recent_file(remove_idx);

@@ -1,24 +1,8 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "path.hpp"
-
-namespace swan
-{
-    static s32                      g_page_size = 0;
-    static swan_thread_pool_t       g_thread_pool(1);
-    static bool                     g_move_dirents_payload_is_set = false;
-    static std::filesystem::path    g_execution_path = {};
-};
-
-s32 &global_state::page_size() noexcept { return swan::g_page_size; }
-
-swan_thread_pool_t &global_state::thread_pool() noexcept { return swan::g_thread_pool; }
-
-bool &global_state::move_dirents_payload_set() noexcept { return swan::g_move_dirents_payload_is_set; }
-
-std::filesystem::path &global_state::execution_path() noexcept { return swan::g_execution_path; }
 
 bool basic_dirent::is_path_dotdot()          const noexcept { return path_equals_exactly(path, ".."); }
 bool basic_dirent::is_dotdot_dir()           const noexcept { return type == basic_dirent::kind::directory && path_equals_exactly(path, ".."); }
@@ -249,9 +233,9 @@ recycle_bin_info query_recycle_bin() noexcept
     return retval;
 }
 
-generic_result reveal_in_windows_file_explorer(swan_path_t const &full_path_in) noexcept
+generic_result reveal_in_windows_file_explorer(swan_path const &full_path_in) noexcept
 {
-    swan_path_t full_path_utf8 = full_path_in;
+    swan_path full_path_utf8 = full_path_in;
 
     // Windows File Explorer does not like unix separator
     path_force_separator(full_path_utf8, '\\');

@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
-#include "imgui_specific.hpp"
+#include "imgui_dependent_functions.hpp"
 
 HRESULT undelete_directory_progress_sink::StartOperations() noexcept { print_debug_msg("undelete_directory_progress_sink :: StartOperations"); return S_OK; }
 HRESULT undelete_directory_progress_sink::PauseTimer()      noexcept { print_debug_msg("undelete_directory_progress_sink :: PauseTimer");      return S_OK; }

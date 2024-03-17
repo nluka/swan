@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
-#include "imgui_specific.hpp"
+#include "imgui_dependent_functions.hpp"
 
 basic_dirent::kind derive_obj_type(DWORD attributes) noexcept
 {
@@ -44,7 +44,7 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
     }
 
     wchar_t *src_path_utf16 = nullptr;
-    swan_path_t src_path_utf8;
+    swan_path src_path_utf8;
 
     if (FAILED(src_item->GetDisplayName(SIGDN_FILESYSPATH, &src_path_utf16))) {
         return S_OK;
@@ -57,7 +57,7 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
 
     wchar_t *dst_path_utf16 = nullptr;
     bool free_dst_path_utf16 = false;
-    swan_path_t dst_path_utf8 = path_create("");
+    swan_path dst_path_utf8 = path_create("");
 
     if (dst_item != nullptr) {
         if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {
@@ -73,7 +73,7 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
 
     print_debug_msg("PostMoveItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
 
-    swan_path_t new_name_utf8;
+    swan_path new_name_utf8;
 
     if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
         return S_OK;
@@ -122,7 +122,7 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
     SCOPE_EXIT { CoTaskMemFree(deleted_item_path_utf16); };
 
     // Convert deleted item path to UTF8
-    swan_path_t deleted_item_path_utf8;
+    swan_path deleted_item_path_utf8;
     if (!utf16_to_utf8(deleted_item_path_utf16, deleted_item_path_utf8.data(), deleted_item_path_utf8.max_size())) {
         return S_OK;
     }
@@ -130,7 +130,7 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
     // Extract recycle bin item path
     wchar_t *recycle_bin_hardlink_path_utf16 = nullptr;
     bool free_recycle_bin_hardlink_path_utf16 = false;
-    swan_path_t recycle_bin_item_path_utf8 = path_create("");
+    swan_path recycle_bin_item_path_utf8 = path_create("");
 
     if (item_newly_created != nullptr) {
         if (FAILED(item_newly_created->GetDisplayName(SIGDN_FILESYSPATH, &recycle_bin_hardlink_path_utf16))) {
@@ -181,7 +181,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
     }
 
     wchar_t *src_path_utf16 = nullptr;
-    swan_path_t src_path_utf8;
+    swan_path src_path_utf8;
 
     if (FAILED(src_item->GetDisplayName(SIGDN_FILESYSPATH, &src_path_utf16))) {
         return S_OK;
@@ -194,7 +194,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
 
     wchar_t *dst_path_utf16 = nullptr;
     bool dst_path_utf16_needs_free = false;
-    swan_path_t dst_path_utf8 = path_create("");
+    swan_path dst_path_utf8 = path_create("");
 
     if (dst_item != nullptr) {
         if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {

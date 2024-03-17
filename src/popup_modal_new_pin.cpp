@@ -1,16 +1,16 @@
 #include "imgui/imgui.h"
 
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 
 namespace new_pin_modal_global_state
 {
     static bool         g_open = false;
     static bool         g_enable_path_text_input = true;
-    static swan_path_t  g_initial_path_value = {};
+    static swan_path  g_initial_path_value = {};
 }
 
-void swan_popup_modals::open_new_pin(swan_path_t const &init_path, bool mutable_path) noexcept
+void swan_popup_modals::open_new_pin(swan_path const &init_path, bool mutable_path) noexcept
 {
     using namespace new_pin_modal_global_state;
 
@@ -38,7 +38,7 @@ void swan_popup_modals::render_new_pin() noexcept
     }
 
     static char label_input[pinned_path::LABEL_MAX_LEN + 1] = {};
-    static swan_path_t path_input = {};
+    static swan_path path_input = {};
     static ImVec4 color_input = dir_color();
     static std::string err_msg = {};
 
@@ -100,7 +100,7 @@ void swan_popup_modals::render_new_pin() noexcept
     imgui::SameLineSpaced(1);
 
     if (imgui::Button("Create##pin") && !strempty(path_input.data()) && !strempty(label_input)) {
-        swan_path_t path = path_squish_adjacent_separators(path_input);
+        swan_path path = path_squish_adjacent_separators(path_input);
         path_force_separator(path, global_state::settings().dir_separator_utf8);
 
         global_state::add_pin(color_input, label_input, path, '\\');

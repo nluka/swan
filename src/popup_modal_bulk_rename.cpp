@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "scoped_timer.hpp"
 
 namespace bulk_rename_modal_global_state
@@ -178,7 +178,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                 for (auto &dirent : selection) {
                     file_name_extension_splitter name_ext(dirent.basic.path.data());
-                    swan_path_t after;
+                    swan_path after;
 
                     auto transform = bulk_rename_transform(pattern_compile_res.compiled_pattern, after, name_ext.name,
                                                            name_ext.ext, counter, dirent.basic.size);
@@ -442,7 +442,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     }
 
     if (rename_button_pressed && pattern_compile_res.success && collisions.empty() && rename_state.load() == bulk_rename_state::nil) {
-        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops,  swan_path_t expl_cwd, wchar_t dir_sep_utf16) noexcept {
+        auto bulk_rename_task = [](std::vector<bulk_rename_op> rename_ops,  swan_path expl_cwd, wchar_t dir_sep_utf16) noexcept {
             rename_state.store(bulk_rename_state::in_progress);
             num_renames_total.store(rename_ops.size());
 

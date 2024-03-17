@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "path.hpp"
 
 static swan_settings g_settings = {};

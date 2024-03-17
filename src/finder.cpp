@@ -1,14 +1,14 @@
 #include "stdafx.hpp"
 #include "data_types.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 
 namespace swan_finder
 {
     static swan_thread_pool_t g_thread_pool(1);
 }
 
-void traverse_directory_recursively(swan_path_t const &directory_path_utf8,
+void traverse_directory_recursively(swan_path const &directory_path_utf8,
                                     std::atomic<u64> &num_entries_checked,
                                     progressive_task<std::vector<finder_window::match>> &search_task,
                                     char const *search_value,
@@ -39,7 +39,7 @@ void traverse_directory_recursively(swan_path_t const &directory_path_utf8,
             return;
         }
 
-        swan_path_t found_file_name = path_create("");
+        swan_path found_file_name = path_create("");
 
         if (!utf16_to_utf8(find_data.cFileName, found_file_name.data(), found_file_name.size())) {
             continue;
@@ -118,7 +118,7 @@ void traverse_directory_recursively(swan_path_t const &directory_path_utf8,
         }
 
         if (is_directory) {
-            swan_path_t sub_directory_utf8 = directory_path_utf8;
+            swan_path sub_directory_utf8 = directory_path_utf8;
             if (!path_append(sub_directory_utf8, found_file_name.data(), '\\', true, true)) {
                 return;
             }
@@ -139,7 +139,7 @@ void search_proc(progressive_task<std::vector<finder_window::match>> &search_tas
     u64 search_value_len = strlen(search_value.data());
 
     for (auto const &search_dir : search_directories) {
-        swan_path_t search_dir_path_ut8_normalized = search_dir.path_utf8;
+        swan_path search_dir_path_ut8_normalized = search_dir.path_utf8;
         path_force_separator(search_dir_path_ut8_normalized, L'\\');
 
         traverse_directory_recursively(search_dir_path_ut8_normalized, num_entries_checked, search_task, search_value.data(), search_value_len);

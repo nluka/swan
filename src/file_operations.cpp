@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "path.hpp"
 
 static std::mutex s_completed_file_ops_mutex = {};
@@ -106,8 +106,8 @@ try {
         s32 stored_obj_type = 0;
         u64 stored_src_path_len = 0;
         u64 stored_dst_path_len = 0;
-        swan_path_t stored_src_path = {};
-        swan_path_t stored_dst_path = {};
+        swan_path stored_src_path = {};
+        swan_path stored_dst_path = {};
 
         std::tm tm_completion = {};
         iss >> std::get_time(&tm_completion, "%Y-%m-%d %H:%M:%S");
@@ -305,9 +305,9 @@ undelete_file_result undelete_file(char const *recycle_bin_hardlink_path_utf8) n
 }
 
 void perform_undelete_directory(
-    swan_path_t directory_path_in_recycle_bin_utf8,
-    swan_path_t destination_dir_path_utf8,
-    swan_path_t destination_full_path_utf8,
+    swan_path directory_path_in_recycle_bin_utf8,
+    swan_path destination_dir_path_utf8,
+    swan_path destination_full_path_utf8,
     std::mutex *init_done_mutex,
     std::condition_variable *init_done_cond,
     bool *init_done,
@@ -681,10 +681,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
             completed_file_operation &context_elem = *context_menu_target_iter.value();
 
             {
-                auto reveal = [](swan_path_t const &full_path) noexcept {
+                auto reveal = [](swan_path const &full_path) noexcept {
                     explorer_window &expl = global_state::explorers()[0];
 
-                    swan_path_t reveal_name_utf8 = path_create(cget_file_name(full_path.data()));
+                    swan_path reveal_name_utf8 = path_create(cget_file_name(full_path.data()));
                     std::string_view path_no_name_utf8 = get_everything_minus_file_name(full_path.data());
 
                     expl.deselect_all_cwd_entries();
@@ -694,7 +694,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                         expl.select_cwd_entries_on_next_update.push_back(reveal_name_utf8);
                     }
 
-                    swan_path_t containing_dir_utf8 = path_create(path_no_name_utf8.data(), path_no_name_utf8.size());
+                    swan_path containing_dir_utf8 = path_create(path_no_name_utf8.data(), path_no_name_utf8.size());
                     auto [containing_dir_exists, num_selected] = expl.update_cwd_entries(full_refresh, containing_dir_utf8.data());
 
                     if (!containing_dir_exists) {
@@ -742,7 +742,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
                 if (can_be_undeleted && has_recycle_bin_entry && imgui::Selectable("Undelete this one")) {
                     if (context_elem.obj_type == basic_dirent::kind::directory) {
-                        swan_path_t restore_dir_utf8 = path_create(context_elem.src_path.data(),
+                        swan_path restore_dir_utf8 = path_create(context_elem.src_path.data(),
                                                                    get_everything_minus_file_name(context_elem.src_path.data()).length());
 
                         auto res = enqueue_undelete_directory(context_elem.dst_path.data(), restore_dir_utf8.data(), context_elem.src_path.data());
@@ -1006,7 +1006,7 @@ void perform_file_operations(
 
     IShellItem *destination = nullptr;
     {
-        swan_path_t destination_utf8 = path_create("");
+        swan_path destination_utf8 = path_create("");
 
         result = SHCreateItemFromParsingName(destination_directory_utf16.c_str(), nullptr, IID_PPV_ARGS(&destination));
 
@@ -1065,7 +1065,7 @@ void perform_file_operations(
             // shlwapi doesn't like '/', force them all to '\'
             std::replace(full_path_to_exec_utf16.begin(), full_path_to_exec_utf16.end(), L'/', L'\\');
 
-            swan_path_t item_path_utf8 = path_create("");
+            swan_path item_path_utf8 = path_create("");
 
             IShellItem *to_exec = nullptr;
             result = SHCreateItemFromParsingName(full_path_to_exec_utf16.c_str(), nullptr, IID_PPV_ARGS(&to_exec));

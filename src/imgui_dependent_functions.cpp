@@ -1,4 +1,4 @@
-#include "imgui_specific.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "util.hpp"
 
 void new_frame(char const *ini_file_path) noexcept

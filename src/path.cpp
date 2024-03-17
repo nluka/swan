@@ -1,9 +1,9 @@
 #include "stdafx.hpp"
 #include "path.hpp"
 
-swan_path_t path_create(char const *data, u64 count) noexcept
+swan_path path_create(char const *data, u64 count) noexcept
 {
-    swan_path_t p = {};
+    swan_path p = {};
 
 #if DEBUG_MODE
     assert(data != nullptr);
@@ -15,22 +15,22 @@ swan_path_t path_create(char const *data, u64 count) noexcept
     return p;
 }
 
-u16 path_length(swan_path_t const &path) noexcept
+u16 path_length(swan_path const &path) noexcept
 {
     return (u16)strnlen(path.data(), UINT16_MAX);
 }
 
-bool path_equals_exactly(swan_path_t const &p1, char const *p2) noexcept
+bool path_equals_exactly(swan_path const &p1, char const *p2) noexcept
 {
     return strcmp(p1.data(), p2) == 0;
 }
 
-bool path_equals_exactly(swan_path_t const &p1, swan_path_t const &p2) noexcept
+bool path_equals_exactly(swan_path const &p1, swan_path const &p2) noexcept
 {
     return strcmp(p1.data(), p2.data()) == 0;
 }
 
-char path_pop_back(swan_path_t &path) noexcept
+char path_pop_back(swan_path &path) noexcept
 {
     u64 len = path_length(path);
 
@@ -44,7 +44,7 @@ char path_pop_back(swan_path_t &path) noexcept
     }
 }
 
-bool path_pop_back_if(swan_path_t &path, char if_ch) noexcept
+bool path_pop_back_if(swan_path &path, char if_ch) noexcept
 {
     u64 len = path_length(path);
 
@@ -56,7 +56,7 @@ bool path_pop_back_if(swan_path_t &path, char if_ch) noexcept
     }
 }
 
-bool path_pop_back_if(swan_path_t &path, char const *chs) noexcept
+bool path_pop_back_if(swan_path &path, char const *chs) noexcept
 {
     u64 len = path_length(path);
 
@@ -68,7 +68,7 @@ bool path_pop_back_if(swan_path_t &path, char const *chs) noexcept
     }
 }
 
-bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept
+bool path_pop_back_if_not(swan_path &path, char if_not_ch) noexcept
 {
     u64 len = path_length(path);
 
@@ -80,12 +80,12 @@ bool path_pop_back_if_not(swan_path_t &path, char if_not_ch) noexcept
     }
 }
 
-bool path_is_empty(swan_path_t const &path) noexcept
+bool path_is_empty(swan_path const &path) noexcept
 {
     return path[0] == '\0';
 }
 
-bool path_ends_with(swan_path_t const &path, char const *end) noexcept
+bool path_ends_with(swan_path const &path, char const *end) noexcept
 {
     assert(end != nullptr);
 
@@ -100,7 +100,7 @@ bool path_ends_with(swan_path_t const &path, char const *end) noexcept
     }
 }
 
-bool path_ends_with_one_of(swan_path_t const &path, char const *chars) noexcept
+bool path_ends_with_one_of(swan_path const &path, char const *chars) noexcept
 {
     assert(chars != nullptr);
     assert(strlen(chars) > 0);
@@ -116,13 +116,13 @@ bool path_ends_with_one_of(swan_path_t const &path, char const *chars) noexcept
     }
 }
 
-void path_clear(swan_path_t &path) noexcept
+void path_clear(swan_path &path) noexcept
 {
     assert(path.size() > 0);
     path[0] = '\0';
 }
 
-void path_force_separator(swan_path_t &path, char dir_separator) noexcept
+void path_force_separator(swan_path &path, char dir_separator) noexcept
 {
     u64 path_len = path_length(path);
 
@@ -134,7 +134,7 @@ void path_force_separator(swan_path_t &path, char dir_separator) noexcept
 }
 
 u64 path_append(
-    swan_path_t &path,
+    swan_path &path,
     char const *str,
     char dir_separator,
     bool prepend_sep,
@@ -212,26 +212,26 @@ bool path_loosely_same(char const *p1, char const *p2, u64 p1_len, u64 p2_len) n
     }
 }
 
-bool path_loosely_same(swan_path_t const &p1, char const *p2, u64 p2_len) noexcept
+bool path_loosely_same(swan_path const &p1, char const *p2, u64 p2_len) noexcept
 {
     return path_loosely_same(p1.data(), p2, path_length(p1), p2_len);
 }
 
-bool path_loosely_same(char const *p1, swan_path_t const &p2, u64 p1_len) noexcept
+bool path_loosely_same(char const *p1, swan_path const &p2, u64 p1_len) noexcept
 {
     return path_loosely_same(p1, p2.data(), p1_len, path_length(p2));
 }
 
-bool path_loosely_same(swan_path_t const &p1, swan_path_t const &p2) noexcept
+bool path_loosely_same(swan_path const &p1, swan_path const &p2) noexcept
 {
     return path_loosely_same(p1.data(), p2.data(), path_length(p1), path_length(p2));
 }
 
-swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept
+swan_path path_squish_adjacent_separators(swan_path const &path) noexcept
 {
     // shoutout to ChatGPT for writing this for me
 
-    swan_path_t cleaned_path;
+    swan_path cleaned_path;
     u64 cleaned_index = 0;
     u64 path_len = path_length(path);
 
@@ -260,7 +260,7 @@ swan_path_t path_squish_adjacent_separators(swan_path_t const &path) noexcept
     return cleaned_path;
 }
 
-swan_path_t path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf8) noexcept
+swan_path path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf8) noexcept
 {
     auto segments = std::string_view(path_utf8) | std::ranges::views::split(dir_sep_utf8);
 
@@ -268,7 +268,7 @@ swan_path_t path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf
 
     char dir_sep_utf8_[] = { dir_sep_utf8, '\0' };
 
-    swan_path_t retval = path_create("");
+    swan_path retval = path_create("");
 
     for (auto const &seg : segments) {
         (void) strncat(subpath_utf8, seg.data(), seg.size());

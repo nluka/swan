@@ -127,7 +127,7 @@ try
   // path_clear;
   #if 1
   {
-    swan_path_t p = path_create("Text.");
+    swan_path p = path_create("Text.");
     ntest::assert_cstr("Text.", p.data());
     path_clear(p);
     ntest::assert_cstr("", p.data());
@@ -138,11 +138,11 @@ try
   #if 1
   {
     {
-      swan_path_t p = {};
+      swan_path p = {};
       ntest::assert_uint64(0, path_length(p));
     }
     {
-      swan_path_t p = path_create("Text.");
+      swan_path p = path_create("Text.");
       ntest::assert_cstr("Text.", p.data());
       ntest::assert_uint64(5, path_length(p));
     }
@@ -153,12 +153,12 @@ try
   #if 1
   {
     {
-      swan_path_t p = {};
+      swan_path p = {};
       ntest::assert_bool(false, path_ends_with(p, ""));
       ntest::assert_bool(false, path_ends_with(p, "text"));
     }
     {
-      swan_path_t p = path_create("Text.");
+      swan_path p = path_create("Text.");
       ntest::assert_bool(false, path_ends_with(p, "text."));
       ntest::assert_bool(true, path_ends_with(p, "."));
       ntest::assert_bool(true, path_ends_with(p, "xt."));
@@ -172,11 +172,11 @@ try
   #if 1
   {
     {
-      swan_path_t p = {};
+      swan_path p = {};
       ntest::assert_bool(false, path_ends_with_one_of(p, "abc"));
     }
     {
-      swan_path_t p = path_create("Text");
+      swan_path p = path_create("Text");
       ntest::assert_bool(false, path_ends_with_one_of(p, "abc"));
       ntest::assert_bool(false, path_ends_with_one_of(p, "T"));
       ntest::assert_bool(true, path_ends_with_one_of(p, "t"));
@@ -191,7 +191,7 @@ try
   #if 1
   {
     {
-      swan_path_t p = {};
+      swan_path p = {};
 
       ntest::assert_uint64(1, path_append(p, "C:"));
       ntest::assert_cstr("C:", p.data());
@@ -206,7 +206,7 @@ try
       ntest::assert_cstr("C:\\code\\swan.md", p.data());
     }
     {
-      swan_path_t p = {};
+      swan_path p = {};
 
       // std::string temp(swan_path_t::static_capacity, 'x');
       std::string temp(p.max_size() - 1, 'x');
@@ -241,11 +241,11 @@ try
   #if 1
   {
     {
-      swan_path_t p = {};
+      swan_path p = {};
       ntest::assert_bool(true, path_is_empty(p));
     }
     {
-      swan_path_t p = path_create("text");
+      swan_path p = path_create("text");
       ntest::assert_bool(false, path_is_empty(p));
     }
   }
@@ -273,57 +273,57 @@ try
   #if 1
   {
     {
-      swan_path_t p1 = path_create("1/2/3");
-      swan_path_t p2 = path_create("1/2/3");
+      swan_path p1 = path_create("1/2/3");
+      swan_path p2 = path_create("1/2/3");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
     {
-      swan_path_t p1 = path_create("1/2/3");
-      swan_path_t p2 = path_create("1/2/3/");
+      swan_path p1 = path_create("1/2/3");
+      swan_path p2 = path_create("1/2/3/");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
     {
-      swan_path_t p1 = path_create("C:\\code\\");
-      swan_path_t p2 = path_create("C:\\code");
+      swan_path p1 = path_create("C:\\code\\");
+      swan_path p2 = path_create("C:\\code");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
     {
-      swan_path_t p1 = path_create("C:/code/");
-      swan_path_t p2 = path_create("C:/code/");
+      swan_path p1 = path_create("C:/code/");
+      swan_path p2 = path_create("C:/code/");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
     {
-      swan_path_t p1 = path_create("C:/code///");
-      swan_path_t p2 = path_create("C:/code/");
+      swan_path p1 = path_create("C:/code///");
+      swan_path p2 = path_create("C:/code/");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
     {
-      swan_path_t p1 = path_create("C:/code///");
-      swan_path_t p2 = path_create("C:/code//");
+      swan_path p1 = path_create("C:/code///");
+      swan_path p2 = path_create("C:/code//");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
     {
-      swan_path_t p1 = path_create("C:/code///");
-      swan_path_t p2 = path_create("C:/Code//");
+      swan_path p1 = path_create("C:/code///");
+      swan_path p2 = path_create("C:/Code//");
       ntest::assert_bool(true, path_loosely_same(p1, p2));
       ntest::assert_bool(true, path_loosely_same(p2, p1));
     }
 
     {
-      swan_path_t p1 = path_create("C:/code///");
-      swan_path_t p2 = path_create("C:/cod");
+      swan_path p1 = path_create("C:/code///");
+      swan_path p2 = path_create("C:/cod");
       ntest::assert_bool(false, path_loosely_same(p1, p2));
       ntest::assert_bool(false, path_loosely_same(p2, p1));
     }
     {
-      swan_path_t p1 = path_create("C:\\code");
-      swan_path_t p2 = path_create("C:\\");
+      swan_path p1 = path_create("C:\\code");
+      swan_path p2 = path_create("C:\\");
       ntest::assert_bool(false, path_loosely_same(p1, p2));
       ntest::assert_bool(false, path_loosely_same(p2, p1));
     }
@@ -346,7 +346,7 @@ try
   #if 1
   {
     // bool squish_adjacent_spaces = false;
-    swan_path_t after = {};
+    swan_path after = {};
 
     auto assert_failed_compile = [](char const *pattern, char const *expected_error, std::source_location sloc = std::source_location::current()) noexcept {
       auto const [success, compiled, err_msg] = bulk_rename_compile_pattern(pattern, false);
@@ -385,7 +385,7 @@ try
       ntest::assert_cstr("", err_msg_compile.data(), ntest::default_str_opts(), sloc);
       ntest::assert_bool(args.squish_adjacent_spaces, compiled.squish_adjacent_spaces, sloc);
 
-      swan_path_t after = {};
+      swan_path after = {};
 
       auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, args.name, args.ext, args.counter, args.size);
       ntest::assert_bool(true, success_transform, sloc);
@@ -469,7 +469,7 @@ try
       ntest::assert_cstr("", err_msg_compile.data(), ntest::default_str_opts(), sloc);
       ntest::assert_bool(args.squish_adjacent_spaces, compiled.squish_adjacent_spaces, sloc);
 
-      swan_path_t after = {};
+      swan_path after = {};
 
       auto [success_transform, err_msg_transform] = bulk_rename_transform(compiled, after, args.name, args.ext, args.counter, args.size);
       ntest::assert_bool(false, success_transform, sloc);

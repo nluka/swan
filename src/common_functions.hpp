@@ -31,10 +31,10 @@ namespace global_state
     std::pair<bool, u64> load_recent_files_from_disk(char dir_separator) noexcept;
 
     std::vector<pinned_path> &pins() noexcept;
-    bool add_pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept;
+    bool add_pin(ImVec4 color, char const *label, swan_path &path, char dir_separator) noexcept;
     void remove_pin(u64 pin_idx) noexcept;
     void update_pin_dir_separators(char new_dir_separator) noexcept;
-    u64 find_pin_idx(swan_path_t const &) noexcept;
+    u64 find_pin_idx(swan_path const &) noexcept;
     void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept;
     bool save_pins_to_disk() noexcept;
     std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
@@ -138,29 +138,37 @@ namespace swan_windows
 
 namespace swan_popup_modals
 {
-    constexpr char const *error = "Error##popup_modal";
-    constexpr char const *single_rename = "Rename##popup_modal";
-    constexpr char const *bulk_rename = "Bulk Rename##popup_modal";
-    constexpr char const *new_pin = "New Pin##popup_modal";
-    constexpr char const *edit_pin = "Edit Pin##popup_modal";
+    constexpr char const *error = "Error ## popup_modal";
+    constexpr char const *single_rename = "Rename ## popup_modal";
+    constexpr char const *bulk_rename = "Bulk Rename ## popup_modal";
+    constexpr char const *new_pin = "New Pin ## popup_modal";
+    constexpr char const *edit_pin = "Edit Pin ## popup_modal";
+    constexpr char const *new_file = "New File ## popup_modal";
+    constexpr char const *new_directory = "New Directory ## popup_modal";
 
     void open_single_rename(explorer_window &expl_opened_from, explorer_window::dirent const &rename_target, std::function<void ()> on_rename_callback) noexcept;
     void open_bulk_rename(explorer_window &expl_opened_from, std::function<void ()> on_rename_callback) noexcept;
     void open_error(char const *action, char const *failure, bool beautify_action = false, bool beautify_failure = false) noexcept;
-    void open_new_pin(swan_path_t const &initial_path_value, bool mutable_path) noexcept;
+    void open_new_pin(swan_path const &initial_path_value, bool mutable_path) noexcept;
     void open_edit_pin(pinned_path *pin) noexcept;
+    void open_new_file(char const *parent_directory_utf8, s32 initiating_expl_id = -1) noexcept;
+    void open_new_directory(char const *parent_directory_utf8, s32 initiating_expl_id = -1) noexcept;
 
     bool is_open_single_rename() noexcept;
     bool is_open_bulk_rename() noexcept;
     bool is_open_error() noexcept;
     bool is_open_new_pin() noexcept;
     bool is_open_edit_pin() noexcept;
+    bool is_open_new_file() noexcept;
+    bool is_open_new_directory() noexcept;
 
     void render_single_rename() noexcept;
     void render_bulk_rename() noexcept;
     void render_error() noexcept;
     void render_new_pin() noexcept;
     void render_edit_pin() noexcept;
+    void render_new_file() noexcept;
+    void render_new_directory() noexcept;
 
 } // namespace swan_popup_modals
 
@@ -180,7 +188,7 @@ recycle_bin_info query_recycle_bin() noexcept;
 
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin = false) noexcept;
 
-generic_result reveal_in_windows_file_explorer(swan_path_t const &full_path) noexcept;
+generic_result reveal_in_windows_file_explorer(swan_path const &full_path) noexcept;
 
 winapi_error get_last_winapi_error() noexcept;
 
@@ -198,7 +206,7 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
 
 bulk_rename_transform_result bulk_rename_transform(
     bulk_rename_compiled_pattern compiled_pattern,
-    swan_path_t &after,
+    swan_path &after,
     char const *name,
     char const *ext,
     s32 counter,

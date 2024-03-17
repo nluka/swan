@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "util.hpp"
 
 static void         glfw_error_callback(s32 error, char const *description) noexcept;
@@ -358,6 +358,12 @@ try {
         }
         if (swan_popup_modals::is_open_bulk_rename()) {
             swan_popup_modals::render_bulk_rename();
+        }
+        if (swan_popup_modals::is_open_new_file()) {
+            swan_popup_modals::render_new_file();
+        }
+        if (swan_popup_modals::is_open_new_directory()) {
+            swan_popup_modals::render_new_directory();
         }
         if (swan_popup_modals::is_open_new_pin()) {
             swan_popup_modals::render_new_pin();

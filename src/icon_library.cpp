@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 
 u64 compute_levenshtein_dist(char const *word1, u64 size1, char const *word2, u64 size2) {
     // int size1 = word1.size();

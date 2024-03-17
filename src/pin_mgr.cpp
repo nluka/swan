@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
-#include "common_fns.hpp"
-#include "imgui_specific.hpp"
+#include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "util.hpp"
 
 static std::vector<pinned_path> g_pinned_paths = {};
@@ -177,7 +177,7 @@ std::vector<pinned_path> &global_state::pins() noexcept
     return g_pinned_paths;
 }
 
-bool global_state::add_pin(ImVec4 color, char const *label, swan_path_t &path, char dir_separator) noexcept
+bool global_state::add_pin(ImVec4 color, char const *label, swan_path &path, char dir_separator) noexcept
 {
     path_force_separator(path, dir_separator);
 
@@ -211,7 +211,7 @@ void global_state::swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
     std::swap(*(g_pinned_paths.begin() + pin1_idx), *(g_pinned_paths.begin() + pin2_idx));
 }
 
-u64 global_state::find_pin_idx(swan_path_t const &path) noexcept
+u64 global_state::find_pin_idx(swan_path const &path) noexcept
 {
     for (u64 i = 0; i < g_pinned_paths.size(); ++i) {
         if (path_loosely_same(g_pinned_paths[i].path, path)) {
@@ -282,7 +282,7 @@ try {
         ImVec4 color;
         char label[pinned_path::LABEL_MAX_LEN + 1] = {};
         u64 label_len = 0;
-        swan_path_t path = {};
+        swan_path path = {};
         u64 path_len = 0;
 
         out >> (f32 &)color.x;
