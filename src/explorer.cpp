@@ -2425,16 +2425,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     bool open_bulk_rename_popup = false;
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
     bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
-
-    bool any_popups_open = swan_popup_modals::is_open_bulk_rename() ||
-                           swan_popup_modals::is_open_error() ||
-                           swan_popup_modals::is_open_single_rename() ||
-                           swan_popup_modals::is_open_edit_pin() ||
-                           swan_popup_modals::is_open_new_pin() ||
-                           swan_popup_modals::is_open_new_file() ||
-                           swan_popup_modals::is_open_new_directory() ||
-                           imgui::IsPopupOpen("History")
-                           ;
+    bool any_popups_open = global_state::any_popup_modals_open() || imgui::IsPopupOpen("History");
 
     static explorer_window::dirent const *dirent_to_be_renamed = nullptr;
 
@@ -2596,9 +2587,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     expl.read_dir_changes_target = expl.cwd;
 
                     if (success) {
-                        print_debug_msg("[ %d ] ReadDirectoryChangesW(%s) succeeded", expl.id, expl.cwd.data());
+                        print_debug_msg("[ %d ] SUCCESS ReadDirectoryChangesW(%s)", expl.id, expl.cwd.data());
                     } else {
-                        print_debug_msg("[ %d ] ReadDirectoryChangesW FAILED: %s", expl.id, get_last_winapi_error().formatted_message.c_str());
+                        print_debug_msg("[ %d ] FAILED ReadDirectoryChangesW: %s", expl.id, get_last_winapi_error().formatted_message.c_str());
                     }
                 }
             };

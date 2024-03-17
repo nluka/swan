@@ -62,6 +62,9 @@ namespace global_state
 
     s32 &page_size() noexcept;
 
+    bool any_popup_modals_open() noexcept;
+    u64 &popup_modals_open_bit_field() noexcept;
+
 } // namespace global_state
 
 namespace swan_windows
@@ -138,13 +141,27 @@ namespace swan_windows
 
 namespace swan_popup_modals
 {
-    constexpr char const *error = "Error ## popup_modal";
-    constexpr char const *single_rename = "Rename ## popup_modal";
-    constexpr char const *bulk_rename = "Bulk Rename ## popup_modal";
-    constexpr char const *new_pin = "New Pin ## popup_modal";
-    constexpr char const *edit_pin = "Edit Pin ## popup_modal";
-    constexpr char const *new_file = "New File ## popup_modal";
-    constexpr char const *new_directory = "New Directory ## popup_modal";
+    enum bit_pos : u64
+    {
+        bit_pos_error = 0,
+        bit_pos_single_rename,
+        bit_pos_bulk_rename,
+        bit_pos_new_pin,
+        bit_pos_edit_pin,
+        bit_pos_new_file,
+        bit_pos_new_directory,
+        bit_pos_count
+    };
+
+    static_assert(bit_pos_count <= 64);
+
+    constexpr char const *label_error = "Error ## popup_modal";
+    constexpr char const *label_single_rename = "Rename ## popup_modal";
+    constexpr char const *label_bulk_rename = "Bulk Rename ## popup_modal";
+    constexpr char const *label_new_pin = "New Pin ## popup_modal";
+    constexpr char const *label_edit_pin = "Edit Pin ## popup_modal";
+    constexpr char const *label_new_file = "New File ## popup_modal";
+    constexpr char const *label_new_directory = "New Directory ## popup_modal";
 
     void open_single_rename(explorer_window &expl_opened_from, explorer_window::dirent const &rename_target, std::function<void ()> on_rename_callback) noexcept;
     void open_bulk_rename(explorer_window &expl_opened_from, std::function<void ()> on_rename_callback) noexcept;

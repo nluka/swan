@@ -471,13 +471,14 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
     auto &io = imgui::GetIO();
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
-    bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    // bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    bool any_popup_modals_open = global_state::any_popup_modals_open();
     auto pair = global_state::completed_file_ops();
     auto &completed_operations = *pair.first;
     auto &mutex = *pair.second;
 
     // handle keybind actions
-    if (window_hovered) {
+    if (!any_popup_modals_open && window_hovered) {
         if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
             std::scoped_lock lock(mutex);
             deselect_all(completed_operations);
@@ -538,12 +539,12 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
     if (imgui::BeginTable("completed_file_operations", file_ops_table_col_count, table_flags)) {
         static std::optional< std::deque<completed_file_operation>::iterator > context_menu_target_iter = std::nullopt;
-                              std::deque<completed_file_operation>::iterator   remove_single_iter      = completed_operations.end();
+                              std::deque<completed_file_operation>::iterator   remove_single_iter       = completed_operations.end();
 
-        static u64 num_selected_when_context_menu_opened = 0;
-        static u64 num_deletes_selected_when_context_menu_opened = 0;
-        static u64 num_deletes_in_group_when_context_menu_opened = 0;
-        static u64 latest_selected_row_idx = u64(-1);
+        static u64 s_num_selected_when_context_menu_opened = 0;
+        static u64 s_num_deletes_selected_when_context_menu_opened = 0;
+        static u64 s_num_deletes_in_group_when_context_menu_opened = 0;
+        static u64 s_latest_selected_row_idx = u64(-1);
 
         imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
@@ -642,24 +643,24 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     }
 
                     if (io.KeyShift) {
-                        auto [first_idx, last_idx] = imgui::SelectRange(latest_selected_row_idx, i);
-                        latest_selected_row_idx = last_idx;
+                        auto [first_idx, last_idx] = imgui::SelectRange(s_latest_selected_row_idx, i);
+                        s_latest_selected_row_idx = last_idx;
                         for (u64 j = first_idx; j <= last_idx; ++j) {
                             completed_operations[j].selected = true;
                         }
                     } else {
-                        latest_selected_row_idx = i;
+                        s_latest_selected_row_idx = i;
                     }
                 }
 
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                    imgui::OpenPopup("## completed_file_operations context");
+                    imgui::OpenPopup("## completed_file_operations context_menu");
                     context_menu_target_iter = elem_iter;
 
                     for (auto const &cfo : completed_operations) {
-                        num_selected_when_context_menu_opened += u64(cfo.selected);
-                        num_deletes_selected_when_context_menu_opened += u64(cfo.op_type == file_operation_type::del && cfo.selected);
-                        num_deletes_in_group_when_context_menu_opened += u64(cfo.op_type == file_operation_type::del && cfo.group_id == elem_iter->group_id);
+                        s_num_selected_when_context_menu_opened += u64(cfo.selected);
+                        s_num_deletes_selected_when_context_menu_opened += u64(cfo.op_type == file_operation_type::del && cfo.selected);
+                        s_num_deletes_in_group_when_context_menu_opened += u64(cfo.op_type == file_operation_type::del && cfo.group_id == elem_iter->group_id);
                     }
                 }
             }
@@ -675,7 +676,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
         bool execute_forget_group_immediately = false;
         bool execute_forget_selection_immediately = false;
 
-        if (imgui::BeginPopup("## completed_file_operations context")) {
+        if (imgui::BeginPopup("## completed_file_operations context_menu")) {
             assert(context_menu_target_iter.has_value());
             assert(context_menu_target_iter.value() != completed_operations.end());
             completed_file_operation &context_elem = *context_menu_target_iter.value();
@@ -786,7 +787,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
 
             {
-                bool disabled = true; // num_deletes_in_group_when_context_menu_opened > 0 && context_elem.group_id != 0;
+                bool disabled = true; // s_num_deletes_in_group_when_context_menu_opened > 0 && context_elem.group_id != 0;
                 {
                     imgui::ScopedDisable d(disabled);
 
@@ -809,7 +810,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
 
             {
-                bool disabled = true; // num_deletes_selected_when_context_menu_opened > 0;
+                bool disabled = true; // s_num_deletes_selected_when_context_menu_opened > 0;
                 {
                     imgui::ScopedDisable d(disabled);
 
@@ -841,14 +842,14 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     &global_state::settings().confirm_completed_file_operations_forget_group);
             }
             {
-                bool disabled = num_selected_when_context_menu_opened == 0;
+                bool disabled = s_num_selected_when_context_menu_opened == 0;
                 {
                     imgui::ScopedDisable d(disabled);
 
                     if (imgui::Selectable("Forget selection")) {
                         execute_forget_selection_immediately = imgui::OpenConfirmationModal(
                             swan_id_confirm_completed_file_operations_forget_selected,
-                            make_str("Are you sure you want to forget the %zu selected file operations? This action cannot be undone.", num_selected_when_context_menu_opened).c_str(),
+                            make_str("Are you sure you want to forget the %zu selected file operations? This action cannot be undone.", s_num_selected_when_context_menu_opened).c_str(),
                             &global_state::settings().confirm_completed_file_operations_forget_selected);
                     }
                 }
@@ -865,9 +866,9 @@ void swan_windows::render_file_operations(bool &open) noexcept
         }
         else {
             // not rendering context popup
-            num_selected_when_context_menu_opened = 0;
-            num_deletes_selected_when_context_menu_opened = 0;
-            num_deletes_in_group_when_context_menu_opened = 0;
+            s_num_selected_when_context_menu_opened = 0;
+            s_num_deletes_selected_when_context_menu_opened = 0;
+            s_num_deletes_in_group_when_context_menu_opened = 0;
         }
 
         {

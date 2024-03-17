@@ -153,3 +153,15 @@ Ty &inc_or_wrap(Ty &val, Ty const &min, Ty const &max) noexcept
     }
     return val;
 }
+
+template <typename Ty>
+void bit_set(Ty &val, u64 bit_pos) noexcept
+{
+    val = val | (u64(1) << bit_pos);
+}
+
+template <typename Ty>
+void bit_clear(Ty &val, u64 bit_pos) noexcept
+{
+    val = val & ~(u64(1) << bit_pos);
+}

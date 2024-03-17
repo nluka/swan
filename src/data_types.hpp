@@ -577,6 +577,7 @@ struct recent_file
     boost::static_string<ACTION_MAX_LEN> action;
     system_time_point_t action_time;
     swan_path path;
+    bool selected;
 };
 
 struct bulk_rename_compiled_pattern

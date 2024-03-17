@@ -15,6 +15,8 @@ void swan_popup_modals::open_new_directory(char const *parent_directory_utf8, s3
     using namespace new_directory_modal_global_state;
 
     g_open = true;
+    bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_new_directory);
+
     g_parent_path_utf8 = path_create(parent_directory_utf8);
     g_initiating_expl_id = initiating_expl_id;
 }
@@ -31,28 +33,30 @@ void swan_popup_modals::render_new_directory() noexcept
     using namespace new_directory_modal_global_state;
 
     if (g_open) {
-        imgui::OpenPopup(swan_popup_modals::new_directory);
+        imgui::OpenPopup(swan_popup_modals::label_new_directory);
     }
-    if (!imgui::BeginPopupModal(swan_popup_modals::new_directory, nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::label_new_directory, nullptr, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
 
-    static char s_dir_name_utf8[MAX_PATH] = {};
+    static swan_path s_dir_name_utf8 = path_create("");
     static std::string s_err_msg = {};
 
     auto cleanup_and_close_popup = [&]() noexcept {
         g_open = false;
+        bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_new_directory);
+
         g_parent_path_utf8 = {};
         g_initiating_expl_id = -1;
 
-        s_dir_name_utf8[0] = L'\0';
+        path_clear(s_dir_name_utf8);
         s_err_msg.clear();
 
         imgui::CloseCurrentPopup();
     };
 
     auto attempt_create = [&]() noexcept {
-        if (strempty(s_dir_name_utf8)) {
+        if (path_is_empty(s_dir_name_utf8)) {
             s_err_msg = "Directory name cannot be blank.";
             return;
         }
@@ -68,7 +72,7 @@ void swan_popup_modals::render_new_directory() noexcept
             return;
         }
 
-        if (!utf8_to_utf16(s_dir_name_utf8, dir_name_utf16, lengthof(dir_name_utf16))) {
+        if (!utf8_to_utf16(s_dir_name_utf8.data(), dir_name_utf16, lengthof(dir_name_utf16))) {
             cleanup_and_close_popup();
             return;
         }
@@ -102,7 +106,7 @@ void swan_popup_modals::render_new_directory() noexcept
                 explorer_window &expl = global_state::explorers()[g_initiating_expl_id];
                 expl.deselect_all_cwd_entries();
                 std::scoped_lock lock(expl.select_cwd_entries_on_next_update_mutex);
-                expl.select_cwd_entries_on_next_update.push_back(path_create(s_dir_name_utf8));
+                expl.select_cwd_entries_on_next_update.push_back(s_dir_name_utf8);
             }
             cleanup_and_close_popup();
         }
@@ -112,7 +116,7 @@ void swan_popup_modals::render_new_directory() noexcept
     {
         imgui::ScopedAvailWidth w(imgui::CalcTextSize("(?)").x + imgui::GetStyle().ItemSpacing.x);
 
-        if (imgui::InputTextWithHint("##dir_name_input", "Directory name", s_dir_name_utf8, lengthof(s_dir_name_utf8),
+        if (imgui::InputTextWithHint("##dir_name_input", "Directory name", s_dir_name_utf8.data(), s_dir_name_utf8.max_size(),
                                      ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars()))
         {
             s_err_msg.clear();
