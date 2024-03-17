@@ -829,6 +829,40 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
             imgui::Separator();
 
+            if (s_num_selected_when_context_menu_opened == 0) {
+                if (imgui::Selectable("Copy source name")) {
+                    char const *name = cget_file_name(context_elem.src_path.data());
+                    imgui::SetClipboardText(name);
+                }
+                if (imgui::Selectable("Copy source location")) {
+                    std::string_view location = get_everything_minus_file_name(context_elem.src_path.data());
+                    std::string location_str(location);
+                    imgui::SetClipboardText(location_str.c_str());
+                }
+                if (imgui::Selectable("Copy source full path")) {
+                    imgui::SetClipboardText(context_elem.src_path.data());
+                }
+
+                imgui::Separator();
+
+                if (!path_is_empty(context_elem.dst_path)) {
+                    if (imgui::Selectable("Copy destination name")) {
+                        char const *name = cget_file_name(context_elem.dst_path.data());
+                        imgui::SetClipboardText(name);
+                    }
+                    if (imgui::Selectable("Copy destination location")) {
+                        std::string_view location = get_everything_minus_file_name(context_elem.dst_path.data());
+                        std::string location_str(location);
+                        imgui::SetClipboardText(location_str.c_str());
+                    }
+                    if (imgui::Selectable("Copy destination full path")) {
+                        imgui::SetClipboardText(context_elem.dst_path.data());
+                    }
+                }
+            }
+
+            imgui::Separator();
+
             if (imgui::Selectable("Forget this one")) {
                 execute_forget_single_immediately = imgui::OpenConfirmationModal(
                     swan_id_confirm_completed_file_operations_forget_single,
