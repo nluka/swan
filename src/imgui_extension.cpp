@@ -272,7 +272,7 @@ void imgui::TableDrawCellBorderTop(ImVec2 cell_rect_min, f32 cell_width) noexcep
     drawList->AddLine(ImVec2(min.x, min.y), ImVec2(max.x, min.y), color, thickness);
 }
 
-void imgui::HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u64 highlight_start_idx, u64 highlight_len) noexcept
+void imgui::HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u64 highlight_start_idx, u64 highlight_len, ImVec4 color) noexcept
 {
     ImVec2 min = text_rect_min;
     ImVec2 max = min + imgui::CalcTextSize(text);
@@ -285,5 +285,155 @@ void imgui::HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u
     // move backward max.x to eliminate characters after the highlight ends
     max.x -= imgui::CalcTextSize(text + highlight_start_idx + highlight_len).x;
 
-    ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 100, 0, 60));
+    auto border_color = color;
+    border_color.w += 50;
+
+    ImGui::GetWindowDrawList()->AddRectFilled(min, max, imgui::ImVec4_to_ImU32(color));
+    ImGui::GetWindowDrawList()->AddRect(min, max, imgui::ImVec4_to_ImU32(border_color));
+}
+
+f32 imgui::CalcLineLength(ImVec2 const &p1, ImVec2 const &p2) noexcept
+{
+    f32 dx = p2.x - p1.x;
+    f32 dy = p2.y - p1.y;
+    return sqrt(dx * dx + dy * dy);
+}
+
+bool imgui::DrawBestLineBetweenContextMenuAndTarget(ImRect const &target_rect, ImVec2 const &menu_TL, ImU32 const &color,
+                                                    f32 circle_radius_target_corner, f32 circle_radius_menu_TL) noexcept
+{
+    imgui::GetWindowDrawList()->AddRect(target_rect.GetTL(), target_rect.GetBR(), color);
+
+    bool menu_TL_is_inside_target_rect = target_rect.Contains(menu_TL);
+
+    if (!menu_TL_is_inside_target_rect) {
+        ImVec2 target_TL = target_rect.GetTL();
+        ImVec2 target_BR = target_rect.GetBR();
+        ImVec2 target_TR = target_rect.GetTR();
+        ImVec2 target_BL = target_rect.GetBL();
+
+        struct line {
+            ImVec2 m_name_corner_point;
+            ImVec2 m_context_TL_point;
+            f32 m_length;
+            bool m_obstructed;
+
+            line(ImVec2 const &name_corner_point, ImVec2 const &context_TL_point) noexcept
+                : m_name_corner_point(name_corner_point)
+                , m_context_TL_point(context_TL_point)
+                , m_length(imgui::CalcLineLength(name_corner_point, context_TL_point))
+                , m_obstructed(context_TL_point.x <= name_corner_point.x && context_TL_point.y <= name_corner_point.y)
+            {}
+
+            bool operator<(line const &other) noexcept { return m_length < other.m_length; }
+        };
+
+        std::array<line, 4> line_candidates = {{
+            line(target_TL, menu_TL),
+            line(target_BR, menu_TL),
+            line(target_TR, menu_TL),
+            line(target_BL, menu_TL),
+        }};
+
+        std::sort(line_candidates.begin(), line_candidates.end(), std::less());
+
+        auto shortest_unobstructed_line_iter = std::find_if(line_candidates.begin(), line_candidates.end(),
+                                                            [](line const &ln) { return !ln.m_obstructed; });
+
+        line const &best_line = shortest_unobstructed_line_iter == line_candidates.end()
+            ? *line_candidates.begin() // all lines obstructed, use the shortest one
+            : *shortest_unobstructed_line_iter;
+
+        imgui::GetWindowDrawList()->AddLine(best_line.m_name_corner_point, best_line.m_context_TL_point, color);
+
+        if (circle_radius_target_corner > 0.f) {
+            imgui::GetWindowDrawList()->AddCircleFilled(best_line.m_name_corner_point, circle_radius_target_corner, color);
+        }
+        if (circle_radius_menu_TL > 0.f) {
+            imgui::GetWindowDrawList()->AddCircleFilled(best_line.m_context_TL_point, circle_radius_menu_TL, color);
+        }
+    }
+
+    return !menu_TL_is_inside_target_rect;
+}
+
+bool imgui::DrawBestLineBetweenRectCorners(ImRect const &rect1, ImRect const &rect2, ImVec4 const &color,
+                                           bool draw_border_for_rect1, bool draw_border_for_rect2,
+                                           f32 rect1_corner_circle_radius, f32 rect2_corner_circle_radius) noexcept
+{
+    struct line
+    {
+        ImVec2 m_p1;
+        ImVec2 m_p2;
+        f32 m_length;
+        bool m_obstructed;
+
+        line(ImVec2 const &p1, ImVec2 const &p2, ImRect const &forward_most_rect) noexcept
+            : m_p1(p1)
+            , m_p2(p2)
+            , m_length(imgui::CalcLineLength(p1, p2))
+            , m_obstructed(forward_most_rect.Contains(p1))
+        {}
+
+        bool operator<(line const &other) noexcept { return m_length < other.m_length; }
+    };
+
+    std::array<ImVec2, 4> p1_corners = { rect1.GetTL(), rect1.GetTR(), rect1.GetBL(), rect1.GetBR() };
+    std::array<ImVec2, 4> p2_corners = { rect2.GetTL(), rect2.GetTR(), rect2.GetBL(), rect2.GetBR() };
+    boost::container::static_vector<line, 4*4> possible_lines = {};
+
+    for (auto const &p1_corner : p1_corners) {
+        for (auto const &p2_corner : p2_corners) {
+            possible_lines.emplace_back(p1_corner, p2_corner, rect2);
+        }
+    }
+
+    std::sort(possible_lines.begin(), possible_lines.end(), std::less()); // shortest lines first
+
+    auto shortest_unobstructed_line_iter = std::find_if(possible_lines.begin(), possible_lines.end(), [](line const &ln) { return !ln.m_obstructed; });
+
+    if (shortest_unobstructed_line_iter == possible_lines.end()) {
+        return false; // all possible lines to draw will be obstructed by rect2
+    }
+
+    ImU32 color_u32 = imgui::ImVec4_to_ImU32(color);
+
+    line const &best_line = *shortest_unobstructed_line_iter;
+
+    imgui::GetForegroundDrawList()->AddLine(best_line.m_p1, best_line.m_p2, color_u32);
+
+    if (draw_border_for_rect1) {
+        imgui::GetWindowDrawList()->AddRect(rect1.GetTL(), rect1.GetBR(), color_u32);
+    }
+    if (draw_border_for_rect2) {
+        ImRect rect2_with_margin;
+        ImVec2 margin = { 1, 1 };
+        rect2_with_margin.Min = rect2.Min - margin;
+        rect2_with_margin.Max = rect2.Max + margin;
+        imgui::GetForegroundDrawList()->AddRect(rect2_with_margin.GetTL(), rect2_with_margin.GetBR(), color_u32);
+    }
+
+    if (rect1_corner_circle_radius > 0.f) {
+        imgui::GetForegroundDrawList()->AddCircleFilled(best_line.m_p1, rect1_corner_circle_radius, color_u32);
+    }
+    if (rect2_corner_circle_radius > 0.f) {
+        imgui::GetForegroundDrawList()->AddCircleFilled(best_line.m_p2, rect2_corner_circle_radius, color_u32);
+    }
+
+    return true;
+}
+
+ImVec4 imgui::RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept
+{
+    f32 newr = f32(r) / 255.0f;
+    f32 newg = f32(g) / 255.0f;
+    f32 newb = f32(b) / 255.0f;
+    f32 newa = f32(a);
+    return ImVec4(newr, newg, newb, newa);
+}
+
+ImU32 imgui::ImVec4_to_ImU32(ImVec4 const &vec) noexcept
+{
+    ImU32 retval = IM_COL32(vec.x, vec.y, vec.z, vec.w);
+    return retval;
 }

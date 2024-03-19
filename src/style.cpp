@@ -4,15 +4,6 @@
 #include "imgui_dependent_functions.hpp"
 
 // https://github.com/ocornut/imgui/issues/5102
-ImVec4 imgui::RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept {
-    f32 newr = f32(r) / 255.0f;
-    f32 newg = f32(g) / 255.0f;
-    f32 newb = f32(b) / 255.0f;
-    f32 newa = f32(a);
-    return ImVec4(newr, newg, newb, newa);
-}
-
-// https://github.com/ocornut/imgui/issues/5102
 // static
 // ImVec4 HexA_to_ImVec4(char const *hex, s32 a) {
 //     s32 r, g, b;

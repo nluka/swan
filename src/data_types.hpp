@@ -256,6 +256,7 @@ struct explorer_window
         bool is_filtered_out = false;
         bool is_selected = false;
         bool is_cut = false;
+        bool context_menu_active = false;
     };
 
     enum filter_mode : u64

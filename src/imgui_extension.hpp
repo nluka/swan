@@ -9,6 +9,20 @@
 
 namespace ImGui
 {
+    ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;
+
+    ImU32 ImVec4_to_ImU32(ImVec4 const &vec) noexcept;
+
+    f32 CalcLineLength(ImVec2 const &p1, ImVec2 const &p2) noexcept;
+
+    [[deprecated( "Prefer DrawBestLineBetweenRectCorners" )]]
+    bool DrawBestLineBetweenContextMenuAndTarget(ImRect const &target_rect, ImVec2 const &menu_TL, ImU32 const &color,
+                                                 f32 circle_radius_target_corner = 2, f32 circle_radius_menu_TL = 2) noexcept;
+
+    bool DrawBestLineBetweenRectCorners(ImRect const &rect1, ImRect const &rect2, ImVec4 const &color,
+                                        bool draw_border_for_rect1 = false, bool draw_border_for_rect2 = false,
+                                        f32 circle_radius_target_corner = 0, f32 circle_radius_menu_TL = 0) noexcept;
+
     void Spacing(u64 n) noexcept;
 
     void SameLineSpaced(u64 num_spacing_calls) noexcept;
@@ -19,7 +33,7 @@ namespace ImGui
 
     void TableDrawCellBorderTop(ImVec2 cell_rect_min, f32 cell_width) noexcept;
 
-    void HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u64 highlight_start_idx, u64 highlight_len) noexcept;
+    void HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u64 highlight_start_idx, u64 highlight_len, ImVec4 color) noexcept;
 
     bool RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, f32 possibly_truncated_text_offset_x = 0, char const *tooltip_content = nullptr) noexcept;
 
@@ -99,21 +113,25 @@ namespace ImGui
     template <typename Ty>
     struct ScopedStyle
     {
+        bool m_condition;
         Ty &m_attr;
         Ty m_original_value;
 
         ScopedStyle() = delete;
 
-        ScopedStyle(Ty &attr, Ty const &override_value) noexcept
-            : m_attr(attr)
+        ScopedStyle(Ty &attr, Ty const &override_value, bool condition = true) noexcept
+            : m_condition(condition)
+            , m_attr(attr)
             , m_original_value(attr)
         {
-            attr = override_value;
+            if (m_condition)
+                m_attr = override_value;
         }
 
         ~ScopedStyle() noexcept
         {
-            m_attr = m_original_value;
+            if (m_condition)
+                m_attr = m_original_value;
         }
     };
 
