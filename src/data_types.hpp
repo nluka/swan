@@ -177,6 +177,7 @@ struct swan_settings
         bool debug_log = false;
         bool settings = false;
         bool imgui_demo = false;
+        bool theme_editor = false;
         bool icon_library = false;
         bool fa_icons = false;
         bool ci_icons = false;

@@ -123,6 +123,7 @@ try {
     write_bool("show.settings", this->show.settings);
     write_bool("show.debug_log", this->show.debug_log);
     write_bool("show.imgui_demo", this->show.imgui_demo);
+    write_bool("show.theme_editor", this->show.theme_editor);
     write_bool("show.icon_library", this->show.icon_library);
     write_bool("show.fa_icons", this->show.fa_icons);
     write_bool("show.ci_icons", this->show.ci_icons);
@@ -306,6 +307,9 @@ try {
         }
         else if (property == "show.imgui_demo") {
             this->show.imgui_demo = extract_bool();
+        }
+        else if (property == "show.theme_editor") {
+            this->show.theme_editor = extract_bool();
         }
         else if (property == "show.icon_library") {
             this->show.icon_library = extract_bool();

@@ -89,6 +89,9 @@ try {
         apply_swan_style_overrides();
     }
 
+    ImVec4 starting_colors[ImGuiCol_COUNT] = {};
+    (void) std::memcpy(starting_colors, imgui::GetStyle().Colors, sizeof(ImVec4) * ImGuiCol_COUNT);
+
     auto &explorers = global_state::explorers();
     // init explorers
     {
@@ -139,6 +142,7 @@ try {
         swan_windows::analytics,
         swan_windows::debug_log,
         swan_windows::settings,
+        swan_windows::theme_editor,
         swan_windows::icon_library,
         swan_windows::icon_font_browser_font_awesome,
         swan_windows::icon_font_browser_codicon,
@@ -302,6 +306,12 @@ try {
                             global_state::save_focused_window(swan_windows::imgui_demo);
                         }
                         imgui::End();
+                    }
+                    break;
+                }
+                case swan_windows::theme_editor: {
+                    if (window_visib.theme_editor) {
+                        swan_windows::render_theme_editor(window_visib.theme_editor, starting_colors);
                     }
                     break;
                 }
@@ -557,6 +567,7 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::debug_log), nullptr, &global_state::settings().show.debug_log);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::imgui_demo), nullptr, &global_state::settings().show.imgui_demo);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::theme_editor), nullptr, &global_state::settings().show.theme_editor);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_library), nullptr, &global_state::settings().show.icon_library);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_font_browser_font_awesome), nullptr, &global_state::settings().show.fa_icons);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_font_browser_codicon), nullptr, &global_state::settings().show.ci_icons);

@@ -82,6 +82,7 @@ namespace swan_windows
         analytics,
         debug_log,
         settings,
+        theme_editor,
         icon_library,
         icon_font_browser_font_awesome,
         icon_font_browser_codicon,
@@ -104,6 +105,7 @@ namespace swan_windows
             case analytics: return " Analytics ";
             case debug_log: return " Debug Log ";
             case settings: return " Settings ";
+            case theme_editor: return " Theme Editor ";
             case icon_library: return " Icon Library ";
             case icon_font_browser_font_awesome: return " Font Awesome Icons ";
             case icon_font_browser_codicon: return " Codicon Icons ";
@@ -136,6 +138,8 @@ namespace swan_windows
         std::vector<icon_font_glyph> const &(*get_all_icons)() noexcept) noexcept;
 
     void render_icon_library(bool &open) noexcept;
+
+    void render_theme_editor(bool &open, ImVec4 *starting_colors) noexcept;
 
 } // namespace render_window
 

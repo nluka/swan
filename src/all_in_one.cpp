@@ -33,5 +33,6 @@
 #include "stdafx.cpp"
 #include "style.cpp"
 #include "swan.cpp"
+#include "theme_editor.cpp"
 #include "undelete_directory_progress_sink.cpp"
 #include "util.cpp"
