@@ -98,8 +98,8 @@ void swan_popup_modals::render_edit_pin() noexcept
         g_target_pin->label = s_label_input;
         g_target_pin->path = path;
 
-        bool success = global_state::save_pins_to_disk();
-        print_debug_msg("save_pins_to_disk: %d", success);
+        bool success = global_state::pinned_save_to_disk();
+        print_debug_msg("pinned_save_to_disk: %d", success);
     };
 
     if (imgui::Button("Save##pin") && !strempty(s_path_input.data()) && !strempty(s_label_input)) {

@@ -77,9 +77,9 @@ try {
         print_debug_msg("global_state::page_size = %d", global_state::page_size());
 
         (void) global_state::settings().load_from_disk();
-        (void) global_state::load_pins_from_disk(global_state::settings().dir_separator_utf8);
-        (void) global_state::load_recent_files_from_disk(global_state::settings().dir_separator_utf8);
-        (void) global_state::load_completed_file_ops_from_disk(global_state::settings().dir_separator_utf8);
+        (void) global_state::pinned_load_from_disk(global_state::settings().dir_separator_utf8);
+        (void) global_state::recent_files_load_from_disk(global_state::settings().dir_separator_utf8);
+        (void) global_state::completed_file_operations_load_from_disk(global_state::settings().dir_separator_utf8);
 
         if (global_state::settings().startup_with_window_maximized) {
             glfwMaximizeWindow(window);
@@ -94,10 +94,10 @@ try {
     // init explorers
     {
         char const *names[global_constants::num_explorers] = {
-            swan_windows::get_name(swan_windows::explorer_0),
-            swan_windows::get_name(swan_windows::explorer_1),
-            swan_windows::get_name(swan_windows::explorer_2),
-            swan_windows::get_name(swan_windows::explorer_3),
+            swan_windows::get_name(swan_windows::id::explorer_0),
+            swan_windows::get_name(swan_windows::id::explorer_1),
+            swan_windows::get_name(swan_windows::id::explorer_2),
+            swan_windows::get_name(swan_windows::id::explorer_3),
         };
 
         for (u64 i = 0; i < explorers.size(); ++i) {
@@ -128,40 +128,42 @@ try {
         .search_directories = { { false, path_create("") } }
     };
 
-    std::array<s32, swan_windows::count - 1> window_render_order = {
-        swan_windows::explorer_0,
-        swan_windows::explorer_1,
-        swan_windows::explorer_2,
-        swan_windows::explorer_3,
-        swan_windows::finder,
-        swan_windows::pinned,
-        swan_windows::file_operations,
-        swan_windows::recent_files,
-        swan_windows::analytics,
-        swan_windows::debug_log,
-        swan_windows::settings,
-        swan_windows::theme_editor,
-        swan_windows::icon_library,
-        swan_windows::icon_font_browser_font_awesome,
-        swan_windows::icon_font_browser_codicon,
-        swan_windows::icon_font_browser_material_design,
-        swan_windows::imgui_demo,
+    std::array<swan_windows::id, (u64)swan_windows::id::count - 1> window_render_order = {
+        swan_windows::id::explorer_0,
+        swan_windows::id::explorer_1,
+        swan_windows::id::explorer_2,
+        swan_windows::id::explorer_3,
+        swan_windows::id::finder,
+        swan_windows::id::pinned,
+        swan_windows::id::file_operations,
+        swan_windows::id::recent_files,
+        swan_windows::id::analytics,
+        swan_windows::id::debug_log,
+        swan_windows::id::settings,
+        swan_windows::id::theme_editor,
+        swan_windows::id::icon_library,
+        swan_windows::id::icon_font_browser_font_awesome,
+        swan_windows::id::icon_font_browser_codicon,
+        swan_windows::id::icon_font_browser_material_design,
+        swan_windows::id::imgui_demo,
     };
 
 #if DEBUG_MODE
     for (auto const &window_id : window_render_order) {
-        assert(window_id != (s32)swan_windows::nil_window && "Forgot to add window id to initializer list of `window_render_order`");
+        assert(window_id != swan_windows::id::nil_window && "Forgot to add window id to initializer list of `window_render_order`");
     }
 #endif
 
     {
-        s32 last_focused_window;
-        if (!global_state::load_focused_window_from_disk(last_focused_window)) {
-            last_focused_window = swan_windows::explorer_0;
-        } else {
-            assert(last_focused_window != -1);
-            auto last_focused_window_it = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window);
-            std::swap(*last_focused_window_it, window_render_order.back());
+        swan_windows::id last_focused_window_id;
+
+        if (!global_state::focused_window_load_from_disk(last_focused_window_id)) {
+            last_focused_window_id = swan_windows::id::explorer_0;
+        }
+        else {
+            assert(last_focused_window_id != swan_windows::id::nil_window);
+            auto last_focused_window_iter = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window_id);
+            std::swap(*last_focused_window_iter, window_render_order.back());
         }
     }
 
@@ -186,20 +188,20 @@ try {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        static s32 last_focused_window = window_render_order.back();
+        static swan_windows::id last_focused_window_id = window_render_order.back();
         {
-            s32 focused_now = global_state::focused_window();
-            assert(focused_now != -1);
+            swan_windows::id focused_now_id = global_state::focused_window_get();
+            assert(focused_now_id != swan_windows::id::nil_window);
 
-            if (last_focused_window != focused_now) {
-                auto focused_now_it = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window);
-                std::swap(*focused_now_it, window_render_order.back());
+            if (last_focused_window_id != focused_now_id) {
+                auto focused_now_iter = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window_id);
+                std::swap(*focused_now_iter, window_render_order.back());
             }
 
             // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing escape
             if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE) })) {
                 // ImGui::SetWindowFocus(nullptr);
-                ImGui::SetWindowFocus(swan_windows::get_name(focused_now));
+                ImGui::SetWindowFocus(swan_windows::get_name(focused_now_id));
             }
         }
 
@@ -229,101 +231,101 @@ try {
 
         auto &window_visib = global_state::settings().show;
 
-        for (s32 window_code : window_render_order) {
-            switch (window_code) {
-                case swan_windows::explorer_0: {
+        for (swan_windows::id window_id : window_render_order) {
+            switch (window_id) {
+                case swan_windows::id::explorer_0: {
                     if (window_visib.explorer_0) {
                         swan_windows::render_explorer(explorers[0], window_visib.explorer_0, finder);
                     }
                     break;
                 }
-                case swan_windows::explorer_1: {
+                case swan_windows::id::explorer_1: {
                     if (window_visib.explorer_1) {
                         swan_windows::render_explorer(explorers[1], window_visib.explorer_1, finder);
                     }
                     break;
                 }
-                case swan_windows::explorer_2: {
+                case swan_windows::id::explorer_2: {
                     if (window_visib.explorer_2) {
                         swan_windows::render_explorer(explorers[2], window_visib.explorer_2, finder);
                     }
                     break;
                 }
-                case swan_windows::explorer_3: {
+                case swan_windows::id::explorer_3: {
                     if (window_visib.explorer_3) {
                         swan_windows::render_explorer(explorers[3], window_visib.explorer_3, finder);
                     }
                     break;
                 }
-                case swan_windows::finder: {
+                case swan_windows::id::finder: {
                     if (window_visib.finder) {
                         swan_windows::render_finder(finder, window_visib.finder);
                     }
                     break;
                 }
-                case swan_windows::pinned: {
+                case swan_windows::id::pinned: {
                     if (window_visib.pinned) {
                         swan_windows::render_pin_manager(explorers, window_visib.pinned);
                     }
                     break;
                 }
-                case swan_windows::file_operations: {
+                case swan_windows::id::file_operations: {
                     if (window_visib.file_operations) {
                         swan_windows::render_file_operations(window_visib.file_operations);
                     }
                     break;
                 }
-                case swan_windows::recent_files: {
+                case swan_windows::id::recent_files: {
                     if (window_visib.recent_files) {
                         swan_windows::render_recent_files(window_visib.recent_files);
                     }
                     break;
                 }
-                case swan_windows::analytics: {
+                case swan_windows::id::analytics: {
                     if (window_visib.analytics) {
                         render_analytics();
                     }
                     break;
                 }
-                case swan_windows::debug_log: {
+                case swan_windows::id::debug_log: {
                     if (window_visib.debug_log) {
                         swan_windows::render_debug_log(window_visib.debug_log);
                     }
                     break;
                 }
-                case swan_windows::settings: {
+                case swan_windows::id::settings: {
                     if (window_visib.settings) {
-                        swan_windows::render_settings(window);
+                        swan_windows::render_settings(window, window_visib.settings);
                     }
                     break;
                 }
-                case swan_windows::imgui_demo: {
+                case swan_windows::id::imgui_demo: {
                     if (window_visib.imgui_demo) {
                         imgui::ShowDemoWindow(&window_visib.imgui_demo);
                         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-                            global_state::save_focused_window(swan_windows::imgui_demo);
+                            global_state::focused_window_set(swan_windows::id::imgui_demo);
                         }
                         imgui::End();
                     }
                     break;
                 }
-                case swan_windows::theme_editor: {
+                case swan_windows::id::theme_editor: {
                     if (window_visib.theme_editor) {
                         swan_windows::render_theme_editor(window_visib.theme_editor, our_default_imgui_style);
                     }
                     break;
                 }
-                case swan_windows::icon_library: {
+                case swan_windows::id::icon_library: {
                     if (window_visib.icon_library) {
                         swan_windows::render_icon_library(window_visib.icon_library);
                     }
                     break;
                 }
-                case swan_windows::icon_font_browser_font_awesome: {
+                case swan_windows::id::icon_font_browser_font_awesome: {
                     static icon_font_browser_state fa_browser = { {}, 10, global_constants::icon_font_glyphs_font_awesome() };
                     if (window_visib.fa_icons) {
                         swan_windows::render_icon_font_browser(
-                            swan_windows::icon_font_browser_font_awesome,
+                            swan_windows::id::icon_font_browser_font_awesome,
                             fa_browser,
                             window_visib.fa_icons,
                             "Font Awesome",
@@ -332,11 +334,11 @@ try {
                     }
                     break;
                 }
-                case swan_windows::icon_font_browser_codicon: {
+                case swan_windows::id::icon_font_browser_codicon: {
                     static icon_font_browser_state ci_browser = { {}, 10, global_constants::icon_font_glyphs_codicon() };
                     if (window_visib.ci_icons) {
                         swan_windows::render_icon_font_browser(
-                            swan_windows::icon_font_browser_codicon,
+                            swan_windows::id::icon_font_browser_codicon,
                             ci_browser,
                             window_visib.ci_icons,
                             "Codicons",
@@ -345,11 +347,11 @@ try {
                     }
                     break;
                 }
-                case swan_windows::icon_font_browser_material_design: {
+                case swan_windows::id::icon_font_browser_material_design: {
                     static icon_font_browser_state md_browser = { {}, 10, global_constants::icon_font_glyphs_material_design() };
                     if (window_visib.md_icons) {
                         swan_windows::render_icon_font_browser(
-                            swan_windows::icon_font_browser_material_design,
+                            swan_windows::id::icon_font_browser_material_design,
                             md_browser,
                             window_visib.md_icons,
                             "Material Design",
@@ -556,20 +558,20 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             setting_change |= imgui::MenuItem(explorers[2].name, nullptr, &global_state::settings().show.explorer_2);
             setting_change |= imgui::MenuItem(explorers[3].name, nullptr, &global_state::settings().show.explorer_3);
 
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::finder), nullptr, &global_state::settings().show.finder);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::pinned), nullptr, &global_state::settings().show.pinned);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::file_operations), nullptr, &global_state::settings().show.file_operations);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::recent_files), nullptr, &global_state::settings().show.recent_files);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::analytics), nullptr, &global_state::settings().show.analytics);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::settings), nullptr, &global_state::settings().show.settings);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::finder), nullptr, &global_state::settings().show.finder);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::pinned), nullptr, &global_state::settings().show.pinned);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::file_operations), nullptr, &global_state::settings().show.file_operations);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::recent_files), nullptr, &global_state::settings().show.recent_files);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::analytics), nullptr, &global_state::settings().show.analytics);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::settings), nullptr, &global_state::settings().show.settings);
 
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::debug_log), nullptr, &global_state::settings().show.debug_log);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::imgui_demo), nullptr, &global_state::settings().show.imgui_demo);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::theme_editor), nullptr, &global_state::settings().show.theme_editor);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_library), nullptr, &global_state::settings().show.icon_library);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_font_browser_font_awesome), nullptr, &global_state::settings().show.fa_icons);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_font_browser_codicon), nullptr, &global_state::settings().show.ci_icons);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::icon_font_browser_material_design), nullptr, &global_state::settings().show.md_icons);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::debug_log), nullptr, &global_state::settings().show.debug_log);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::imgui_demo), nullptr, &global_state::settings().show.imgui_demo);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::theme_editor), nullptr, &global_state::settings().show.theme_editor);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_library), nullptr, &global_state::settings().show.icon_library);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_font_awesome), nullptr, &global_state::settings().show.fa_icons);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_codicon), nullptr, &global_state::settings().show.ci_icons);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_material_design), nullptr, &global_state::settings().show.md_icons);
 
             imgui::EndMenu();
         }
@@ -599,32 +601,28 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 
                     global_state::settings().dir_separator_utf8 = new_utf8_separator;
                     global_state::settings().dir_separator_utf16 = static_cast<wchar_t>(new_utf8_separator);
-                    global_state::update_pin_dir_separators(new_utf8_separator);
+                    global_state::pinned_update_directory_separators(new_utf8_separator);
 
                     for (auto &expl : explorers) {
                         path_force_separator(expl.cwd, new_utf8_separator);
                     }
 
                     {
-                        auto pair = global_state::recent_files();
-                        auto &recent_files = *pair.first;
-                        auto &mutex = *pair.second;
+                        auto recent_files = global_state::recent_files_get();
 
-                        std::scoped_lock lock(mutex);
+                        std::scoped_lock lock(*recent_files.mutex);
 
-                        for (auto &recent_file : recent_files) {
+                        for (auto &recent_file : *recent_files.container) {
                             path_force_separator(recent_file.path, new_utf8_separator);
                         }
                     }
 
                     {
-                        auto pair = global_state::completed_file_ops();
-                        auto &completed_operations = *pair.first;
-                        auto &mutex = *pair.second;
+                        auto completed_file_operations = global_state::completed_file_operations_get();
 
-                        std::scoped_lock lock(mutex);
+                        std::scoped_lock lock(*completed_file_operations.mutex);
 
-                        for (auto &file_op : completed_operations) {
+                        for (auto &file_op : *completed_file_operations.container) {
                             path_force_separator(file_op.src_path, global_state::settings().dir_separator_utf8);
                             path_force_separator(file_op.dst_path, global_state::settings().dir_separator_utf8);
                         }
@@ -698,9 +696,9 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 static
 void render_analytics() noexcept
 {
-    if (imgui::Begin(swan_windows::get_name(swan_windows::analytics), &global_state::settings().show.analytics)) {
+    if (imgui::Begin(swan_windows::get_name(swan_windows::id::analytics), &global_state::settings().show.analytics)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::save_focused_window(swan_windows::analytics);
+            global_state::focused_window_set(swan_windows::id::analytics);
         }
 
         auto &io = imgui::GetIO();
@@ -811,7 +809,7 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
             // attempt_load_font("C:/Windows/Fonts/arialuni.ttf", 20.0f, false, false);
             attempt_load_font("fonts/CascadiaMonoPL.ttf", 16.0f, true, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());
 
-            auto attempt_load_icon_font = [&](char const *path, f32 size, f32 offset_x, f32 offset_y, ImWchar const *glyph_ranges)
+            auto attempt_load_icon_font = [&](char const *path, f32 size, f32 offset_x, f32 offset_y, ImWchar const *s_glyph_ranges)
             {
                 std::filesystem::path font_file_path = global_state::execution_path() / path;
 
@@ -823,7 +821,7 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
                 icons_config.GlyphMinAdvanceX = size;
                 icons_config.GlyphMaxAdvanceX = size;
 
-                auto font = imgui::GetIO().Fonts->AddFontFromFileTTF(font_file_path.generic_string().c_str(), size, &icons_config, glyph_ranges);
+                auto font = imgui::GetIO().Fonts->AddFontFromFileTTF(font_file_path.generic_string().c_str(), size, &icons_config, s_glyph_ranges);
 
                 if (!font_loaded(font)) {
                     failed_fonts.push_back(font_file_path);
@@ -832,20 +830,20 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
 
             // font awesome
             {
-                static ImWchar const glyph_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
-                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_FAS, 16, 0.25f, 0, glyph_ranges);
+                static ImWchar const s_glyph_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
+                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_FAS, 16, 0.25f, 0, s_glyph_ranges);
             }
 
             // codicons
             {
-                static ImWchar const glyph_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
-                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_CI, 18, 0, 3, glyph_ranges);
+                static ImWchar const s_glyph_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
+                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_CI, 18, 0, 3, s_glyph_ranges);
             }
 
             // material design
             {
-                static ImWchar const glyph_ranges[] = { ICON_MIN_MD, ICON_MAX_16_MD, 0 };
-                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_MD, 13, 0, 3, glyph_ranges);
+                static ImWchar const s_glyph_ranges[] = { ICON_MIN_MD, ICON_MAX_16_MD, 0 };
+                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_MD, 13, 0, 3, s_glyph_ranges);
             }
         }
 

@@ -27,9 +27,9 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
     static bool s_edit_enabled = false;
     static bool s_numbered_list = false;
 
-    if (imgui::Begin(swan_windows::get_name(swan_windows::pinned), &open)) {
+    if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::save_focused_window(swan_windows::pinned);
+            global_state::focused_window_set(swan_windows::id::pinned);
         }
 
         if (imgui::Button(ICON_CI_SYMBOL_NUMBER "##Numbered List")) {
@@ -46,7 +46,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
 
         imgui::Separator();
 
-        std::vector<pinned_path> &pins = global_state::pins();
+        std::vector<pinned_path> &pins = global_state::pinned_get();
 
         static pinned_path *s_context_target = nullptr;
         u64 const npos = u64(-1);
@@ -131,8 +131,8 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                     print_debug_msg("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
 
                     if (reorder_success) {
-                        bool save_success = global_state::save_pins_to_disk();
-                        print_debug_msg("global_state::save_pins_to_disk: %d", save_success);
+                        bool save_success = global_state::pinned_save_to_disk();
+                        print_debug_msg("global_state::pinned_save_to_disk: %d", save_success);
                     }
                 }
 
@@ -164,20 +164,20 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
 
         if (pin_to_delete_idx != npos) {
             pins.erase(pins.begin() + pin_to_delete_idx);
-            bool success = global_state::save_pins_to_disk();
-            print_debug_msg("delete pins[%zu], global_state::save_pins_to_disk: %d", pin_to_delete_idx, success);
+            bool success = global_state::pinned_save_to_disk();
+            print_debug_msg("delete pins[%zu], global_state::pinned_save_to_disk: %d", pin_to_delete_idx, success);
         }
     }
 
     imgui::End();
 }
 
-std::vector<pinned_path> &global_state::pins() noexcept
+std::vector<pinned_path> &global_state::pinned_get() noexcept
 {
     return g_pinned_paths;
 }
 
-bool global_state::add_pin(ImVec4 color, char const *label, swan_path &path, char dir_separator) noexcept
+bool global_state::pinned_add(ImVec4 color, char const *label, swan_path &path, char dir_separator) noexcept
 {
     path_force_separator(path, dir_separator);
 
@@ -189,7 +189,7 @@ bool global_state::add_pin(ImVec4 color, char const *label, swan_path &path, cha
     }
 }
 
-void global_state::remove_pin(u64 pin_idx) noexcept
+void global_state::pinned_remove(u64 pin_idx) noexcept
 {
     [[maybe_unused]] u64 last_idx = g_pinned_paths.size() - 1;
 
@@ -198,7 +198,7 @@ void global_state::remove_pin(u64 pin_idx) noexcept
     g_pinned_paths.erase(g_pinned_paths.begin() + pin_idx);
 }
 
-void global_state::swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
+void global_state::pinned_swap(u64 pin1_idx, u64 pin2_idx) noexcept
 {
     assert(pin1_idx != pin2_idx);
 
@@ -211,7 +211,7 @@ void global_state::swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept
     std::swap(*(g_pinned_paths.begin() + pin1_idx), *(g_pinned_paths.begin() + pin2_idx));
 }
 
-u64 global_state::find_pin_idx(swan_path const &path) noexcept
+u64 global_state::pinned_find_idx(swan_path const &path) noexcept
 {
     for (u64 i = 0; i < g_pinned_paths.size(); ++i) {
         if (path_loosely_same(g_pinned_paths[i].path, path)) {
@@ -221,7 +221,7 @@ u64 global_state::find_pin_idx(swan_path const &path) noexcept
     return std::string::npos;
 }
 
-bool global_state::save_pins_to_disk() noexcept
+bool global_state::pinned_save_to_disk() noexcept
 try {
     std::filesystem::path full_path = global_state::execution_path() / "data\\pins.txt";
 
@@ -231,7 +231,7 @@ try {
         return false;
     }
 
-    auto const &pins = global_state::pins();
+    auto const &pins = global_state::pinned_get();
     for (auto const &pin : pins) {
         out
             << pin.color.x << ' '
@@ -244,22 +244,22 @@ try {
             << pin.path.data() << '\n';
     }
 
-    print_debug_msg("SUCCESS global_state::save_pins_to_disk");
+    print_debug_msg("SUCCESS global_state::pinned_save_to_disk");
     return true;
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::save_pins_to_disk");
+    print_debug_msg("FAILED global_state::pinned_save_to_disk");
     return false;
 }
 
-void global_state::update_pin_dir_separators(char new_dir_separator) noexcept
+void global_state::pinned_update_directory_separators(char new_dir_separator) noexcept
 {
     for (auto &pin : g_pinned_paths) {
         path_force_separator(pin.path, new_dir_separator);
     }
 }
 
-std::pair<bool, u64> global_state::load_pins_from_disk(char dir_separator) noexcept
+std::pair<bool, u64> global_state::pinned_load_from_disk(char dir_separator) noexcept
 try {
     std::filesystem::path full_path = global_state::execution_path() / "data\\pins.txt";
 
@@ -298,16 +298,16 @@ try {
         out.ignore(1);
         out.read(path.data(), path_len);
 
-        global_state::add_pin(color, label, path, dir_separator);
+        global_state::pinned_add(color, label, path, dir_separator);
         ++num_loaded_successfully;
 
         line.clear();
     }
 
-    print_debug_msg("SUCCESS global_state::load_pins_from_disk, loaded %zu pins", num_loaded_successfully);
+    print_debug_msg("SUCCESS global_state::pinned_load_from_disk, loaded %zu pins", num_loaded_successfully);
     return { true, num_loaded_successfully };
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::load_pins_from_disk");
+    print_debug_msg("FAILED global_state::pinned_load_from_disk");
     return { false, 0 };
 }

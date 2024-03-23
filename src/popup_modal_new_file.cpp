@@ -1,5 +1,3 @@
-#include "imgui/imgui.h"
-
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 
@@ -108,8 +106,8 @@ void swan_popup_modals::render_new_file() noexcept
             swan_path create_path_utf8;
 
             if (utf16_to_utf8(create_path_utf16.c_str(), create_path_utf8.data(), create_path_utf8.max_size())) {
-                global_state::add_recent_file("Created", create_path_utf8.data());
-                (void) global_state::save_recent_files_to_disk();
+                global_state::recent_files_add("Created", create_path_utf8.data());
+                (void) global_state::recent_files_save_to_disk();
             }
 
             if (g_initiating_expl_id != -1) {

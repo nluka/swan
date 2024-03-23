@@ -128,14 +128,11 @@ void swan_popup_modals::render_single_rename() noexcept
             }
         }
         else {
-            auto pair = global_state::recent_files();
-            auto &recent_files = *pair.first;
-            auto &mutex = *pair.second;
-
+            auto recent_files = global_state::recent_files_get();
             {
-                std::scoped_lock recent_files_lock(mutex);
+                std::scoped_lock recent_files_lock(*recent_files.mutex);
 
-                for (auto &rf : recent_files) {
+                for (auto &rf : *recent_files.container) {
                     if (path_loosely_same(rf.path, old_path_utf8)) {
                         rf.path = new_path_utf8;
                         break;
@@ -143,7 +140,7 @@ void swan_popup_modals::render_single_rename() noexcept
                 }
             }
 
-            (void) global_state::save_recent_files_to_disk();
+            (void) global_state::recent_files_save_to_disk();
 
             g_on_rename_callback();
             cleanup_and_close_popup();

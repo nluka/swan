@@ -4,28 +4,28 @@
 
 namespace swan
 {
-    static s32 g_focused_window = -1;
+    static swan_windows::id g_focused_window_id = swan_windows::id::nil_window;
 };
 
-s32 global_state::focused_window() noexcept
+swan_windows::id global_state::focused_window_get() noexcept
 {
     using namespace swan;
 
-    return g_focused_window;
+    return g_focused_window_id;
 };
 
-bool global_state::save_focused_window(s32 window_code) noexcept
+bool global_state::focused_window_set(swan_windows::id window_id) noexcept
 {
     using namespace swan;
 
     bool success;
-    bool same_window_as_before = g_focused_window == window_code;
+    bool same_window_as_before = g_focused_window_id == window_id;
 
     if (same_window_as_before) {
         success = true;
     }
     else {
-        g_focused_window = window_code;
+        g_focused_window_id = window_id;
 
         std::filesystem::path file_path = global_state::execution_path() / "data\\focused_window.txt";
 
@@ -36,7 +36,7 @@ bool global_state::save_focused_window(s32 window_code) noexcept
                 success = false;
             }
             else {
-                out << window_code;
+                out << (s32 &)window_id;
                 success = true;
             }
         }
@@ -44,13 +44,13 @@ bool global_state::save_focused_window(s32 window_code) noexcept
             success = false;
         }
 
-        print_debug_msg("%s global_state::save_focused_window (%s)", success ? "SUCCESS" : "FAILED", swan_windows::get_name(window_code));
+        print_debug_msg("%s global_state::save_focused_window (%s)", success ? "SUCCESS" : "FAILED", swan_windows::get_name(window_id));
     }
 
     return success;
 }
 
-bool global_state::load_focused_window_from_disk(s32 &out) noexcept
+bool global_state::focused_window_load_from_disk(swan_windows::id &out) noexcept
 {
     using namespace swan;
 
@@ -60,18 +60,18 @@ bool global_state::load_focused_window_from_disk(s32 &out) noexcept
         std::ifstream in(file_path);
 
         if (!in) {
-            print_debug_msg("FAILED global_state::load_focused_window_from_disk: !in");
+            print_debug_msg("FAILED global_state::focused_window_load_from_disk: !in");
             return false;
         }
 
-        in >> g_focused_window;
-        out = g_focused_window;
+        in >> (s32 &)g_focused_window_id;
+        out = g_focused_window_id;
 
-        print_debug_msg("SUCCESS load_focused_window_from_disk");
+        print_debug_msg("SUCCESS focused_window_load_from_disk");
         return true;
     }
     catch (...) {
-        print_debug_msg("FAILED load_focused_window_from_disk: catch(...)");
+        print_debug_msg("FAILED focused_window_load_from_disk: catch(...)");
         return false;
     }
 }

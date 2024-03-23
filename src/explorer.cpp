@@ -341,7 +341,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
             }
 
             bool compound_operation = i > 1;
-            prog_sink.group_id = compound_operation ? global_state::next_group_id() : 0;
+            prog_sink.group_id = compound_operation ? global_state::completed_file_operations_calc_next_group_id() : 0;
         }
 
         DWORD cookie = {};
@@ -755,13 +755,13 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
         scoped_timer<timer_unit::MICROSECONDS> function_timer(&timers.total_us);
 
         if (actions & query_filesystem) {
-            static std::vector<swan_path> selected_entries = {};
-            selected_entries.clear();
+            static std::vector<swan_path> s_selected_entries = {};
+            s_selected_entries.clear();
 
             for (auto const &dirent : this->cwd_entries) {
                 if (dirent.is_selected) {
                     // this could throw on alloc failure, which will call std::terminate
-                    selected_entries.push_back(dirent.basic.path);
+                    s_selected_entries.push_back(dirent.basic.path);
                 }
             }
 
@@ -880,13 +880,13 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                             std::swap(this->cwd_entries.back(), this->cwd_entries.front());
                         }
                     } else {
-                        for (auto prev_selected_entry = selected_entries.begin(); prev_selected_entry != selected_entries.end(); ++prev_selected_entry) {
+                        for (auto prev_selected_entry = s_selected_entries.begin(); prev_selected_entry != s_selected_entries.end(); ++prev_selected_entry) {
                             bool was_selected_before_refresh = path_equals_exactly(entry.basic.path, *prev_selected_entry);
                             if (was_selected_before_refresh) {
                                 entry.is_selected = true;
                                 retval.num_entries_selected += 1;
-                                std::swap(*prev_selected_entry, selected_entries.back());
-                                selected_entries.pop_back();
+                                std::swap(*prev_selected_entry, s_selected_entries.back());
+                                s_selected_entries.pop_back();
                                 break;
                             }
                         }
@@ -974,10 +974,10 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                         }
 
                         case explorer_window::filter_mode::regex_match: {
-                            static std::regex filter_regex;
+                            static std::regex s_filter_regex;
                             try {
                                 scoped_timer<timer_unit::MICROSECONDS> regex_ctor_timer(&timers.regex_ctor_us);
-                                filter_regex = this->filter_text.data();
+                                s_filter_regex = this->filter_text.data();
                             }
                             catch (std::exception const &except) {
                                 this->filter_error = except.what();
@@ -986,7 +986,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
 
                             auto match_flags = std::regex_constants::match_default | (std::regex_constants::icase * (this->filter_case_sensitive == 0));
 
-                            bool filtered_out = this->filter_polarity != std::regex_match(dirent_name, filter_regex, (std::regex_constants::match_flag_type)match_flags);
+                            bool filtered_out = this->filter_polarity != std::regex_match(dirent_name, s_filter_regex, (std::regex_constants::match_flag_type)match_flags);
                             dirent.is_filtered_out = filtered_out;
 
                             if (!filtered_out && filter_polarity == true) {
@@ -1798,7 +1798,7 @@ void render_pins_popup(explorer_window &expl) noexcept
 
     imgui::Separator();
 
-    auto const &pins = global_state::pins();
+    auto const &pins = global_state::pinned_get();
 
     if (pins.empty()) {
         imgui::TextUnformatted("(empty)");
@@ -2106,14 +2106,6 @@ void render_filter_polarity_button(explorer_window &expl) noexcept
     }
 }
 
-// static
-// void render_blank_button() noexcept
-// {
-//     imgui::ScopedDisable d(true);
-//     imgui::ScopedColor c(ImGuiCol_Button, imgui::GetStyle().Colors[ImGuiCol_WindowBg]);
-//     imgui::Button(ICON_CI_BLANK);
-// }
-
 #if 0
 static
 void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) noexcept
@@ -2121,7 +2113,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
     u64 pin_idx;
     {
         scoped_timer<timer_unit::MICROSECONDS> check_if_pinned_timer(&expl.check_if_pinned_us);
-        pin_idx = global_state::find_pin_idx(expl.cwd);
+        pin_idx = global_state::pinned_find_idx(expl.cwd);
     }
     bool already_pinned = pin_idx != std::string::npos;
 
@@ -2135,7 +2127,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
                 /* confirmation_id  = */ swan_id_confirm_explorer_unpin_directory,
                 /* confirmation_msg = */
                 [pin_idx]() noexcept {
-                    auto const &pin = global_state::pins()[pin_idx];
+                    auto const &pin = global_state::pinned_get()[pin_idx];
 
                     imgui::TextUnformatted("Are you sure you want to delete the following pin?");
                     imgui::Spacing(2);
@@ -2149,7 +2141,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
                 /* on_yes_callback = */
                 [pin_idx, &expl]() noexcept {
                     scoped_timer<timer_unit::MICROSECONDS> unpin_timer(&expl.unpin_us);
-                    global_state::remove_pin(pin_idx);
+                    global_state::pinned_remove(pin_idx);
                     (void) global_state::settings().save_to_disk();
                 },
                 /* confirmation_enabled = */ &(global_state::settings().confirm_explorer_unpin_directory)
@@ -2158,8 +2150,8 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
         else {
             swan_popup_modals::open_new_pin(expl.cwd, false);
         }
-        bool result = global_state::save_pins_to_disk();
-        print_debug_msg("save_pins_to_disk: %d", result);
+        bool result = global_state::pinned_save_to_disk();
+        print_debug_msg("pinned_save_to_disk: %d", result);
     }
     if (imgui::IsItemHovered()) {
         imgui::SetTooltip("%s current working directory", already_pinned ? "Unpin" : "Pin");
@@ -2297,14 +2289,14 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
         return;
     }
 
-    static std::vector<char const *> slices = {};
+    static std::vector<char const *> s_slices = {};
     slices.reserve(50);
     slices.clear();
 
     swan_path_t sliced_path = expl.cwd;
     char const *slice = strtok(sliced_path.data(), "\\/");
     while (slice != nullptr) {
-        slices.push_back(slice);
+        s_slices.push_back(slice);
         slice = strtok(nullptr, "\\/");
     }
 
@@ -2348,7 +2340,7 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
 
     {
         u64 i = 0;
-        for (auto slice_it = slices.begin(); slice_it != slices.end() - 1; ++slice_it, ++i) {
+        for (auto slice_it = s_slices.begin(); slice_it != s_slices.end() - 1; ++slice_it, ++i) {
             auto label = make_str_static<1200>("%s##slice%zu", *slice_it, i);
 
             if (imgui::Button(label.data())) {
@@ -2362,7 +2354,7 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char dir_sep_ut
         }
     }
 
-    imgui::Text("%s", slices.back());
+    imgui::Text("%s", s_slices.back());
 }
 #endif
 
@@ -2431,13 +2423,13 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     bool open_bulk_rename_popup = false;
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
     bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
-    bool any_popups_open = global_state::any_popup_modals_open() || imgui::IsPopupOpen("History");
+    bool any_popups_open = global_state::popup_modals_are_any_open() || imgui::IsPopupOpen("History");
 
     static explorer_window::dirent const *s_dirent_to_be_renamed = nullptr;
 
     if (window_focused) {
         assert(expl.id >= 0);
-        global_state::save_focused_window(swan_windows::explorer_0 + expl.id);
+        global_state::focused_window_set(swan_windows::id( (s32)swan_windows::id::explorer_0 + expl.id ));
     }
 
     auto label_child = make_str_static<64>("%s##main_child", expl.name);
@@ -2523,7 +2515,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 global_state::settings().show.finder = true;
                 (void) global_state::settings().save_to_disk();
 
-                imgui::SetWindowFocus(swan_windows::get_name(swan_windows::finder));
+                imgui::SetWindowFocus(swan_windows::get_name(swan_windows::id::finder));
             }
         }
         else if (window_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
@@ -2549,12 +2541,12 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             u64 pin_idx;
             {
                 scoped_timer<timer_unit::MICROSECONDS> check_if_pinned_timer(&expl.check_if_pinned_us);
-                pin_idx = global_state::find_pin_idx(expl.cwd);
+                pin_idx = global_state::pinned_find_idx(expl.cwd);
             }
             bool already_pinned = pin_idx != std::string::npos;
 
             if (already_pinned) {
-                swan_popup_modals::open_edit_pin(&global_state::pins()[pin_idx]);
+                swan_popup_modals::open_edit_pin(&global_state::pinned_get()[pin_idx]);
             } else {
                 swan_popup_modals::open_new_pin(expl.cwd, false);
             }
@@ -3096,68 +3088,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     }
 
-    #if 0
-    {
-        imgui::ScopedColor c(ImGuiCol_WindowBg, window_bg_color);
-
-        auto label = make_str_static<32>("Filter##%d", expl.id);
-
-        if (expl.show_filter_window && imgui::Begin(label.data(), nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoTitleBar)) {
-            if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
-                flip_bool(expl.show_filter_window);
-                expl.reset_filter();
-                (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                (void) expl.save_to_disk();
-            }
-            else {
-                imgui::AlignTextToFramePadding();
-
-                imgui::Text("(?)", expl.id + 1);
-                if (imgui::IsItemHovered()) {
-                    expl.highlight = true;
-                }
-
-                imgui::SameLine();
-
-                render_filter_reset_button(expl);
-
-                imgui::SameLine();
-
-                render_filter_text_input(expl);
-
-                {
-                    imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
-                    imgui::SameLineSpaced(0);
-                    imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
-                    imgui::SameLineSpaced(0);
-                }
-
-                render_filter_polarity_button(expl);
-                imgui::SameLine();
-                render_filter_case_sensitivity_button(expl);
-                imgui::SameLine();
-                render_filter_mode_toggle(expl);
-
-                {
-                    imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, 0.5);
-                    imgui::SameLineSpaced(0);
-                    imgui::TextUnformatted(ICON_CI_KEBAB_VERTICAL);
-                    imgui::SameLineSpaced(0);
-                }
-
-                render_filter_type_toggler_buttons(expl);
-
-                if (expl.filter_error != "") {
-                    imgui::PushTextWrapPos(imgui::GetColumnWidth());
-                    imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
-                    imgui::PopTextWrapPos();
-                }
-            }
-            imgui::End();
-        }
-    }
-    #endif
-
     }
     imgui::EndChild();
 
@@ -3167,7 +3097,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         if (payload_wrapper != nullptr) {
             assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
             auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
-            auto const &pin = global_state::pins()[payload_data->pin_idx];
+            auto const &pin = global_state::pinned_get()[payload_data->pin_idx];
 
             swan_path initial_cwd = expl.cwd;
             expl.cwd = path_create("");
@@ -3414,15 +3344,15 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                         }
                                         else if (dirent.basic.is_symlink_to_file()) {
                                             char const *full_file_path = res.error_or_utf8_path.c_str();
-                                            u64 recent_file_idx = global_state::find_recent_file_idx(full_file_path);
+                                            u64 recent_file_idx = global_state::recent_files_find_idx(full_file_path);
 
                                             if (recent_file_idx == u64(-1)) {
-                                                global_state::add_recent_file("Opened", full_file_path);
+                                                global_state::recent_files_add("Opened", full_file_path);
                                             }
                                             else { // already in recent
-                                                global_state::move_recent_file_idx_to_front(recent_file_idx, "Opened");
+                                                global_state::recent_files_move_to_front(recent_file_idx, "Opened");
                                             }
-                                            (void) global_state::save_recent_files_to_disk();
+                                            (void) global_state::recent_files_save_to_disk();
                                         }
                                     } else {
                                         std::string action = make_str("Open symlink [%s].", dirent.basic.path.data());
@@ -3437,15 +3367,15 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
                                     if (res.success) {
                                         char const *full_file_path = res.error_or_utf8_path.c_str();
-                                        u64 recent_file_idx = global_state::find_recent_file_idx(full_file_path);
+                                        u64 recent_file_idx = global_state::recent_files_find_idx(full_file_path);
 
                                         if (recent_file_idx == u64(-1)) {
-                                            global_state::add_recent_file("Opened", full_file_path);
+                                            global_state::recent_files_add("Opened", full_file_path);
                                         }
                                         else { // already in recent
-                                            global_state::move_recent_file_idx_to_front(recent_file_idx, "Opened");
+                                            global_state::recent_files_move_to_front(recent_file_idx, "Opened");
                                         }
-                                        (void) global_state::save_recent_files_to_disk();
+                                        (void) global_state::recent_files_save_to_disk();
                                     } else {
                                         std::string action = make_str("Open file [%s].", dirent.basic.path.data());
                                         char const *failed = res.error_or_utf8_path.c_str();
@@ -3664,15 +3594,15 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
                 if (res.success) {
                     char const *full_file_path = res.error_or_utf8_path.c_str();
-                    u64 recent_file_idx = global_state::find_recent_file_idx(full_file_path);
+                    u64 recent_file_idx = global_state::recent_files_find_idx(full_file_path);
 
                     if (recent_file_idx == u64(-1)) {
-                        global_state::add_recent_file("Opened", full_file_path);
+                        global_state::recent_files_add("Opened", full_file_path);
                     }
                     else { // already in recent
-                        global_state::move_recent_file_idx_to_front(recent_file_idx, "Opened");
+                        global_state::recent_files_move_to_front(recent_file_idx, "Opened");
                     }
-                    (void) global_state::save_recent_files_to_disk();
+                    (void) global_state::recent_files_save_to_disk();
                 } else {
                     std::string action = make_str("Open file as administrator [%s].", expl.context_menu_target->basic.path.data());
                     char const *failed = res.error_or_utf8_path.c_str();

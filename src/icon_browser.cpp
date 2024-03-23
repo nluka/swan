@@ -3,20 +3,20 @@
 #include "imgui_dependent_functions.hpp"
 
 void swan_windows::render_icon_font_browser(
-    s32 window_code,
+    swan_windows::id window_id,
     icon_font_browser_state &browser,
     bool &open,
     char const *icon_lib_name,
     char const *icon_prefix,
     std::vector<icon_font_glyph> const &(*get_all_icons)() noexcept) noexcept
 {
-    if (!imgui::Begin(swan_windows::get_name(window_code), &open)) {
+    if (!imgui::Begin(swan_windows::get_name(window_id), &open)) {
         imgui::End();
         return;
     }
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::save_focused_window(window_code);
+        global_state::focused_window_set(window_id);
     }
 
     bool update_list = false;

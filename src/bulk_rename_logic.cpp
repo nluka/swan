@@ -142,9 +142,9 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_size;
                 }
                 else {
-                    static std::regex valid_slice_with_start_end ("^[0-9]{1,5}, *[0-9]{1,5}$");
-                    static std::regex valid_slice_with_start     ("^[0-9]{1,5}, *$");
-                    static std::regex valid_slice_with_end                 ("^, *[0-9]{1,5}$");
+                    static std::regex s_valid_slice_with_start_end ("^[0-9]{1,5}, *[0-9]{1,5}$");
+                    static std::regex s_valid_slice_with_start     ("^[0-9]{1,5}, *$");
+                    static std::regex s_valid_slice_with_end                 ("^, *[0-9]{1,5}$");
 
                     std::string_view expr_view(expr, expr_len);
                     static std::string expr_str(100, '\0');
@@ -155,14 +155,14 @@ bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *patte
 
                     op.kind = bulk_rename_compiled_pattern::op::type::insert_slice;
 
-                    if (std::regex_match(expr_str, valid_slice_with_start_end)) {
+                    if (std::regex_match(expr_str, s_valid_slice_with_start_end)) {
                         op.explicit_first = true;
                         op.explicit_last = true;
                     }
-                    else if (std::regex_match(expr_str, valid_slice_with_start)) {
+                    else if (std::regex_match(expr_str, s_valid_slice_with_start)) {
                         op.explicit_first = true;
                     }
-                    else if (std::regex_match(expr_str, valid_slice_with_end)) {
+                    else if (std::regex_match(expr_str, s_valid_slice_with_end)) {
                         op.explicit_last = true;
                     }
                     else {

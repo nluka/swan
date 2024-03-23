@@ -1,5 +1,3 @@
-#include "imgui/imgui.h"
-
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 

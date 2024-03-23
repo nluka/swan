@@ -20,56 +20,9 @@ namespace global_constants
 
 } // global_constants
 
-namespace global_state
-{
-    std::pair<circular_buffer<recent_file> *, std::mutex *> recent_files() noexcept;
-    u64 find_recent_file_idx(char const *search_path) noexcept;
-    void move_recent_file_idx_to_front(u64 recent_file_idx, char const *new_action = nullptr) noexcept;
-    void add_recent_file(char const *action, char const *full_file_path) noexcept;
-    void remove_recent_file(u64 recent_file_idx) noexcept;
-    bool save_recent_files_to_disk() noexcept;
-    std::pair<bool, u64> load_recent_files_from_disk(char dir_separator) noexcept;
-
-    std::vector<pinned_path> &pins() noexcept;
-    bool add_pin(ImVec4 color, char const *label, swan_path &path, char dir_separator) noexcept;
-    void remove_pin(u64 pin_idx) noexcept;
-    void update_pin_dir_separators(char new_dir_separator) noexcept;
-    u64 find_pin_idx(swan_path const &) noexcept;
-    void swap_pins(u64 pin1_idx, u64 pin2_idx) noexcept;
-    bool save_pins_to_disk() noexcept;
-    std::pair<bool, u64> load_pins_from_disk(char dir_separator) noexcept;
-
-    std::pair<std::deque<completed_file_operation> *, std::mutex *> completed_file_ops() noexcept;
-    bool save_completed_file_ops_to_disk(std::scoped_lock<std::mutex> *lock) noexcept;
-    std::pair<bool, u64> load_completed_file_ops_from_disk(char dir_separator) noexcept;
-    u32 next_group_id() noexcept;
-
-    s32 focused_window() noexcept;
-    bool save_focused_window(s32 window_code) noexcept;
-    bool load_focused_window_from_disk(s32 &window_code) noexcept;
-
-    bool &move_dirents_payload_set() noexcept;
-
-    s32 &debug_log_text_limit_megabytes() noexcept;
-
-    std::filesystem::path &execution_path() noexcept;
-
-    swan_thread_pool_t &thread_pool() noexcept;
-
-    swan_settings &settings() noexcept;
-
-    std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
-
-    s32 &page_size() noexcept;
-
-    bool any_popup_modals_open() noexcept;
-    u64 &popup_modals_open_bit_field() noexcept;
-
-} // namespace global_state
-
 namespace swan_windows
 {
-    enum window_id : s32 {
+    enum class id : s32 {
         nil_window = 0,
         explorer_0,
         explorer_1,
@@ -91,26 +44,26 @@ namespace swan_windows
         count
     };
 
-    char const *get_name(s32 id) noexcept
+    char const *get_name(id id) noexcept
     {
         switch (id) {
-            case explorer_0: return " Explorer 1 ";
-            case explorer_1: return " Explorer 2 ";
-            case explorer_2: return " Explorer 3 ";
-            case explorer_3: return " Explorer 4 ";
-            case finder: return " Finder ";
-            case pinned: return " Pinned ";
-            case file_operations: return " File Operations ";
-            case recent_files: return " Recent Files ";
-            case analytics: return " Analytics ";
-            case debug_log: return " Debug Log ";
-            case settings: return " Settings ";
-            case theme_editor: return " Theme Editor ";
-            case icon_library: return " Icon Library ";
-            case icon_font_browser_font_awesome: return " Font Awesome Icons ";
-            case icon_font_browser_codicon: return " Codicon Icons ";
-            case icon_font_browser_material_design: return " Material Design Icons ";
-            case imgui_demo: return " ImGui Demo ";
+            case id::explorer_0: return " Explorer 1 ";
+            case id::explorer_1: return " Explorer 2 ";
+            case id::explorer_2: return " Explorer 3 ";
+            case id::explorer_3: return " Explorer 4 ";
+            case id::finder: return " Finder ";
+            case id::pinned: return " Pinned ";
+            case id::file_operations: return " File Operations ";
+            case id::recent_files: return " Recent Files ";
+            case id::analytics: return " Analytics ";
+            case id::debug_log: return " Debug Log ";
+            case id::settings: return " Settings ";
+            case id::theme_editor: return " Theme Editor ";
+            case id::icon_library: return " Icon Library ";
+            case id::icon_font_browser_font_awesome: return " Font Awesome Icons ";
+            case id::icon_font_browser_codicon: return " Codicon Icons ";
+            case id::icon_font_browser_material_design: return " Material Design Icons ";
+            case id::imgui_demo: return " ImGui Demo ";
             default: assert(false && "Window has no name"); return nullptr;
         }
     }
@@ -127,10 +80,10 @@ namespace swan_windows
 
     void render_recent_files(bool &open) noexcept;
 
-    void render_settings(GLFWwindow *window) noexcept;
+    void render_settings(GLFWwindow *window, bool &open) noexcept;
 
     void render_icon_font_browser(
-        s32 window_code,
+        swan_windows::id window_id,
         icon_font_browser_state &browser,
         bool &open,
         char const *icon_lib_name,
@@ -192,6 +145,62 @@ namespace swan_popup_modals
     void render_new_directory() noexcept;
 
 } // namespace swan_popup_modals
+
+namespace global_state
+{
+    // Bundles of global state are accessible through this API.
+    // Some globals are used in a multiple threads, their getters provide a mutex.
+    // Globals which are only used in the main thread do not provide a mutex through their getter.
+
+    struct recent_files
+    {
+        circular_buffer<recent_file> *container;
+        std::mutex                   *mutex;
+    };
+    recent_files            recent_files_get() noexcept;
+    u64                     recent_files_find_idx(char const *search_path) noexcept;
+    void                    recent_files_move_to_front(u64 recent_file_idx, char const *new_action = nullptr) noexcept;
+    void                    recent_files_add(char const *action, char const *full_file_path) noexcept;
+    void                    recent_files_remove(u64 recent_file_idx) noexcept;
+    bool                    recent_files_save_to_disk() noexcept;
+    std::pair<bool, u64>    recent_files_load_from_disk(char dir_separator) noexcept;
+
+    struct completed_file_operations
+    {
+        std::deque<completed_file_operation> *container;
+        std::mutex                           *mutex;
+    };
+    completed_file_operations   completed_file_operations_get() noexcept;
+    std::pair<bool, u64>        completed_file_operations_load_from_disk(char dir_separator) noexcept;
+    u32                         completed_file_operations_calc_next_group_id() noexcept;
+    bool                        completed_file_operations_save_to_disk(std::scoped_lock<std::mutex> *lock) noexcept;
+
+    std::vector<pinned_path> &  pinned_get() noexcept;
+    std::pair<bool, u64>        pinned_load_from_disk(char override_dir_separator) noexcept;
+    u64                         pinned_find_idx(swan_path const &) noexcept;
+    bool                        pinned_add(ImVec4 color, char const *label, swan_path &path, char dir_separator) noexcept;
+    bool                        pinned_save_to_disk() noexcept;
+    void                        pinned_remove(u64 pin_idx) noexcept;
+    void                        pinned_update_directory_separators(char new_dir_separator) noexcept;
+    void                        pinned_swap(u64 pin1_idx, u64 pin2_idx) noexcept;
+
+    swan_windows::id   focused_window_get() noexcept;
+    bool               focused_window_set(swan_windows::id window_id) noexcept;
+    bool               focused_window_load_from_disk(swan_windows::id &window_id) noexcept;
+
+    u64 &   popup_modals_open_bit_field() noexcept;
+    bool    popup_modals_are_any_open() noexcept;
+
+    std::filesystem::path & execution_path() noexcept;
+    swan_thread_pool_t &    thread_pool() noexcept;
+    swan_settings &         settings() noexcept;
+    bool &                  move_dirents_payload_set() noexcept;
+    s32 &                   debug_log_text_limit_megabytes() noexcept;
+    s32 &                   page_size() noexcept;
+
+    std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
+
+} // namespace global_state
 
 void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexcept;
 

@@ -2,7 +2,7 @@
 #include "data_types.hpp"
 #include "common_functions.hpp"
 
-static std::vector<icon_font_glyph> s_font_awesome_icons = {
+static std::vector<icon_font_glyph> g_font_awesome_icons = {
     { "ICON_FA_AD", "\xef\x99\x81" }, // U+f641
     { "ICON_FA_ADDRESS_BOOK", "\xef\x8a\xb9" }, // U+f2b9
     { "ICON_FA_ADDRESS_CARD", "\xef\x8a\xbb" }, // U+f2bb
@@ -1007,7 +1007,7 @@ static std::vector<icon_font_glyph> s_font_awesome_icons = {
     { "ICON_FA_YIN_YANG", "\xef\x9a\xad" }, // U+f6ad
 };
 
-static std::vector<icon_font_glyph> s_codicon_icons = {
+static std::vector<icon_font_glyph> g_codicon_icons = {
     { "ICON_CI_ADD", "\xee\xa9\xa0" }, // U+ea60
     { "ICON_CI_PLUS", "\xee\xa9\xa0" }, // U+ea60
     { "ICON_CI_GIST_NEW", "\xee\xa9\xa0" }, // U+ea60
@@ -1550,7 +1550,7 @@ static std::vector<icon_font_glyph> s_codicon_icons = {
     { "ICON_CI_COPILOT", "\xee\xb0\x9e" }, // U+ec1e
 };
 
-static std::vector<icon_font_glyph> s_material_design_icons = {
+static std::vector<icon_font_glyph> g_material_design_icons = {
     { "ICON_MD_10K", "\xee\xa5\x91" }, // U+e951
     { "ICON_MD_10MP", "\xee\xa5\x92" }, // U+e952
     { "ICON_MD_11MP", "\xee\xa5\x93" }, // U+e953
@@ -3787,6 +3787,6 @@ static std::vector<icon_font_glyph> s_material_design_icons = {
     { "ICON_MD_ZOOM_OUT_MAP", "\xee\x95\xab" }, // U+e56b
 };
 
-std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_font_awesome() noexcept { return s_font_awesome_icons; }
-std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_codicon() noexcept { return s_codicon_icons; }
-std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_material_design() noexcept { return s_material_design_icons; }
+std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_font_awesome() noexcept { return g_font_awesome_icons; }
+std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_codicon() noexcept { return g_codicon_icons; }
+std::vector<icon_font_glyph> const &global_constants::icon_font_glyphs_material_design() noexcept { return g_material_design_icons; }

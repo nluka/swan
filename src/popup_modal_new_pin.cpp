@@ -1,5 +1,3 @@
-#include "imgui/imgui.h"
-
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 
@@ -105,10 +103,10 @@ void swan_popup_modals::render_new_pin() noexcept
         swan_path path = path_squish_adjacent_separators(s_path_input);
         path_force_separator(path, global_state::settings().dir_separator_utf8);
 
-        global_state::add_pin(s_color_input, s_label_input, path, '\\');
+        global_state::pinned_add(s_color_input, s_label_input, path, '\\');
 
-        bool success = global_state::save_pins_to_disk();
-        print_debug_msg("save_pins_to_disk: %d", success);
+        bool success = global_state::pinned_save_to_disk();
+        print_debug_msg("pinned_save_to_disk: %d", success);
 
         cleanup_and_close_popup();
     }

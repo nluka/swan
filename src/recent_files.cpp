@@ -7,9 +7,9 @@
 static circular_buffer<recent_file> g_recent_files = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
 static std::mutex g_recent_files_mutex = {};
 
-std::pair<circular_buffer<recent_file> *, std::mutex *> global_state::recent_files() noexcept { return std::make_pair(&g_recent_files, &g_recent_files_mutex); }
+global_state::recent_files global_state::recent_files_get() noexcept { return { &g_recent_files, &g_recent_files_mutex }; }
 
-u64 global_state::find_recent_file_idx(char const *search_path) noexcept
+u64 global_state::recent_files_find_idx(char const *search_path) noexcept
 {
     std::scoped_lock lock(g_recent_files_mutex);
 
@@ -23,7 +23,7 @@ u64 global_state::find_recent_file_idx(char const *search_path) noexcept
     return u64(-1);
 }
 
-void global_state::move_recent_file_idx_to_front(u64 recent_file_idx, char const *new_action) noexcept
+void global_state::recent_files_move_to_front(u64 recent_file_idx, char const *new_action) noexcept
 {
     std::scoped_lock lock(g_recent_files_mutex);
 
@@ -38,7 +38,7 @@ void global_state::move_recent_file_idx_to_front(u64 recent_file_idx, char const
     g_recent_files.push_front(temp);
 }
 
-void global_state::add_recent_file(char const *action, char const *full_file_path) noexcept
+void global_state::recent_files_add(char const *action, char const *full_file_path) noexcept
 {
     swan_path path = path_create(full_file_path);
 
@@ -46,13 +46,13 @@ void global_state::add_recent_file(char const *action, char const *full_file_pat
     g_recent_files.push_front({ action, current_time_system(), path });
 }
 
-void global_state::remove_recent_file(u64 recent_file_idx) noexcept
+void global_state::recent_files_remove(u64 recent_file_idx) noexcept
 {
     std::scoped_lock lock(g_recent_files_mutex);
     g_recent_files.erase(g_recent_files.begin() + recent_file_idx);
 }
 
-bool global_state::save_recent_files_to_disk() noexcept
+bool global_state::recent_files_save_to_disk() noexcept
 try {
     std::filesystem::path full_path = global_state::execution_path() / "data\\recent_files.txt";
 
@@ -75,15 +75,15 @@ try {
             << file.path.data() << '\n';
     }
 
-    print_debug_msg("SUCCESS global_state::save_recent_files_to_disk");
+    print_debug_msg("SUCCESS global_state::recent_files_save_to_disk");
     return true;
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::save_recent_files_to_disk");
+    print_debug_msg("FAILED global_state::recent_files_save_to_disk");
     return false;
 }
 
-std::pair<bool, u64> global_state::load_recent_files_from_disk(char dir_separator) noexcept
+std::pair<bool, u64> global_state::recent_files_load_from_disk(char dir_separator) noexcept
 try {
     std::filesystem::path full_path = global_state::execution_path() / "data\\recent_files.txt";
 
@@ -138,11 +138,11 @@ try {
         line.clear();
     }
 
-    print_debug_msg("SUCCESS global_state::load_recent_files_from_disk, loaded %zu files", num_loaded_successfully);
+    print_debug_msg("SUCCESS global_state::recent_files_load_from_disk, loaded %zu files", num_loaded_successfully);
     return { true, num_loaded_successfully };
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::load_recent_files_from_disk");
+    print_debug_msg("FAILED global_state::recent_files_load_from_disk");
     return { false, 0 };
 }
 
@@ -162,13 +162,13 @@ u64 deselect_all(circular_buffer<recent_file> &recent_files) noexcept
 
 void swan_windows::render_recent_files(bool &open) noexcept
 {
-    if (!imgui::Begin(swan_windows::get_name(swan_windows::recent_files), &open)) {
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::id::recent_files), &open)) {
         imgui::End();
         return;
     }
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::save_focused_window(swan_windows::recent_files);
+        global_state::focused_window_set(swan_windows::id::recent_files);
     }
 
     imgui::TextUnformatted("(?)");
@@ -191,7 +191,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
         if (status.value_or(false)) {
             std::scoped_lock lock(g_recent_files_mutex);
             g_recent_files.clear();
-            (void) global_state::save_recent_files_to_disk();
+            (void) global_state::recent_files_save_to_disk();
         }
     }
 
@@ -202,7 +202,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
     auto &io = imgui::GetIO();
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
-    bool any_popup_modals_open = global_state::any_popup_modals_open();
+    bool any_popup_modals_open = global_state::popup_modals_are_any_open();
     u64 move_to_front_idx = u64(-1);
     u64 remove_idx = u64(-1);
     bool execute_forget_selection_immediately = false;
@@ -509,7 +509,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
                 g_recent_files.erase(not_selected_end_iter, g_recent_files.end());
 
-                (void) global_state::save_completed_file_ops_to_disk(&recent_files_lock);
+                (void) global_state::completed_file_operations_save_to_disk(&recent_files_lock);
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
             }
         }
@@ -518,12 +518,12 @@ void swan_windows::render_recent_files(bool &open) noexcept
     }
 
     if (remove_idx != u64(-1)) {
-        (void) global_state::remove_recent_file(remove_idx);
-        (void) global_state::save_recent_files_to_disk();
+        (void) global_state::recent_files_remove(remove_idx);
+        (void) global_state::recent_files_save_to_disk();
     }
     if (move_to_front_idx != u64(-1)) {
-        global_state::move_recent_file_idx_to_front(move_to_front_idx, "Opened");
-        (void) global_state::save_recent_files_to_disk();
+        global_state::recent_files_move_to_front(move_to_front_idx, "Opened");
+        (void) global_state::recent_files_save_to_disk();
     }
 
     imgui::End();

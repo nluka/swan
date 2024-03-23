@@ -6,51 +6,54 @@
 static swan_settings g_settings = {};
 swan_settings &global_state::settings() noexcept { return g_settings; }
 
-void swan_windows::render_settings(GLFWwindow *window) noexcept
+void swan_windows::render_settings(GLFWwindow *window, bool &open) noexcept
 {
-    static bool regular_change = false;
-    static bool overridden = false;
+    static bool s_regular_change = false;
+    static bool s_overridden = false;
 
-    if (imgui::Begin(swan_windows::get_name(swan_windows::settings), &global_state::settings().show.settings)) {
-        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::save_focused_window(swan_windows::settings);
-        }
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::id::settings), &open)) {
+        imgui::End();
+        return;
+    }
 
-        auto &settings = global_state::settings();
+    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+        global_state::focused_window_set(swan_windows::id::settings);
+    }
 
-        regular_change |= imgui::Checkbox("Start with window maximized", &settings.startup_with_window_maximized);
-        regular_change |= imgui::Checkbox("Start with previous window size & pos", &settings.startup_with_previous_window_pos_and_size);
+    auto &settings = global_state::settings();
 
-        {
-            imgui::Separator();
-            imgui::AlignTextToFramePadding();
-            imgui::TextUnformatted("Override window pos & size");
-            if (overridden) {
-                imgui::SameLine();
-                if (imgui::Button("Apply")) {
-                    overridden = false;
-                    glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
-                    glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
-                    (void) settings.save_to_disk();
-                }
+    s_regular_change |= imgui::Checkbox("Start with window maximized", &settings.startup_with_window_maximized);
+    s_regular_change |= imgui::Checkbox("Start with previous window size & pos", &settings.startup_with_previous_window_pos_and_size);
+
+    {
+        imgui::Separator();
+        imgui::AlignTextToFramePadding();
+        imgui::TextUnformatted("Override window pos & size");
+        if (s_overridden) {
+            imgui::SameLine();
+            if (imgui::Button("Apply")) {
+                s_overridden = false;
+                glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
+                glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
+                (void) settings.save_to_disk();
             }
-        #if 1
-            imgui::ScopedItemWidth w(200.f);
-            overridden |= imgui::InputInt2("Window position (x, y)", &settings.window_x);
-            overridden |= imgui::InputInt2("Window size (w, h)", &settings.window_w);
-        #else
-            imgui::ScopedItemWidth w(150.f);
-            overridden |= imgui::InputInt("Window position x", &settings.window_x);
-            overridden |= imgui::InputInt("Window position y", &settings.window_y);
-            overridden |= imgui::InputInt("Window width", &settings.window_w);
-            overridden |= imgui::InputInt("Window height", &settings.window_h);
-        #endif
         }
+    #if 1
+        imgui::ScopedItemWidth w(200.f);
+        s_overridden |= imgui::InputInt2("Window position (x, y)", &settings.window_x);
+        s_overridden |= imgui::InputInt2("Window size (w, h)", &settings.window_w);
+    #else
+        imgui::ScopedItemWidth w(150.f);
+        s_overridden |= imgui::InputInt("Window position x", &settings.window_x);
+        s_overridden |= imgui::InputInt("Window position y", &settings.window_y);
+        s_overridden |= imgui::InputInt("Window width", &settings.window_w);
+        s_overridden |= imgui::InputInt("Window height", &settings.window_h);
+    #endif
+    }
 
-        if (regular_change) {
-            regular_change = false;
-            (void) settings.save_to_disk();
-        }
+    if (s_regular_change) {
+        s_regular_change = false;
+        (void) settings.save_to_disk();
     }
 
     imgui::End();

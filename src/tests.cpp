@@ -11,7 +11,7 @@
 #include "util.hpp"
 #include "util.cpp"
 
-#include "bulk_rnm.cpp"
+#include "bulk_rename_logic.cpp"
 
 s32 main()
 try

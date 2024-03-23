@@ -10,9 +10,9 @@ s32 &global_state::debug_log_text_limit_megabytes() noexcept { return s_debug_lo
 
 void swan_windows::render_debug_log(bool &open) noexcept
 {
-    if (imgui::Begin(swan_windows::get_name(swan_windows::debug_log), &open)) {
+    if (imgui::Begin(swan_windows::get_name(swan_windows::id::debug_log), &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::save_focused_window(swan_windows::debug_log);
+            global_state::focused_window_set(swan_windows::id::debug_log);
         }
 
         static bool s_auto_scroll = true;
@@ -31,17 +31,10 @@ void swan_windows::render_debug_log(bool &open) noexcept
 
         imgui::SameLine();
 
+    #if 0
         if (imgui::Button("Save")) {
             // TODO
         }
-
-        imgui::SameLine();
-
-    #if 0
-        imgui::BeginDisabled(true);
-        if (imgui::Button("Save to file")) {
-        }
-        imgui::EndDisabled();
     #endif
 
         imgui::SameLineSpaced(1);

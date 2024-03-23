@@ -34,19 +34,21 @@ HRESULT undelete_directory_progress_sink::FinishOperations(HRESULT) noexcept
     path_force_separator(this->destination_full_path_utf8, global_state::settings().dir_separator_utf8); //! UB
 
     {
-        auto pair = global_state::completed_file_ops();
-        auto &completed_file_ops = *pair.first;
-        auto &mutex = *pair.second;
+        auto completed_file_operations = global_state::completed_file_operations_get();
 
-        std::scoped_lock lock(mutex);
+        std::scoped_lock lock(*completed_file_operations.mutex);
 
-        auto found = std::find_if(completed_file_ops.begin(), completed_file_ops.end(), [&](completed_file_operation const &cfo) noexcept {
-            return path_equals_exactly(cfo.src_path, this->destination_full_path_utf8);
-        });
+        auto found = std::find_if(
+            completed_file_operations.container->begin(),
+            completed_file_operations.container->end(),
+            [&](completed_file_operation const &cfo) noexcept {
+                return path_equals_exactly(cfo.src_path, this->destination_full_path_utf8);
+            }
+        );
 
-        if (found != completed_file_ops.end()) {
+        if (found != completed_file_operations.container->end()) {
             found->undo_time = current_time_system();
-            (void) global_state::save_completed_file_ops_to_disk(&lock);
+            (void) global_state::completed_file_operations_save_to_disk(&lock);
         }
     }
 

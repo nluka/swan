@@ -55,8 +55,5 @@ Quickly slice and dice file names for multiple files at once.
 
 ## Attributions
 
+- <a href="https://www.flaticon.com/free-icons/origami" title="origami icons">Origami icons created by Freepik - Flaticon</a>
 - <a href="https://ezgif.com/video-to-gif" title="site used for making GIFs">GIFs made using ezgif.com</a>
-- <a href="https://www.flaticon.com/free-icons/swan" title="swan icons">Swan icons created by Freepik - Flaticon</a>
-- <a href="https://www.flaticon.com/free-icons/lightweight" title="lightweight icons">Lightweight icons created by Icongeek26 - Flaticon</a>
-- <a href="https://www.flaticon.com/free-icons/origami" title="origami icons">Origami icons created by smalllikeart - Flaticon</a>
-- <a href="https://www.flaticon.com/free-icons/bird" title="bird icons">Bird icons created by berkahicon - Flaticon</a>

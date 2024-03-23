@@ -4,13 +4,15 @@
 
 void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_style) noexcept
 {
-    if (!imgui::Begin(swan_windows::get_name(swan_windows::theme_editor), &open, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse)) {
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
+
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::id::theme_editor), &open, window_flags)) {
         imgui::End();
         return;
     }
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::save_focused_window(swan_windows::theme_editor);
+        global_state::focused_window_set(swan_windows::id::theme_editor);
     }
 
     // auto &io = imgui::GetIO();
@@ -149,7 +151,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
         imgui::TableNextColumn();
         {
             u64 constexpr longest_label = 21;
-            static std::array<char, longest_label+1> search_input = {};
+            static std::array<char, longest_label+1> s_search_input = {};
 
             if (imgui::Button(ICON_CI_REFRESH "## Colors reset all")) {
                 imgui::OpenConfirmationModalWithCallback(
@@ -173,7 +175,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             {
                 imgui::ScopedItemWidth w(imgui::CalcTextSize("_").x * longest_label);
-                imgui::InputTextWithHint("## theme_editor Colors search", ICON_CI_SEARCH, search_input.data(), search_input.max_size());
+                imgui::InputTextWithHint("## theme_editor Colors search", ICON_CI_SEARCH, s_search_input.data(), s_search_input.max_size());
             }
 
             imgui::SameLineSpaced(1);
@@ -229,7 +231,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                     };
 
                     for (auto &c : s_swan_colors) {
-                        if (strempty(search_input.data()) || StrStrIA(c.label, search_input.data())) {
+                        if (strempty(s_search_input.data()) || StrStrIA(c.label, s_search_input.data())) {
                             render_swan_color_picker(c);
                         }
                     }
@@ -329,7 +331,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                     u64 i = 0;
                     for (; i < lengthof(imgui_colors); ++i) {
                         auto &c = imgui_colors[i];
-                        if (strempty(search_input.data()) || StrStrIA(c.label, search_input.data())) {
+                        if (strempty(s_search_input.data()) || StrStrIA(c.label, s_search_input.data())) {
                             render_imgui_color_picker(c);
                         }
                     }
@@ -346,7 +348,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
         imgui::TableNextColumn();
         {
             u64 constexpr longest_label = 26;
-            static std::array<char, longest_label+1> search_input = {};
+            static std::array<char, longest_label+1> s_search_input = {};
 
             if (imgui::Button(ICON_CI_REFRESH "## Style reset all")) {
                 imgui::OpenConfirmationModalWithCallback(
@@ -368,7 +370,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             {
                 imgui::ScopedItemWidth w(imgui::CalcTextSize("_").x * longest_label);
-                imgui::InputTextWithHint("## theme_editor Style search", ICON_CI_SEARCH, search_input.data(), search_input.max_size());
+                imgui::InputTextWithHint("## theme_editor Style search", ICON_CI_SEARCH, s_search_input.data(), s_search_input.max_size());
             }
 
             imgui::SameLineSpaced(1);
@@ -399,7 +401,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             if (imgui::BeginChild("## theme_editor Style child")) {
                 auto render_input_f32 = [](char const *label, f32 &val, f32 const &fallback_val, char const *format, f32 min = NAN, f32 max = NAN) noexcept {
-                    if (strempty(search_input.data()) || StrStrIA(label, search_input.data())) {
+                    if (strempty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
                         imgui::TableNextColumn();
                         {
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
@@ -422,7 +424,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 };
 
                 auto render_input_bool = [](char const *label, bool &val, bool const &fallback_val) noexcept {
-                    if (strempty(search_input.data()) || StrStrIA(label, search_input.data())) {
+                    if (strempty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
                         imgui::TableNextColumn();
                         {
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
@@ -441,7 +443,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 };
 
                 auto render_input_ImGuiDir = [](char const *label, ImGuiDir &val, ImGuiDir const &fallback_val) noexcept {
-                    if (strempty(search_input.data()) || StrStrIA(label, search_input.data())) {
+                    if (strempty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
                         imgui::TableNextColumn();
                         {
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
@@ -451,7 +453,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
                             imgui::SameLine();
 
-                            static char const *options[] = {
+                            static char const *s_options[] = {
                                 /*ImGuiDir_*/"Left",
                                 /*ImGuiDir_*/"Right",
                                 // /*ImGuiDir_*/"Up",
@@ -459,7 +461,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             };
 
                             auto combo_label = make_str_static<64>("## Combo %s", label);
-                            imgui::Combo(combo_label.data(), &val, options, lengthof(options));
+                            imgui::Combo(combo_label.data(), &val, s_options, lengthof(s_options));
                         }
                         imgui::TableNextColumn();
                         imgui::Text(" %s", label);

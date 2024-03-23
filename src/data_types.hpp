@@ -201,57 +201,6 @@ struct swan_settings
     };
 
     window_visibility show;
-
-#if 0
-private:
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive &ar, [[maybe_unused]] u32 version) noexcept
-    {
-        ar & BOOST_SERIALIZATION_NVP(show_debug_info);
-        ar & BOOST_SERIALIZATION_NVP(explorer_show_dotdot_dir);
-        ar & BOOST_SERIALIZATION_NVP(explorer_cwd_entries_table_alt_row_bg);
-        ar & BOOST_SERIALIZATION_NVP(explorer_cwd_entries_table_borders_in_body);
-        ar & BOOST_SERIALIZATION_NVP(explorer_clear_filter_on_cwd_change);
-
-        ar & BOOST_SERIALIZATION_NVP(startup_with_window_maximized);
-        ar & BOOST_SERIALIZATION_NVP(startup_with_previous_window_pos_and_size);
-
-        ar & BOOST_SERIALIZATION_NVP(confirm_explorer_delete_via_keybind);
-        ar & BOOST_SERIALIZATION_NVP(confirm_explorer_delete_via_context_menu);
-        ar & BOOST_SERIALIZATION_NVP(confirm_explorer_unpin_directory);
-        ar & BOOST_SERIALIZATION_NVP(confirm_recent_files_clear);
-        ar & BOOST_SERIALIZATION_NVP(confirm_delete_pin);
-        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_single);
-        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_group);
-        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_selected);
-        ar & BOOST_SERIALIZATION_NVP(confirm_completed_file_operations_forget_all);
-
-        ar & BOOST_SERIALIZATION_NVP(window_x);
-        ar & BOOST_SERIALIZATION_NVP(window_y);
-        ar & BOOST_SERIALIZATION_NVP(window_w);
-        ar & BOOST_SERIALIZATION_NVP(window_h);
-        ar & BOOST_SERIALIZATION_NVP(size_unit_multiplier);
-        ar & BOOST_SERIALIZATION_NVP(explorer_refresh_mode);
-        ar & BOOST_SERIALIZATION_NVP(dir_separator_utf16);
-        ar & BOOST_SERIALIZATION_NVP(dir_separator_utf8);
-
-        ar & boost::serialization::make_nvp("show_explorer_0", show.explorer_0);
-        ar & boost::serialization::make_nvp("show_explorer_1", show.explorer_1);
-        ar & boost::serialization::make_nvp("show_explorer_2", show.explorer_2);
-        ar & boost::serialization::make_nvp("show_explorer_3", show.explorer_3);
-        ar & boost::serialization::make_nvp("show_pin_manager", show.pinned);
-        ar & boost::serialization::make_nvp("show_file_operations", show.file_operations);
-        ar & boost::serialization::make_nvp("show_recent_files", show.recent_files);
-        ar & boost::serialization::make_nvp("show_analytics", show.analytics);
-        ar & boost::serialization::make_nvp("show_debug_log", show.debug_log);
-        ar & boost::serialization::make_nvp("show_settings", show.settings);
-        ar & boost::serialization::make_nvp("show_imgui_demo", show.imgui_demo);
-        ar & boost::serialization::make_nvp("show_fa_icons", show.fa_icons);
-        ar & boost::serialization::make_nvp("show_ci_icons", show.ci_icons);
-        ar & boost::serialization::make_nvp("show_md_icons", show.md_icons);
-    }
-#endif
 };
 
 enum update_cwd_entries_actions : u8
@@ -503,9 +452,9 @@ struct completed_file_operation
     completed_file_operation(system_time_point_t completion_time, system_time_point_t undo_time, file_operation_type op_type,
                              char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id = 0) noexcept;
 
-    completed_file_operation() noexcept; // for boost::circular_buffer
-    completed_file_operation(completed_file_operation const &other) noexcept; // for boost::circular_buffer
-    completed_file_operation &operator=(completed_file_operation const &other) noexcept; // for boost::circular_buffer
+    completed_file_operation() noexcept;
+    completed_file_operation(completed_file_operation const &other) noexcept;
+    completed_file_operation &operator=(completed_file_operation const &other) noexcept;
 };
 
 struct explorer_file_op_progress_sink : public IFileOperationProgressSink

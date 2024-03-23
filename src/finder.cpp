@@ -148,7 +148,7 @@ void search_proc(progressive_task<std::vector<finder_window::match>> &search_tas
 
 void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
 {
-    if (!imgui::Begin(swan_windows::get_name(swan_windows::finder), &open)) {
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::id::finder), &open)) {
         imgui::End();
         return;
     }
@@ -156,7 +156,7 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
     // auto &io = imgui::GetIO();
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::save_focused_window(swan_windows::finder);
+        global_state::focused_window_set(swan_windows::id::finder);
     }
 
     std::optional<u64> remove_search_dir_idx = std::nullopt;
@@ -276,20 +276,6 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
                 search_proc(std::ref(finder.search_task), finder.search_directories, std::ref(finder.num_entries_checked), finder.search_value);
             });
         }
-
-    #if 0
-        if (imgui::IsItemHovered() && d.state == true) {
-            char const *reasons[] = {
-                search_value_empty ? "search value is empty" : nullptr,
-                any_search_dirs_not_found ? "some search directories not are valid" : nullptr,
-            };
-
-            auto tooltip = make_str_static<256>("Cannot search because %s", std::find_if_not(reasons, reasons + lengthof(reasons),
-                                                                                             [](char const *reason) { return reason == nullptr; }));
-
-            imgui::SetTooltip(tooltip.data());
-        }
-    #endif
     }
 
     imgui::SameLine();

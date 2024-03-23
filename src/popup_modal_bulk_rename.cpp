@@ -85,16 +85,13 @@ void update_recent_files(std::vector<bulk_rename_op> &renames, swan_path const &
         return strcmp(lhs.before->path.data(), rhs.before->path.data()) < 0;
     });
 
-    auto pair = global_state::recent_files();
-    auto &recent_files = *pair.first;
-    auto &mutex = *pair.second;
-
     path_comparator comparator = { global_state::settings().dir_separator_utf8, renames_parent_path };
 
+    auto recent_files = global_state::recent_files_get();
     {
-        std::scoped_lock recent_files_lock(mutex);
+        std::scoped_lock recent_files_lock(*recent_files.mutex);
 
-        for (auto &rf : recent_files) {
+        for (auto &rf : *recent_files.container) {
             auto range = std::equal_range(renames.begin(), renames.end(), rf, comparator);
 
             if (range.first != renames.end()) {
@@ -107,7 +104,7 @@ void update_recent_files(std::vector<bulk_rename_op> &renames, swan_path const &
         }
     }
 
-    (void) global_state::save_recent_files_to_disk();
+    (void) global_state::recent_files_save_to_disk();
 }
 
 void swan_popup_modals::render_bulk_rename() noexcept

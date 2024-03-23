@@ -3,22 +3,22 @@
 #include "imgui_dependent_functions.hpp"
 #include "path.hpp"
 
-static std::mutex s_completed_file_ops_mutex = {};
-static std::deque<completed_file_operation> s_completed_file_ops(1000);
+static std::mutex g_completed_file_ops_mutex = {};
+static std::deque<completed_file_operation> g_completed_file_ops(1000);
 
-std::pair<std::deque<completed_file_operation> *, std::mutex *> global_state::completed_file_ops() noexcept
+global_state::completed_file_operations global_state::completed_file_operations_get() noexcept
 {
-    return std::make_pair(&s_completed_file_ops, &s_completed_file_ops_mutex);
+    return { &g_completed_file_ops, &g_completed_file_ops_mutex };
 }
 
-u32 global_state::next_group_id() noexcept
+u32 global_state::completed_file_operations_calc_next_group_id() noexcept
 {
     u32 max_group_id = 0;
     u32 reserved_nil_value = std::numeric_limits<decltype(max_group_id)>::max();
 
-    std::scoped_lock lock(s_completed_file_ops_mutex);
+    std::scoped_lock lock(g_completed_file_ops_mutex);
 
-    for (auto const &file_op : s_completed_file_ops) {
+    for (auto const &file_op : g_completed_file_ops) {
         if (file_op.group_id > max_group_id) {
             max_group_id = file_op.group_id;
         }
@@ -31,9 +31,9 @@ u32 global_state::next_group_id() noexcept
     }
 }
 
-bool global_state::save_completed_file_ops_to_disk(std::scoped_lock<std::mutex> *supplied_lock) noexcept
+bool global_state::completed_file_operations_save_to_disk(std::scoped_lock<std::mutex> *supplied_lock) noexcept
 try {
-    std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_ops.txt";
+    std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_operations.txt";
 
     std::ofstream out(full_path);
 
@@ -41,14 +41,12 @@ try {
         return false;
     }
 
-    auto pair = global_state::completed_file_ops();
-    auto const &completed_operations = *pair.first;
-    auto &mutex = *pair.second;
+    auto completed_file_operations = global_state::completed_file_operations_get();
 
     {
-        auto lock = supplied_lock != nullptr ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(mutex);
+        auto lock = supplied_lock != nullptr ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(*completed_file_operations.mutex);
 
-        for (auto const &file_op : completed_operations) {
+        for (auto const &file_op : *completed_file_operations.container) {
             auto time_t_completion = std::chrono::system_clock::to_time_t(file_op.completion_time);
             std::tm tm_completion = *std::localtime(&time_t_completion);
 
@@ -68,17 +66,17 @@ try {
         }
     }
 
-    print_debug_msg("SUCCESS global_state::save_completed_file_ops_to_disk");
+    print_debug_msg("SUCCESS global_state::completed_file_operations_save_to_disk");
     return true;
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::save_completed_file_ops_to_disk");
+    print_debug_msg("FAILED global_state::completed_file_operations_save_to_disk");
     return false;
 }
 
-std::pair<bool, u64> global_state::load_completed_file_ops_from_disk(char dir_separator) noexcept
+std::pair<bool, u64> global_state::completed_file_operations_load_from_disk(char dir_separator) noexcept
 try {
-    std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_ops.txt";
+    std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_operations.txt";
 
     std::ifstream in(full_path);
 
@@ -86,13 +84,11 @@ try {
         return { false, 0 };
     }
 
-    auto pair = global_state::completed_file_ops();
-    auto &completed_operations = *pair.first;
-    auto &mutex = *pair.second;
+    auto completed_file_operations = global_state::completed_file_operations_get();
 
-    std::scoped_lock lock(mutex);
+    std::scoped_lock lock(*completed_file_operations.mutex);
 
-    completed_operations.clear();
+    completed_file_operations.container->clear();
 
     std::string line = {};
     line.reserve(global_state::page_size() - 1);
@@ -143,18 +139,18 @@ try {
         path_force_separator(stored_src_path, dir_separator);
         path_force_separator(stored_dst_path, dir_separator);
 
-        completed_operations.emplace_back(stored_time_completion, stored_time_undo, file_operation_type(stored_op_type),
-                                          stored_src_path.data(), stored_dst_path.data(), basic_dirent::kind(stored_obj_type), stored_group_id);
+        completed_file_operations.container->emplace_back(stored_time_completion, stored_time_undo, file_operation_type(stored_op_type),
+                                                          stored_src_path.data(), stored_dst_path.data(), basic_dirent::kind(stored_obj_type), stored_group_id);
         ++num_loaded_successfully;
 
         line.clear();
     }
 
-    print_debug_msg("SUCCESS global_state::load_completed_file_ops_from_disk, loaded %zu records", num_loaded_successfully);
+    print_debug_msg("SUCCESS global_state::completed_file_operations_load_from_disk, loaded %zu records", num_loaded_successfully);
     return { true, num_loaded_successfully };
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::load_completed_file_ops_from_disk");
+    print_debug_msg("FAILED global_state::completed_file_operations_load_from_disk");
     return { false, 0 };
 }
 
@@ -461,57 +457,54 @@ u64 deselect_all(std::deque<completed_file_operation> &completed_operations) noe
 
 void swan_windows::render_file_operations(bool &open) noexcept
 {
-    if (!imgui::Begin(swan_windows::get_name(swan_windows::file_operations), &open)) {
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::id::file_operations), &open)) {
         imgui::End();
         return;
     }
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::save_focused_window(swan_windows::file_operations);
+        global_state::focused_window_set(swan_windows::id::file_operations);
     }
 
     auto &io = imgui::GetIO();
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
-    // bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-    bool any_popup_modals_open = global_state::any_popup_modals_open();
-    auto pair = global_state::completed_file_ops();
-    auto &completed_operations = *pair.first;
-    auto &mutex = *pair.second;
+    bool any_popup_modals_open = global_state::popup_modals_are_any_open();
+    auto completed_file_operations = global_state::completed_file_operations_get();
 
     // handle keybind actions
     if (!any_popup_modals_open && window_hovered) {
         if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
-            std::scoped_lock lock(mutex);
-            deselect_all(completed_operations);
+            std::scoped_lock lock(*completed_file_operations.mutex);
+            deselect_all(*completed_file_operations.container);
         }
         else if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_A)) {
-            std::scoped_lock lock(mutex);
-            for (auto &fo : completed_operations) {
-                fo.selected = true;
+            std::scoped_lock lock(*completed_file_operations.mutex);
+            for (auto &cfo : *completed_file_operations.container) {
+                cfo.selected = true;
             }
         }
         else if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_I)) {
-            std::scoped_lock lock(mutex);
-            for (auto &fo : completed_operations) {
-                flip_bool(fo.selected);
+            std::scoped_lock lock(*completed_file_operations.mutex);
+            for (auto &cfo : *completed_file_operations.container) {
+                flip_bool(cfo.selected);
             }
         }
     }
 
-    imgui::Text("%zu completed operations", completed_operations.size());
+    imgui::Text("%zu completed operations", completed_file_operations.container->size());
     imgui::SameLine();
     {
-        imgui::ScopedDisable d(completed_operations.empty());
+        imgui::ScopedDisable d(completed_file_operations.container->empty());
 
         if (imgui::SmallButton("Clear")) {
             imgui::OpenConfirmationModalWithCallback(
                 /* confirmation_id  = */ swan_id_confirm_completed_file_operations_forget_all,
                 /* confirmation_msg = */ "Are you sure you want to delete your ENTIRE file operations history? This action cannot be undone.",
                 /* on_yes_callback  = */
-                [&mutex, &completed_operations]() noexcept {
-                    std::scoped_lock lock(mutex);
-                    completed_operations.clear();
-                    (void) global_state::save_completed_file_ops_to_disk(&lock);
+                [completed_file_operations]() noexcept {
+                    std::scoped_lock lock(*completed_file_operations.mutex);
+                    completed_file_operations.container->clear();
+                    (void) global_state::completed_file_operations_save_to_disk(&lock);
                     (void) global_state::settings().save_to_disk();
                 },
                 /* confirmation_enabled = */ &(global_state::settings().confirm_completed_file_operations_forget_all)
@@ -538,9 +531,9 @@ void swan_windows::render_file_operations(bool &open) noexcept
         (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
     ;
 
-    if (imgui::BeginTable("completed_file_operations", file_ops_table_col_count, table_flags)) {
-        static std::optional< std::deque<completed_file_operation>::iterator > context_menu_target_iter = std::nullopt;
-                              std::deque<completed_file_operation>::iterator   remove_single_iter       = completed_operations.end();
+    if (imgui::BeginTable("completed_file_operations_get", file_ops_table_col_count, table_flags)) {
+        static std::optional< std::deque<completed_file_operation>::iterator > s_context_menu_target_iter = std::nullopt;
+                              std::deque<completed_file_operation>::iterator   remove_single_iter         = completed_file_operations.container->end();
 
         static u64 s_num_selected_when_context_menu_opened = 0;
         static u64 s_num_deletes_selected_when_context_menu_opened = 0;
@@ -555,11 +548,11 @@ void swan_windows::render_file_operations(bool &open) noexcept
         ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();
 
-        std::scoped_lock completed_file_ops_lock(mutex);
+        std::scoped_lock completed_file_ops_lock(*completed_file_operations.mutex);
 
         ImGuiListClipper clipper;
         {
-            u64 num_rows_to_render = completed_operations.size();
+            u64 num_rows_to_render = completed_file_operations.container->size();
             assert(num_rows_to_render <= (u64)INT32_MAX);
             clipper.Begin(s32(num_rows_to_render));
         }
@@ -568,8 +561,8 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
         while (clipper.Step())
         for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-            auto &file_op = completed_operations[i];
-            auto elem_iter = completed_operations.begin() + i;
+            auto elem_iter = completed_file_operations.container->begin() + i;
+            auto &file_op  = *elem_iter;
 
             imgui::TableNextRow();
 
@@ -634,7 +627,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     u64 num_deselected = 0;
                     if (!io.KeyCtrl && !io.KeyShift) {
                         // entry was selected but Ctrl was not held, so deselect everything
-                        num_deselected = deselect_all(completed_operations);
+                        num_deselected = deselect_all(*completed_file_operations.container);
                     }
 
                     if (num_deselected > 1) {
@@ -647,7 +640,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                         auto [first_idx, last_idx] = imgui::SelectRange(s_latest_selected_row_idx, i);
                         s_latest_selected_row_idx = last_idx;
                         for (u64 j = first_idx; j <= last_idx; ++j) {
-                            completed_operations[j].selected = true;
+                            completed_file_operations.container->operator[](j).selected = true;
                         }
                     } else {
                         s_latest_selected_row_idx = i;
@@ -655,10 +648,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 }
 
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                    imgui::OpenPopup("## completed_file_operations context_menu");
-                    context_menu_target_iter = elem_iter;
+                    imgui::OpenPopup("## completed_file_operations_get context_menu");
+                    s_context_menu_target_iter = elem_iter;
 
-                    for (auto const &cfo : completed_operations) {
+                    for (auto const &cfo : *completed_file_operations.container) {
                         s_num_selected_when_context_menu_opened += u64(cfo.selected);
                         s_num_deletes_selected_when_context_menu_opened += u64(cfo.op_type == file_operation_type::del && cfo.selected);
                         s_num_deletes_in_group_when_context_menu_opened += u64(cfo.op_type == file_operation_type::del && cfo.group_id == elem_iter->group_id);
@@ -677,10 +670,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
         bool execute_forget_group_immediately = false;
         bool execute_forget_selection_immediately = false;
 
-        if (imgui::BeginPopup("## completed_file_operations context_menu")) {
-            assert(context_menu_target_iter.has_value());
-            assert(context_menu_target_iter.value() != completed_operations.end());
-            completed_file_operation &context_target = *context_menu_target_iter.value();
+        if (imgui::BeginPopup("## completed_file_operations_get context_menu")) {
+            assert(s_context_menu_target_iter.has_value());
+            assert(s_context_menu_target_iter.value() != completed_file_operations.container->end());
+            completed_file_operation &context_target = *s_context_menu_target_iter.value();
 
             {
                 auto reveal = [](swan_path const &full_path) noexcept {
@@ -760,7 +753,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                         if (res.success()) {
                             context_target.undo_time = current_time_system();
                             context_target.selected = false;
-                            (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                            (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                         }
                         else {
                             std::string action = make_str("Undelete file [%s].", context_target.src_path.data());
@@ -780,7 +773,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
                             if (res.step3_new_hardlink_created) {
                                 // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
                                 context_target.undo_time = current_time_system();
-                                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                                (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                             }
                         }
                     }
@@ -937,10 +930,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
             auto status = imgui::GetConfirmationStatus(swan_id_confirm_completed_file_operations_forget_single);
 
             if (execute_forget_single_immediately || status.value_or(false)) {
-                completed_operations.erase(context_menu_target_iter.value());
+                completed_file_operations.container->erase(s_context_menu_target_iter.value());
 
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
-                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
             }
         }
 
@@ -948,16 +941,19 @@ void swan_windows::render_file_operations(bool &open) noexcept
             auto status = imgui::GetConfirmationStatus(swan_id_confirm_completed_file_operations_forget_group);
 
             if (execute_forget_group_immediately || status.value_or(false)) {
-                u32 group_id = context_menu_target_iter.value()->group_id;
+                u32 group_id = s_context_menu_target_iter.value()->group_id;
 
                 auto predicate_same_group = [group_id](completed_file_operation const &cfo) noexcept { return cfo.group_id == group_id; };
 
-                auto remove_group_begin_iter = std::find_if    (completed_operations.begin(), completed_operations.end(), predicate_same_group);
-                auto remove_group_end_iter   = std::find_if_not(remove_group_begin_iter,      completed_operations.end(), predicate_same_group);
+                auto begin_iter = completed_file_operations.container->begin();
+                auto end_iter   = completed_file_operations.container->end();
 
-                completed_operations.erase(remove_group_begin_iter, remove_group_end_iter);
+                auto remove_group_begin_iter = std::find_if    (begin_iter,              end_iter, predicate_same_group);
+                auto remove_group_end_iter   = std::find_if_not(remove_group_begin_iter, end_iter, predicate_same_group);
 
-                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                completed_file_operations.container->erase(remove_group_begin_iter, remove_group_end_iter);
+
+                (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
             }
         }
@@ -966,19 +962,20 @@ void swan_windows::render_file_operations(bool &open) noexcept
             auto status = imgui::GetConfirmationStatus(swan_id_confirm_completed_file_operations_forget_selected);
 
             if (execute_forget_selection_immediately || status.value_or(false)) {
-                auto not_selected_end_iter = std::remove_if(completed_operations.begin(), completed_operations.end(),
-                                                            [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
+                auto begin_iter = completed_file_operations.container->begin();
+                auto end_iter   = completed_file_operations.container->end();
 
-                completed_operations.erase(not_selected_end_iter, completed_operations.end());
+                auto not_selected_end_iter = std::remove_if(begin_iter, end_iter, [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
+
+                completed_file_operations.container->erase(not_selected_end_iter, end_iter);
 
                 // perplexingly, the unremoved elements (who were not selected prior) become selected after .erase(),
                 // hence this seemingly unnecessary operation. I suspect it has something to do with imgui::Selectable,
                 // but I don't have the time or will to go figure out the root case so I'm just going to fix it here.
                 // let the runtime parallelize it too, in hopes that for large containers it will be faster.
-                std::for_each(std::execution::par_unseq, completed_operations.begin(), completed_operations.end(),
-                              [](completed_file_operation &cfo) noexcept { cfo.selected = false; });
+                std::for_each(std::execution::par_unseq, begin_iter, end_iter, [](completed_file_operation &cfo) noexcept { cfo.selected = false; });
 
-                (void) global_state::save_completed_file_ops_to_disk(&completed_file_ops_lock);
+                (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
             }
         }
@@ -1196,7 +1193,7 @@ void perform_file_operations(
         }
 
         bool compound_operation = i > 1;
-        prog_sink.group_id = compound_operation ? global_state::next_group_id() : 0;
+        prog_sink.group_id = compound_operation ? global_state::completed_file_operations_calc_next_group_id() : 0;
     }
 
     DWORD cookie = {};

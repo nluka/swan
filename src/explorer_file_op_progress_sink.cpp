@@ -93,16 +93,14 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
     path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
 
     {
-        auto pair = global_state::completed_file_ops();
-        auto &completed_file_ops = *pair.first;
-        auto &mutex = *pair.second;
+        auto completed_file_operations = global_state::completed_file_operations_get();
 
-        std::scoped_lock lock(mutex);
+        std::scoped_lock lock(*completed_file_operations.mutex);
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
-        completed_file_ops.emplace_front(completion_time, system_time_point_t(), file_operation_type::move,
-                                         src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
+        completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::move,
+                                                           src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 
     return S_OK;
@@ -151,16 +149,14 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
     }
 
     {
-        auto pair = global_state::completed_file_ops();
-        auto &completed_file_ops = *pair.first;
-        auto &mutex = *pair.second;
+        auto completed_file_operations = global_state::completed_file_operations_get();
 
-        std::scoped_lock lock(mutex);
+        std::scoped_lock lock(*completed_file_operations.mutex);
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
-        completed_file_ops.emplace_front(completion_time, system_time_point_t(), file_operation_type::del,
-                                         deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
+        completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::del,
+                                                          deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
     }
 
     print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
@@ -214,16 +210,14 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
     path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
 
     {
-        auto pair = global_state::completed_file_ops();
-        auto &completed_file_ops = *pair.first;
-        auto &mutex = *pair.second;
+        auto completed_file_operations = global_state::completed_file_operations_get();
 
-        std::scoped_lock lock(mutex);
+        std::scoped_lock lock(*completed_file_operations.mutex);
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
-        completed_file_ops.emplace_front(completion_time, system_time_point_t(), file_operation_type::copy,
-                                         src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
+        completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::copy,
+                                                           src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 
     return S_OK;
@@ -243,13 +237,11 @@ HRESULT explorer_file_op_progress_sink::FinishOperations(HRESULT) noexcept
         {
             auto new_buffer = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
 
-            auto pair = global_state::recent_files();
-            auto &recent_files = *pair.first;
-            auto &mutex = *pair.second;
+            auto recent_files = global_state::recent_files_get();
 
-            std::scoped_lock lock(mutex);
+            std::scoped_lock lock(*recent_files.mutex);
 
-            for (auto const &recent_file : recent_files) {
+            for (auto const &recent_file : *recent_files.container) {
                 wchar_t recent_file_path_utf16[MAX_PATH];
 
                 if (utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16))) {
@@ -259,13 +251,13 @@ HRESULT explorer_file_op_progress_sink::FinishOperations(HRESULT) noexcept
                 }
             }
 
-            recent_files = new_buffer;
+            *recent_files.container = new_buffer;
         }
 
-        global_state::save_recent_files_to_disk();
+        global_state::recent_files_save_to_disk();
     }
 
-    (void) global_state::save_completed_file_ops_to_disk(nullptr);
+    (void) global_state::completed_file_operations_save_to_disk(nullptr);
 
     return S_OK;
 }
