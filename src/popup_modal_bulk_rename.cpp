@@ -341,21 +341,21 @@ void swan_popup_modals::render_bulk_rename() noexcept
     bool all_renames_attempted = (success + fail) == total;
 
     if (state == bulk_rename_state::in_progress && fail > 0) {
-        imgui::TextColored(red(), "%zu renames failed!", fail);
+        imgui::TextColored(error_color(), "%zu renames failed!", fail);
         // TODO: show failures
     }
     else if (state == bulk_rename_state::done && all_renames_attempted && fail > 0) {
-        imgui::TextColored(red(), "%zu renames failed!", fail);
+        imgui::TextColored(error_color(), "%zu renames failed!", fail);
         // TODO: show failures
     }
     else if (state == bulk_rename_state::done && !all_renames_attempted) {
-        imgui::TextColored(red(), "Catastrophic failure, unable to attempt all renames!");
+        imgui::TextColored(error_color(), "Catastrophic failure, unable to attempt all renames!");
     }
     else if (state == bulk_rename_state::cancelled) {
-        imgui::TextColored(red(), "Operation cancelled.");
+        imgui::TextColored(error_color(), "Operation cancelled.");
     }
     else if (!s_collisions.empty()) {
-        imgui::TextColored(red(), "Collisions detected, see below.");
+        imgui::TextColored(error_color(), "Collisions detected, see below.");
 
         enum collisions_table_col_id : s32
         {
@@ -396,7 +396,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                     if (imgui::TableSetColumnIndex(collisions_table_col_problem)) {
                         imgui::AlignTextToFramePadding();
-                        imgui::TextColored(red(), c.dest_dirent ? "Name exists in destination" : "Converge to same name");
+                        imgui::TextColored(error_color(), c.dest_dirent ? "Name exists in destination" : "Converge to same name");
                     }
 
                     if (imgui::TableSetColumnIndex(collisions_table_col_after)) {
@@ -461,7 +461,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
         imgui::PushTextWrapPos(imgui::GetColumnWidth());
         SCOPE_EXIT { imgui::PopTextWrapPos(); };
 
-        imgui::TextColored(red(), compile_error.data());
+        imgui::TextColored(error_color(), compile_error.data());
     }
     else { // show preview
         if (imgui::BeginChild("bulk_rename_child")) {

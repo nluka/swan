@@ -54,7 +54,7 @@ void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexc
         new_frame(ini_file_path);
 
         if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
-            imgui::TextColored(red(), "Application is unable to continue, critical initialization failed:");
+            imgui::TextColored(error_color(), "Application is unable to continue, critical initialization failed:");
             imgui::TextUnformatted(what_failed);
             retry = imgui::Button("Retry");
         }
@@ -1483,7 +1483,7 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
             f64 percent_files    = (f64(cnt.child_files)       / f64(cnt.child_dirents)) * 100.0;
 
             if (cnt.child_directories > 0) {
-                imgui::TextColored(dir_color(), "%zu (%.2lf %%) director%s.", cnt.child_directories, percent_dirs, pluralized(cnt.child_directories, "y", "ies"));
+                imgui::TextColored(directory_color(), "%zu (%.2lf %%) director%s.", cnt.child_directories, percent_dirs, pluralized(cnt.child_directories, "y", "ies"));
             }
             if (cnt.child_symlinks > 0) {
                 imgui::TextColored(symlink_color(), "%zu (%.2lf %%) symlink%s.", cnt.child_symlinks, percent_symlinks, pluralized(cnt.child_symlinks, "", "s"));
@@ -1509,7 +1509,7 @@ void render_num_cwd_items_filtered(explorer_window &expl, cwd_count_info const &
 
     if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
         if (cnt.filtered_directories > 0) {
-            imgui::TextColored(dir_color(), "%zu director%s filtered.", cnt.filtered_directories, pluralized(cnt.filtered_directories, "y", "ies"));
+            imgui::TextColored(directory_color(), "%zu director%s filtered.", cnt.filtered_directories, pluralized(cnt.filtered_directories, "y", "ies"));
         }
         if (cnt.filtered_symlinks > 0) {
             imgui::TextColored(symlink_color(), "%zu symlink%s filtered.", cnt.filtered_symlinks, pluralized(cnt.filtered_symlinks, "", "s"));
@@ -1536,7 +1536,7 @@ void render_num_cwd_items_selected(explorer_window &expl, cwd_count_info const &
 
     if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
         if (cnt.selected_directories > 0) {
-            imgui::TextColored(dir_color(), "%zu director%s selected.", cnt.selected_directories, pluralized(cnt.selected_directories, "y", "ies"));
+            imgui::TextColored(directory_color(), "%zu director%s selected.", cnt.selected_directories, pluralized(cnt.selected_directories, "y", "ies"));
         }
         if (cnt.selected_symlinks > 0) {
             imgui::TextColored(symlink_color(), "%zu symlink%s selected.", cnt.selected_symlinks, pluralized(cnt.selected_symlinks, "", "s"));
@@ -1687,6 +1687,7 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
     }
 }
 
+#if 0
 static
 void render_history_browser_button() noexcept
 {
@@ -1697,6 +1698,7 @@ void render_history_browser_button() noexcept
         imgui::SetTooltip("Open history");
     }
 }
+#endif
 
 static
 bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[maybe_unused]] bool show_history_label = true) noexcept
@@ -1743,7 +1745,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
 
                 imgui::TableNextColumn();
                 if (i == expl.wd_history_pos) {
-                    imgui::TextColored(orange(), ICON_FA_LONG_ARROW_ALT_RIGHT);
+                    imgui::TextColored(warning_color(), ICON_FA_LONG_ARROW_ALT_RIGHT);
                 }
 
                 imgui::TableNextColumn();
@@ -1754,7 +1756,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
                 auto label = make_str_static<1200>("%s ##%zu", hist_path.data(), i);
                 bool pressed;
                 {
-                    imgui::ScopedTextColor tc(dir_color());
+                    imgui::ScopedTextColor tc(directory_color());
                     pressed = imgui::Selectable(label.data(), false, ImGuiSelectableFlags_SpanAllColumns);
                 }
 
@@ -2112,6 +2114,7 @@ void render_filter_polarity_button(explorer_window &expl) noexcept
 //     imgui::Button(ICON_CI_BLANK);
 // }
 
+#if 0
 static
 void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) noexcept
 {
@@ -2162,6 +2165,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
         imgui::SetTooltip("%s current working directory", already_pinned ? "Unpin" : "Pin");
     }
 }
+#endif
 
 static
 void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_before_edit) noexcept
@@ -2757,7 +2761,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         if (expl.filter_error != "") {
             imgui::PushTextWrapPos(imgui::GetColumnWidth());
-            imgui::TextColored(red(), "%s", expl.filter_error.c_str());
+            imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
             imgui::PopTextWrapPos();
         }
 
@@ -2876,16 +2880,12 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             if (expl.cwd_entries.empty()) {
                 imgui::Spacing(3);
                 imgui::SameLineSpaced(1); // indent
-                if (!directory_exists(expl.cwd.data())) {
-                    imgui::TextColored(orange(), "Directory not found.");
-                } else {
-                    imgui::TextColored(orange(), "Empty directory.");
-                }
+                imgui::TextColored(warning_color(), directory_exists(expl.cwd.data()) ? "Empty directory." : "Directory not found.");
             }
             else if (cnt.filtered_dirents == expl.cwd_entries.size()) {
                 imgui::Spacing(3);
                 imgui::SameLineSpaced(1); // indent
-                imgui::TextColored(orange(), "All items filtered.");
+                imgui::TextColored(warning_color(), "All items filtered.");
 
                 if (imgui::IsItemClicked()) {
                     expl.show_filter_window = true;
@@ -2942,7 +2942,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     s_dirent_to_be_renamed = result.single_dirent_to_be_renamed;
                 }
 
-                if (result.context_menu_rect.has_value() && context_menu_target_name_rect.has_value()) {
+                if (result.context_menu_rect.has_value() && context_menu_target_name_rect.has_value() && cnt.selected_dirents <= 1) {
                     ImVec2 surrounding_rect_padding = { 5.f, 5.f };
                     context_menu_target_name_rect.value().Min -= surrounding_rect_padding;
                     context_menu_target_name_rect.value().Max += surrounding_rect_padding;
@@ -3149,7 +3149,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
                 if (expl.filter_error != "") {
                     imgui::PushTextWrapPos(imgui::GetColumnWidth());
-                    imgui::TextColored(red(), "%s", expl.filter_error.c_str());
+                    imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
                     imgui::PopTextWrapPos();
                 }
             }
@@ -3306,7 +3306,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
                 // render colored icon
                 {
-                    ImVec4 color = dirent.spotlight_frames_remaining > 0 ? red() : get_color(dirent.basic.type);
+                    ImVec4 color = dirent.spotlight_frames_remaining > 0 ? error_color() : get_color(dirent.basic.type);
                     f32 &alpha = color.w;
                     alpha = 1.0f - (f32(dirent.is_cut) * 0.75f);
                     imgui::TextColored(color, icon);
@@ -3320,8 +3320,8 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 ImVec2 name_BR = {};
 
                 {
-                    imgui::ScopedTextColor tc_spotlight(dirent.spotlight_frames_remaining > 0 ? red() : white());
-                    // imgui::ScopedStyle<ImVec4> tc_context(imgui::GetStyle().Colors[ImGuiCol_Text], red(), dirent.context_menu_active);
+                    imgui::ScopedTextColor tc_spotlight(dirent.spotlight_frames_remaining > 0 ? error_color() : imgui::GetStyle().Colors[ImGuiCol_Text]);
+                    // imgui::ScopedStyle<ImVec4> tc_context(imgui::GetStyle().Colors[ImGuiCol_Text], error_color(), dirent.context_menu_active);
 
                     auto label = make_str_static<1200>("%s##dirent%zu", path, i);
                     if (imgui::Selectable(label.data(), dirent.is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
@@ -3943,7 +3943,7 @@ void render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle 
         imgui::AlignTextToFramePadding();
 
         if (expl.refresh_message != "") {
-            imgui::TextColored(orange(), "%s", expl.refresh_message.c_str());
+            imgui::TextColored(warning_color(), "%s", expl.refresh_message.c_str());
             if (imgui::IsItemHovered()) {
                 imgui::SetTooltip(expl.refresh_message_tooltip.c_str());
             }

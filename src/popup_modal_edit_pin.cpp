@@ -56,7 +56,7 @@ void swan_popup_modals::render_edit_pin() noexcept
 
     static char s_label_input[pinned_path::LABEL_MAX_LEN + 1] = {};
     static swan_path s_path_input = {};
-    static ImVec4 s_color_input = dir_color();
+    static ImVec4 s_color_input = directory_color();
     static std::string s_err_msg = {};
 
     auto cleanup_and_close_popup = [&]() noexcept {
@@ -133,7 +133,7 @@ void swan_popup_modals::render_edit_pin() noexcept
     imgui::TextColored(s_color_input, "Color");
 
     if (!s_err_msg.empty()) {
-        imgui::TextColored(red(), "Error: %s", s_err_msg.c_str());
+        imgui::TextColored(error_color(), "Error: %s", s_err_msg.c_str());
     }
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {

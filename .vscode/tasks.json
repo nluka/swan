@@ -35,7 +35,12 @@
       "group": {
         "kind": "build",
         "isDefault": true
-      }
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "reveal": "always"
+      },
     },
     {
       "label": "Build Swan (Release)",

@@ -61,9 +61,13 @@ try {
     print_debug_msg("COM initialized successfully for explorers");
     SCOPE_EXIT { clean_COM_for_explorers(); };
 
+    ImGuiStyle const our_default_imgui_style = swan_default_imgui_style();
+
     // other initialization stuff which is either: optional, cannot fail, or whose failure is considered non-fatal
     {
         set_window_icon(window);
+
+        imgui::GetStyle() = our_default_imgui_style;
 
         seed_fast_rand((u64)current_time_precise().time_since_epoch().count());
 
@@ -84,13 +88,7 @@ try {
             glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
             glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
         }
-
-        imgui::StyleColorsDark();
-        apply_swan_style_overrides();
     }
-
-    ImVec4 starting_colors[ImGuiCol_COUNT] = {};
-    (void) std::memcpy(starting_colors, imgui::GetStyle().Colors, sizeof(ImVec4) * ImGuiCol_COUNT);
 
     auto &explorers = global_state::explorers();
     // init explorers
@@ -311,7 +309,7 @@ try {
                 }
                 case swan_windows::theme_editor: {
                     if (window_visib.theme_editor) {
-                        swan_windows::render_theme_editor(window_visib.theme_editor, starting_colors);
+                        swan_windows::render_theme_editor(window_visib.theme_editor, our_default_imgui_style);
                     }
                     break;
                 }
@@ -668,17 +666,19 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             }
 
             if (imgui::BeginMenu("Confirmations")) {
-                setting_change |= imgui::MenuItem("Clear  [Recent Files]", nullptr, &global_state::settings().confirm_recent_files_clear);
-                setting_change |= imgui::MenuItem("Reveal [Recent Files] selection in File Explorer", nullptr, &global_state::settings().confirm_recent_files_reveal_selected_in_win_file_expl);
-                setting_change |= imgui::MenuItem("Forget [Recent Files] selection", nullptr, &global_state::settings().confirm_recent_files_forget_selected);
-                setting_change |= imgui::MenuItem("Delete [Pinned] pin", nullptr, &global_state::settings().confirm_delete_pin);
-                setting_change |= imgui::MenuItem("Delete [Explorer] via context menu", nullptr, &global_state::settings().confirm_explorer_delete_via_context_menu);
-                setting_change |= imgui::MenuItem("Delete [Explorer] via Del key", nullptr, &global_state::settings().confirm_explorer_delete_via_keybind);
-                setting_change |= imgui::MenuItem("Unpin  [Explorer] working directory", nullptr, &global_state::settings().confirm_explorer_unpin_directory);
-                setting_change |= imgui::MenuItem("Forget [File Operations] single", nullptr, &global_state::settings().confirm_completed_file_operations_forget_single);
-                setting_change |= imgui::MenuItem("Forget [File Operations] group", nullptr, &global_state::settings().confirm_completed_file_operations_forget_group);
-                setting_change |= imgui::MenuItem("Forget [File Operations] selection", nullptr, &global_state::settings().confirm_completed_file_operations_forget_selected);
-                setting_change |= imgui::MenuItem("Forget [File Operations] all", nullptr, &global_state::settings().confirm_completed_file_operations_forget_all);
+                setting_change |= imgui::MenuItem("[Recent Files]     Clear", nullptr, &global_state::settings().confirm_recent_files_clear);
+                setting_change |= imgui::MenuItem("[Recent Files]     Reveal selection in File Explorer", nullptr, &global_state::settings().confirm_recent_files_reveal_selected_in_win_file_expl);
+                setting_change |= imgui::MenuItem("[Recent Files]     Forget selection", nullptr, &global_state::settings().confirm_recent_files_forget_selected);
+                setting_change |= imgui::MenuItem("[Pinned]           Delete pin", nullptr, &global_state::settings().confirm_delete_pin);
+                setting_change |= imgui::MenuItem("[Explorer]         Delete via context menu", nullptr, &global_state::settings().confirm_explorer_delete_via_context_menu);
+                setting_change |= imgui::MenuItem("[Explorer]         Delete via Del key", nullptr, &global_state::settings().confirm_explorer_delete_via_keybind);
+                setting_change |= imgui::MenuItem("[Explorer]         Unpin working directory", nullptr, &global_state::settings().confirm_explorer_unpin_directory);
+                setting_change |= imgui::MenuItem("[File Operations]  Forget single", nullptr, &global_state::settings().confirm_completed_file_operations_forget_single);
+                setting_change |= imgui::MenuItem("[File Operations]  Forget group", nullptr, &global_state::settings().confirm_completed_file_operations_forget_group);
+                setting_change |= imgui::MenuItem("[File Operations]  Forget selection", nullptr, &global_state::settings().confirm_completed_file_operations_forget_selected);
+                setting_change |= imgui::MenuItem("[File Operations]  Forget all", nullptr, &global_state::settings().confirm_completed_file_operations_forget_all);
+                setting_change |= imgui::MenuItem("[Theme Editor]     Reset colors", nullptr, &global_state::settings().confirm_theme_editor_color_reset);
+                setting_change |= imgui::MenuItem("[Theme Editor]     Reset style", nullptr, &global_state::settings().confirm_theme_editor_style_reset);
 
                 imgui::EndMenu();
             }
@@ -758,7 +758,7 @@ void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcep
         new_frame(ini_file_path);
 
         if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
-            imgui::TextColored(red(), "Application is unable to continue, essential file(s) not found:");
+            imgui::TextColored(error_color(), "Application is unable to continue, essential file(s) not found:");
             imgui::Spacing();
             for (u64 i = 0; i < lengthof(essential); ++i) {
                 auto &file = essential[i];
@@ -856,7 +856,7 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
         new_frame(ini_file_path);
 
         if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
-            imgui::TextColored(red(), "Application is unable to continue, font(s) failed to load:");
+            imgui::TextColored(error_color(), "Application is unable to continue, font(s) failed to load:");
             imgui::Spacing();
             for (auto const &font : failed_fonts) {
                 imgui::TextUnformatted(font.generic_string().c_str());

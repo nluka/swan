@@ -192,7 +192,7 @@ void swan_popup_modals::render_single_rename() noexcept
     }
 
     if (!s_err_msg.empty()) {
-        imgui::TextColored(red(), "Error: %s", s_err_msg.c_str());
+        imgui::TextColored(error_color(), "Error: %s", s_err_msg.c_str());
     }
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {

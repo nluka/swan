@@ -17,6 +17,13 @@ typedef BS::thread_pool swan_thread_pool_t;
 #include "path.hpp"
 #include "util.hpp"
 
+inline ImVec4 default_success_color() noexcept { return ImVec4(0, 1, 0, 1); }
+inline ImVec4 default_warning_color() noexcept { return ImVec4(1, 0.5f, 0, 1); }
+inline ImVec4 default_error_color() noexcept { return ImVec4(1, 0, 0, 1); }
+inline ImVec4 default_directory_color() noexcept { return ImVec4(1, 1, 0, 1); }
+inline ImVec4 default_symlink_color() noexcept { return ImVec4(220/255.f, 189/255.f, 251/255.f, 1); }
+inline ImVec4 default_file_color() noexcept { return ImVec4(0.85f, 1, 0.85f, 1); }
+
 /// Bundle of state for a "progressive" task - a cancellable async function.
 /// Provides a facility to safely query the result as the task progresses, and cancel the task.
 template <typename Result>
@@ -135,8 +142,15 @@ struct swan_settings
         explorer_refresh_mode_count
     };
 
-    s32 window_x = 10, window_y = 40; //! must be adjacent, y must always come after x in memory
-    s32 window_w = 1280, window_h = 720; //! must be adjacent, h must always come after w in memory
+    ImVec4 success_color = default_success_color();
+    ImVec4 warning_color = default_warning_color();
+    ImVec4 error_color = default_error_color();
+    ImVec4 directory_color = default_directory_color();
+    ImVec4 file_color = default_file_color();
+    ImVec4 symlink_color = default_symlink_color();
+
+    s32 window_x = 10, window_y = 40; //! must be adjacent, y must come after x in memory
+    s32 window_w = 1280, window_h = 720; //! must be adjacent, h must come after w in memory
     s32 size_unit_multiplier = 1024;
     explorer_refresh_mode explorer_refresh_mode = explorer_refresh_mode_automatic;
     wchar_t dir_separator_utf16 = L'\\';
@@ -162,6 +176,8 @@ struct swan_settings
     bool confirm_completed_file_operations_forget_group = true;
     bool confirm_completed_file_operations_forget_selected = true;
     bool confirm_completed_file_operations_forget_all = true;
+    bool confirm_theme_editor_color_reset = true;
+    bool confirm_theme_editor_style_reset = true;
 
     struct window_visibility
     {
@@ -681,6 +697,9 @@ enum swan_confirmation_id : s32
     swan_id_confirm_completed_file_operations_forget_group,
     swan_id_confirm_completed_file_operations_forget_selected,
     swan_id_confirm_completed_file_operations_forget_all,
+
+    swan_id_confirm_theme_editor_color_reset,
+    swan_id_confirm_theme_editor_style_reset,
 
     swan_id_confirm_count
 };

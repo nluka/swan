@@ -413,11 +413,14 @@ bool imgui::DrawBestLineBetweenRectCorners(ImRect const &rect1, ImRect const &re
         imgui::GetForegroundDrawList()->AddRect(rect2_with_margin.GetTL(), rect2_with_margin.GetBR(), color_u32);
     }
 
+    ImVec2 rect_size = { 2, 2 };
     if (rect1_corner_circle_radius > 0.f) {
-        imgui::GetForegroundDrawList()->AddCircleFilled(best_line.m_p1, rect1_corner_circle_radius, color_u32);
+        imgui::GetForegroundDrawList()->AddRectFilled(best_line.m_p1 - rect_size, best_line.m_p1 + rect_size, color_u32);
+        // imgui::GetForegroundDrawList()->AddCircleFilled(best_line.m_p1, rect1_corner_circle_radius, color_u32);
     }
     if (rect2_corner_circle_radius > 0.f) {
-        imgui::GetForegroundDrawList()->AddCircleFilled(best_line.m_p2, rect2_corner_circle_radius, color_u32);
+        imgui::GetForegroundDrawList()->AddRectFilled(best_line.m_p2 - rect_size, best_line.m_p2 + rect_size, color_u32);
+        // imgui::GetForegroundDrawList()->AddCircleFilled(best_line.m_p2, rect2_corner_circle_radius, color_u32);
     }
 
     return true;

@@ -96,13 +96,13 @@ void swan_popup_modals::render_error() noexcept
         SCOPE_EXIT { imgui::PopTextWrapPos(); };
 
         if (g_action.empty()) {
-            imgui::TextColored(red(), "%s", g_failure.c_str());
+            imgui::TextColored(error_color(), "%s", g_failure.c_str());
         }
         else {
             imgui::TextUnformatted("Failed:");
-            imgui::TextColored(orange(), "%s", g_action.c_str());
+            imgui::TextColored(warning_color(), "%s", g_action.c_str());
             imgui::TextUnformatted("Reason:");
-            imgui::TextColored(red(), "%s", g_failure.c_str());
+            imgui::TextColored(error_color(), "%s", g_failure.c_str());
         }
     }
 

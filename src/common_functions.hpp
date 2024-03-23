@@ -139,7 +139,7 @@ namespace swan_windows
 
     void render_icon_library(bool &open) noexcept;
 
-    void render_theme_editor(bool &open, ImVec4 *starting_colors) noexcept;
+    void render_theme_editor(bool &open, ImGuiStyle const &fallback_style) noexcept;
 
 } // namespace render_window
 

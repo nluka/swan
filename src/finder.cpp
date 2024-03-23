@@ -176,19 +176,19 @@ void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
         }
 
         if (path_is_empty(search_directory.path_utf8)) {
-            imgui::TextColored(orange(), ICON_CI_ALERT);
+            imgui::TextColored(warning_color(), ICON_CI_ALERT);
             if (imgui::IsItemHovered()) {
                 imgui::SetTooltip("Empty input");
             }
         }
         else if (search_directory.found) {
-            imgui::TextColored(ImVec4(0, 1, 0, 1), ICON_CI_CHECK);
+            imgui::TextColored(success_color(), ICON_CI_CHECK);
             if (imgui::IsItemHovered()) {
                 imgui::SetTooltip("Directory found");
             }
         }
         else {
-            imgui::TextColored(ImVec4(1, 0, 0, 1), ICON_CI_X);
+            imgui::TextColored(error_color(), ICON_CI_X);
             if (imgui::IsItemHovered()) {
                 imgui::SetTooltip("Directory not found");
             }
