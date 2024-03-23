@@ -7,9 +7,10 @@ u64 compute_levenshtein_dist(char const *word1, u64 size1, char const *word2, u6
     // int size2 = word2.size();
 
     // int verif[size1 + 1][size2 + 1]; // Verification matrix i.e. 2D array which will store the calculated distance.
-    std::vector< std::vector<u64> > verif;
-    verif.resize(size1 + 1);
-    for (auto &row : verif)
+    static static_vector< static_vector<u64, 64>, 64 > s_verif;
+    s_verif.clear();
+    s_verif.resize(size1 + 1);
+    for (auto &row : s_verif)
         row.resize(size2 + 1);
 
     // If one of the words has zero length, the distance is equal to the size of the other word.
@@ -20,9 +21,9 @@ u64 compute_levenshtein_dist(char const *word1, u64 size1, char const *word2, u6
 
     // Sets the first row and the first column of the verification matrix with the numerical order from 0 to the length of each word.
     for (int i = 0; i <= size1; i++)
-        verif[i][0] = i;
+        s_verif[i][0] = i;
     for (int j = 0; j <= size2; j++)
-        verif[0][j] = j;
+        s_verif[0][j] = j;
 
     // Verification step / matrix filling.
     for (int i = 1; i <= size1; i++) {
@@ -35,15 +36,15 @@ u64 compute_levenshtein_dist(char const *word1, u64 size1, char const *word2, u6
             // a = the upper adjacent value plus 1: verif[i - 1][j] + 1
             // b = the left adjacent value plus 1: verif[i][j - 1] + 1
             // c = the upper left adjacent value plus the modification cost: verif[i - 1][j - 1] + cost
-            verif[i][j] = std::min(
-                std::min(verif[i - 1][j] + 1, verif[i][j - 1] + 1),
-                verif[i - 1][j - 1] + cost
+            s_verif[i][j] = std::min(
+                std::min(s_verif[i - 1][j] + 1, s_verif[i][j - 1] + 1),
+                s_verif[i - 1][j - 1] + cost
             );
         }
     }
 
     // The last position of the matrix will contain the Levenshtein distance.
-    return verif[size1][size2];
+    return s_verif[size1][size2];
 }
 
 void swan_windows::render_icon_library(bool &open) noexcept
@@ -63,7 +64,7 @@ void swan_windows::render_icon_library(bool &open) noexcept
         char const *prefix;
         std::vector<icon_font_glyph> glyphs;
     };
-    static icon_library icon_libraries[] = {
+    static icon_library s_icon_libraries[] = {
         { "Codicons", "ICON_CI_", global_constants::icon_font_glyphs_codicon() },
         { "Font Awesome", "ICON_FA_", global_constants::icon_font_glyphs_font_awesome() },
         { "Material Design", "ICON_MD_", global_constants::icon_font_glyphs_material_design() },
@@ -76,7 +77,20 @@ void swan_windows::render_icon_library(bool &open) noexcept
         char const *icon_name;
         char const *icon_content;
     };
-    static std::vector<icon_match> matches = {};
+
+    auto match_everything = []() noexcept {
+        std::vector<icon_match> everything = {};
+
+        for (auto &icon_lib : s_icon_libraries) {
+            for (auto &icon_glyph : icon_lib.glyphs) {
+                everything.emplace_back(0, icon_lib.library_name, icon_glyph.name, icon_glyph.content);
+            }
+        }
+
+        return everything;
+    };
+
+    static std::vector<icon_match> s_matches = match_everything();
 
     static char s_search_input[64] = {};
     bool search_update = false;
@@ -86,7 +100,7 @@ void swan_windows::render_icon_library(bool &open) noexcept
     }
 
     if (search_update) {
-        matches.clear();
+        s_matches.clear();
 
         u64 search_input_len = strnlen(s_search_input, lengthof(s_search_input));
 
@@ -95,8 +109,15 @@ void swan_windows::render_icon_library(bool &open) noexcept
         std::transform(s_search_input, s_search_input + search_input_len,
                        search_input_upper, [](char ch) noexcept { return (char)toupper(ch); });
 
-        if (search_input_len > 0) {
-            for (auto &icon_lib : icon_libraries) {
+        if (search_input_len == 0) {
+            for (auto &icon_lib : s_icon_libraries) {
+                for (auto &icon_glyph : icon_lib.glyphs) {
+                    s_matches.emplace_back(0, icon_lib.library_name, icon_glyph.name, icon_glyph.content);
+                }
+            }
+        }
+        else { // search_input_len > 0
+            for (auto &icon_lib : s_icon_libraries) {
                 u64 prefix_len = strlen(icon_lib.prefix);
 
                 for (auto &icon_glyph : icon_lib.glyphs) {
@@ -105,18 +126,18 @@ void swan_windows::render_icon_library(bool &open) noexcept
 
                     u64 lev_edit_distance = compute_levenshtein_dist(icon_name_no_prefix, icon_name_no_prefix_len, search_input_upper, search_input_len);
 
-                    matches.emplace_back(lev_edit_distance, icon_lib.library_name, icon_glyph.name, icon_glyph.content);
+                    s_matches.emplace_back(lev_edit_distance, icon_lib.library_name, icon_glyph.name, icon_glyph.content);
                 }
             }
 
-            std::sort(matches.begin(), matches.end(), [](icon_match const &left, icon_match const &right) noexcept {
+            std::sort(s_matches.begin(), s_matches.end(), [](icon_match const &left, icon_match const &right) noexcept {
                 return left.lev_edit_distance < right.lev_edit_distance;
             });
         }
     }
 
     if (imgui::BeginChild("icon_library_matches")) {
-        for (auto const &match : matches) {
+        for (auto const &match : s_matches) {
             f32 space_left = imgui::GetContentRegionAvail().x - imgui::GetStyle().ScrollbarSize - imgui::GetStyle().ItemSpacing.x - imgui::GetStyle().WindowPadding.x;
             f32 button_size = imgui::CalcTextSize(match.icon_content).x + imgui::GetStyle().FramePadding.x*2 + imgui::GetStyle().ItemSpacing.x;
 

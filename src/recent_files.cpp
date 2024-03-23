@@ -247,9 +247,9 @@ void swan_windows::render_recent_files(bool &open) noexcept
     ;
 
     if (imgui::BeginTable("recent_files", recent_files_table_col_count, table_flags)) {
-        imgui::TableSetupColumn("#");
+        imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort);
         imgui::TableSetupColumn("When");
-        imgui::TableSetupColumn("File Name");
+        imgui::TableSetupColumn("File Name", ImGuiTableColumnFlags_NoHide);
         imgui::TableSetupColumn("Location");
         ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();
@@ -268,7 +268,6 @@ void swan_windows::render_recent_files(bool &open) noexcept
             auto directory = get_everything_minus_file_name(full_path);
             swan_path file_directory = path_create(directory.data(), directory.size());
 
-            bool left_clicked = false;
             bool right_clicked = false;
             bool double_clicked = false;
 
@@ -348,7 +347,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
         }
 
         if (imgui::BeginPopup("## recent_files context_menu")) {
-            if (imgui::Selectable("Reveal this one in Explorer 1")) {
+            if (imgui::Selectable("Open file location")) {
                 auto &expl = global_state::explorers()[0];
                 char *full_path = s_context_menu_target->path.data();
                 char *file_name = get_file_name(full_path);
@@ -402,7 +401,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
                 }
             }
 
-            if (imgui::Selectable("Reveal this one in File Explorer")) {
+            if (imgui::Selectable("Reveal in File Explorer")) {
                 swan_path const &full_path = s_context_menu_target->path;
                 auto res = reveal_in_windows_file_explorer(full_path);
                 if (!res.success) {

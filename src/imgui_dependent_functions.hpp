@@ -70,8 +70,16 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
 
     f64 current_time = ImGui::GetTime();
     s32 max_size = global_state::debug_log_text_limit_megabytes() * 1024 * 1024;
-    char const *just_the_file_name = cget_file_name(pack.loc.file_name());
+    char const *full_file_name = cget_file_name(pack.loc.file_name());
     s32 thread_id = GetCurrentThreadId();
+
+    u64 const file_name_max_len = 30;
+    char shortened_buf[file_name_max_len+1];
+    char const *shortened_file_name = full_file_name;
+    if (strlen(full_file_name) > file_name_max_len) {
+        (void) snprintf(shortened_buf, lengthof(shortened_buf), "%*s%s", s32(file_name_max_len), full_file_name, ICON_MD_MORE);
+        shortened_file_name = shortened_buf;
+    }
 
     {
         std::scoped_lock lock(debug_log_package::s_mutex);
@@ -84,7 +92,7 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
             debug_buffer.clear();
         }
 
-        debug_buffer.appendf("%-5d %10.3lf %40s:%-5d ", thread_id, current_time, just_the_file_name, pack.loc.line());
+        debug_buffer.appendf("%-5d %10.3lf %*s:%-5d ", thread_id, current_time, file_name_max_len, shortened_file_name, pack.loc.line());
         debug_buffer.appendf(pack.fmt, args...);
         debug_buffer.append("\n");
     }

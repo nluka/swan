@@ -83,6 +83,19 @@ ImVec4 get_color(basic_dirent::kind t) noexcept
     }
 }
 
+void center_window_and_set_size_when_appearing(f32 width, f32 height) noexcept
+{
+    imgui::SetNextWindowPos(
+        {
+            (f32(global_state::settings().window_w) / 2.f) - (width / 2.f),
+            (f32(global_state::settings().window_h) / 2.f) - (height / 2.f),
+        },
+        ImGuiCond_Appearing
+    );
+
+    imgui::SetNextWindowSize({ width, height }, ImGuiCond_Appearing);
+}
+
 void serialize_ImGuiStyle_all_except_colors(ImGuiStyle const &style, std::string &out, serialize_ImGuiStyle_mode mode) noexcept
 {
     auto append_f32_plain_text = [&](char const *label, f32 const &val) noexcept {

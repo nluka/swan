@@ -14,6 +14,7 @@ std::pair<std::deque<completed_file_operation> *, std::mutex *> global_state::co
 u32 global_state::next_group_id() noexcept
 {
     u32 max_group_id = 0;
+    u32 reserved_nil_value = std::numeric_limits<decltype(max_group_id)>::max();
 
     std::scoped_lock lock(s_completed_file_ops_mutex);
 
@@ -23,8 +24,8 @@ u32 global_state::next_group_id() noexcept
         }
     }
 
-    if (max_group_id == std::numeric_limits<decltype(max_group_id)>::max()) {
-        return 1; // wrap around, skip 0 because it's a reserved value
+    if (max_group_id == reserved_nil_value) {
+        return 1; // wrap around
     } else {
         return max_group_id + 1;
     }
@@ -492,7 +493,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
         else if (io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_I)) {
             std::scoped_lock lock(mutex);
             for (auto &fo : completed_operations) {
-                fo.selected = !fo.selected;
+                flip_bool(fo.selected);
             }
         }
     }
@@ -549,7 +550,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
         imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
         imgui::TableSetupColumn("Completed", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_completion_time);
-        imgui::TableSetupColumn("Source Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_src_path);
+        imgui::TableSetupColumn("Source Path", ImGuiTableColumnFlags_NoSort|ImGuiTableColumnFlags_NoHide, 0.0f, file_ops_table_col_src_path);
         imgui::TableSetupColumn("Destination Path", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_dst_path);
         ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();

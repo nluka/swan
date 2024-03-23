@@ -25,7 +25,7 @@ try {
     if (window == nullptr) {
         return 1;
     }
-    print_debug_msg("Barebones window created");
+    print_debug_msg("SUCCESS barebones window created");
 
     SCOPE_EXIT {
         ImGui_ImplOpenGL3_Shutdown();
@@ -43,22 +43,22 @@ try {
         print_debug_msg("global_state::execution_path = [%s]", swan_exec_path.generic_string().c_str());
     }
 
-    std::string ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
+    std::string const ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
 
     // block execution until all necessary files are found in their expected locations, relative to execution path.
     // if any are not found, the user is notified and given the ability to "Retry" the search for essential files.
     find_essential_files(window, ini_file_path.c_str());
-    print_debug_msg("Essential files found");
+    print_debug_msg("SUCCESS essential files found");
 
     // block execution until all non-default fonts are loaded successfully.
     // the user is notified of any font load failures and given the ability to "Retry" which will attempt to reload the fonts.
     load_non_default_fonts(window, ini_file_path.c_str());
-    print_debug_msg("Non-default fonts loaded successfully");
+    print_debug_msg("SUCCESS non-default fonts loaded");
 
     // block until COM is successfully initialized. the user is notified if an error occurs,
     // and has the ability to "Retry" which will attempt to re-initialize COM.
     init_COM_for_explorers(window, ini_file_path.c_str());
-    print_debug_msg("COM initialized successfully for explorers");
+    print_debug_msg("SUCCESS COM initialized");
     SCOPE_EXIT { clean_COM_for_explorers(); };
 
     ImGuiStyle const our_default_imgui_style = swan_default_imgui_style();

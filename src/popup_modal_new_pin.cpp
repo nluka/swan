@@ -32,20 +32,7 @@ void swan_popup_modals::render_new_pin() noexcept
 {
     using namespace new_pin_modal_global_state;
 
-    {
-        f32 default_w = 600;
-        f32 default_h = 180;
-
-        imgui::SetNextWindowPos(
-            {
-                (f32(global_state::settings().window_w) / 2.f) - (default_w / 2.f),
-                (f32(global_state::settings().window_h) / 2.f) - (default_h / 2.f),
-            },
-            ImGuiCond_Appearing
-        );
-
-        imgui::SetNextWindowSize({ default_w, default_h }, ImGuiCond_Appearing);
-    }
+    center_window_and_set_size_when_appearing(600, 180);
 
     if (g_open) {
         imgui::OpenPopup(swan_popup_modals::label_new_pin);

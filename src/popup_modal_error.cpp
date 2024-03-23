@@ -57,20 +57,7 @@ void swan_popup_modals::render_error() noexcept
 {
     using namespace error_modal_global_state;
 
-    {
-        f32 default_w = 800;
-        f32 default_h = 600;
-
-        imgui::SetNextWindowPos(
-            {
-                (f32(global_state::settings().window_w) / 2.f) - (default_w / 2.f),
-                (f32(global_state::settings().window_h) / 2.f) - (default_h / 2.f),
-            },
-            ImGuiCond_Appearing
-        );
-
-        imgui::SetNextWindowSize({ default_w, default_h }, ImGuiCond_Appearing);
-    }
+    center_window_and_set_size_when_appearing(800, 600);
 
     if (g_open) {
         imgui::OpenPopup(swan_popup_modals::label_error);
