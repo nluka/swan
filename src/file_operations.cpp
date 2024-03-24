@@ -76,6 +76,11 @@ catch (...) {
 
 std::pair<bool, u64> global_state::completed_file_operations_load_from_disk(char dir_separator) noexcept
 try {
+    auto completed_file_operations = global_state::completed_file_operations_get();
+
+    std::scoped_lock lock(*completed_file_operations.mutex);
+    completed_file_operations.container->clear();
+
     std::filesystem::path full_path = global_state::execution_path() / "data\\completed_file_operations.txt";
 
     std::ifstream in(full_path);
@@ -83,12 +88,6 @@ try {
     if (!in) {
         return { false, 0 };
     }
-
-    auto completed_file_operations = global_state::completed_file_operations_get();
-
-    std::scoped_lock lock(*completed_file_operations.mutex);
-
-    completed_file_operations.container->clear();
 
     std::string line = {};
     line.reserve(global_state::page_size() - 1);

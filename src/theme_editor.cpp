@@ -20,8 +20,6 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
     ImGuiStyle style_at_frame_start = style;
     bool swan_color_changed = false;
 
-    imgui::ScopedStyle<f32> p(style.CellPadding.x, 15);
-
     if (imgui::BeginTable("## theme_editor", 3, ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_Resizable)) {
         s32 color_edit_flags = 0;
 

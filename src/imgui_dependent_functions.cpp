@@ -327,7 +327,7 @@ inline ImGuiStyle swan_default_imgui_style() noexcept
     style.ItemSpacing.y = 10.000f;
     style.ItemInnerSpacing.x = 8.000f;
     style.ItemInnerSpacing.y = 8.000f;
-    style.CellPadding.x = 15.000f;
+    style.CellPadding.x = 10.000f;
     style.CellPadding.y = 5.000f;
     style.TouchExtraPadding.x = 0.000f;
     style.TouchExtraPadding.y = 0.000f;
