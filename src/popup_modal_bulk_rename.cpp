@@ -65,14 +65,14 @@ struct path_comparator
     bool operator()(bulk_rename_op const &lhs, recent_file const &rhs) const noexcept
     {
         swan_path lhs_full_path = bulk_rename_parent_dir;
-        bool success = path_append(lhs_full_path, lhs.before->path.data(), dir_sep_utf8, true);
+        [[maybe_unused]] bool success = path_append(lhs_full_path, lhs.before->path.data(), dir_sep_utf8, true);
         assert(success);
         return strcmp(lhs_full_path.data(), rhs.path.data()) < 0;
     }
     bool operator()(recent_file const &lhs, bulk_rename_op const &rhs) const noexcept
     {
         swan_path rhs_full_path = bulk_rename_parent_dir;
-        bool success = path_append(rhs_full_path, rhs.before->path.data(), dir_sep_utf8, true);
+        [[maybe_unused]] bool success = path_append(rhs_full_path, rhs.before->path.data(), dir_sep_utf8, true);
         assert(success);
         return strcmp(lhs.path.data(), rhs_full_path.data()) < 0;
     }

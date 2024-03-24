@@ -3,6 +3,16 @@
 
 #include "stdafx.hpp"
 
+#if defined(NDEBUG)
+#   define DEBUG_MODE 0
+#   define RELEASE_MODE 1
+#else
+#   define DEBUG_MODE 1
+#   define RELEASE_MODE 0
+#endif
+
+#include "libs/ntest.cpp"
+
 #include "bulk_rename_logic.cpp"
 #include "debug_log.cpp"
 #include "explorer.cpp"
@@ -33,6 +43,7 @@
 #include "stdafx.cpp"
 #include "style.cpp"
 #include "swan.cpp"
+#include "tests.cpp"
 #include "theme_editor.cpp"
 #include "undelete_directory_progress_sink.cpp"
 #include "util.cpp"

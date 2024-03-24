@@ -536,7 +536,7 @@ struct init_result
   size_t num_files_failed_to_remove;
 };
 
-init_result init(bool remove_residual_files = true);
+init_result init(std::filesystem::path const &output_path, bool remove_residual_files = true);
 
 struct report_result
 {
@@ -546,6 +546,7 @@ struct report_result
 
 report_result generate_report(
   char const *name,
+  std::filesystem::path const &output_directory,
   void (*assertion_callback)(assertion const &, bool) = nullptr);
 
 size_t pass_count();

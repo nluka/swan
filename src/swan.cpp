@@ -3,21 +3,49 @@
 #include "imgui_dependent_functions.hpp"
 #include "util.hpp"
 
-static void         glfw_error_callback(s32 error, char const *description) noexcept;
-static GLFWwindow * create_barebones_window() noexcept;
-static void         set_window_icon(GLFWwindow *window) noexcept;
+struct failed_assertion
+{
+    ntest::assertion ntest;
+    swan_path expected_path;
+    swan_path actual_path;
+};
+
+static std::vector<failed_assertion>    g_failed_assertions = {};
+static std::optional<bool>              g_test_suite_ran_without_crashes = std::nullopt;
+
 static LONG WINAPI  custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcept;
-static void         render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
-static void         render_analytics() noexcept;
+static GLFWwindow * create_barebones_window() noexcept;
+static void         glfw_error_callback(s32 error, char const *description) noexcept;
 static void         find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept;
 static void         load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept;
+static void         set_window_icon(GLFWwindow *window) noexcept;
+static void         render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
+static void         render_analytics() noexcept;
+static void         render_ntest_output_window(swan_path const &output_directory_path) noexcept;
+static void         run_tests_integrated(swan_path const &ntest_output_directory_path) noexcept;
+static s32          run_tests_only(swan_path const &ntest_output_directory_path) noexcept;
 
-#if defined(NDEBUG)
+#if RELEASE_MODE
 #   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 #endif
-s32 main(s32, char const *argv[])
+s32 main([[maybe_unused]] s32 argc, char const *argv[])
 try {
     SetUnhandledExceptionFilter(custom_exception_handler);
+
+    {
+        std::filesystem::path swan_exec_path = argv[0];
+        swan_exec_path = swan_exec_path.remove_filename();
+        global_state::execution_path() = swan_exec_path;
+    }
+    swan_path ntest_output_directory_path = path_create( (global_state::execution_path() / "ntest").string().c_str() );
+
+#if RELEASE_MODE
+    for (u64 i = 1; i < argc; ++i) {
+        if (streq(argv[i], "--tests-only")) {
+            return run_tests_only(ntest_output_directory_path);
+        }
+    }
+#endif
 
     SCOPE_EXIT { std::cout << boost::stacktrace::stacktrace(); };
 
@@ -36,14 +64,9 @@ try {
         glfwTerminate();
     };
 
-    {
-        std::filesystem::path swan_exec_path = argv[0];
-        swan_exec_path = swan_exec_path.remove_filename();
-        global_state::execution_path() = swan_exec_path;
-        print_debug_msg("global_state::execution_path = [%s]", swan_exec_path.generic_string().c_str());
-    }
-
     std::string const ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
+
+    print_debug_msg("global_state::execution_path = [%s]", global_state::execution_path().generic_string().c_str());
 
     // block execution until all necessary files are found in their expected locations, relative to execution path.
     // if any are not found, the user is notified and given the ability to "Retry" the search for essential files.
@@ -60,6 +83,19 @@ try {
     init_COM_for_explorers(window, ini_file_path.c_str());
     print_debug_msg("SUCCESS COM initialized");
     SCOPE_EXIT { clean_COM_for_explorers(); };
+
+    {
+    #if DEBUG_MODE
+        run_tests_integrated(ntest_output_directory_path);
+    #else
+        for (u64 i = 1; i < argc; ++i) {
+            if (streq(argv[i], "--with-tests")) {
+                run_tests_integrated(ntest_output_directory_path);
+                break;
+            }
+        }
+    #endif
+    }
 
     ImGuiStyle const our_default_imgui_style = swan_default_imgui_style();
 
@@ -148,11 +184,9 @@ try {
         swan_windows::id::imgui_demo,
     };
 
-#if DEBUG_MODE
-    for (auto const &window_id : window_render_order) {
+    for ([[maybe_unused]] auto const &window_id : window_render_order) {
         assert(window_id != swan_windows::id::nil_window && "Forgot to add window id to initializer list of `window_render_order`");
     }
-#endif
 
     {
         swan_windows::id last_focused_window_id;
@@ -386,6 +420,11 @@ try {
         }
 
         imgui::RenderConfirmationModal();
+
+        if (!g_test_suite_ran_without_crashes.value_or(true) || g_failed_assertions.size() > 0) {
+            imgui::OpenPopup(" Test Output ");
+            render_ntest_output_window(ntest_output_directory_path);
+        }
     }
 
     //? I don't know if this is safe to do, would be good to look into it,
@@ -438,7 +477,7 @@ GLFWwindow *create_barebones_window() noexcept
         s32 screen_width = GetSystemMetrics(SM_CXSCREEN);
         s32 screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-        std::string window_title = make_str("swan - %s - %s %s", get_build_mode().str, __DATE__, __TIME__);
+        std::string window_title = make_str("swan - %s - built %s %s", get_build_mode().str, __DATE__, __TIME__);
 
         window = glfwCreateWindow(screen_width, screen_height, window_title.c_str(), nullptr, nullptr);
         if (window == nullptr) {
@@ -867,3 +906,150 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
         render_frame(window);
     }
 }
+
+static
+void render_ntest_output_window([[maybe_unused]] swan_path const &output_directory_path) noexcept
+{
+    // static bool s_open = false;
+
+    if (imgui::BeginPopupModal(" Test Output ", nullptr, ImGuiWindowFlags_NoTitleBar)) {
+        if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
+            g_test_suite_ran_without_crashes = true;
+            g_failed_assertions.clear();
+            imgui::CloseCurrentPopup();
+        }
+
+        imgui::TextColored(error_color(), "%zu assertions failed.", g_failed_assertions.size());
+
+        imgui::Separator();
+
+        if (imgui::BeginChild("## ntest_output_window child")) {
+            ImGuiTableFlags table_flags =
+                ImGuiTableFlags_SizingStretchProp|
+                ImGuiTableFlags_Resizable|
+                ImGuiTableFlags_BordersV|
+                ImGuiTableFlags_ScrollY
+            ;
+
+            if (imgui::BeginTable("## ntest_output_window table", 4, table_flags)) {
+                imgui::TableSetupColumn("Line");
+                imgui::TableSetupColumn("Diff Exp & Act");
+                imgui::TableSetupColumn("Expected");
+                imgui::TableSetupColumn("Actual");
+                imgui::TableSetupScrollFreeze(0, 1);
+                imgui::TableHeadersRow();
+
+                ImGuiListClipper clipper;
+                clipper.Begin((s32)g_failed_assertions.size());
+
+                while (clipper.Step())
+                for (s32 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+                    auto const &a = g_failed_assertions[i];
+                    auto serialized = a.ntest.extract_serialized_values(false);
+
+                    imgui::TableNextColumn();
+                    {
+                        auto label = make_str_static<256>("%zu ## Line of elem %zu", a.ntest.loc.line(), i);
+
+                        imgui::Selectable(label.data(), false, ImGuiSelectableFlags_AllowDoubleClick);
+                        if (imgui::IsItemHovered() && imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                            auto full_command = make_str_static<512>("code --goto %s:%zu", a.ntest.loc.file_name(), a.ntest.loc.line());
+                            system(full_command.data());
+                        }
+                    }
+
+                    imgui::TableNextColumn();
+                    if (path_is_empty(a.expected_path) || path_is_empty(a.actual_path)) {
+                        imgui::TextUnformatted("--");
+                    } else {
+                        auto label = make_str_static<256>("Open" "## %zu", i);
+
+                        if (imgui::SmallButton(label.data())) {
+                            auto full_command = make_str_static<1024>("code --diff %s %s", a.expected_path.data(), a.actual_path.data());
+                            system(full_command.data());
+                        }
+                    }
+
+                    imgui::TableNextColumn();
+                    if (path_is_empty(a.expected_path)) {
+                        imgui::TextUnformatted(serialized.expected);
+                    } else {
+                        char const *file_name = cget_file_name(a.expected_path.data());
+                        auto label = make_str_static<256>("%s ## %zu", file_name, i);
+
+                        imgui::Selectable(label.data(), false, ImGuiSelectableFlags_AllowDoubleClick);
+                        if (imgui::IsItemHovered() && imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                            auto full_command = make_str_static<512>("code %s", a.expected_path.data());
+                            system(full_command.data());
+                        }
+                    }
+
+                    imgui::TableNextColumn();
+                    if (path_is_empty(a.actual_path)) {
+                        imgui::TextUnformatted(serialized.actual);
+                    } else {
+                        char const *file_name = cget_file_name(a.actual_path.data());
+                        auto label = make_str_static<256>("%s ## %zu", file_name, i);
+
+                        imgui::Selectable(label.data(), false, ImGuiSelectableFlags_AllowDoubleClick);
+                        if (imgui::IsItemHovered() && imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                            auto full_command = make_str_static<512>("code %s", a.actual_path.data());
+                            system(full_command.data());
+                        }
+                    }
+                }
+
+                imgui::EndTable();
+            }
+        }
+        imgui::EndChild();
+
+        imgui::EndPopup();
+    }
+}
+
+static
+void run_tests_integrated(swan_path const &ntest_output_directory_path) noexcept
+{
+    auto assertion_callback = [](ntest::assertion const &a, bool passed) noexcept {
+        if (!passed) {
+            failed_assertion a2 = { a, {}, {}, };
+            g_failed_assertions.push_back(a2);
+        }
+    };
+
+    auto result = run_tests(global_state::execution_path() / "ntest", assertion_callback);
+
+    g_test_suite_ran_without_crashes = result.has_value();
+
+    for (auto &a : g_failed_assertions) {
+        auto serialized = a.ntest.extract_serialized_values(false);
+
+        if (serialized.expected[0] == '[') {
+            auto expected_file_name = make_str_static<128>("%s", serialized.expected + 1); // skip [
+            strtok(expected_file_name.data(), "]");
+            a.expected_path = ntest_output_directory_path;
+            (void) path_append(a.expected_path, expected_file_name.data(), '\\', true);
+        }
+        if (serialized.expected[0] == '[') {
+            auto actual_file_name = make_str_static<128>("%s", serialized.actual + 1); // skip [
+            strtok(actual_file_name.data(), "]");
+            a.actual_path = ntest_output_directory_path;
+            (void) path_append(a.actual_path, actual_file_name.data(), '\\', true);
+        }
+    }
+}
+
+#if RELEASE_MODE
+static
+s32 run_tests_only([[maybe_unused]] swan_path const &ntest_output_directory_path) noexcept
+{
+    auto result = run_tests(global_state::execution_path() / "ntest", nullptr);
+
+    if (!result.has_value()) {
+        return -1;
+    }
+
+    return s32(result.value().num_fails);
+}
+#endif

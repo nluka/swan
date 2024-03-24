@@ -1,45 +1,16 @@
 #include "stdafx.hpp"
-
-#include "libs/term.hpp"
-#include "libs/term.cpp"
 #include "libs/ntest.hpp"
-#include "libs/ntest.cpp"
+#include "common_functions.hpp"
 
-#include "path.hpp"
-#include "path.cpp"
-
-#include "util.hpp"
-#include "util.cpp"
-
-#include "bulk_rename_logic.cpp"
-
-s32 main()
-try
-{
-  using namespace term;
-  using term::printf;
-
-  std::printf("~~~~~~~~~~\n");
-  std::printf("swan_tests\n");
-  std::printf("~~~~~~~~~~\n");
-  printf(FG_BRIGHT_CYAN, "std::filesystem::current_path() = [%s]\n", std::filesystem::current_path().string().c_str());
-
+std::optional<ntest::report_result> run_tests(std::filesystem::path const &output_path,
+                                              void (*assertion_callback)(ntest::assertion const &, bool)) noexcept
+try {
   ntest::config::set_max_arr_preview_len(3);
   ntest::config::set_max_str_preview_len(10);
 
-  // ntest init
   {
-    auto const res = ntest::init();
-    u64 const total = res.num_files_removed + res.num_files_failed_to_remove;
-
-    if (total > 0)
-      printf(FG_MAGENTA, "ntest: ");
-    if (res.num_files_removed)
-      printf(FG_MAGENTA, "%zu residual files removed ", res.num_files_removed);
-    if (res.num_files_failed_to_remove > 0)
-      printf(FG_YELLOW, "(%zu residual files failed to be removed)", res.num_files_failed_to_remove);
-    if (total > 0)
-      std::printf("\n");
+    std::filesystem::create_directories(output_path);
+    [[maybe_unused]] auto const res = ntest::init(output_path);
   }
 
   // flip_bool
@@ -255,7 +226,9 @@ try
   #if 1
   {
     ntest::assert_bool(false, directory_exists("not_a_directory"));
+  #if DEBUG_MODE
     ntest::assert_bool(true, directory_exists("src"));
+  #endif
   }
   #endif
 
@@ -911,33 +884,11 @@ try
   }
   #endif
 
-  // ntest report output
-  {
-    auto const res = ntest::generate_report("swan_tests", [](ntest::assertion const &a, bool const passed) noexcept {
-      if (!passed)
-        printf(FG_RED, "failed: %s:%zu\n", a.loc.file_name(), a.loc.line());
-    });
-
-    if ((res.num_fails + res.num_passes) == 0) {
-      printf(FG_BRIGHT_YELLOW, "No tests defined");
-    } else {
-      if (res.num_fails > 0) {
-        printf(FG_BRIGHT_RED,   "%zu failed", res.num_fails);
-        std::printf(" | ");
-        printf(FG_BRIGHT_GREEN, "%zu passed", res.num_passes);
-      } else
-        printf(FG_BRIGHT_GREEN, "All %zu tests passed", res.num_passes);
-    }
-    std::printf("\n\n");
-
-    return 0;
-  }
+  return ntest::generate_report("swan_tests", output_path, assertion_callback);
 }
-catch (std::exception const &err) {
-  std::printf("FATAL: %s\n", err.what());
-  std::cout << boost::stacktrace::stacktrace();
+catch ([[maybe_unused]] std::exception const &err) {
+  return std::nullopt;
 }
 catch (...) {
-  std::printf("FATAL: unusual exception - catch (...)\n");
-  std::cout << boost::stacktrace::stacktrace();
+  return std::nullopt;
 }

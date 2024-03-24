@@ -248,3 +248,6 @@ void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> 
 bulk_rename_find_collisions_result bulk_rename_find_collisions(
     std::vector<explorer_window::dirent> &dest,
     std::vector<bulk_rename_op> const &renames) noexcept;
+
+std::optional<ntest::report_result> run_tests(std::filesystem::path const &output_path,
+                                              void (*assertion_callback)(ntest::assertion const &, bool)) noexcept;

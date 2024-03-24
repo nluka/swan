@@ -8,7 +8,7 @@ obj_release/imgui_tables.obj ^
 obj_release/imgui_widgets.obj ^
 obj_release/imgui.obj ^
 obj_release/stb_image.obj ^
-resource/resources.res ^
+resource/swan.res ^
 /Fo:obj_release\ ^
 /Fe:dist/swan_release.exe ^
 /Fd:dist/vc140_release.pdb ^

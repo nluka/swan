@@ -31,6 +31,7 @@ using std::fstream;
 // STATE:
 static vector<ntest::assertion> s_failed_assertions{};
 static vector<ntest::assertion> s_passed_assertions{};
+static std::string s_output_directory_path{};
 
 ntest::assertion::serialized ntest::assertion::extract_serialized_values(bool const passed) const
 {
@@ -153,10 +154,14 @@ string ntest::internal::make_serialized_file_path(
 {
   stringstream path{};
 
-  path
-    << fs::path(loc.file_name()).filename().generic_string()
-    // Windows doesn't like : so use _ instead
-    << '_' << loc.line();
+  path << s_output_directory_path;
+
+  if (!s_output_directory_path.ends_with('/')) {
+    path << '/';
+  }
+
+  // Windows doesn't like : so use _ instead
+  path << fs::path( loc.file_name() ).filename().generic_string() << '_' << loc.line();
 
   if (s_show_column_numbers)
     path << ',' << loc.column();
@@ -492,7 +497,15 @@ bool ntest::assert_cstr(
     if (expected_path != "")
     {
       write_file(expected_path, expected, expected_len);
-      serialized_vals << '[' << expected_path << "](" << expected_path << ')' << '\0';
+
+      char const *just_the_file_name = expected_path.c_str();
+      std::string_view view(just_the_file_name);
+      u64 last_sep_pos = view.find_last_of("\\/");
+      if (last_sep_pos != std::string::npos) {
+          just_the_file_name += last_sep_pos + 1;
+      }
+
+      serialized_vals << '[' << just_the_file_name << "](" << just_the_file_name << ')' << '\0';
     }
     else
     {
@@ -502,7 +515,15 @@ bool ntest::assert_cstr(
     if (actual_path != "")
     {
       write_file(actual_path, actual, actual_len);
-      serialized_vals << '[' << actual_path << "](" << actual_path << ')' << '\0';
+
+      char const *just_the_file_name = actual_path.c_str();
+      std::string_view view(just_the_file_name);
+      u64 last_sep_pos = view.find_last_of("\\/");
+      if (last_sep_pos != std::string::npos) {
+          just_the_file_name += last_sep_pos + 1;
+      }
+
+      serialized_vals << '[' << just_the_file_name << "](" << just_the_file_name << ')' << '\0';
     }
     else
     {
@@ -735,8 +756,8 @@ std::string path_minus_dir_overlap(fs::path subject_abs, fs::path directory_abs)
   assert(fs::is_directory(directory_abs));
   assert(directory_abs.is_absolute());
 
-  string subj_str = subject_abs.string();
-  string dir_str = directory_abs.string();
+  string subj_str = subject_abs.generic_string();
+  string dir_str = directory_abs.generic_string();
 
   assert(!subj_str.empty());
   assert(!dir_str.empty());
@@ -754,15 +775,17 @@ std::string path_minus_dir_overlap(fs::path subject_abs, fs::path directory_abs)
 
 ntest::report_result ntest::generate_report(
   char const *const name,
+  std::filesystem::path const &output_directory,
   void (*assertion_callback)(assertion const &, bool))
 {
   size_t const
     total_failed = s_failed_assertions.size(),
     total_passed = s_passed_assertions.size();
 
-  string report_path = "./";
-  report_path.append(name);
-  report_path.append(".md");
+  std::filesystem::path report_path = output_directory / name;
+  report_path.replace_extension(".md");
+  // report_path.append(name);
+  // report_path.append(".md");
 
   std::ofstream ofs(report_path, std::ios::out);
 
@@ -850,17 +873,18 @@ ntest::report_result ntest::generate_report(
   return { total_passed, total_failed };
 }
 
-ntest::init_result ntest::init(bool const remove_residual_files)
+ntest::init_result ntest::init(std::filesystem::path const &output_path, bool const remove_residual_files)
 {
-  auto const current_path = fs::current_path();
   size_t num_files_removed = 0;
   size_t num_files_failed_to_remove = 0;
+
+  s_output_directory_path = output_path.generic_string();
 
   if (remove_residual_files)
   {
     // remove any residual .expected and .actual files
     for (auto const &entry : fs::directory_iterator(
-      current_path,
+      output_path,
       fs::directory_options::skip_permission_denied
     ))
     {

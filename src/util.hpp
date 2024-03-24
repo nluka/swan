@@ -2,8 +2,13 @@
 
 #include "stdafx.hpp"
 
-#define DEBUG_MODE !defined(NDEBUG)
-#define RELEASE_MODE defined(NDEBUG)
+#if defined(NDEBUG)
+#   define DEBUG_MODE 0
+#   define RELEASE_MODE 1
+#else
+#   define DEBUG_MODE 1
+#   define RELEASE_MODE 0
+#endif
 
 #if DEBUG_MODE
 #define WCOUT_IF_DEBUG(x) std::wcout << '[' << std::source_location::current().file_name() << ':' << std::source_location::current().line() << "] " << x
