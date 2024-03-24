@@ -347,13 +347,16 @@ void swan_windows::render_recent_files(bool &open) noexcept
         }
 
         if (imgui::BeginPopup("## recent_files context_menu")) {
-            if (imgui::Selectable("Open file location")) {
-                auto &expl = global_state::explorers()[0];
-                char *full_path = s_context_menu_target->path.data();
-                char *file_name = get_file_name(full_path);
-                auto directory = get_everything_minus_file_name(full_path);
-                swan_path file_directory = path_create(directory.data(), directory.size());
+            bool draw_context_connector = false;
 
+            auto &expl = global_state::explorers()[0];
+            char *full_path = s_context_menu_target->path.data();
+            char *file_name = get_file_name(full_path);
+            auto directory = get_everything_minus_file_name(full_path);
+            swan_path parent_directory = path_create(directory.data(), directory.size());
+
+            if (imgui::Selectable("Open file location")) {
+                swan_path file_directory = path_create(parent_directory.data(), parent_directory.size());
                 wchar_t file_path_utf16[MAX_PATH];
 
                 if (utf8_to_utf16(full_path, file_path_utf16, lengthof(file_path_utf16))) {
@@ -402,10 +405,10 @@ void swan_windows::render_recent_files(bool &open) noexcept
             }
 
             if (imgui::Selectable("Reveal in File Explorer")) {
-                swan_path const &full_path = s_context_menu_target->path;
-                auto res = reveal_in_windows_file_explorer(full_path);
+                swan_path const &full_path_ = s_context_menu_target->path;
+                auto res = reveal_in_windows_file_explorer(full_path_);
                 if (!res.success) {
-                    std::string action = make_str("Reveal [%s] in File Explorer.", full_path.data());
+                    std::string action = make_str("Reveal [%s] in File Explorer.", full_path_.data());
                     char const *failed = res.error_or_utf8_path.c_str();
                     swan_popup_modals::open_error(action.c_str(), failed);
                 }
@@ -465,6 +468,24 @@ void swan_windows::render_recent_files(bool &open) noexcept
                     }
                 }
             }
+
+            imgui::Separator();
+
+            if (imgui::Selectable("Copy file name")) {
+                imgui::SetClipboardText(file_name);
+            }
+            draw_context_connector |= imgui::IsItemHovered();
+
+            if (imgui::Selectable("Copy file path")) {
+                imgui::SetClipboardText(full_path);
+            }
+            draw_context_connector |= imgui::IsItemHovered();
+
+            if (imgui::Selectable("Copy file location")) {
+                swan_path location = path_create(parent_directory.data(), parent_directory.size());
+                imgui::SetClipboardText(location.data());
+            }
+            draw_context_connector |= imgui::IsItemHovered();
 
             imgui::Separator();
 
