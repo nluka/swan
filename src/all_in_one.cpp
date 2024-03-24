@@ -18,7 +18,7 @@
 #include "miscellaneous_functions.cpp"
 #include "miscellaneous_globals.cpp"
 #include "path.cpp"
-#include "pin_mgr.cpp"
+#include "pinned.cpp"
 #include "popup_modal_bulk_rename.cpp"
 #include "popup_modal_edit_pin.cpp"
 #include "popup_modal_error.cpp"

@@ -223,7 +223,7 @@ u64 global_state::pinned_find_idx(swan_path const &path) noexcept
 
 bool global_state::pinned_save_to_disk() noexcept
 try {
-    std::filesystem::path full_path = global_state::execution_path() / "data\\pins.txt";
+    std::filesystem::path full_path = global_state::execution_path() / "data\\pinned.txt";
 
     std::ofstream out(full_path);
 
@@ -261,7 +261,7 @@ void global_state::pinned_update_directory_separators(char new_dir_separator) no
 
 std::pair<bool, u64> global_state::pinned_load_from_disk(char dir_separator) noexcept
 try {
-    std::filesystem::path full_path = global_state::execution_path() / "data\\pins.txt";
+    std::filesystem::path full_path = global_state::execution_path() / "data\\pinned.txt";
 
     std::ifstream in(full_path);
 
