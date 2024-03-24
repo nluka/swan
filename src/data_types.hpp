@@ -547,6 +547,7 @@ struct recent_file
     system_time_point_t action_time;
     swan_path path;
     bool selected;
+    bool context_menu_active;
 };
 
 struct bulk_rename_compiled_pattern

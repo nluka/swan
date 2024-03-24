@@ -246,6 +246,8 @@ void swan_windows::render_recent_files(bool &open) noexcept
         (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
     ;
 
+    std::optional<ImRect> file_name_rect = std::nullopt;
+
     if (imgui::BeginTable("recent_files", recent_files_table_col_count, table_flags)) {
         imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort);
         imgui::TableSetupColumn("When");
@@ -282,6 +284,8 @@ void swan_windows::render_recent_files(bool &open) noexcept
                 imgui::Text("%s %s", file.action.c_str(), when.data());
             }
 
+            ImVec2 file_name_TL;
+
             if (imgui::TableSetColumnIndex(recent_files_table_col_file_name)) {
                 {
                     file_name_extension_splitter splitter(file_name);
@@ -289,6 +293,8 @@ void swan_windows::render_recent_files(bool &open) noexcept
                 }
 
                 imgui::SameLine();
+
+                file_name_TL = imgui::GetCursorScreenPos();
 
                 auto label = make_str_static<1200>("%s##recent_file_%zu", file_name, i);
                 if (imgui::Selectable(label.data(), file.selected, ImGuiSelectableFlags_SpanAllColumns|ImGuiSelectableFlags_AllowDoubleClick)) {
@@ -339,10 +345,19 @@ void swan_windows::render_recent_files(bool &open) noexcept
             if (right_clicked) {
                 imgui::OpenPopup("## recent_files context_menu");
                 s_context_menu_target = &g_recent_files[i];
+                s_context_menu_target->context_menu_active = true;
                 s_context_menu_target_idx = i;
                 for (auto const &rf : g_recent_files) {
                     s_num_selected_when_context_menu_opened += u64(rf.selected);
                 }
+            }
+
+            if (file.context_menu_active) {
+                ImVec2 file_name_BR = file_name_TL + imgui::CalcTextSize(file_name);
+                file_name_rect.emplace(file_name_TL, file_name_BR);
+                ImVec2 surrounding_rect_padding = { 5.f, 5.f };
+                file_name_rect.value().Min -= surrounding_rect_padding;
+                file_name_rect.value().Max += surrounding_rect_padding;
             }
         }
 
@@ -403,6 +418,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
                     }
                 }
             }
+            draw_context_connector |= imgui::IsItemHovered();
 
             if (imgui::Selectable("Reveal in File Explorer")) {
                 swan_path const &full_path_ = s_context_menu_target->path;
@@ -413,6 +429,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
                     swan_popup_modals::open_error(action.c_str(), failed);
                 }
             }
+            draw_context_connector |= imgui::IsItemHovered();
 
             {
                 bool disabled = s_num_selected_when_context_menu_opened == 0;
@@ -492,6 +509,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
             if (imgui::Selectable("Forget this one")) {
                 remove_idx = s_context_menu_target_idx;
             }
+            draw_context_connector |= imgui::IsItemHovered();
 
             {
                 bool disabled = s_num_selected_when_context_menu_opened == 0;
@@ -515,9 +533,20 @@ void swan_windows::render_recent_files(bool &open) noexcept
                 }
             }
 
+            ImVec2 popup_pos = imgui::GetWindowPos();
+            ImVec2 popup_size = imgui::GetWindowSize();
+            ImRect context_menu_rect = { popup_pos, popup_pos + popup_size };
+
             imgui::EndPopup();
+
+            if (draw_context_connector) {
+                imgui::DrawBestLineBetweenRectCorners(file_name_rect.value(), context_menu_rect, ImVec4(255, 255, 255, 100), true, false, 2.f, 2.f);
+            }
         }
         else {
+            if (s_context_menu_target != nullptr) {
+                s_context_menu_target->context_menu_active = false;
+            }
             s_num_selected_when_context_menu_opened = 0;
         }
 
