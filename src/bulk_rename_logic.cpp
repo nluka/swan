@@ -249,6 +249,12 @@ bulk_rename_transform_result bulk_rename_transform(
     after = {};
     u64 after_insert_idx = 0;
 
+    auto report_error = [&](char const *msg) -> bulk_rename_transform_result & {
+        result.success = false;
+        (void) strncpy(result.error.data(), msg, result.error.max_size());
+        return result;
+    };
+
     for (auto const &op : compiled_pattern.ops) {
         u64 space_left = after.max_size() - after_insert_idx;
         char *out = after.data() + after_insert_idx;
@@ -261,82 +267,65 @@ bulk_rename_transform_result bulk_rename_transform(
                 if (after_insert_idx < after.max_size()) {
                     after[after_insert_idx++] = op.ch;
                 } else {
-                    result.success = false;
-                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                    return result;
+                    return report_error("not enough space for pattern");
                 }
                 break;
             }
             case op_type::insert_name: {
-                u64 len = strlen(name);
-                if (len <= space_left) {
-                    (void) strcat(out, name);
-                    after_insert_idx += len;
-                } else {
-                    result.success = false;
-                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                    return result;
+                u64 name_len = strlen(name);
+                if (name_len > space_left) {
+                    return report_error("not enough space for pattern");
                 }
+                (void) strcat(out, name);
+                after_insert_idx += name_len;
                 break;
             }
             case op_type::insert_ext: {
-                if (ext != nullptr) {
-                    u64 len = strlen(ext);
-                    if (len <= space_left) {
-                        (void) strcat(out, ext);
-                        after_insert_idx += len;
-                    } else {
-                        result.success = false;
-                        (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                        return result;
-                    }
+                if (ext == nullptr) {
+                    break;
                 }
+                u64 name_len = strlen(ext);
+                if (name_len > space_left) {
+                    return report_error("not enough space for pattern");
+                }
+                (void) strcat(out, ext);
+                after_insert_idx += name_len;
                 break;
             }
             case op_type::insert_dotext: {
-                if (ext != nullptr) {
-                    if (after_insert_idx < after.max_size()) {
-                        after[after_insert_idx++] = '.';
-                    } else {
-                        result.success = false;
-                        (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                        return result;
-                    }
-
-                    u64 len = strlen(ext);
-                    if (len <= space_left) {
-                        (void) strcat(out, ext);
-                        after_insert_idx += len;
-                    } else {
-                        result.success = false;
-                        (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                        return result;
-                    }
+                if (ext == nullptr) {
+                    break;
                 }
+                if (after_insert_idx >= after.max_size()) {
+                    return report_error("not enough space for pattern");
+                }
+                after[after_insert_idx++] = '.';
+                u64 len = strlen(ext);
+                if (len > space_left) {
+                    return report_error("not enough space for pattern");
+                }
+                (void) strcat(out, ext);
+                after_insert_idx += len;
                 break;
             }
             case op_type::insert_size: {
                 auto buffer = make_str_static<21>("%zu", bytes);
-                if (written <= space_left) {
-                    (void) strcat(out, buffer.data());
-                    after_insert_idx += written;
-                } else {
-                    result.success = false;
-                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                    return result;
+                u64 buffer_len = strlen(buffer.data());
+                if (buffer_len > space_left) {
+                    return report_error("not enough space for pattern");
                 }
+                (void) strcat(out, buffer.data());
+                after_insert_idx += buffer_len;
                 break;
             }
             case op_type::insert_counter: {
                 auto buffer = make_str_static<11>("%d", counter);
-                if (written <= space_left) {
-                    (void) strcat(out, buffer.data());
-                    after_insert_idx += written;
-                } else {
-                    result.success = false;
-                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                    return result;
+                u64 buffer_len = strlen(buffer.data());
+                if (buffer_len > space_left) {
+                    return report_error("not enough space for pattern");
                 }
+                (void) strcat(out, buffer.data());
+                after_insert_idx += buffer_len;
                 break;
             }
             case op_type::insert_slice: {
@@ -365,19 +354,13 @@ bulk_rename_transform_result bulk_rename_transform(
                 assert(len > 0);
 
                 if (op.slice_first >= full_len || actual_slice_last >= full_len) {
-                    result.success = false;
-                    (void) strncpy(result.error.data(), "slice goes out of bounds", result.error.max_size());
-                    return result;
+                    return report_error("slice goes out of bounds");
                 }
-
-                if (len <= space_left) {
-                    (void) strncat(out, full.data() + op.slice_first, len);
-                    after_insert_idx += len;
-                } else {
-                    result.success = false;
-                    (void) strncpy(result.error.data(), "not enough space for pattern", result.error.max_size());
-                    return result;
+                if (len > space_left) {
+                    return report_error("not enough space for pattern");
                 }
+                (void) strncat(out, full.data() + op.slice_first, len);
+                after_insert_idx += len;
                 break;
             }
         }
