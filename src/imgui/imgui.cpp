@@ -13098,7 +13098,8 @@ bool ImGui::IsDragDropPayloadBeingAccepted()
     return g.DragDropActive && g.DragDropAcceptIdPrev != 0;
 }
 
-const ImGuiPayload* ImGui::AcceptDragDropPayload(const char* type, ImGuiDragDropFlags flags, ImVec2 visual_rect_min_max_offset)
+const ImGuiPayload* ImGui::AcceptDragDropPayload(const char* type, ImGuiDragDropFlags flags, ImRect *target_rect_out,
+                                                 bool visual_rect_sides_TRBL[4], ImVec2 visual_rect_min_max_offset)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
@@ -13112,6 +13113,9 @@ const ImGuiPayload* ImGui::AcceptDragDropPayload(const char* type, ImGuiDragDrop
     // NB: We currently accept NULL id as target. However, overlapping targets requires a unique ID to function!
     const bool was_accepted_previously = (g.DragDropAcceptIdPrev == g.DragDropTargetId);
     ImRect r = g.DragDropTargetRect;
+    if (target_rect_out != nullptr) {
+        *target_rect_out = r;
+    }
     float r_surface = r.GetWidth() * r.GetHeight();
     if (r_surface > g.DragDropAcceptIdCurrRectSurface)
         return NULL;
@@ -13124,9 +13128,30 @@ const ImGuiPayload* ImGui::AcceptDragDropPayload(const char* type, ImGuiDragDrop
     // Render default drop visuals
     payload.Preview = was_accepted_previously;
     flags |= (g.DragDropSourceFlags & ImGuiDragDropFlags_AcceptNoDrawDefaultRect); // Source can also inhibit the preview (useful for external sources that live for 1 frame)
-    if (!(flags & ImGuiDragDropFlags_AcceptNoDrawDefaultRect) && payload.Preview)
-        window->DrawList->AddRect(r.Min - visual_rect_min_max_offset, r.Max + visual_rect_min_max_offset, GetColorU32(ImGuiCol_DragDropTarget), 0.0f, 0, 2.0f);
+    if (!(flags & ImGuiDragDropFlags_AcceptNoDrawDefaultRect) && payload.Preview) {
+        auto color = GetColorU32(ImGuiCol_DragDropTarget);
+        float thickness = 2.0f;
+
+        ImRect visual_rect(r.Min - visual_rect_min_max_offset, r.Max + visual_rect_min_max_offset);
+
+        if (visual_rect_sides_TRBL == nullptr) {
+            GetForegroundDrawList()->AddRect(visual_rect.GetTL(), visual_rect.GetBR(), color, 0.0f, 0, thickness);
+        }
+        else if (visual_rect_sides_TRBL[0]) {
+            window->DrawList->AddLine(visual_rect.GetTL(), visual_rect.GetTR(), color, thickness);
+        }
+        else if (visual_rect_sides_TRBL[1]) {
+            window->DrawList->AddLine(visual_rect.GetTR(), visual_rect.GetBR(), color, thickness);
+        }
+        else if (visual_rect_sides_TRBL[2]) {
+            window->DrawList->AddLine(visual_rect.GetBL(), visual_rect.GetBR(), color, thickness);
+        }
+        else if (visual_rect_sides_TRBL[3]) {
+            window->DrawList->AddLine(visual_rect.GetTL(), visual_rect.GetBL(), color, thickness);
+        }
+
         // window->DrawList->AddRectFilled(r.Min, r.Max, GetColorU32(ImGuiCol_DragDropTarget), 0.0f, 0);
+    }
 
     g.DragDropAcceptFrameCount = g.FrameCount;
     payload.Delivery = was_accepted_previously && !IsMouseDown(g.DragDropMouseButton); // For extern drag sources affecting OS window focus, it's easier to just test !IsMouseDown() instead of IsMouseReleased()

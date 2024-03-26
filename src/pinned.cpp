@@ -24,27 +24,10 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
 
 void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_window, global_constants::num_explorers> &explorers, bool &open) noexcept
 {
-    static bool s_edit_enabled = false;
-    static bool s_numbered_list = false;
-
     if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
             global_state::focused_window_set(swan_windows::id::pinned);
         }
-
-        if (imgui::Button(ICON_CI_SYMBOL_NUMBER "##Numbered List")) {
-            flip_bool(s_numbered_list);
-        }
-        imgui::SameLine();
-        if (imgui::Button(ICON_FA_EDIT "##Enable Edit")) {
-            flip_bool(s_edit_enabled);
-        }
-        imgui::SameLine();
-        if (imgui::Button(ICON_CI_REPO_CREATE "##Create Pin")) {
-            swan_popup_modals::open_new_pin({}, true);
-        }
-
-        imgui::Separator();
 
         std::vector<pinned_path> &pins = global_state::pinned_get();
 
@@ -60,79 +43,51 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
         for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
             auto &pin = pins[i];
 
-            if (s_edit_enabled) {
-                {
-                    auto label = make_str_static<64>(ICON_CI_EDIT "##pin%zu", i);
-
-                    if (imgui::SmallButton(label.data())) {
-                        swan_popup_modals::open_edit_pin(&pin);
-                    }
-                }
-                imgui::SameLine();
-                {
-                    auto label = make_str_static<64>(ICON_CI_TRASH "##pin%zu", i);
-
-                    if (imgui::SmallButton(label.data())) {
-                        imgui::OpenConfirmationModal(swan_id_confirm_delete_pin, [&pin]() noexcept {
-                            imgui::TextUnformatted("Are you sure you want to delete the following pin?");
-                            imgui::TextColored(pin.color, pin.label.c_str());
-                            imgui::TextUnformatted("This action cannot be undone.");
-                        });
-                    }
-
-                    auto status = imgui::GetConfirmationStatus(swan_id_confirm_delete_pin);
-
-                    if (status.value_or(false)) {
-                        pin_to_delete_idx = i;
-                    }
-                }
-                imgui::SameLine();
-            }
-
-            if (s_numbered_list) {
-                imgui::Text("%zu.", i+1);
-                imgui::SameLine();
-            }
-
+            imgui::TextDisabled(ICON_CI_PIN);
+            imgui::SameLine();
             {
                 imgui::ScopedTextColor tc(pin.color);
-                auto label = make_str_static<pinned_path::LABEL_MAX_LEN + 32>("%s##%zu", pin.label.c_str(), i);
-                imgui::Selectable(label.data(), false/*, ImGuiSelectableFlags_SpanAllColumns*/);
+                auto label = make_str_static<pinned_path::LABEL_MAX_LEN + 32>("%s ## %zu", pin.label.c_str(), i);
+                imgui::Selectable(label.data(), false);
             }
-
             if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
                 s_context_target = &pin;
-                imgui::OpenPopup("##pin_context");
+                imgui::OpenPopup("## pinned context_menu");
             }
-
             if (imgui::BeginDragDropSource()) {
-                if (s_numbered_list) {
-                    imgui::Text("%zu.", i+1);
-                    imgui::SameLineSpaced(1);
-                }
                 imgui::TextColored(pin.color, pin.label.c_str());
-
                 pin_drag_drop_payload payload = { i };
                 imgui::SetDragDropPayload(typeid(pin_drag_drop_payload).name(), &payload, sizeof(payload), ImGuiCond_Once);
                 imgui::EndDragDropSource();
             }
-
             if (imgui::BeginDragDropTarget()) {
-                auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name());
+                ImRect drop_target_rect = {};
+                auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name(),
+                                                                    ImGuiDragDropFlags_AcceptNoDrawDefaultRect|ImGuiDragDropFlags_AcceptBeforeDelivery,
+                                                                    &drop_target_rect);
 
                 if (payload_wrapper != nullptr) {
-                    assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
                     auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
+                    assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
 
                     u64 from = payload_data->pin_idx;
                     u64 to = i;
 
-                    bool reorder_success = change_element_position(pins, from, to);
-                    print_debug_msg("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
+                    assert(from != to);
 
-                    if (reorder_success) {
-                        bool save_success = global_state::pinned_save_to_disk();
-                        print_debug_msg("global_state::pinned_save_to_disk: %d", save_success);
+                    bool reorder_moving_down = from > to;
+                    ImVec2 p1 = reorder_moving_down ? drop_target_rect.GetTL() : drop_target_rect.GetBL();
+                    ImVec2 p2 = reorder_moving_down ? drop_target_rect.GetTR() : drop_target_rect.GetBR();
+                    imgui::GetWindowDrawList()->AddLine(p1, p2, imgui::GetColorU32(ImGuiCol_DragDropTarget), 2.f);
+
+                    if (imgui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                        bool reorder_success = change_element_position(pins, from, to);
+                        print_debug_msg("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
+
+                        if (reorder_success) {
+                            bool save_success = global_state::pinned_save_to_disk();
+                            print_debug_msg("global_state::pinned_save_to_disk: %d", save_success);
+                        }
                     }
                 }
 
@@ -140,7 +95,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
             }
         }
 
-        if (imgui::BeginPopup("##pin_context")) {
+        if (imgui::BeginPopup("## pinned context_menu")) {
             if (imgui::Selectable("Edit")) {
                 swan_popup_modals::open_edit_pin(s_context_target);
             }
@@ -151,7 +106,7 @@ void swan_windows::render_pin_manager([[maybe_unused]] std::array<explorer_windo
                     imgui::TextUnformatted("This action cannot be undone.");
                 });
             }
-            imgui::TextUnformatted("(drag to reorder)");
+            imgui::TextDisabled("(drag to reorder)");
 
             imgui::EndPopup();
         }

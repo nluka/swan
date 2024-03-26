@@ -3092,7 +3092,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     imgui::EndChild();
 
     if (imgui::BeginDragDropTarget()) {
-        auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name(), {}, ImVec2(6.5, 6.5));
+        auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name(), 0, 0, 0, ImVec2(style.WindowPadding.x, style.WindowPadding.y));
 
         if (payload_wrapper != nullptr) {
             assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
