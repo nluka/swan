@@ -478,113 +478,113 @@ try {
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("file1") },
+                bulk_rename_op( nullptr, "file1" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("file1") },
+                bulk_rename_op( nullptr, "file1" ),
             }, input_renames);
         }
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("file2") },
-                { nullptr, path_create("file2") },
+                bulk_rename_op( nullptr, "file2" ),
+                bulk_rename_op( nullptr, "file2" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("file2") },
-                { nullptr, path_create("file2") },
+                bulk_rename_op( nullptr, "file2" ),
+                bulk_rename_op( nullptr, "file2" ),
             }, input_renames);
         }
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("file3") },
-                { nullptr, path_create("file3") },
-                { nullptr, path_create("file3") },
+                bulk_rename_op( nullptr, "file3" ),
+                bulk_rename_op( nullptr, "file3" ),
+                bulk_rename_op( nullptr, "file3" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("file3") },
-                { nullptr, path_create("file3") },
-                { nullptr, path_create("file3") },
+                bulk_rename_op( nullptr, "file3" ),
+                bulk_rename_op( nullptr, "file3" ),
+                bulk_rename_op( nullptr, "file3" ),
             }, input_renames);
         }
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("file1") },
-                { nullptr, path_create("file2") },
+                bulk_rename_op( nullptr, "file1" ),
+                bulk_rename_op( nullptr, "file2" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("file2") },
-                { nullptr, path_create("file1") },
+                bulk_rename_op( nullptr, "file2" ),
+                bulk_rename_op( nullptr, "file1" ),
             }, input_renames);
         }
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("file1") },
-                { nullptr, path_create("file2") },
-                { nullptr, path_create("file3") },
+                bulk_rename_op( nullptr, "file1" ),
+                bulk_rename_op( nullptr, "file2" ),
+                bulk_rename_op( nullptr, "file3" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("file3") },
-                { nullptr, path_create("file2") },
-                { nullptr, path_create("file1") },
+                bulk_rename_op( nullptr, "file3" ),
+                bulk_rename_op( nullptr, "file2" ),
+                bulk_rename_op( nullptr, "file1" ),
             }, input_renames);
         }
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("file4") },
-                { nullptr, path_create("file5") },
-                { nullptr, path_create("file6") },
+                bulk_rename_op( nullptr, "file4" ),
+                bulk_rename_op( nullptr, "file5" ),
+                bulk_rename_op( nullptr, "file6" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("file6") },
-                { nullptr, path_create("file5") },
-                { nullptr, path_create("file4") },
+                bulk_rename_op( nullptr, "file6" ),
+                bulk_rename_op( nullptr, "file5" ),
+                bulk_rename_op( nullptr, "file4" ),
             }, input_renames);
         }
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("file1") },
-                { nullptr, path_create("file2") },
-                { nullptr, path_create("file3") },
-                { nullptr, path_create("file4") },
+                bulk_rename_op( nullptr, "file1" ),
+                bulk_rename_op( nullptr, "file2" ),
+                bulk_rename_op( nullptr, "file3" ),
+                bulk_rename_op( nullptr, "file4" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("file4") },
-                { nullptr, path_create("file3") },
-                { nullptr, path_create("file2") },
-                { nullptr, path_create("file1") },
+                bulk_rename_op( nullptr, "file4" ),
+                bulk_rename_op( nullptr, "file3" ),
+                bulk_rename_op( nullptr, "file2" ),
+                bulk_rename_op( nullptr, "file1" ),
             }, input_renames);
         }
 
         {
             std::vector<bulk_rename_op> input_renames = {
-                { nullptr, path_create("apple") },
-                { nullptr, path_create("banana") },
-                { nullptr, path_create("cherry") },
-                { nullptr, path_create("apple") },
-                { nullptr, path_create("banana") },
-                { nullptr, path_create("date") },
+                bulk_rename_op( nullptr, "apple" ),
+                bulk_rename_op( nullptr, "banana" ),
+                bulk_rename_op( nullptr, "cherry" ),
+                bulk_rename_op( nullptr, "apple" ),
+                bulk_rename_op( nullptr, "banana" ),
+                bulk_rename_op( nullptr, "date" ),
             };
             sort_renames_dup_elem_sequences_after_non_dups(input_renames);
             ntest::assert_stdvec({
-                { nullptr, path_create("date") },
-                { nullptr, path_create("cherry") },
-                { nullptr, path_create("banana") },
-                { nullptr, path_create("banana") },
-                { nullptr, path_create("apple") },
-                { nullptr, path_create("apple") },
+                bulk_rename_op( nullptr, "date" ),
+                bulk_rename_op( nullptr, "cherry" ),
+                bulk_rename_op( nullptr, "banana" ),
+                bulk_rename_op( nullptr, "banana" ),
+                bulk_rename_op( nullptr, "apple" ),
+                bulk_rename_op( nullptr, "apple" ),
             }, input_renames);
         }
     }
@@ -639,10 +639,10 @@ try {
                 { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("file1") },
-                { .before = &dest[1].basic, .after = path_create("file2") },
-                { .before = &dest[2].basic, .after = path_create("file3") },
-                { .before = &dest[3].basic, .after = path_create("file4") },
+                bulk_rename_op( &dest[0].basic, "file1" ),
+                bulk_rename_op( &dest[1].basic, "file2" ),
+                bulk_rename_op( &dest[2].basic, "file3" ),
+                bulk_rename_op( &dest[3].basic, "file4" ),
             };
             std::vector<bulk_rename_collision> expected_collisions = {
                 // none
@@ -661,9 +661,9 @@ try {
                 { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("file1") },
-                { .before = &dest[1].basic, .after = path_create("file2") },
-                { .before = &dest[2].basic, .after = path_create("file3") },
+                bulk_rename_op( &dest[0].basic, "file1" ),
+                bulk_rename_op( &dest[1].basic, "file2" ),
+                bulk_rename_op( &dest[2].basic, "file3" ),
                 //! NOTE: this will get sorted in bulk_rename_find_collisions, order to check against will be:
                 // file3
                 // file2
@@ -686,9 +686,9 @@ try {
                 { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("file3") },
-                { .before = &dest[1].basic, .after = path_create("file3") },
-                { .before = &dest[2].basic, .after = path_create("file3") },
+                bulk_rename_op( &dest[0].basic, "file3" ),
+                bulk_rename_op( &dest[1].basic, "file3" ),
+                bulk_rename_op( &dest[2].basic, "file3" ),
             };
             std::vector<bulk_rename_collision> expected_collisions = {
                 { .dest_dirent = &dest[3].basic, .first_rename_pair_idx = 0, .last_rename_pair_idx = 2 },
@@ -707,9 +707,9 @@ try {
                 { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("file5") },
-                { .before = &dest[1].basic, .after = path_create("file5") },
-                { .before = &dest[2].basic, .after = path_create("file5") },
+                bulk_rename_op( &dest[0].basic, "file5" ),
+                bulk_rename_op( &dest[1].basic, "file5" ),
+                bulk_rename_op( &dest[2].basic, "file5" ),
             };
             std::vector<bulk_rename_collision> expected_collisions = {
                 { .dest_dirent = nullptr, .first_rename_pair_idx = 0, .last_rename_pair_idx = 2 },
@@ -730,9 +730,9 @@ try {
                 { .basic = create_basic_dirent("file5", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("file3") },
-                { .before = &dest[1].basic, .after = path_create("file4") },
-                { .before = &dest[2].basic, .after = path_create("file5") },
+                bulk_rename_op( &dest[0].basic, "file3" ),
+                bulk_rename_op( &dest[1].basic, "file4" ),
+                bulk_rename_op( &dest[2].basic, "file5" ),
                 //! NOTE: this will get sorted in bulk_rename_find_collisions, order to check against will be:
                 // file5
                 // file4
@@ -756,8 +756,8 @@ try {
                 { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("file2") },
-                { .before = &dest[1].basic, .after = path_create("file2") },
+                bulk_rename_op( &dest[0].basic, "file2" ),
+                bulk_rename_op( &dest[1].basic, "file2" ),
             };
             std::vector<bulk_rename_collision> expected_collisions = {
                 { .dest_dirent = &dest[2].basic, .first_rename_pair_idx = 0, .last_rename_pair_idx = 1 },
@@ -777,9 +777,9 @@ try {
                 { .basic = create_basic_dirent("file4", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("file1") },
-                { .before = &dest[2].basic, .after = path_create("fileX") },
-                { .before = &dest[4].basic, .after = path_create("file3") },
+                bulk_rename_op( &dest[0].basic, "file1" ),
+                bulk_rename_op( &dest[2].basic, "fileX" ),
+                bulk_rename_op( &dest[4].basic, "file3" ),
                 //! NOTE: this will get sorted in bulk_rename_find_collisions, order to check against will be:
                 // fileX
                 // file3
@@ -804,11 +804,11 @@ try {
                 { .basic = create_basic_dirent("02MugF", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("0b") },
-                { .before = &dest[1].basic, .after = path_create("0b") },
-                { .before = &dest[2].basic, .after = path_create("0b") },
-                { .before = &dest[3].basic, .after = path_create("0b") },
-                { .before = &dest[4].basic, .after = path_create("0b") },
+                bulk_rename_op( &dest[0].basic, "0b" ),
+                bulk_rename_op( &dest[1].basic, "0b" ),
+                bulk_rename_op( &dest[2].basic, "0b" ),
+                bulk_rename_op( &dest[3].basic, "0b" ),
+                bulk_rename_op( &dest[4].basic, "0b" ),
                 //! NOTE: this will get sorted in bulk_rename_find_collisions
             };
             std::vector<bulk_rename_collision> expected_collisions = {
@@ -827,8 +827,8 @@ try {
                 { .basic = create_basic_dirent("test2",   ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
-                { .before = &dest[0].basic, .after = path_create("bla_2") },
-                { .before = &dest[1].basic, .after = path_create("test2") },
+                bulk_rename_op( &dest[0].basic, "bla_2" ),
+                bulk_rename_op( &dest[1].basic, "test2" ),
                 //! NOTE: this will get sorted in bulk_rename_find_collisions
             };
             std::vector<bulk_rename_collision> expected_collisions = {

@@ -595,8 +595,14 @@ struct bulk_rename_transform_result
 
 struct bulk_rename_op
 {
-    basic_dirent *before;
+    basic_dirent *before = nullptr;
     swan_path after;
+    std::atomic_char result = 0;
+
+    bulk_rename_op(basic_dirent *before, char const *after) noexcept;
+
+    bulk_rename_op(bulk_rename_op const &other) noexcept; // for emplace_back
+    bulk_rename_op &operator=(bulk_rename_op const &other) noexcept; // for emplace_back
 
     bool operator!=(bulk_rename_op const &other) const noexcept; // for ntest
     friend std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r); // for ntest

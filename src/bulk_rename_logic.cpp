@@ -258,7 +258,6 @@ bulk_rename_transform_result bulk_rename_transform(
     for (auto const &op : compiled_pattern.ops) {
         u64 space_left = after.max_size() - after_insert_idx;
         char *out = after.data() + after_insert_idx;
-        s32 written = 0;
 
         switch (op.kind) {
             using op_type = bulk_rename_compiled_pattern::op::type;
@@ -472,4 +471,26 @@ bulk_rename_find_collisions_result bulk_rename_find_collisions(
     }
 
     return { collisions, renames };
+}
+
+bulk_rename_op &bulk_rename_op::operator=(bulk_rename_op const &other) noexcept // for emplace_back
+{
+    this->before = other.before;
+    this->after = other.after;
+    this->result = other.result.load();
+    return *this;
+}
+
+bulk_rename_op::bulk_rename_op(const bulk_rename_op &other) noexcept // for emplace_back
+    : before(other.before)
+    , after(other.after)
+    , result(other.result.load())
+{
+}
+
+bulk_rename_op::bulk_rename_op(basic_dirent *before, char const *after) noexcept
+    : before(before)
+    , after(path_create(after))
+    , result(0)
+{
 }
