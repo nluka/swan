@@ -544,7 +544,7 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcep
 
     // Create a crash dump file
     HANDLE dump_file = CreateFile(
-        _T("CrashDump.dmp"),
+        _T("swan_crash.dmp"),
         GENERIC_WRITE,
         0,
         NULL,
@@ -604,13 +604,18 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::analytics), nullptr, &global_state::settings().show.analytics);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::settings), nullptr, &global_state::settings().show.settings);
 
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::debug_log), nullptr, &global_state::settings().show.debug_log);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::imgui_demo), nullptr, &global_state::settings().show.imgui_demo);
+            imgui::Separator();
+
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::theme_editor), nullptr, &global_state::settings().show.theme_editor);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_library), nullptr, &global_state::settings().show.icon_library);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_font_awesome), nullptr, &global_state::settings().show.fa_icons);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_codicon), nullptr, &global_state::settings().show.ci_icons);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_material_design), nullptr, &global_state::settings().show.md_icons);
+
+            imgui::Separator();
+
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::debug_log), nullptr, &global_state::settings().show.debug_log);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::imgui_demo), nullptr, &global_state::settings().show.imgui_demo);
 
             imgui::EndMenu();
         }

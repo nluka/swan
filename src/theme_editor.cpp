@@ -462,7 +462,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             imgui::Combo(combo_label.data(), &val, s_options, lengthof(s_options));
                         }
                         imgui::TableNextColumn();
-                        imgui::Text(" %s", label);
+                        imgui::Text("%s", label);
                     }
                 };
 
