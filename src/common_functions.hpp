@@ -13,7 +13,6 @@ namespace global_constants
 {
     std::vector<icon_font_glyph> const &icon_font_glyphs_font_awesome() noexcept;
     std::vector<icon_font_glyph> const &icon_font_glyphs_codicon() noexcept;
-    std::vector<icon_font_glyph> const &icon_font_glyphs_material_design() noexcept;
 
     constexpr u64 num_explorers = 4;
     constexpr u64 MAX_RECENT_FILES = 100;
@@ -81,14 +80,6 @@ namespace swan_windows
     void render_recent_files(bool &open) noexcept;
 
     void render_settings(GLFWwindow *window, bool &open) noexcept;
-
-    void render_icon_font_browser(
-        swan_windows::id window_id,
-        icon_font_browser_state &browser,
-        bool &open,
-        char const *icon_lib_name,
-        char const *icon_prefix,
-        std::vector<icon_font_glyph> const &(*get_all_icons)() noexcept) noexcept;
 
     void render_icon_library(bool &open) noexcept;
 

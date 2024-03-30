@@ -373,7 +373,7 @@
 #define ICON_FA_FOLDER_OPEN "\xef\x81\xbc"	// U+f07c
 #define ICON_FA_FOLDER_PLUS "\xef\x99\x9e"	// U+f65e
 #define ICON_FA_FONT "\xef\x80\xb1"	// U+f031
-#define ICON_FA_FONT_AWESOME_LOGO_FULL "\xef\x93\xa6"	// U+f4e6
+// #define ICON_FA_FONT_AWESOME_LOGO_FULL "\xef\x93\xa6"	// U+f4e6
 #define ICON_FA_FOOTBALL_BALL "\xef\x91\x8e"	// U+f44e
 #define ICON_FA_FORWARD "\xef\x81\x8e"	// U+f04e
 #define ICON_FA_FROG "\xef\x94\xae"	// U+f52e

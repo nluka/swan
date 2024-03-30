@@ -58,32 +58,49 @@ void swan_windows::render_icon_library(bool &open) noexcept
         global_state::focused_window_set(swan_windows::id::icon_library);
     }
 
+    static bool s_show_codicons = true;
+    static bool s_show_font_awesome = true;
+
+    enum class library_id : s8
+    {
+        nil = -1,
+        codicons,
+        font_awesome_5,
+        count
+    };
+
     struct icon_library
     {
-        char const *library_name;
-        char const *prefix;
+        char const *library_name = nullptr;
+        char const *prefix = nullptr;
         std::vector<icon_font_glyph> glyphs;
+        bool *show = nullptr;
     };
-    static icon_library s_icon_libraries[] = {
-        { "Codicons", "ICON_CI_", global_constants::icon_font_glyphs_codicon() },
-        { "Font Awesome", "ICON_FA_", global_constants::icon_font_glyphs_font_awesome() },
-        { "Material Design", "ICON_MD_", global_constants::icon_font_glyphs_material_design() },
+    static icon_library s_icon_libraries[(u64)library_id::count] = {
+        { "Codicons", "ICON_CI_", global_constants::icon_font_glyphs_codicon(), &s_show_codicons },
+        { "Font Awesome 5", "ICON_FA_", global_constants::icon_font_glyphs_font_awesome(), &s_show_font_awesome },
     };
 
     struct icon_match
     {
-        u64 lev_edit_distance;
-        char const *library_name;
-        char const *icon_name;
-        char const *icon_content;
+        u64 lev_edit_distance = 0;
+        char const *library_name = nullptr;
+        char const *icon_name = nullptr;
+        char const *icon_content = nullptr;
+        library_id lib_id = library_id::nil;
+        bool has_word = false;
     };
 
     auto match_everything = []() noexcept {
         std::vector<icon_match> everything = {};
 
-        for (auto &icon_lib : s_icon_libraries) {
-            for (auto &icon_glyph : icon_lib.glyphs) {
-                everything.emplace_back(0, icon_lib.library_name, icon_glyph.name, icon_glyph.content);
+        for (u64 i = 0; i < lengthof(s_icon_libraries); ++i) {
+            auto &icon_lib = s_icon_libraries[i];
+
+            if (*icon_lib.show) {
+                for (auto &icon_glyph : icon_lib.glyphs) {
+                    everything.emplace_back(0, icon_lib.library_name, icon_glyph.name, icon_glyph.content, library_id(i), false);
+                }
             }
         }
 
@@ -93,13 +110,37 @@ void swan_windows::render_icon_library(bool &open) noexcept
     static std::vector<icon_match> s_matches = match_everything();
 
     static char s_search_input[64] = {};
-    bool search_update = false;
+    bool recompute_matches = false;
     {
         imgui::ScopedAvailWidth w = {};
-        search_update = imgui::InputTextWithHint("## icon_font_finder search", "Search", s_search_input, lengthof(s_search_input));
+        recompute_matches |= imgui::InputTextWithHint("## icon_font_finder search", "Search", s_search_input, lengthof(s_search_input));
     }
 
-    if (search_update) {
+    static bool s_prioritize_sub_word_matching = true;
+
+    imgui::Checkbox("Codicons", &s_show_codicons);
+    imgui::SameLineSpaced(1);
+    imgui::Checkbox("Font Awesome 5", &s_show_font_awesome);
+
+    imgui::SameLineSpaced(3);
+
+    recompute_matches |= imgui::Checkbox("Prioritize Sub Words", &s_prioritize_sub_word_matching);
+    imgui::SameLine();
+    imgui::TextUnformatted("(?)");
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("When enabled, icon names with exact word matches will appear first,\n"
+                          "icon names that don't have a matching word will appear as the second partition.\n"
+                          "Levenshtein edit distance is used to sort the two partitions.\n"
+                          "\n"
+                          "When disabled, only Levenshtein edit distance is used to sort matches.");
+    }
+
+    if (!strempty(s_search_input)) {
+        imgui::SameLineSpaced(3);
+        imgui::TextDisabled("Icons appear in order of closest to furthest match");
+    }
+
+    if (recompute_matches) {
         s_matches.clear();
 
         u64 search_input_len = strnlen(s_search_input, lengthof(s_search_input));
@@ -110,34 +151,78 @@ void swan_windows::render_icon_library(bool &open) noexcept
                        search_input_upper, [](char ch) noexcept { return (char)toupper(ch); });
 
         if (search_input_len == 0) {
-            for (auto &icon_lib : s_icon_libraries) {
+            for (u64 i = 0; i < lengthof(s_icon_libraries); ++i) {
+                auto &icon_lib = s_icon_libraries[i];
+
                 for (auto &icon_glyph : icon_lib.glyphs) {
-                    s_matches.emplace_back(0, icon_lib.library_name, icon_glyph.name, icon_glyph.content);
+                    s_matches.emplace_back(0, icon_lib.library_name, icon_glyph.name, icon_glyph.content, library_id(i), false);
                 }
             }
         }
         else { // search_input_len > 0
-            for (auto &icon_lib : s_icon_libraries) {
+            for (u64 i = 0; i < lengthof(s_icon_libraries); ++i) {
+                auto &icon_lib = s_icon_libraries[i];
+
+                if (*icon_lib.show == false) {
+                    continue;
+                }
+
                 u64 prefix_len = strlen(icon_lib.prefix);
 
                 for (auto &icon_glyph : icon_lib.glyphs) {
                     char const *icon_name_no_prefix     = icon_glyph.name + prefix_len;
                     u64         icon_name_no_prefix_len = strlen(icon_name_no_prefix);
 
+                    bool sub_word_found = false;
+
+                    if (s_prioritize_sub_word_matching) {
+                        auto  icon_name_copy = make_str_static<256>(icon_glyph.name);
+                        char *icon_name_copy_no_prefix = icon_name_copy.data() + strlen(icon_lib.prefix) - 1;
+
+                        boost::container::static_vector<char const *, 16> words = {};
+                        {
+                            char const *word = strtok(icon_name_copy_no_prefix, "_");
+                            while (word != nullptr) {
+                                words.push_back(word);
+                                word = strtok(nullptr, "_");
+                            }
+                        }
+
+                        sub_word_found = std::any_of(words.begin(), words.end(), [&](char const *word) noexcept {
+                            return StrCmpIA(word, s_search_input) == 0;
+                        });
+                    }
+
                     u64 lev_edit_distance = compute_levenshtein_dist(icon_name_no_prefix, icon_name_no_prefix_len, search_input_upper, search_input_len);
 
-                    s_matches.emplace_back(lev_edit_distance, icon_lib.library_name, icon_glyph.name, icon_glyph.content);
+                    s_matches.emplace_back(lev_edit_distance, icon_lib.library_name, icon_glyph.name, icon_glyph.content, library_id(i), sub_word_found);
                 }
             }
 
             std::sort(s_matches.begin(), s_matches.end(), [](icon_match const &left, icon_match const &right) noexcept {
+                if (left.lib_id != right.lib_id) {
+                    return (u8)left.lib_id < (u8)right.lib_id;
+                } else if (s_prioritize_sub_word_matching && left.has_word != right.has_word) {
+                    return left.has_word > right.has_word;
+                }
                 return left.lev_edit_distance < right.lev_edit_distance;
             });
         }
     }
 
-    if (imgui::BeginChild("icon_library_matches")) {
+    if (imgui::BeginChild("icon_library_matches", {}, false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+        library_id curr_lib_id = library_id::nil;
+
         for (auto const &match : s_matches) {
+            if (*s_icon_libraries[(u64)match.lib_id].show == false) {
+                continue;
+            }
+            if (match.lib_id != curr_lib_id) {
+                imgui::NewLine();
+                imgui::SeparatorText(match.library_name);
+                curr_lib_id = match.lib_id;
+            }
+
             f32 space_left = imgui::GetContentRegionAvail().x - imgui::GetStyle().ScrollbarSize - imgui::GetStyle().ItemSpacing.x - imgui::GetStyle().WindowPadding.x;
             f32 button_size = imgui::CalcTextSize(match.icon_content).x + imgui::GetStyle().FramePadding.x*2 + imgui::GetStyle().ItemSpacing.x;
 
@@ -147,7 +232,23 @@ void swan_windows::render_icon_library(bool &open) noexcept
             }
 
             if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-                imgui::SetTooltip("%s %zu", match.icon_name, match.lev_edit_distance);
+                if (imgui::BeginTooltip()) {
+                    imgui::Separator();
+                    imgui::TextUnformatted(match.icon_name);
+                    imgui::SameLineSpaced(1);
+                    imgui::TextDisabled("click to copy");
+
+                    if (s_prioritize_sub_word_matching) {
+                        imgui::Separator();
+                        imgui::TextColored(match.has_word ? success_color() : error_color(), "Word match = %c", match.has_word ? 'Y' : 'N');
+                    }
+
+                    imgui::Separator();
+                    imgui::Text("Lev edit dist = %zu", match.lev_edit_distance);
+
+                    imgui::Separator();
+                    imgui::EndTooltip();
+                }
             }
 
             if (imgui::IsItemClicked()) {

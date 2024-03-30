@@ -355,45 +355,6 @@ try {
                     }
                     break;
                 }
-                case swan_windows::id::icon_font_browser_font_awesome: {
-                    static icon_font_browser_state fa_browser = { {}, 10, global_constants::icon_font_glyphs_font_awesome() };
-                    if (window_visib.fa_icons) {
-                        swan_windows::render_icon_font_browser(
-                            swan_windows::id::icon_font_browser_font_awesome,
-                            fa_browser,
-                            window_visib.fa_icons,
-                            "Font Awesome",
-                            "ICON_FA_",
-                            global_constants::icon_font_glyphs_font_awesome);
-                    }
-                    break;
-                }
-                case swan_windows::id::icon_font_browser_codicon: {
-                    static icon_font_browser_state ci_browser = { {}, 10, global_constants::icon_font_glyphs_codicon() };
-                    if (window_visib.ci_icons) {
-                        swan_windows::render_icon_font_browser(
-                            swan_windows::id::icon_font_browser_codicon,
-                            ci_browser,
-                            window_visib.ci_icons,
-                            "Codicons",
-                            "ICON_CI_",
-                            global_constants::icon_font_glyphs_codicon);
-                    }
-                    break;
-                }
-                case swan_windows::id::icon_font_browser_material_design: {
-                    static icon_font_browser_state md_browser = { {}, 10, global_constants::icon_font_glyphs_material_design() };
-                    if (window_visib.md_icons) {
-                        swan_windows::render_icon_font_browser(
-                            swan_windows::id::icon_font_browser_material_design,
-                            md_browser,
-                            window_visib.md_icons,
-                            "Material Design",
-                            "ICON_MD_",
-                            global_constants::icon_font_glyphs_material_design);
-                    }
-                    break;
-                }
             }
         }
 
@@ -608,9 +569,6 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::theme_editor), nullptr, &global_state::settings().show.theme_editor);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_library), nullptr, &global_state::settings().show.icon_library);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_font_awesome), nullptr, &global_state::settings().show.fa_icons);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_codicon), nullptr, &global_state::settings().show.ci_icons);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::icon_font_browser_material_design), nullptr, &global_state::settings().show.md_icons);
 
             imgui::Separator();
 
@@ -882,12 +840,6 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
                 attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_CI, 18, 0, 3, s_glyph_ranges);
-            }
-
-            // material design
-            {
-                static ImWchar const s_glyph_ranges[] = { ICON_MIN_MD, ICON_MAX_16_MD, 0 };
-                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_MD, 13, 0, 3, s_glyph_ranges);
             }
         }
 

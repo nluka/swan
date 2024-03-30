@@ -59,7 +59,7 @@ char const *get_icon(basic_dirent::kind t) noexcept
         case basic_dirent::kind::invalid_symlink:      return ICON_CI_ERROR;
         default:                                       assert(false && "has no icon"); break;
     }
-    return ICON_MD_ERROR;
+    return ICON_CI_ERROR;
 }
 
 char const *get_icon_for_extension(char const *extension) noexcept
