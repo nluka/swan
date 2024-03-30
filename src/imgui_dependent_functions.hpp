@@ -77,7 +77,7 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
     char shortened_buf[file_name_max_len+1];
     char const *shortened_file_name = full_file_name;
     if (strlen(full_file_name) > file_name_max_len) {
-        (void) snprintf(shortened_buf, lengthof(shortened_buf), "%*s%s", s32(file_name_max_len), full_file_name, ICON_MD_MORE);
+        (void) snprintf(shortened_buf, lengthof(shortened_buf), "%.*s{..}", s32(file_name_max_len - lengthof("{..}")), full_file_name);
         shortened_file_name = shortened_buf;
     }
 

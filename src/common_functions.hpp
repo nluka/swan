@@ -71,7 +71,7 @@ namespace swan_windows
 
     void render_finder(finder_window &, bool &open) noexcept;
 
-    void render_pin_manager(std::array<explorer_window, 4> &, bool &open) noexcept;
+    void render_pinned(std::array<explorer_window, 4> &, bool &open) noexcept;
 
     void render_debug_log(bool &open) noexcept;
 

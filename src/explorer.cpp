@@ -1781,9 +1781,9 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
 static
 void render_pins_popup(explorer_window &expl) noexcept
 {
-    auto cleanup_and_close_popup = []() noexcept {
-        imgui::CloseCurrentPopup();
-    };
+    // auto cleanup_and_close_popup = []() noexcept {
+    //     imgui::CloseCurrentPopup();
+    // };
 
     imgui::AlignTextToFramePadding();
     imgui::TextUnformatted("Pins");

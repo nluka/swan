@@ -234,7 +234,6 @@ try {
 
             // this is to prevent the ugly blue border (nav focus I think it's called?) when pressing escape
             if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE) })) {
-                // ImGui::SetWindowFocus(nullptr);
                 ImGui::SetWindowFocus(swan_windows::get_name(focused_now_id));
             }
         }
@@ -299,7 +298,7 @@ try {
                 }
                 case swan_windows::id::pinned: {
                     if (window_visib.pinned) {
-                        swan_windows::render_pin_manager(explorers, window_visib.pinned);
+                        swan_windows::render_pinned(explorers, window_visib.pinned);
                     }
                     break;
                 }

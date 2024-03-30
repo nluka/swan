@@ -69,69 +69,117 @@ char const *get_icon_for_extension(char const *extension) noexcept
     }
     else {
         std::pair<char const *, char const *> const extension_to_icon[] = {
-            { "mp3",  ICON_FA_FILE_AUDIO },
-            { "wav",  ICON_FA_FILE_AUDIO },
-            { "opus", ICON_FA_FILE_AUDIO },
-            { "ogg",  ICON_FA_FILE_AUDIO },
+            { ICON_FA_FILE_AUDIO, "mp3" },
+            { ICON_FA_FILE_AUDIO, "wav" },
+            { ICON_FA_FILE_AUDIO, "opus" },
+            { ICON_FA_FILE_AUDIO, "ogg" },
 
-            { "csv", ICON_FA_FILE_CSV },
+            { ICON_FA_FILE_ARCHIVE, "zip" },
+            { ICON_FA_FILE_ARCHIVE, "7z" },
+            { ICON_FA_FILE_ARCHIVE, "rar" },
 
-            { "zip", ICON_FA_FILE_ARCHIVE },
-            { "rar", ICON_FA_FILE_ARCHIVE },
+            { ICON_FA_FILE_CODE, "cpp" },
+            { ICON_FA_FILE_CODE, "c" },
+            { ICON_FA_FILE_CODE, "hpp" },
+            { ICON_FA_FILE_CODE, "h" },
+            { ICON_FA_FILE_CODE, "js" },
+            { ICON_FA_FILE_CODE, "ts" },
+            { ICON_FA_FILE_CODE, "py" },
+            { ICON_FA_FILE_CODE, "java" },
+            { ICON_FA_FILE_CODE, "cs"   },
 
-            { "cpp",  ICON_FA_FILE_CODE },
-            { "c",    ICON_FA_FILE_CODE },
-            { "hpp",  ICON_FA_FILE_CODE },
-            { "h",    ICON_FA_FILE_CODE },
-            { "js",   ICON_FA_FILE_CODE },
-            { "ts",   ICON_FA_FILE_CODE },
-            { "py",   ICON_FA_FILE_CODE },
-            { "java", ICON_FA_FILE_CODE },
-            { "cs",   ICON_FA_FILE_CODE },
+            { ICON_FA_FILE_PDF, "pdf" },
+            { ICON_FA_FILE_CSV, "csv" },
 
-            { "pdf", ICON_FA_FILE_PDF },
+            { ICON_FA_FILE_WORD, "doc" },
+            { ICON_FA_FILE_WORD, "docx" },
+            { ICON_FA_FILE_POWERPOINT, "pptx" },
+            { ICON_FA_FILE_POWERPOINT, "ppt" },
+            { ICON_FA_FILE_POWERPOINT, "pptx" },
+            { ICON_FA_FILE_EXCEL, "xlsx" },
+            { ICON_FA_FILE_EXCEL, "xls" },
+            { ICON_FA_FILE_EXCEL, "xlsb" },
 
-            { "doc",  ICON_FA_FILE_WORD },
-            { "docx", ICON_FA_FILE_WORD },
-            { "pptx", ICON_FA_FILE_POWERPOINT },
-            { "ppt",  ICON_FA_FILE_POWERPOINT },
-            { "pptx", ICON_FA_FILE_POWERPOINT },
-            { "xlsx", ICON_FA_FILE_EXCEL },
-            { "xls",  ICON_FA_FILE_EXCEL },
-            { "xlsb", ICON_FA_FILE_EXCEL },
+            { ICON_FA_FILE_VIDEO, "mp4" },
+            { ICON_FA_FILE_VIDEO, "avi" },
+            { ICON_FA_FILE_VIDEO, "mov" },
+            { ICON_FA_FILE_VIDEO, "wmv" },
+            { ICON_FA_FILE_VIDEO, "mkv" },
+            { ICON_FA_FILE_VIDEO, "avchd" },
 
-            { "mp4",   ICON_FA_FILE_VIDEO },
-            { "avi",   ICON_FA_FILE_VIDEO },
-            { "mov",   ICON_FA_FILE_VIDEO },
-            { "wmv",   ICON_FA_FILE_VIDEO },
-            { "mkv",   ICON_FA_FILE_VIDEO },
-            { "avchd", ICON_FA_FILE_VIDEO },
+            { ICON_FA_FILE_IMAGE, "jpeg" },
+            { ICON_FA_FILE_IMAGE, "jpg" },
+            { ICON_FA_FILE_IMAGE, "png" },
+            { ICON_FA_FILE_IMAGE, "raw" },
+            { ICON_FA_FILE_IMAGE, "ico" },
+            { ICON_FA_FILE_IMAGE, "tiff" },
+            { ICON_FA_FILE_IMAGE, "bmp" },
+            { ICON_FA_FILE_IMAGE, "pgm" },
+            { ICON_FA_FILE_IMAGE, "pnm" },
+            { ICON_FA_FILE_IMAGE, "gif" },
 
-            { "jpeg", ICON_FA_FILE_IMAGE },
-            { "jpg",  ICON_FA_FILE_IMAGE },
-            { "png",  ICON_FA_FILE_IMAGE },
-            { "raw",  ICON_FA_FILE_IMAGE },
-            { "ico",  ICON_FA_FILE_IMAGE },
-            { "tiff", ICON_FA_FILE_IMAGE },
-            { "bmp",  ICON_FA_FILE_IMAGE },
-            { "pgm",  ICON_FA_FILE_IMAGE },
-            { "pnm",  ICON_FA_FILE_IMAGE },
-            { "gif",  ICON_FA_FILE_IMAGE },
+            { ICON_FA_FILE_ALT, "txt" },
+            { ICON_FA_FILE_ALT, "md" },
+            { ICON_FA_FILE_ALT, "bat" },
+            { ICON_FA_FILE_ALT, "xml" },
+            { ICON_FA_FILE_ALT, "ini" },
+            { ICON_FA_FILE_ALT, "conf" },
+            { ICON_FA_FILE_ALT, "cfg" },
+            { ICON_FA_FILE_ALT, "config" },
+            { ICON_FA_FILE_ALT, "json" },
+            { ICON_FA_FILE_ALT, "gitignore" },
+            { ICON_FA_FILE_ALT, "natvis" },
+            { ICON_FA_FILE_ALT, "rc" },
 
-            { "txt",    ICON_FA_FILE_ALT },
-            { "md",     ICON_FA_FILE_ALT },
-            { "bat",    ICON_FA_FILE_ALT },
-            { "xml",    ICON_FA_FILE_ALT },
-            { "ini",    ICON_FA_FILE_ALT },
-            { "conf",   ICON_FA_FILE_ALT },
-            { "cfg",    ICON_FA_FILE_ALT },
-            { "config", ICON_FA_FILE_ALT },
-            { "json",   ICON_FA_FILE_ALT },
+            { ICON_CI_FILE_BINARY, "exe" }, // (Executable)
+            { ICON_CI_FILE_BINARY, "obj" }, // (Object)
+            { ICON_CI_FILE_BINARY, "pch" }, // (Precompiled Header)
+            { ICON_CI_FILE_BINARY, "bin" }, // (Binary)
+            { ICON_CI_FILE_BINARY, "dll" }, // (Dynamic Link Library)
+            { ICON_CI_FILE_BINARY, "dat" }, // (Data)
+            { ICON_CI_FILE_BINARY, "app" }, // (Application)
+            { ICON_CI_FILE_BINARY, "jar" }, // (Java Archive)
+            { ICON_CI_FILE_BINARY, "so" }, // (Shared Object)
+            { ICON_CI_FILE_BINARY, "lib" }, // (Library)
+            { ICON_CI_FILE_BINARY, "sys" }, // (System)
+            { ICON_CI_FILE_BINARY, "class" }, // (Java Class)
+            { ICON_CI_FILE_BINARY, "dylib" }, // (Dynamic Library)
+            { ICON_CI_FILE_BINARY, "ko" }, // (Kernel Object)
+            { ICON_CI_FILE_BINARY, "a" }, // (Archive)
+            { ICON_CI_FILE_BINARY, "img" }, // (Disk Image)
+            { ICON_CI_FILE_BINARY, "iso" }, // (Disk Image)
+            { ICON_CI_FILE_BINARY, "rpm" }, // (RPM Package Manager)
+            { ICON_CI_FILE_BINARY, "deb" }, // (Debian Package)
+            { ICON_CI_FILE_BINARY, "dmg" }, // (Disk Image)
+            { ICON_CI_FILE_BINARY, "dmp" }, // (Dump)
+            { ICON_CI_FILE_BINARY, "o" }, // (Object)
+            { ICON_CI_FILE_BINARY, "gadget" }, // (Windows Gadget)
+            { ICON_CI_FILE_BINARY, "psd" }, // (Photoshop Document)
+            { ICON_CI_FILE_BINARY, "apk" }, // (Android Package)
+            { ICON_CI_FILE_BINARY, "zip" }, // (Zip Archive)
+            { ICON_CI_FILE_BINARY, "tar" }, // (Tape Archive)
+            { ICON_CI_FILE_BINARY, "gz" }, // (Gzip Archive)
+            { ICON_CI_FILE_BINARY, "xz" }, // (XZ Archive)
+            { ICON_CI_FILE_BINARY, "7z" }, // (7-Zip Archive)
+            { ICON_CI_FILE_BINARY, "rar" }, // (RAR Archive)
+            { ICON_CI_FILE_BINARY, "cab" }, // (Cabinet File)
+            { ICON_CI_FILE_BINARY, "b" }, // (Binary)
+            { ICON_CI_FILE_BINARY, "coff" }, // (Common Object File Format)
+            { ICON_CI_FILE_BINARY, "mod" }, // (Module)
+            { ICON_CI_FILE_BINARY, "vxd" }, // (Virtual Device Driver)
+            { ICON_CI_FILE_BINARY, "bin" }, // (Binary Data)
+            { ICON_CI_FILE_BINARY, "sav" }, // (Saved Data)
+            { ICON_CI_FILE_BINARY, "sys" }, // (System File)
+            { ICON_CI_FILE_BINARY, "prx" }, // (Plugin)
+            { ICON_CI_FILE_BINARY, "fon" }, // (Font)
+            { ICON_CI_FILE_BINARY, "ttf" }, // (TrueType Font)
+            { ICON_CI_FILE_BINARY, "woff" }, // (Web Open Font Format)
+            { ICON_CI_FILE_BINARY, "res" }, // (Resource)
         };
 
         for (auto const &pair : extension_to_icon) {
-            if (StrCmpI(pair.first, extension) == 0) {
-                return pair.second;
+            if (StrCmpI(pair.second, extension) == 0) {
+                return pair.first;
             }
         }
 
