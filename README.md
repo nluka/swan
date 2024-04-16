@@ -1,57 +1,41 @@
-# Swan
+<img src="resource/swan.ico" alt="Swan logo" width="50" height="50" />
 
-*Transform your Windows file management experience into a swan's elegant dance.*
+<br />
 
-Swan is a substitute to the Windows File Explorer (WFE), for those wanting to squash the WFE frustrations (e.g., myself).
+Swan is a substitute to the Windows File Explorer (WFE hereafter) for those craving a more elegant file management experience. Many features are ported from WFE to make Swan a familiar experience, whilst solving several major frustrations:
 
-<img src="resource/preview.gif" />
+- Ergonomic file operations through multiple explorer panes, instead of managing multiple WFE windows
+- Instant and intuitive searching, instead of the slow and clumsy WFE search
+- Bulk renaming, completely absent from the WFE
 
-## What's not to love about the Windows File Explorer?
+In addition, Swan solves many smaller frustrations, as identified in the [feature comparison section](#feature-comparison).
 
-*Many things, unfortunately.*
+Due to feature immaturity, Swan is not intended to outright replace the WFE as of now. Rather, it's meant to be used as a powerful primary whilst making WFE an easy to reach secondary for when a feature is missing.
 
-- **Only 1 explorer per window**
-  - Want to work between 2 explorers at once? You need 2 windows open. Want 3 explorers? Have fun managing 3 separate windows!
-  - *Swan solves this by providing 4 explorers in its single window - dock them however suits you best.*
+## Feature comparison
 
-- **Hard to filter through a directory to find files with particular names.**
-  - The "Search" feature really ain't it because...
-    - It's slow.
-    - It's always recursive.
-  - *Swan solves this by having a dedicated filter for the current working directory.*
-
-- **No bulk rename feature.**
-  - *Swan solves this with a powerful and user friendly bulk renaming tool, for simple and complex renaming situations.*
-
-- **It's hard to find a file when you don't know where it is.**
-  - WFE "Search" consistently disappoints its slow performance, freezing, crashing... seriously, what is Microsoft doing with that thing?
-  - *Swan will eventually solve this by providing a fast, dedicated file finder which elegantly integrates with the explorer.*
-
-- **Impossible to figure out who locked a file you're trying to move/rename/delete.**
-  - *Swan will eventually solve this by finding the culprit, and giving you disciplinary options*
-
-- **Tedious to prune dead wood from your filesystem efficiently**
-  - Sometimes you want to find empty directories in a particular region - have fun opening then one at a time to find out which ones are empty!
-  - *Swan will eventually solve this with its analyze feature, letting you find and discipline empty directories quickly*
-
-## Features
-
-### Filtering
-
-Demo coming soon.
-
-### Bulk renaming
-
-Quickly slice and dice file names for multiple files at once.
-
-<img src="resource/bulk_rename_demo_1.gif" />
-
-- Preview before and after prior to renaming
-- Insert arbitrary counter with customizable start and step values using `<counter>`
-- Insert current file name using `<name>`
-- Insert current file extension using `<ext>`
-- Insert current file extension with a leading dot using `<dotext>`
-- Insert file size (in bytes) using `<bytes>`
+| Feature | <img src="resource/WFE_icon.png" alt="WFE" width="25" height="25" /> | <img src="resource/swan.ico" alt="Swan" width="25" height="25" /> |
+| - | - | - |
+| Directory browsing and navigation | ✔ | ✔ |
+| Create empty file, directory | ✔ | ✔ |
+| Cut-copy-paste file operations | ✔ | ✔ |
+| Drag-to-move file operations | ✔ | ✔ |
+| Basic directory history foward/back | ✔ | ✔ |
+| Rename single object | ✔ | ✔ |
+| Pinned directories | ✔ | ✔ |
+| Recent files | ✔ | ✔ |
+| Multi-pane explorer | ❌ | ✔ |
+| Rename objects in bulk | ❌ | ✔ |
+| Browsable directory history | ❌ | ✔ |
+| Multi-column sort | ❌ | ✔ |
+| File operations history | ❌ | ✔ |
+| Unix directory separator support | ❌ | ✔ |
+| Editable appearance | ❌ | ✔ |
+| Current working directory autocomplete | ✔ | 🛠️ |
+| Create shortcut | ✔ | 🛠️ |
+| Object attributes | ✔ | 🛠️ |
+| Object sharing | ✔ | 🛠️ |
+| Object security | ✔ | 🛠️ |
 
 ## Attributions
 
