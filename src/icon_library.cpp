@@ -231,12 +231,19 @@ void swan_windows::render_icon_library(bool &open) noexcept
                 imgui::SameLine();
             }
 
+            if (match.has_word) {
+                ImVec2 button_TL = imgui::GetItemRectMin();
+                ImVec2 button_BR = imgui::GetItemRectMax();
+                ImRect button_rect(button_TL, button_BR);
+                imgui::GetWindowDrawList()->AddCircleFilled(button_rect.GetTR(), 2, IM_COL32(0, 255, 0, 255));
+            }
+
             if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                 if (imgui::BeginTooltip()) {
                     imgui::Separator();
                     imgui::TextUnformatted(match.icon_name);
-                    imgui::SameLineSpaced(1);
-                    imgui::TextDisabled("click to copy");
+                    imgui::SameLine();
+                    imgui::TextDisabled("(click to copy)");
 
                     if (s_prioritize_sub_word_matching) {
                         imgui::Separator();

@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "imgui_dependent_functions.hpp"
 #include "util.hpp"
 
@@ -300,7 +301,7 @@ std::string serialize_ImGuiStyle(ImGuiStyle const &style, u64 reserve_size, seri
     return str;
 }
 
-inline ImGuiStyle swan_default_imgui_style() noexcept
+ImGuiStyle swan_default_imgui_style() noexcept
 {
     ImGuiStyle style;
 

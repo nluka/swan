@@ -47,8 +47,6 @@ try {
     }
 #endif
 
-    SCOPE_EXIT { std::cout << boost::stacktrace::stacktrace(); };
-
     GLFWwindow *window = create_barebones_window();
     if (window == nullptr) {
         return 1;
@@ -395,19 +393,15 @@ try {
 }
 catch (std::exception const &except) {
     fprintf(stderr, "fatal: %s\n", except.what());
-    std::cout << boost::stacktrace::stacktrace();
 }
 catch (std::string const &err) {
     fprintf(stderr, "fatal: %s\n", err.c_str());
-    std::cout << boost::stacktrace::stacktrace();
 }
 catch (char const *err) {
     fprintf(stderr, "fatal: %s\n", err);
-    std::cout << boost::stacktrace::stacktrace();
 }
 catch (...) {
     fprintf(stderr, "fatal: unknown error, catch(...)\n");
-    std::cout << boost::stacktrace::stacktrace();
 }
 
 static

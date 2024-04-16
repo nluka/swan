@@ -1,5 +1,4 @@
 #include "stdafx.hpp"
-#include "libs/ntest.hpp"
 #include "common_functions.hpp"
 
 std::optional<ntest::report_result> run_tests(std::filesystem::path const &output_path,

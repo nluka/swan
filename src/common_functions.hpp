@@ -43,7 +43,7 @@ namespace swan_windows
         count
     };
 
-    char const *get_name(id id) noexcept
+    inline char const *get_name(id id) noexcept
     {
         switch (id) {
             case id::explorer_0: return " Explorer 1 ";

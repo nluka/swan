@@ -48,11 +48,7 @@ s32 directory_exists(char const *path) noexcept
     return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-void format_file_size(
-    u64 file_size,
-    char *out,
-    u64 out_size,
-    u64 unit_multiplier) noexcept
+void format_file_size(u64 file_size, char *out, u64 out_size, u64 unit_multiplier) noexcept
 {
     char const *units[] = { "B", "KB", "MB", "GB", "TB" };
     u64 constexpr largest_unit_idx = (sizeof(units) / sizeof(*units)) - 1;
@@ -559,4 +555,28 @@ std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
     // std::replace(buffer_final.begin(), buffer_final.end(), '-', ' ');
 
     return { length, buffer_final };
+}
+
+bool str_starts_with(char const *str, char const *prefix) noexcept
+{
+    assert(str != nullptr);
+    assert(prefix != nullptr);
+
+    return strncmp(prefix, str, strlen(prefix)) == 0;
+}
+
+std::tm make_tm(system_time_point_t const &time) noexcept
+{
+    auto time_t = std::chrono::system_clock::to_time_t(time);
+    std::tm tm = *std::localtime(&time_t);
+    return tm;
+    // return std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+}
+
+system_time_point_t extract_system_time_from_istream(std::istream &in_stream) noexcept
+{
+    std::tm tm = {};
+    in_stream >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+    system_time_point_t system_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    return system_time;
 }

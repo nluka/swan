@@ -1,4 +1,8 @@
-#include "stdafx.hpp"
+#if defined(USE_PRECOMPILED_HEADER)
+#   include "stdafx.hpp"
+#else
+#endif
+
 #include "path.hpp"
 
 swan_path swan_path::create(char const *data, u64 count) noexcept

@@ -1,5 +1,5 @@
 @call cl.exe ^
-src/all_in_one.cpp ^
+src/all_in_one.cc ^
 obj_debug/imgui_demo.obj ^
 obj_debug/imgui_draw.obj ^
 obj_debug/imgui_impl_glfw.obj ^

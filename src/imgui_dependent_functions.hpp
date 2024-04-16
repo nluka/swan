@@ -31,7 +31,7 @@ std::string serialize_ImGuiStyle(ImGuiStyle const &style, u64 reserve_size, seri
 void serialize_ImGuiStyle_all_except_colors(ImGuiStyle const &style, std::string &out, serialize_ImGuiStyle_mode mode) noexcept;
 void serialize_ImGuiStyle_only_colors(ImVec4 const *colors, std::string &out, serialize_ImGuiStyle_mode mode) noexcept;
 
-inline ImGuiStyle swan_default_imgui_style() noexcept;
+ImGuiStyle swan_default_imgui_style() noexcept;
 
 typedef wchar_t* filter_chars_callback_user_data_t;
 s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept;

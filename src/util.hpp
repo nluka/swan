@@ -29,6 +29,9 @@ typedef std::chrono::system_clock::time_point system_time_point_t;
 precise_time_point_t current_time_precise() noexcept;
 system_time_point_t current_time_system() noexcept;
 
+std::tm make_tm(system_time_point_t const &time) noexcept;
+system_time_point_t extract_system_time_from_istream(std::istream &in_stream) noexcept;
+
 s64 compute_diff_ms(precise_time_point_t start, precise_time_point_t end) noexcept;
 s64 compute_diff_ms(system_time_point_t start, system_time_point_t end) noexcept;
 
@@ -57,6 +60,8 @@ s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capa
 bool streq(char const *s1, char const *s2) noexcept;
 
 bool strempty(char const *s) noexcept;
+
+bool str_starts_with(char const *str, char const *prefix) noexcept;
 
 u64 remove_adjacent_spaces(char *str, u64 len = 0) noexcept;
 

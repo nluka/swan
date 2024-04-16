@@ -37,7 +37,6 @@
 #include "popup_modal_single_rename.cpp"
 #include "popup_modal_open_state_tracker.cpp"
 #include "recent_files.cpp"
-#include "retired.cpp"
 #include "settings.cpp"
 #include "stdafx.cpp"
 #include "style.cpp"

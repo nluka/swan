@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "common_functions.hpp"
 #include "path.hpp"
 
@@ -22,7 +23,7 @@ bool bulk_rename_collision::operator!=(bulk_rename_collision const &other) const
 std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c) // for ntest
 {
     return os << "D:[" << (c.dest_dirent ? c.dest_dirent->path.data() : "")
-                << "] [" << c.first_rename_pair_idx << ',' << c.last_rename_pair_idx << ']';
+              << "] [" << c.first_rename_pair_idx << ',' << c.last_rename_pair_idx << ']';
 }
 
 bool bulk_rename_compiled_pattern::op::operator!=(bulk_rename_compiled_pattern::op const &other) const noexcept // for ntest

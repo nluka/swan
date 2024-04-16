@@ -51,8 +51,8 @@ char const *basic_dirent::kind_icon() const noexcept
 char const *get_icon(basic_dirent::kind t) noexcept
 {
     switch (t) {
-        case basic_dirent::kind::directory:            return ICON_FA_FOLDER;
-        case basic_dirent::kind::file:                 return ICON_FA_FILE;
+        case basic_dirent::kind::directory:            return ICON_CI_FOLDER;
+        case basic_dirent::kind::file:                 return ICON_CI_FILE;
         case basic_dirent::kind::symlink_to_directory: return ICON_CI_FILE_SYMLINK_DIRECTORY;
         case basic_dirent::kind::symlink_to_file:      return ICON_CI_FILE_SYMLINK_FILE;
         case basic_dirent::kind::symlink_ambiguous:    return ICON_CI_LINK_EXTERNAL;
@@ -65,71 +65,71 @@ char const *get_icon(basic_dirent::kind t) noexcept
 char const *get_icon_for_extension(char const *extension) noexcept
 {
     if (extension == nullptr) {
-        return ICON_FA_FILE;
+        return ICON_CI_FILE;
     }
     else {
         std::pair<char const *, char const *> const extension_to_icon[] = {
-            { ICON_FA_FILE_AUDIO, "mp3" },
-            { ICON_FA_FILE_AUDIO, "wav" },
-            { ICON_FA_FILE_AUDIO, "opus" },
-            { ICON_FA_FILE_AUDIO, "ogg" },
+            { ICON_CI_FILE_MEDIA, "mp3" },
+            { ICON_CI_FILE_MEDIA, "wav" },
+            { ICON_CI_FILE_MEDIA, "opus" },
+            { ICON_CI_FILE_MEDIA, "ogg" },
 
-            { ICON_FA_FILE_ARCHIVE, "zip" },
-            { ICON_FA_FILE_ARCHIVE, "7z" },
-            { ICON_FA_FILE_ARCHIVE, "rar" },
+            { ICON_CI_FILE_ZIP, "zip" },
+            { ICON_CI_FILE_ZIP, "7z" },
+            { ICON_CI_FILE_ZIP, "rar" },
 
-            { ICON_FA_FILE_CODE, "cpp" },
-            { ICON_FA_FILE_CODE, "c" },
-            { ICON_FA_FILE_CODE, "hpp" },
-            { ICON_FA_FILE_CODE, "h" },
-            { ICON_FA_FILE_CODE, "js" },
-            { ICON_FA_FILE_CODE, "ts" },
-            { ICON_FA_FILE_CODE, "py" },
-            { ICON_FA_FILE_CODE, "java" },
-            { ICON_FA_FILE_CODE, "cs"   },
+            { ICON_CI_FILE_CODE, "cpp" },
+            { ICON_CI_FILE_CODE, "c" },
+            { ICON_CI_FILE_CODE, "hpp" },
+            { ICON_CI_FILE_CODE, "h" },
+            { ICON_CI_FILE_CODE, "js" },
+            { ICON_CI_FILE_CODE, "ts" },
+            { ICON_CI_FILE_CODE, "py" },
+            { ICON_CI_FILE_CODE, "java" },
+            { ICON_CI_FILE_CODE, "cs"   },
 
-            { ICON_FA_FILE_PDF, "pdf" },
-            { ICON_FA_FILE_CSV, "csv" },
+            { ICON_CI_FILE_PDF, "pdf" },
+            // { ICON_FA_FILE_CSV, "csv" },
 
-            { ICON_FA_FILE_WORD, "doc" },
-            { ICON_FA_FILE_WORD, "docx" },
-            { ICON_FA_FILE_POWERPOINT, "pptx" },
-            { ICON_FA_FILE_POWERPOINT, "ppt" },
-            { ICON_FA_FILE_POWERPOINT, "pptx" },
-            { ICON_FA_FILE_EXCEL, "xlsx" },
-            { ICON_FA_FILE_EXCEL, "xls" },
-            { ICON_FA_FILE_EXCEL, "xlsb" },
+            // { ICON_FA_FILE_WORD, "doc" },
+            // { ICON_FA_FILE_WORD, "docx" },
+            // { ICON_FA_FILE_POWERPOINT, "pptx" },
+            // { ICON_FA_FILE_POWERPOINT, "ppt" },
+            // { ICON_FA_FILE_POWERPOINT, "pptx" },
+            // { ICON_FA_FILE_EXCEL, "xlsx" },
+            // { ICON_FA_FILE_EXCEL, "xls" },
+            // { ICON_FA_FILE_EXCEL, "xlsb" },
 
-            { ICON_FA_FILE_VIDEO, "mp4" },
-            { ICON_FA_FILE_VIDEO, "avi" },
-            { ICON_FA_FILE_VIDEO, "mov" },
-            { ICON_FA_FILE_VIDEO, "wmv" },
-            { ICON_FA_FILE_VIDEO, "mkv" },
-            { ICON_FA_FILE_VIDEO, "avchd" },
+            { ICON_CI_FILE_MEDIA, "mp4" },
+            { ICON_CI_FILE_MEDIA, "avi" },
+            { ICON_CI_FILE_MEDIA, "mov" },
+            { ICON_CI_FILE_MEDIA, "wmv" },
+            { ICON_CI_FILE_MEDIA, "mkv" },
+            { ICON_CI_FILE_MEDIA, "avchd" },
 
-            { ICON_FA_FILE_IMAGE, "jpeg" },
-            { ICON_FA_FILE_IMAGE, "jpg" },
-            { ICON_FA_FILE_IMAGE, "png" },
-            { ICON_FA_FILE_IMAGE, "raw" },
-            { ICON_FA_FILE_IMAGE, "ico" },
-            { ICON_FA_FILE_IMAGE, "tiff" },
-            { ICON_FA_FILE_IMAGE, "bmp" },
-            { ICON_FA_FILE_IMAGE, "pgm" },
-            { ICON_FA_FILE_IMAGE, "pnm" },
-            { ICON_FA_FILE_IMAGE, "gif" },
+            { ICON_CI_FILE_MEDIA, "jpeg" },
+            { ICON_CI_FILE_MEDIA, "jpg" },
+            { ICON_CI_FILE_MEDIA, "png" },
+            { ICON_CI_FILE_MEDIA, "raw" },
+            { ICON_CI_FILE_MEDIA, "ico" },
+            { ICON_CI_FILE_MEDIA, "tiff" },
+            { ICON_CI_FILE_MEDIA, "bmp" },
+            { ICON_CI_FILE_MEDIA, "pgm" },
+            { ICON_CI_FILE_MEDIA, "pnm" },
+            { ICON_CI_FILE_MEDIA, "gif" },
 
-            { ICON_FA_FILE_ALT, "txt" },
-            { ICON_FA_FILE_ALT, "md" },
-            { ICON_FA_FILE_ALT, "bat" },
-            { ICON_FA_FILE_ALT, "xml" },
-            { ICON_FA_FILE_ALT, "ini" },
-            { ICON_FA_FILE_ALT, "conf" },
-            { ICON_FA_FILE_ALT, "cfg" },
-            { ICON_FA_FILE_ALT, "config" },
-            { ICON_FA_FILE_ALT, "json" },
-            { ICON_FA_FILE_ALT, "gitignore" },
-            { ICON_FA_FILE_ALT, "natvis" },
-            { ICON_FA_FILE_ALT, "rc" },
+            { ICON_CI_FILE_CODE, "txt" },
+            { ICON_CI_FILE_CODE, "md" },
+            { ICON_CI_FILE_CODE, "bat" },
+            { ICON_CI_FILE_CODE, "xml" },
+            { ICON_CI_FILE_CODE, "ini" },
+            { ICON_CI_FILE_CODE, "conf" },
+            { ICON_CI_FILE_CODE, "cfg" },
+            { ICON_CI_FILE_CODE, "config" },
+            { ICON_CI_FILE_CODE, "json" },
+            { ICON_CI_FILE_CODE, "gitignore" },
+            { ICON_CI_FILE_CODE, "natvis" },
+            { ICON_CI_FILE_CODE, "rc" },
 
             { ICON_CI_FILE_BINARY, "exe" }, // (Executable)
             { ICON_CI_FILE_BINARY, "obj" }, // (Object)
@@ -183,7 +183,7 @@ char const *get_icon_for_extension(char const *extension) noexcept
             }
         }
 
-        return ICON_FA_FILE;
+        return ICON_CI_FILE;
     }
 }
 

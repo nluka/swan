@@ -26,8 +26,8 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
     #if 1
         imgui::TableNextColumn();
         {
-            imgui::TextUnformatted(" ImGuiColorEditFlags_");
-            imgui::Spacing();
+            imgui::AlignTextToFramePadding();
+            imgui::TextUnformatted("ImGuiColorEditFlags_");
 
             imgui::Separator();
 

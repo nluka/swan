@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 

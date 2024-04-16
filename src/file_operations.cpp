@@ -47,11 +47,9 @@ try {
         auto lock = supplied_lock != nullptr ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(*completed_file_operations.mutex);
 
         for (auto const &file_op : *completed_file_operations.container) {
-            auto time_t_completion = std::chrono::system_clock::to_time_t(file_op.completion_time);
-            std::tm tm_completion = *std::localtime(&time_t_completion);
+            std::tm tm_completion = make_tm(file_op.completion_time);
 
-            auto time_t_undo = std::chrono::system_clock::to_time_t(file_op.undo_time);
-            std::tm tm_undo = *std::localtime(&time_t_undo);
+            std::tm tm_undo = make_tm(file_op.undo_time);
 
             out
                 << std::put_time(&tm_completion, "%Y-%m-%d %H:%M:%S") << ' '
@@ -105,14 +103,10 @@ try {
         swan_path stored_src_path = {};
         swan_path stored_dst_path = {};
 
-        std::tm tm_completion = {};
-        iss >> std::get_time(&tm_completion, "%Y-%m-%d %H:%M:%S");
-        system_time_point_t stored_time_completion = std::chrono::system_clock::from_time_t(std::mktime(&tm_completion));
+        system_time_point_t stored_time_completion = extract_system_time_from_istream(iss);
         iss.ignore(1);
 
-        std::tm tm_undo = {};
-        iss >> std::get_time(&tm_undo, "%Y-%m-%d %H:%M:%S");
-        system_time_point_t stored_time_undo = std::chrono::system_clock::from_time_t(std::mktime(&tm_undo));
+        system_time_point_t stored_time_undo = extract_system_time_from_istream(iss);
         iss.ignore(1);
 
         iss >> stored_group_id;

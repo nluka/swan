@@ -61,19 +61,7 @@ namespace ImGui
         u64 rand_2 = {};
     };
 
-    std::pair<u64, u64> SelectRange(u64 prev_select_idx, u64 curr_select_idx) noexcept
-    {
-        bool no_prev_selection = prev_select_idx == u64(-1);
-
-        u64 first_idx = no_prev_selection ? 0 : prev_select_idx;
-        u64 last_idx = curr_select_idx;
-
-        if (first_idx > last_idx) {
-            std::swap(first_idx, last_idx);
-        }
-
-        return { first_idx, last_idx };
-    }
+    std::pair<u64, u64> SelectRange(u64 prev_select_idx, u64 curr_select_idx) noexcept;
 
     struct ScopedAvailWidth
     {

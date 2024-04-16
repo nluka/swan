@@ -271,11 +271,11 @@ struct explorer_window
         std::string_view parent_dir,
         std::source_location sloc = std::source_location::current()) noexcept;
 
-    void push_history_item(swan_path const &new_latest_entry) noexcept;
+    void push_history_item(swan_path const &new_latest_entry, std::source_location sloc = std::source_location::current()) noexcept;
 
     // 104 byte alignment members
 
-    cwd_entries_column_sort_specs_t column_sort_specs;
+    cwd_entries_column_sort_specs_t column_sort_specs = {};
 
     // 80 byte alignment members
 
@@ -288,14 +288,15 @@ struct explorer_window
 
     // 40 byte alignment members
 
-    // struct history_item
-    // {
-    //     system_time_point_t? time_departed;
-    //     swan_path_t path;
-    // };
+    struct history_item
+    {
+        system_time_point_t time_departed;
+        std::string called_from;
+        swan_path path;
+    };
 
     // history for working directories, persisted in file
-    circular_buffer<swan_path> wd_history = circular_buffer<swan_path>(MAX_WD_HISTORY_SIZE);
+    circular_buffer<history_item> wd_history = circular_buffer<history_item>(MAX_WD_HISTORY_SIZE);
 
     // 32 byte alignment members
 
@@ -306,7 +307,7 @@ struct explorer_window
 
     // 24 byte alignment members
 
-    std::vector<dirent> cwd_entries = {};                             // all direct children of the cwd
+    std::vector<dirent> cwd_entries = {};                           // all direct children of the cwd
     std::vector<swan_path> select_cwd_entries_on_next_update = {};  // entries to select on the next update of cwd_entries
 
     // 8 byte alignment members
@@ -358,14 +359,14 @@ struct explorer_window
     swan_path latest_valid_cwd = {};              // latest value of cwd which was a valid directory
     swan_path cwd = {};                           // current working directory, persisted in file
     swan_path read_dir_changes_target = {};       // value of current working directory when ReadDirectoryChangesW was called
-    std::array<char, 256> filter_text = {};         // persisted in file
-    bool filter_case_sensitive = false;             // persisted in file
-    bool filter_polarity = true;                    // persisted in file
-    bool filter_show_directories = true;            // persisted in file
-    bool filter_show_files = true;                  // persisted in file
-    bool filter_show_symlink_directories = true;    // persisted in file
-    bool filter_show_symlink_files = true;          // persisted in file
-    bool filter_show_invalid_symlinks = true;       // persisted in file
+    std::array<char, 256> filter_text = {};       // persisted in file
+    bool filter_case_sensitive = false;           // persisted in file
+    bool filter_polarity = true;                  // persisted in file
+    bool filter_show_directories = true;          // persisted in file
+    bool filter_show_files = true;                // persisted in file
+    bool filter_show_symlink_directories = true;  // persisted in file
+    bool filter_show_symlink_files = true;        // persisted in file
+    bool filter_show_invalid_symlinks = true;     // persisted in file
 
     bool show_filter_window = false;
     bool cwd_latest_selected_dirent_idx_changed = false;

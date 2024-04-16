@@ -65,8 +65,7 @@ try {
     std::scoped_lock lock(g_recent_files_mutex);
 
     for (auto const &file : g_recent_files) {
-        auto time_t = std::chrono::system_clock::to_time_t(file.action_time);
-        std::tm tm = *std::localtime(&time_t);
+        std::tm tm = make_tm(file.action_time);
 
         iss << file.action.size() << ' '
             << file.action.c_str() << ' '
@@ -116,9 +115,7 @@ try {
         iss.read(buffer, std::min(stored_action_len, lengthof(buffer) - 1));
         iss.ignore(1);
 
-        std::tm tm = {};
-        iss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-        system_time_point_t stored_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+        system_time_point_t stored_time = extract_system_time_from_istream(iss);
         iss.ignore(1);
 
         iss >> (u64 &)stored_path_len;

@@ -500,7 +500,7 @@ bool ntest::assert_cstr(
 
       char const *just_the_file_name = expected_path.c_str();
       std::string_view view(just_the_file_name);
-      u64 last_sep_pos = view.find_last_of("\\/");
+      size_t last_sep_pos = view.find_last_of("\\/");
       if (last_sep_pos != std::string::npos) {
           just_the_file_name += last_sep_pos + 1;
       }
@@ -518,7 +518,7 @@ bool ntest::assert_cstr(
 
       char const *just_the_file_name = actual_path.c_str();
       std::string_view view(just_the_file_name);
-      u64 last_sep_pos = view.find_last_of("\\/");
+      size_t last_sep_pos = view.find_last_of("\\/");
       if (last_sep_pos != std::string::npos) {
           just_the_file_name += last_sep_pos + 1;
       }

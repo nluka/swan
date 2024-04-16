@@ -14,3 +14,4 @@ swan_tests.md
 *.pch
 *.dmp
 symbol_cache/
+*.pdb
