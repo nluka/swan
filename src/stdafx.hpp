@@ -22,14 +22,12 @@
 #include <fstream>
 #include <future>
 #include <iostream>
-#include <list>
 #include <mutex>
 #include <numeric>
 #include <oleidl.h>
 #include <pathcch.h>
 #include <ranges>
 #include <regex>
-#include <set>
 #include <shlobj_core.h>
 #include <shlwapi.h>
 #include <shobjidl_core.h>

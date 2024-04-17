@@ -12,19 +12,16 @@
             "environment": [],
             "console": "integratedTerminal",
             "preLaunchTask": "Build Swan (Debug)",
-            "requireExactSource": false
+            "requireExactSource": false,
+            "logging": {
+                "engineLogging": false,
+                "exceptions": false,
+                "moduleLoad": false,
+                "processExit": false,
+                "programOutput": true,
+                "threadExit": false
+            },
+            "symbolSearchPath": "",
         },
-        {
-            "name": "Debug Swan Tests",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/dist/swan_tests_debug.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "console": "integratedTerminal",
-            "preLaunchTask": "Build Swan Tests (Debug)"
-        }
     ]
 }

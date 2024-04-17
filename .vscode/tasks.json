@@ -2,36 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Compile ImGui (Debug)",
-      "type": "shell",
-      "command": "cls; ptime.exe .\\compile_imgui_debug",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "Compile ImGui (Release)",
-      "type": "shell",
-      "command": "cls; ptime.exe .\\compile_imgui_release",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "Precompile (Debug)",
-      "type": "shell",
-      "command": "cls; ptime.exe .\\precompile_debug",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
       "label": "Build Swan (Debug)",
       "type": "shell",
-      "command": "cls; .\\compile_debug",
+      "command": "cls; cd dist; ptime.exe ninja",
       "group": {
         "kind": "build",
         "isDefault": true
@@ -43,6 +16,15 @@
       },
     },
     {
+      "label": "Compile ImGui (Release)",
+      "type": "shell",
+      "command": "cls; ptime.exe .\\compile_imgui_release",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
       "label": "Build Swan (Release)",
       "type": "shell",
       "command": "cls; ptime.exe .\\compile_release",
@@ -51,23 +33,5 @@
         "isDefault": false
       }
     },
-    {
-      "label": "Swan Tests (Debug)",
-      "type": "shell",
-      "command": "cls; ptime.exe .\\compile_tests_debug; .\\dist\\swan_tests_debug.exe",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "Swan Tests (Release)",
-      "type": "shell",
-      "command": "cls; ptime.exe .\\compile_tests_release; .\\dist\\swan_tests_release.exe",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    }
   ]
 }
