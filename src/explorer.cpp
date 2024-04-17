@@ -1,4 +1,3 @@
-
 #include "stdafx.hpp"
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
@@ -156,6 +155,7 @@ void explorer_window::set_latest_valid_cwd(swan_path const &new_latest_valid_cwd
         this->show_filter_window = false;
     }
     this->latest_valid_cwd = new_latest_valid_cwd;
+    path_force_separator(this->latest_valid_cwd, global_state::settings().dir_separator_utf8);
     while (path_pop_back_if(this->latest_valid_cwd, "\\/ "));
 }
 
@@ -424,11 +424,11 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
 generic_result move_files_into(swan_path const &destination_utf8, explorer_window &expl, move_dirents_drag_drop_payload &payload) noexcept
 {
     /*
-        ? The process of moving files via the shlwapi is a blocking operation.
-        ? Thus we must call IFileOperation::PerformOperations outside of the main UI thread so the user can continue to interact with the UI during the operation.
-        ? There is a constraint however: the IFileOperation object must be initialized on the same thread which will call PerformOperations.
-        ? This function will block until the IFileOperation initialization is completed so that we can report any initialization errors to the user.
-        ? After the worker thread signals that initialization is complete, we proceed with execution and let PerformOperations happen asynchronously.
+        ? Moving files via shlwapi is a blocking operation.
+        ? Thus we must call IFileOperation::PerformOperations outside of main UI thread so user can continue to interact with UI during file operation.
+        ? There is a constraint however: the IFileOperation object must be initialized on same thread which will call PerformOperations.
+        ? This function blocks until IFileOperation initialization is complete so that we can report any initialization errors to user.
+        ? After worker thread signals that initialization is complete, we proceed with execution and let PerformOperations happen asynchronously.
     */
 
     SCOPE_EXIT { delete[] payload.absolute_paths_delimited_by_newlines; };
@@ -3428,7 +3428,10 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                     if (res.success) {
                                         if (dirent.basic.is_symlink_to_directory()) {
                                             char const *target_dir_path = res.error_or_utf8_path.c_str();
+
                                             expl.cwd = path_create(target_dir_path);
+                                            path_force_separator(expl.cwd, dir_sep_utf8);
+
                                             expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                                             expl.push_history_item(expl.cwd);
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
