@@ -651,3 +651,43 @@ generic_result reveal_in_windows_file_explorer(swan_path const &full_path_in) no
         return { false, get_last_winapi_error().formatted_message };
     }
 }
+
+generic_result open_file(char const *file_name, char const *file_directory, bool as_admin) noexcept
+{
+    swan_path target_full_path_utf8 = path_create(file_directory);
+
+    if (!path_append(target_full_path_utf8, file_name, global_state::settings().dir_separator_utf8, true)) {
+        print_debug_msg("FAILED path_append, file_directory = [%s], file_name = [\\%s]", file_directory, file_name);
+        return { false, "Full file path exceeds max path length." };
+    }
+
+    wchar_t target_full_path_utf16[MAX_PATH]; init_empty_cstr(target_full_path_utf16);
+
+    if (!utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16))) {
+        return { false, "Conversion of target's full path from UTF-8 to UTF-16." };
+    }
+
+    wchar_t const *operation = as_admin ? L"runas" : L"open";
+
+    HINSTANCE result = ShellExecuteW(nullptr, operation, target_full_path_utf16, nullptr, nullptr, SW_SHOWNORMAL);
+
+    auto ec = (intptr_t)result;
+
+    if (ec > HINSTANCE_ERROR) {
+        print_debug_msg("ShellExecuteW success");
+        return { true, target_full_path_utf8.data() };
+    }
+    else if (ec == SE_ERR_NOASSOC) {
+        print_debug_msg("FAILED ShellExecuteW: SE_ERR_NOASSOC");
+        return { false, "No association between file type and program (ShellExecuteW: SE_ERR_NOASSOC)." };
+    }
+    else if (ec == SE_ERR_FNF) {
+        print_debug_msg("FAILED ShellExecuteW: SE_ERR_FNF");
+        return { false, "File not found (ShellExecuteW: SE_ERR_FNF)." };
+    }
+    else {
+        auto err = get_last_winapi_error().formatted_message;
+        print_debug_msg("FAILED ShellExecuteW: %s", err.c_str());
+        return { false, err };
+    }
+}
