@@ -3324,7 +3324,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_path)) {
                 char const *icon = nullptr;
-                if (dirent.basic.is_file()) {
+                if (dirent.basic.is_file() && global_state::settings().explorer_file_extension_icons) {
                     file_name_extension_splitter splitter(path);
                     icon = get_icon_for_extension(splitter.ext);
                 } else {
