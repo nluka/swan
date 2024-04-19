@@ -3,6 +3,24 @@ project(swan CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
+option(GLFW3_INCLUDE_PATH "Path to directory containing <glfw3.h> file")
+option(GLFW3_LIB_PATH "Path to directory containing <glfw3.lib> file")
+option(BOOST_PATH "Path to Boost 1.80.0 directory")
+option(BOOST_LIB_PATH "Path to directory containing built Boost 1.80.0 .lib files")
+
+if(NOT GLFW3_INCLUDE_PATH)
+    message(FATAL_ERROR "Please provide path to directory containing <glfw3.h> file with -DGLFW3_INCLUDE_PATH=/path/to/dir")
+endif()
+if(NOT GLFW3_LIB_PATH)
+    message(FATAL_ERROR "Please provide path to directory containing <glfw3.lib> file with -DGLFW3_LIB_PATH=/path/to/dir")
+endif()
+if(NOT BOOST_PATH)
+    message(FATAL_ERROR "Please provide path to Boost 1.80.0 directory with -DBOOST_PATH=/path/to/dir")
+endif()
+if(NOT BOOST_LIB_PATH)
+    message(FATAL_ERROR "Please provide path to directory containing built Boost 1.80.0 <.lib> files -DBOOST_LIB_PATH=/path/to/dir")
+endif()
+
 add_compile_options(/EHsc /MP /MT) # common compile options
 add_link_options(/NODEFAULTLIB:MSVCRTD)
 
@@ -19,10 +37,10 @@ set_property(TARGET imgui PROPERTY
     MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`
 )
 target_include_directories(imgui PRIVATE
-    "C:/code/glfw"
+    ${GLFW3_INCLUDE_PATH}
 )
 target_link_directories(imgui PRIVATE
-    "C:/code/glfw"
+    ${GLFW3_LIB_PATH}
 )
 target_link_options(imgui PRIVATE
     /Z7 # embed debug info directly into .obj files, to enable stepping into imgui code during debug
@@ -36,39 +54,39 @@ set_property(TARGET stb_image PROPERTY
 )
 
 add_executable(swan_debug
-    src/libs/ntest.cpp
-    src/bulk_rename_logic.cpp
-    src/debug_log.cpp
-    src/explorer.cpp
-    src/explorer_file_op_progress_sink.cpp
-    src/file_operations.cpp
-    src/finder.cpp
-    src/focused_window.cpp
-    src/icon_glyphs.cpp
-    src/icon_library.cpp
-    src/imgui_dependent_functions.cpp
-    src/imgui_extension.cpp
-    src/miscellaneous_functions.cpp
-    src/miscellaneous_globals.cpp
-    src/path.cpp
-    src/pinned.cpp
-    src/popup_modal_bulk_rename.cpp
-    src/popup_modal_edit_pin.cpp
-    src/popup_modal_error.cpp
-    src/popup_modal_new_directory.cpp
-    src/popup_modal_new_file.cpp
-    src/popup_modal_new_pin.cpp
-    src/popup_modal_single_rename.cpp
-    src/popup_modal_open_state_tracker.cpp
-    src/recent_files.cpp
-    src/settings.cpp
-    src/stdafx.cpp
-    src/style.cpp
-    src/swan.cpp
-    src/tests.cpp
-    src/theme_editor.cpp
-    src/undelete_directory_progress_sink.cpp
-    src/util.cpp
+    "src/libs/ntest.cpp"
+    "src/bulk_rename_logic.cpp"
+    "src/debug_log.cpp"
+    "src/explorer.cpp"
+    "src/explorer_file_op_progress_sink.cpp"
+    "src/file_operations.cpp"
+    "src/finder.cpp"
+    "src/focused_window.cpp"
+    "src/icon_glyphs.cpp"
+    "src/icon_library.cpp"
+    "src/imgui_dependent_functions.cpp"
+    "src/imgui_extension.cpp"
+    "src/miscellaneous_functions.cpp"
+    "src/miscellaneous_globals.cpp"
+    "src/path.cpp"
+    "src/pinned.cpp"
+    "src/popup_modal_bulk_rename.cpp"
+    "src/popup_modal_edit_pin.cpp"
+    "src/popup_modal_error.cpp"
+    "src/popup_modal_new_directory.cpp"
+    "src/popup_modal_new_file.cpp"
+    "src/popup_modal_new_pin.cpp"
+    "src/popup_modal_single_rename.cpp"
+    "src/popup_modal_open_state_tracker.cpp"
+    "src/recent_files.cpp"
+    "src/settings.cpp"
+    "src/stdafx.cpp"
+    "src/style.cpp"
+    "src/swan.cpp"
+    "src/tests.cpp"
+    "src/theme_editor.cpp"
+    "src/undelete_directory_progress_sink.cpp"
+    "src/util.cpp"
 )
 set_property(TARGET swan_debug PROPERTY
     MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`
@@ -78,20 +96,12 @@ target_compile_options(swan_debug PRIVATE
     /D_CRT_SECURE_NO_WARNINGS
 )
 target_include_directories(swan_debug PRIVATE
-    ${ENV_INCLUDE}
-    "C:/code/boost_1_80_0"
-    "C:/code/glfw"
-    "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.29.30133/include"
-    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.19041.0/cppwinrt"
-    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.19041.0/shared"
-    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.19041.0/ucrt"
-    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.19041.0/um"
-    "C:/Program Files (x86)/Windows Kits/10/Include/10.0.19041.0/winrt"
+    ${BOOST_PATH}
+    ${GLFW3_INCLUDE_PATH}
 )
 target_link_directories(swan_debug PRIVATE
-    ${ENV_LIB}
-    "C:/code/boost_1_80_0/stage/lib"
-    "C:/code/glfw"
+    ${BOOST_LIB_PATH}
+    ${GLFW3_LIB_PATH}
 )
 target_link_libraries(swan_debug PRIVATE
     imgui
