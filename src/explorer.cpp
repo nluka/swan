@@ -1754,7 +1754,9 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
         imgui::TextUnformatted("(empty)");
     }
     else {
-        if (imgui::BeginTable("history_table", 5, ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersInnerV)) {
+        ImGuiTableFlags table_flags = ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_Resizable;
+
+        if (imgui::BeginTable("history_table", 5, table_flags)) {
             u64 i = expl.wd_history.size() - 1;
             u64 i_inverse = 0;
 
@@ -1777,6 +1779,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
                     {
                         imgui::ScopedTextColor tc(directory_color());
                         pressed = imgui::Selectable(label.data(), false, ImGuiSelectableFlags_SpanAllColumns);
+                        imgui::RenderTooltipWhenColumnTextTruncated(2, hist_item.path.data());
                     }
 
                     if (pressed) {
@@ -3163,8 +3166,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
 
     imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Appearing);
+    imgui::SetNextWindowSize(imgui::GetContentRegionAvail(), ImGuiCond_Appearing);
 
-    if (imgui::BeginPopupModal("History", nullptr, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (imgui::BeginPopupModal("History", nullptr, ImGuiWindowFlags_NoTitleBar)) {
         swan_path backup = expl.cwd;
         bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_after_edit, false);
 
