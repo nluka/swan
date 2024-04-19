@@ -683,7 +683,7 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
                     delta = lstrcmpiA(right.basic.path.data(), left.basic.path.data());
                     break;
                 }
-                case explorer_window::cwd_entries_table_col_type: {
+                case explorer_window::cwd_entries_table_col_object: {
                     s32 precedence_table[(u64)basic_dirent::kind::count] = {
                         4,  // nil
                         10, // directory
@@ -695,6 +695,10 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
                     };
 
                     delta = precedence_table[(u64)left.basic.type] - precedence_table[(u64)right.basic.type];
+                    break;
+                }
+                case explorer_window::cwd_entries_table_col_type: {
+                    delta = lstrcmpiA(cget_file_ext(right.basic.path.data()), cget_file_ext(left.basic.path.data()));
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_size_pretty:
@@ -2960,7 +2964,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, explorer_window::cwd_entries_table_col_number);
                 imgui::TableSetupColumn("ID", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_id);
                 imgui::TableSetupColumn("Name", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_NoHide, 0.0f, explorer_window::cwd_entries_table_col_path);
-                imgui::TableSetupColumn("Object", ImGuiTableColumnFlags_DefaultSort, 0.0f, explorer_window::cwd_entries_table_col_type);
+                imgui::TableSetupColumn("Object", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_object);
+                imgui::TableSetupColumn("Type", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_type);
                 imgui::TableSetupColumn("Size", col_flags_sortable_prefer_desc, 0.0f, explorer_window::cwd_entries_table_col_size_pretty);
                 imgui::TableSetupColumn("Bytes", col_flags_sortable_prefer_desc, 0.0f, explorer_window::cwd_entries_table_col_size_bytes);
                 imgui::TableSetupColumn("Created", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_creation_time);
@@ -3631,8 +3636,21 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 }
             }
 
-            if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_type)) {
+            if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_object)) {
                 imgui::TextUnformatted(dirent.basic.kind_short_cstr());
+            }
+
+            if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_type)) {
+                if (dirent.basic.is_directory()) {
+                    imgui::TextUnformatted("Directory");
+                } else {
+                    bool has_dot_ch = std::strchr(dirent.basic.path.data(), '.');
+                    if (has_dot_ch) {
+                        char const *extension = cget_file_ext(dirent.basic.path.data());
+                        auto type_text = get_type_text_for_extension(extension);
+                        imgui::TextUnformatted(type_text.data());
+                    }
+                }
             }
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_size_pretty)) {

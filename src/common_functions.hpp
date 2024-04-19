@@ -203,6 +203,8 @@ char const *get_icon(basic_dirent::kind t) noexcept;
 
 char const *get_icon_for_extension(char const *extension) noexcept;
 
+std::array<char, 64> get_type_text_for_extension(char const *extension) noexcept;
+
 drive_list_t query_drive_list() noexcept;
 
 recycle_bin_info query_recycle_bin() noexcept;

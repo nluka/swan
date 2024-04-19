@@ -413,6 +413,29 @@ char *get_file_ext(char *path) noexcept
     }
 }
 
+char const *cget_file_ext(char const *path) noexcept
+{
+    // C:\code\swan\src\explorer_window.cpp
+    //                                  ^^^ what we are after
+    // src/swan.cpp
+    //          ^^^ what we are after
+
+    assert(path != nullptr);
+
+    char const *just_the_file_ext = path;
+
+    std::string_view view(just_the_file_ext);
+
+    u64 last_dot_pos = view.find_last_of(".");
+
+    if (last_dot_pos != std::string::npos) {
+        just_the_file_ext += last_dot_pos + 1;
+        return just_the_file_ext;
+    } else {
+        return nullptr;
+    }
+}
+
 std::string_view get_everything_minus_file_name(char const *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp

@@ -238,6 +238,7 @@ struct explorer_window
         cwd_entries_table_col_number,
         cwd_entries_table_col_id,
         cwd_entries_table_col_path,
+        cwd_entries_table_col_object,
         cwd_entries_table_col_type,
         cwd_entries_table_col_size_pretty,
         cwd_entries_table_col_size_bytes,

@@ -77,7 +77,7 @@ wchar_t *get_file_name(wchar_t *path) noexcept;
 wchar_t const *cget_file_name(wchar_t const *path) noexcept;
 
 char *get_file_ext(char *path) noexcept;
-// char const *cget_file_ext(char const *path) noexcept;
+char const *cget_file_ext(char const *path) noexcept;
 
 std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept;
 
