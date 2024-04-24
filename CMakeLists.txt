@@ -3,6 +3,7 @@ project(swan CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
+option(CMAKE_BUILD_TYPE "Build type, Debug or Release")
 option(GLFW3_INCLUDE_PATH "Path to directory containing <glfw3.h> file")
 option(GLFW3_LIB_PATH "Path to directory containing <glfw3.lib> file")
 option(BOOST_PATH "Path to Boost 1.80.0 directory")
@@ -20,8 +21,11 @@ endif()
 if(NOT BOOST_LIB_PATH)
     message(FATAL_ERROR "Please provide path to directory containing built Boost 1.80.0 <.lib> files -DBOOST_LIB_PATH=/path/to/dir")
 endif()
+if(NOT BOOST_LIB_PATH)
+    message(FATAL_ERROR "Please specify build type as Debug or Release")
+endif()
 
-add_compile_options(/EHsc /MP /MT) # common compile options
+add_compile_options(/EHsc /MP /MT)
 add_link_options(/NODEFAULTLIB:MSVCRTD)
 
 add_library(imgui STATIC
@@ -53,7 +57,7 @@ set_property(TARGET stb_image PROPERTY
     MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`
 )
 
-add_executable(swan_debug
+set(SWAN_SOURCES
     "src/libs/ntest.cpp"
     "src/bulk_rename_logic.cpp"
     "src/debug_log.cpp"
@@ -88,38 +92,87 @@ add_executable(swan_debug
     "src/undelete_directory_progress_sink.cpp"
     "src/util.cpp"
 )
-set_property(TARGET swan_debug PROPERTY
-    MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`
-)
-target_compile_options(swan_debug PRIVATE
-    /W4
-    /D_CRT_SECURE_NO_WARNINGS
-)
-target_include_directories(swan_debug PRIVATE
-    ${BOOST_PATH}
-    ${GLFW3_INCLUDE_PATH}
-)
-target_link_directories(swan_debug PRIVATE
-    ${BOOST_LIB_PATH}
-    ${GLFW3_LIB_PATH}
-)
-target_link_libraries(swan_debug PRIVATE
-    imgui
-    stb_image
-    "opengl32.lib"
-    "glfw3.lib"
-    "gdi32.lib"
-    "shell32.lib"
-    "kernel32.lib"
-    "msvcrt.lib"
-    "ole32.lib"
-    "shlwapi.lib"
-    "Pathcch.lib"
-    "Dbghelp.lib"
-)
-target_precompile_headers(swan_debug PRIVATE
-    src/stdafx.hpp
-)
 
-# if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-# endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_executable(swan_debug
+        ${SWAN_SOURCES}
+    )
+    set_property(TARGET swan_debug PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`
+    )
+    target_compile_options(swan_debug PRIVATE
+        /W4
+        /D_CRT_SECURE_NO_WARNINGS
+    )
+    target_include_directories(swan_debug PRIVATE
+        ${BOOST_PATH}
+        ${GLFW3_INCLUDE_PATH}
+    )
+    target_link_directories(swan_debug PRIVATE
+        ${BOOST_LIB_PATH}
+        ${GLFW3_LIB_PATH}
+    )
+    target_link_libraries(swan_debug PRIVATE
+        imgui
+        stb_image
+        "opengl32.lib"
+        "glfw3.lib"
+        "gdi32.lib"
+        "shell32.lib"
+        "kernel32.lib"
+        "msvcrt.lib"
+        "ole32.lib"
+        "shlwapi.lib"
+        "Pathcch.lib"
+        "Dbghelp.lib"
+    )
+    target_link_options(swan_debug PRIVATE
+        /NATVIS:${CMAKE_CURRENT_LIST_DIR}/swan.natvis
+    )
+    target_precompile_headers(swan_debug PRIVATE
+        src/stdafx.hpp
+    )
+
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_executable(swan_release
+        ${SWAN_SOURCES}
+        "resource/swan.rc"
+    )
+    set_property(TARGET swan_release PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`
+    )
+    target_compile_options(swan_release PRIVATE
+        /W4
+        /D_CRT_SECURE_NO_WARNINGS
+        /DNDEBUG
+        /O2
+    )
+    target_include_directories(swan_release PRIVATE
+        ${BOOST_PATH}
+        ${GLFW3_INCLUDE_PATH}
+    )
+    target_link_directories(swan_release PRIVATE
+        ${BOOST_LIB_PATH}
+        ${GLFW3_LIB_PATH}
+    )
+    target_link_libraries(swan_release PRIVATE
+        imgui
+        stb_image
+        "opengl32.lib"
+        "glfw3.lib"
+        "gdi32.lib"
+        "shell32.lib"
+        "kernel32.lib"
+        "msvcrt.lib"
+        "ole32.lib"
+        "shlwapi.lib"
+        "Pathcch.lib"
+        "Dbghelp.lib"
+    )
+    target_precompile_headers(swan_release PRIVATE
+        src/stdafx.hpp
+    )
+
+else()
+    message(FATAL_ERROR "Incorrect build type, specify Debug or Release")
+endif()
