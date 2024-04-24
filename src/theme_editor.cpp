@@ -17,8 +17,20 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
     // auto &io = imgui::GetIO();
     auto &style = imgui::GetStyle();
-    ImGuiStyle style_at_frame_start = style;
+    ImGuiStyle ImGui_style_at_frame_start = style;
+    bool ImGuiCol_checks_at_frame_start[ImGuiCol_COUNT] = {};
     bool swan_color_changed = false;
+
+    bool swan_color_checks_at_frame_start[6] = {
+        global_state::settings().check_success_color,
+        global_state::settings().check_warning_color,
+        global_state::settings().check_error_color,
+        global_state::settings().check_directory_color,
+        global_state::settings().check_file_color,
+        global_state::settings().check_symlink_color,
+    };
+
+    memcpy(&ImGuiCol_checks_at_frame_start, &( global_state::settings().checks_ImGuiCol ), ImGuiCol_COUNT * sizeof(bool));
 
     if (imgui::BeginTable("## theme_editor", 3, ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_Resizable)) {
         s32 color_edit_flags = 0;
@@ -134,15 +146,16 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
             char const *label = nullptr;
             ImVec4 *data = nullptr;
             ImVec4 (*get_default_data)() = nullptr;
+            bool *check = nullptr;
         };
 
         static swan_color_def s_swan_colors[] = {
-            { "Success",    &global_state::settings().success_color,    default_success_color },
-            { "Warning",    &global_state::settings().warning_color,    default_warning_color },
-            { "Error",      &global_state::settings().error_color,      default_error_color },
-            { "Directory",  &global_state::settings().directory_color,  default_directory_color },
-            { "File",       &global_state::settings().file_color,       default_file_color },
-            { "Symlink",    &global_state::settings().symlink_color,    default_symlink_color },
+            { "Success",    &global_state::settings().success_color,    default_success_color,   &global_state::settings().check_success_color },
+            { "Warning",    &global_state::settings().warning_color,    default_warning_color,   &global_state::settings().check_warning_color },
+            { "Error",      &global_state::settings().error_color,      default_error_color,     &global_state::settings().check_error_color },
+            { "Directory",  &global_state::settings().directory_color,  default_directory_color, &global_state::settings().check_directory_color },
+            { "File",       &global_state::settings().file_color,       default_file_color,      &global_state::settings().check_file_color },
+            { "Symlink",    &global_state::settings().symlink_color,    default_symlink_color,   &global_state::settings().check_symlink_color },
         };
 
     #if 1
@@ -225,7 +238,12 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             col_def.data->w = std::clamp(col_def.data->w, 0.f, 1.f);
                         }
                         imgui::TableNextColumn();
-                        imgui::Text("%s", col_def.label);
+                        {
+                            auto label = make_str_static<64>("## %s.checked", col_def.label);
+                            imgui::Checkbox(label.data(), col_def.check);
+                            imgui::SameLine();
+                            imgui::Text("%s", col_def.label);
+                        }
                     };
 
                     for (auto &c : s_swan_colors) {
@@ -323,7 +341,12 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             data->w = std::clamp(data->w, 0.f, 1.f);
                         }
                         imgui::TableNextColumn();
-                        imgui::Text("%s", col_def.label);
+                        {
+                            auto label = make_str_static<64>("## %s.checked", col_def.label);
+                            imgui::Checkbox(label.data(), &( global_state::settings().checks_ImGuiCol[col_def.index] ));
+                            imgui::SameLine();
+                            imgui::Text("%s", col_def.label);
+                        }
                     };
 
                     u64 i = 0;
@@ -373,7 +396,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             imgui::SameLineSpaced(1);
 
-            if (imgui::Button(ICON_FA_CLIPBOARD " C++ code## Style")) {
+            if (imgui::Button(ICON_FA_CLIPBOARD " C++ code" "## Style")) {
                 std::string serialized = {};
                 serialized.reserve(global_state::page_size());
                 serialize_ImGuiStyle_all_except_colors(style, serialized, serialize_ImGuiStyle_mode::cpp_code);
@@ -385,7 +408,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             imgui::SameLineSpaced(1);
 
-            if (imgui::Button(ICON_FA_CLIPBOARD " swan_settings.txt## Style")) {
+            if (imgui::Button(ICON_FA_CLIPBOARD " swan_settings.txt" "## Style")) {
                 std::string serialized = {};
                 serialized.reserve(global_state::page_size());
                 serialize_ImGuiStyle_all_except_colors(style, serialized, serialize_ImGuiStyle_mode::plain_text);
@@ -540,10 +563,26 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
     static bool s_save_requested = false;
     static std::optional<precise_time_point_t> s_last_save_time = std::nullopt;
 
-    auto const &style_at_frame_end = style;
-    bool style_changed = memcmp(&style_at_frame_start, &style_at_frame_end, sizeof(style_at_frame_start)) != 0; // TODO: nick
+    auto const &ImGui_style_at_frame_end = style;
+     //! this is dodgy because padding bytes have undefined values. But I don't know of a compact way to do this comparison
+     //! because ImGuiStyle does not have any comparison operators
+    bool ImGui_style_changed = memcmp(&ImGui_style_at_frame_start, &ImGui_style_at_frame_end, sizeof(ImGui_style_at_frame_start)) != 0;
 
-    if (style_changed || swan_color_changed) {
+    bool ImGuiCol_checks_at_frame_end[ImGuiCol_COUNT] = {};
+    memcpy(&ImGuiCol_checks_at_frame_end, &( global_state::settings().checks_ImGuiCol ), ImGuiCol_COUNT * sizeof(bool));
+    bool ImGuiCol_checks_changed = memcmp(&ImGuiCol_checks_at_frame_start, &ImGuiCol_checks_at_frame_end, sizeof(ImGuiCol_checks_at_frame_start)) != 0;
+
+    bool swan_color_checks_at_frame_end[sizeof(swan_color_checks_at_frame_start)] = {
+        global_state::settings().check_success_color,
+        global_state::settings().check_warning_color,
+        global_state::settings().check_error_color,
+        global_state::settings().check_directory_color,
+        global_state::settings().check_file_color,
+        global_state::settings().check_symlink_color,
+    };
+    bool swan_color_checks_changed = memcmp(swan_color_checks_at_frame_start, swan_color_checks_at_frame_end, sizeof(swan_color_checks_at_frame_start)) != 0;
+
+    if (ImGui_style_changed || swan_color_changed || ImGuiCol_checks_changed || swan_color_checks_changed) {
         s_save_requested = true;
     }
 

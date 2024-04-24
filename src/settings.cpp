@@ -146,6 +146,69 @@ try {
     write_ImVec4("color.file", this->file_color);
     write_ImVec4("color.symlink", this->symlink_color);
 
+    write_bool("check.success_color", this->check_success_color);
+    write_bool("check.warning_color", this->check_warning_color);
+    write_bool("check.error_color", this->check_error_color);
+    write_bool("check.directory_color", this->check_directory_color);
+    write_bool("check.file_color", this->check_file_color);
+    write_bool("check.symlink_color", this->check_symlink_color);
+
+    write_bool("check.ImGuiCol_Text", this->checks_ImGuiCol[ImGuiCol_Text]);
+    write_bool("check.ImGuiCol_TextDisabled", this->checks_ImGuiCol[ImGuiCol_TextDisabled]);
+    write_bool("check.ImGuiCol_WindowBg", this->checks_ImGuiCol[ImGuiCol_WindowBg]);
+    write_bool("check.ImGuiCol_ChildBg", this->checks_ImGuiCol[ImGuiCol_ChildBg]);
+    write_bool("check.ImGuiCol_PopupBg", this->checks_ImGuiCol[ImGuiCol_PopupBg]);
+    write_bool("check.ImGuiCol_Border", this->checks_ImGuiCol[ImGuiCol_Border]);
+    write_bool("check.ImGuiCol_BorderShadow", this->checks_ImGuiCol[ImGuiCol_BorderShadow]);
+    write_bool("check.ImGuiCol_FrameBg", this->checks_ImGuiCol[ImGuiCol_FrameBg]);
+    write_bool("check.ImGuiCol_FrameBgHovered", this->checks_ImGuiCol[ImGuiCol_FrameBgHovered]);
+    write_bool("check.ImGuiCol_FrameBgActive", this->checks_ImGuiCol[ImGuiCol_FrameBgActive]);
+    write_bool("check.ImGuiCol_TitleBg", this->checks_ImGuiCol[ImGuiCol_TitleBg]);
+    write_bool("check.ImGuiCol_TitleBgActive", this->checks_ImGuiCol[ImGuiCol_TitleBgActive]);
+    write_bool("check.ImGuiCol_TitleBgCollapsed", this->checks_ImGuiCol[ImGuiCol_TitleBgCollapsed]);
+    write_bool("check.ImGuiCol_MenuBarBg", this->checks_ImGuiCol[ImGuiCol_MenuBarBg]);
+    write_bool("check.ImGuiCol_ScrollbarBg", this->checks_ImGuiCol[ImGuiCol_ScrollbarBg]);
+    write_bool("check.ImGuiCol_ScrollbarGrab", this->checks_ImGuiCol[ImGuiCol_ScrollbarGrab]);
+    write_bool("check.ImGuiCol_ScrollbarGrabHovered", this->checks_ImGuiCol[ImGuiCol_ScrollbarGrabHovered]);
+    write_bool("check.ImGuiCol_ScrollbarGrabActive", this->checks_ImGuiCol[ImGuiCol_ScrollbarGrabActive]);
+    write_bool("check.ImGuiCol_CheckMark", this->checks_ImGuiCol[ImGuiCol_CheckMark]);
+    write_bool("check.ImGuiCol_SliderGrab", this->checks_ImGuiCol[ImGuiCol_SliderGrab]);
+    write_bool("check.ImGuiCol_SliderGrabActive", this->checks_ImGuiCol[ImGuiCol_SliderGrabActive]);
+    write_bool("check.ImGuiCol_Button", this->checks_ImGuiCol[ImGuiCol_Button]);
+    write_bool("check.ImGuiCol_ButtonHovered", this->checks_ImGuiCol[ImGuiCol_ButtonHovered]);
+    write_bool("check.ImGuiCol_ButtonActive", this->checks_ImGuiCol[ImGuiCol_ButtonActive]);
+    write_bool("check.ImGuiCol_Header", this->checks_ImGuiCol[ImGuiCol_Header]);
+    write_bool("check.ImGuiCol_HeaderHovered", this->checks_ImGuiCol[ImGuiCol_HeaderHovered]);
+    write_bool("check.ImGuiCol_HeaderActive", this->checks_ImGuiCol[ImGuiCol_HeaderActive]);
+    write_bool("check.ImGuiCol_Separator", this->checks_ImGuiCol[ImGuiCol_Separator]);
+    write_bool("check.ImGuiCol_SeparatorHovered", this->checks_ImGuiCol[ImGuiCol_SeparatorHovered]);
+    write_bool("check.ImGuiCol_SeparatorActive", this->checks_ImGuiCol[ImGuiCol_SeparatorActive]);
+    write_bool("check.ImGuiCol_ResizeGrip", this->checks_ImGuiCol[ImGuiCol_ResizeGrip]);
+    write_bool("check.ImGuiCol_ResizeGripHovered", this->checks_ImGuiCol[ImGuiCol_ResizeGripHovered]);
+    write_bool("check.ImGuiCol_ResizeGripActive", this->checks_ImGuiCol[ImGuiCol_ResizeGripActive]);
+    write_bool("check.ImGuiCol_Tab", this->checks_ImGuiCol[ImGuiCol_Tab]);
+    write_bool("check.ImGuiCol_TabHovered", this->checks_ImGuiCol[ImGuiCol_TabHovered]);
+    write_bool("check.ImGuiCol_TabActive", this->checks_ImGuiCol[ImGuiCol_TabActive]);
+    write_bool("check.ImGuiCol_TabUnfocused", this->checks_ImGuiCol[ImGuiCol_TabUnfocused]);
+    write_bool("check.ImGuiCol_TabUnfocusedActive", this->checks_ImGuiCol[ImGuiCol_TabUnfocusedActive]);
+    write_bool("check.ImGuiCol_DockingPreview", this->checks_ImGuiCol[ImGuiCol_DockingPreview]);
+    write_bool("check.ImGuiCol_DockingEmptyBg", this->checks_ImGuiCol[ImGuiCol_DockingEmptyBg]);
+    write_bool("check.ImGuiCol_PlotLines", this->checks_ImGuiCol[ImGuiCol_PlotLines]);
+    write_bool("check.ImGuiCol_PlotLinesHovered", this->checks_ImGuiCol[ImGuiCol_PlotLinesHovered]);
+    write_bool("check.ImGuiCol_PlotHistogram", this->checks_ImGuiCol[ImGuiCol_PlotHistogram]);
+    write_bool("check.ImGuiCol_PlotHistogramHovered", this->checks_ImGuiCol[ImGuiCol_PlotHistogramHovered]);
+    write_bool("check.ImGuiCol_TableHeaderBg", this->checks_ImGuiCol[ImGuiCol_TableHeaderBg]);
+    write_bool("check.ImGuiCol_TableBorderStrong", this->checks_ImGuiCol[ImGuiCol_TableBorderStrong]);
+    write_bool("check.ImGuiCol_TableBorderLight", this->checks_ImGuiCol[ImGuiCol_TableBorderLight]);
+    write_bool("check.ImGuiCol_TableRowBg", this->checks_ImGuiCol[ImGuiCol_TableRowBg]);
+    write_bool("check.ImGuiCol_TableRowBgAlt", this->checks_ImGuiCol[ImGuiCol_TableRowBgAlt]);
+    write_bool("check.ImGuiCol_TextSelectedBg", this->checks_ImGuiCol[ImGuiCol_TextSelectedBg]);
+    write_bool("check.ImGuiCol_DragDropTarget", this->checks_ImGuiCol[ImGuiCol_DragDropTarget]);
+    write_bool("check.ImGuiCol_NavHighlight", this->checks_ImGuiCol[ImGuiCol_NavHighlight]);
+    write_bool("check.ImGuiCol_NavWindowingHighlight", this->checks_ImGuiCol[ImGuiCol_NavWindowingHighlight]);
+    write_bool("check.ImGuiCol_NavWindowingDimBg", this->checks_ImGuiCol[ImGuiCol_NavWindowingDimBg]);
+    write_bool("check.ImGuiCol_ModalWindowDimBg", this->checks_ImGuiCol[ImGuiCol_ModalWindowDimBg]);
+
     ofs << serialize_ImGuiStyle(imgui::GetStyle(), 8192, serialize_ImGuiStyle_mode::plain_text);
 
     print_debug_msg("SUCCESS swan_settings::save_to_disk");
@@ -698,6 +761,194 @@ try {
             }
             else if (remainder == "ModalWindowDimBg") {
                 style.Colors[ImGuiCol_ModalWindowDimBg] = extract_ImVec4();
+            }
+        }
+        else if (property.starts_with("check.")) {
+            std::string_view remainder(property.c_str() + lengthof("check"));
+
+            if (remainder == "ImGuiCol_Text") {
+                this->checks_ImGuiCol[ImGuiCol_Text] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TextDisabled") {
+                this->checks_ImGuiCol[ImGuiCol_TextDisabled] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_WindowBg") {
+                this->checks_ImGuiCol[ImGuiCol_WindowBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ChildBg") {
+                this->checks_ImGuiCol[ImGuiCol_ChildBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_PopupBg") {
+                this->checks_ImGuiCol[ImGuiCol_PopupBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_Border") {
+                this->checks_ImGuiCol[ImGuiCol_Border] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_BorderShadow") {
+                this->checks_ImGuiCol[ImGuiCol_BorderShadow] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_FrameBg") {
+                this->checks_ImGuiCol[ImGuiCol_FrameBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_FrameBgHovered") {
+                this->checks_ImGuiCol[ImGuiCol_FrameBgHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_FrameBgActive") {
+                this->checks_ImGuiCol[ImGuiCol_FrameBgActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TitleBg") {
+                this->checks_ImGuiCol[ImGuiCol_TitleBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TitleBgActive") {
+                this->checks_ImGuiCol[ImGuiCol_TitleBgActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TitleBgCollapsed") {
+                this->checks_ImGuiCol[ImGuiCol_TitleBgCollapsed] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_MenuBarBg") {
+                this->checks_ImGuiCol[ImGuiCol_MenuBarBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ScrollbarBg") {
+                this->checks_ImGuiCol[ImGuiCol_ScrollbarBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ScrollbarGrab") {
+                this->checks_ImGuiCol[ImGuiCol_ScrollbarGrab] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ScrollbarGrabHovered") {
+                this->checks_ImGuiCol[ImGuiCol_ScrollbarGrabHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ScrollbarGrabActive") {
+                this->checks_ImGuiCol[ImGuiCol_ScrollbarGrabActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_CheckMark") {
+                this->checks_ImGuiCol[ImGuiCol_CheckMark] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_SliderGrab") {
+                this->checks_ImGuiCol[ImGuiCol_SliderGrab] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_SliderGrabActive") {
+                this->checks_ImGuiCol[ImGuiCol_SliderGrabActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_Button") {
+                this->checks_ImGuiCol[ImGuiCol_Button] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ButtonHovered") {
+                this->checks_ImGuiCol[ImGuiCol_ButtonHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ButtonActive") {
+                this->checks_ImGuiCol[ImGuiCol_ButtonActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_Header") {
+                this->checks_ImGuiCol[ImGuiCol_Header] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_HeaderHovered") {
+                this->checks_ImGuiCol[ImGuiCol_HeaderHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_HeaderActive") {
+                this->checks_ImGuiCol[ImGuiCol_HeaderActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_Separator") {
+                this->checks_ImGuiCol[ImGuiCol_Separator] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_SeparatorHovered") {
+                this->checks_ImGuiCol[ImGuiCol_SeparatorHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_SeparatorActive") {
+                this->checks_ImGuiCol[ImGuiCol_SeparatorActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ResizeGrip") {
+                this->checks_ImGuiCol[ImGuiCol_ResizeGrip] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ResizeGripHovered") {
+                this->checks_ImGuiCol[ImGuiCol_ResizeGripHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ResizeGripActive") {
+                this->checks_ImGuiCol[ImGuiCol_ResizeGripActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_Tab") {
+                this->checks_ImGuiCol[ImGuiCol_Tab] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TabHovered") {
+                this->checks_ImGuiCol[ImGuiCol_TabHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TabActive") {
+                this->checks_ImGuiCol[ImGuiCol_TabActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TabUnfocused") {
+                this->checks_ImGuiCol[ImGuiCol_TabUnfocused] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TabUnfocusedActive") {
+                this->checks_ImGuiCol[ImGuiCol_TabUnfocusedActive] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_DockingPreview") {
+                this->checks_ImGuiCol[ImGuiCol_DockingPreview] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_DockingEmptyBg") {
+                this->checks_ImGuiCol[ImGuiCol_DockingEmptyBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_PlotLines") {
+                this->checks_ImGuiCol[ImGuiCol_PlotLines] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_PlotLinesHovered") {
+                this->checks_ImGuiCol[ImGuiCol_PlotLinesHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_PlotHistogram") {
+                this->checks_ImGuiCol[ImGuiCol_PlotHistogram] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_PlotHistogramHovered") {
+                this->checks_ImGuiCol[ImGuiCol_PlotHistogramHovered] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TableHeaderBg") {
+                this->checks_ImGuiCol[ImGuiCol_TableHeaderBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TableBorderStrong") {
+                this->checks_ImGuiCol[ImGuiCol_TableBorderStrong] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TableBorderLight") {
+                this->checks_ImGuiCol[ImGuiCol_TableBorderLight] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TableRowBg") {
+                this->checks_ImGuiCol[ImGuiCol_TableRowBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TableRowBgAlt") {
+                this->checks_ImGuiCol[ImGuiCol_TableRowBgAlt] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_TextSelectedBg") {
+                this->checks_ImGuiCol[ImGuiCol_TextSelectedBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_DragDropTarget") {
+                this->checks_ImGuiCol[ImGuiCol_DragDropTarget] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_NavHighlight") {
+                this->checks_ImGuiCol[ImGuiCol_NavHighlight] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_NavWindowingHighlight") {
+                this->checks_ImGuiCol[ImGuiCol_NavWindowingHighlight] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_NavWindowingDimBg") {
+                this->checks_ImGuiCol[ImGuiCol_NavWindowingDimBg] = extract_bool();
+            }
+            else if (remainder == "ImGuiCol_ModalWindowDimBg") {
+                this->checks_ImGuiCol[ImGuiCol_ModalWindowDimBg] = extract_bool();
+            }
+
+            else if (remainder == "success_color") {
+                this->check_success_color = extract_bool();
+            }
+            else if (remainder == "warning_color") {
+                this->check_warning_color = extract_bool();
+            }
+            else if (remainder == "error_color") {
+                this->check_error_color = extract_bool();
+            }
+            else if (remainder == "directory_color") {
+                this->check_directory_color = extract_bool();
+            }
+            else if (remainder == "file_color") {
+                this->check_file_color = extract_bool();
+            }
+            else if (remainder == "symlink_color") {
+                this->check_symlink_color = extract_bool();
             }
         }
         else {

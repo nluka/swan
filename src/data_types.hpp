@@ -202,6 +202,15 @@ struct swan_settings
     };
 
     window_visibility show;
+
+    bool checks_ImGuiCol[ImGuiCol_COUNT] = {};
+
+    bool check_success_color = false;
+    bool check_warning_color = false;
+    bool check_error_color = false;
+    bool check_directory_color = false;
+    bool check_file_color = false;
+    bool check_symlink_color = false;
 };
 
 enum update_cwd_entries_actions : u8
