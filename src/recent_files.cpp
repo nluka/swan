@@ -168,17 +168,12 @@ void swan_windows::render_recent_files(bool &open) noexcept
         global_state::focused_window_set(swan_windows::id::recent_files);
     }
 
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Newly created and recently opened files are tracked here.\n");
-    }
 
-    imgui::SameLine();
 
     {
         imgui::ScopedDisable d(g_recent_files.empty());
 
-        if (imgui::SmallButton("Clear##recent_files")) {
+        if (imgui::Button(ICON_CI_CLEAR_ALL "## recent_files")) {
             char const *confirmation_msg = "Are you sure you want to clear your recent files? This action cannot be undone.";
             imgui::OpenConfirmationModal(swan_id_confirm_recent_files_clear, confirmation_msg, &(global_state::settings().confirm_recent_files_clear));
         }

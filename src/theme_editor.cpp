@@ -191,7 +191,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             imgui::SameLineSpaced(1);
 
-            if (imgui::Button(ICON_FA_CLIPBOARD " C++ code## Colors")) {
+            if (imgui::Button(ICON_CI_CODE "## Colors")) {
                 std::string serialized = {};
                 serialized.reserve(global_state::page_size());
                 serialize_ImGuiStyle_only_colors(style.Colors, serialized, serialize_ImGuiStyle_mode::cpp_code);
@@ -201,9 +201,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 imgui::SetTooltip("Click to copy color style properties to clipboard, as C++ source code.");
             }
 
-            imgui::SameLineSpaced(1);
+            imgui::SameLineSpaced(0);
 
-            if (imgui::Button(ICON_FA_CLIPBOARD " swan_settings.txt## Colors")) {
+            if (imgui::Button(ICON_CI_SYMBOL_TEXT "## Colors")) {
                 std::string serialized = {};
                 serialized.reserve(global_state::page_size());
                 serialize_ImGuiStyle_only_colors(style.Colors, serialized, serialize_ImGuiStyle_mode::plain_text);
@@ -396,7 +396,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             imgui::SameLineSpaced(1);
 
-            if (imgui::Button(ICON_FA_CLIPBOARD " C++ code" "## Style")) {
+            if (imgui::Button(ICON_CI_CODE "## Style")) {
                 std::string serialized = {};
                 serialized.reserve(global_state::page_size());
                 serialize_ImGuiStyle_all_except_colors(style, serialized, serialize_ImGuiStyle_mode::cpp_code);
@@ -406,9 +406,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 imgui::SetTooltip("Click to copy all non-color style properties to clipboard, as C++ source code.");
             }
 
-            imgui::SameLineSpaced(1);
+            imgui::SameLineSpaced(0);
 
-            if (imgui::Button(ICON_FA_CLIPBOARD " swan_settings.txt" "## Style")) {
+            if (imgui::Button(ICON_CI_SYMBOL_TEXT "## Style")) {
                 std::string serialized = {};
                 serialized.reserve(global_state::page_size());
                 serialize_ImGuiStyle_all_except_colors(style, serialized, serialize_ImGuiStyle_mode::plain_text);

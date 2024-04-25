@@ -103,13 +103,13 @@ namespace swan_popup_modals
 
     static_assert(bit_pos_count <= 64);
 
-    constexpr char const *label_error = "Error ## popup_modal";
-    constexpr char const *label_single_rename = "Rename ## popup_modal";
-    constexpr char const *label_bulk_rename = "Bulk Rename ## popup_modal";
-    constexpr char const *label_new_pin = "New Pin ## popup_modal";
-    constexpr char const *label_edit_pin = "Edit Pin ## popup_modal";
-    constexpr char const *label_new_file = "New File ## popup_modal";
-    constexpr char const *label_new_directory = "New Directory ## popup_modal";
+    constexpr char const *label_error = " Error ## popup_modal";
+    constexpr char const *label_single_rename = " Rename ## popup_modal";
+    constexpr char const *label_bulk_rename = " Bulk Rename ## popup_modal";
+    constexpr char const *label_new_pin = " New Pin ## popup_modal";
+    constexpr char const *label_edit_pin = " Edit Pin ## popup_modal";
+    constexpr char const *label_new_file = " New File ## popup_modal";
+    constexpr char const *label_new_directory = " New Directory ## popup_modal";
 
     void open_single_rename(explorer_window &expl_opened_from, explorer_window::dirent const &rename_target, std::function<void ()> on_rename_callback) noexcept;
     void open_bulk_rename(explorer_window &expl_opened_from, std::function<void ()> on_rename_callback) noexcept;

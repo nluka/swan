@@ -484,12 +484,13 @@ void swan_windows::render_file_operations(bool &open) noexcept
         }
     }
 
+    imgui::AlignTextToFramePadding();
     imgui::Text("%zu completed operations", completed_file_operations.container->size());
     imgui::SameLine();
     {
         imgui::ScopedDisable d(completed_file_operations.container->empty());
 
-        if (imgui::SmallButton("Clear")) {
+        if (imgui::Button(ICON_CI_CLEAR_ALL "## file_operations")) {
             imgui::OpenConfirmationModalWithCallback(
                 /* confirmation_id  = */ swan_id_confirm_completed_file_operations_forget_all,
                 /* confirmation_msg = */ "Are you sure you want to delete your ENTIRE file operations history? This action cannot be undone.",

@@ -1625,7 +1625,7 @@ void render_back_to_prev_valid_cwd_button(explorer_window &expl) noexcept
 
     imgui::ScopedDisable disabled(expl.wd_history_pos == 0);
 
-    if (imgui::Button(ICON_CI_CHEVRON_LEFT "##back")) {
+    if (imgui::Button(ICON_FA_CHEVRON_LEFT "##back")) {
         print_debug_msg("[ %d ] back arrow button triggered", expl.id);
 
         if (io.KeyShift || io.KeyCtrl) {
@@ -1656,7 +1656,7 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
 
     imgui::ScopedDisable disabled(expl.wd_history_pos == wd_history_last_idx);
 
-    if (imgui::Button(ICON_CI_CHEVRON_RIGHT "##forward")) {
+    if (imgui::Button(ICON_FA_CHEVRON_RIGHT "##forward")) {
         print_debug_msg("[ %d ] forward arrow button triggered", expl.id);
 
         if (io.KeyShift || io.KeyCtrl) {
@@ -1677,7 +1677,6 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
         imgui::SetTooltip("Forward");
     }
 }
-
 
 static
 bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[maybe_unused]] bool show_history_label = true) noexcept
@@ -1767,6 +1766,10 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
         }
     }
 
+    if (imgui::IsMouseClicked(ImGuiMouseButton_Left) && !imgui::IsWindowHovered()) {
+        cleanup_and_close_popup();
+    }
+
     return false;
 }
 
@@ -1781,7 +1784,7 @@ void render_pins_popup(explorer_window &expl) noexcept
     if (imgui::Button("Manage")) {
         global_state::settings().show.pinned = true;
         (void) global_state::settings().save_to_disk();
-        ImGui::SetWindowFocus(" Pinned ");
+        ImGui::SetWindowFocus(swan_windows::get_name(swan_windows::id::pinned));
     }
 
     imgui::Separator();
@@ -1982,7 +1985,7 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
         bool &show              = std::get<1>(button_def);
         char const *type_str    = std::get<2>(button_def);
 
-        imgui::SameLine();
+        imgui::SameLine(0, imgui::GetStyle().ItemSpacing.x / 2);
 
         {
             imgui::ScopedColor ct(ImGuiCol_Text, show ? get_color(type) : ImVec4(0.3f, 0.3f, 0.3f, 1));
@@ -2229,13 +2232,13 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char) noexcept
         }
     }
 
-    imgui::Text("%s", s_slices.back());
+    imgui::Text(" %s", s_slices.back());
 }
 
 static
 void render_more_controls_button(explorer_window &expl, bool cwd_exists_before_edit, char dir_sep_utf8) noexcept
 {
-    if (imgui::Button(ICON_CI_MORE)) {
+    if (imgui::Button(ICON_FA_ELLIPSIS_H)) {
         imgui::OpenPopup("more_controls_popup");
     }
     ImRect button_rect(imgui::GetItemRectMin(), imgui::GetItemRectMax());
@@ -2270,7 +2273,7 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
 {
     imgui::ScopedDisable disabled(!cwd_exists_before_edit);
 
-    if (imgui::Button(ICON_CI_ARROW_UP "##up")) {
+    if (imgui::Button(ICON_FA_ARROW_UP "##up")) {
         print_debug_msg("[ %d ] (..) button triggered", expl.id);
 
         auto result = try_ascend_directory(expl);
@@ -2705,17 +2708,17 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     {
         render_more_controls_button(expl, cwd_exists_before_edit, dir_sep_utf8);
 
-        imgui::SameLine();
-
-        render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
-
-        imgui::SameLine();
+        imgui::SameLine(0, style.ItemSpacing.x / 2);
 
         render_back_to_prev_valid_cwd_button(expl);
 
-        imgui::SameLine();
+        imgui::SameLine(0, style.ItemSpacing.x / 2);
 
         render_forward_to_next_valid_cwd_button(expl);
+
+        imgui::SameLine(0, style.ItemSpacing.x / 2);
+
+        render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
 
         imgui::SameLine();
 
@@ -2771,9 +2774,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
 
         render_filter_polarity_button(expl);
-        imgui::SameLine();
+        imgui::SameLine(0, style.ItemSpacing.x / 2);
         render_filter_case_sensitivity_button(expl);
-        imgui::SameLine();
+        imgui::SameLine(0, style.ItemSpacing.x / 2);
         render_filter_mode_toggle(expl);
 
         {
