@@ -1,4 +1,4 @@
-<img src="resource/swan.ico" alt="Swan logo" width="50" height="50" />
+<img src="resource/swan.png" alt="Swan logo" width="50" height="50" />
 
 <br />
 
@@ -14,7 +14,7 @@ Due to feature immaturity, Swan is not intended to outright replace the WFE as o
 
 ## Feature comparison
 
-| Feature | <img src="resource/WFE_icon.png" alt="WFE" width="25" height="25" /> | <img src="resource/swan.ico" alt="Swan" width="25" height="25" /> |
+| Feature | <img src="resource/WFE_icon.png" alt="WFE" width="25" height="25" /> | <img src="resource/swan.png" alt="Swan" width="25" height="25" /> |
 | - | - | - |
 | Directory browsing and navigation | ✔ | ✔ |
 | Create empty file, directory | ✔ | ✔ |
