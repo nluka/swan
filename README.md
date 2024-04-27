@@ -2,7 +2,7 @@
 
 <br />
 
-Swan is a substitute to the Windows File Explorer (WFE hereafter) for those craving a more elegant file management experience. Many features are ported from WFE to make Swan a familiar experience, whilst solving several major frustrations:
+Swan is a substitute to the Windows File Explorer (WFE hereafter) for those seeking an elegant file management experience. Many features are ported from WFE to make Swan a familiar experience, whilst solving several major frustrations:
 
 - Ergonomic file operations through multiple explorer panes, instead of managing multiple WFE windows
 - Instant and intuitive searching, instead of the slow and clumsy WFE search
@@ -30,7 +30,7 @@ Due to feature immaturity, Swan is not intended to outright replace the WFE as o
 | Multi-column sort | ❌ | ✔ |
 | File operations history | ❌ | ✔ |
 | Unix directory separator support | ❌ | ✔ |
-| Editable appearance | ❌ | ✔ |
+| Customizable appearance | ❌ | ✔ |
 | Current working directory autocomplete | ✔ | 🛠️ |
 | Create shortcut | ✔ | 🛠️ |
 | Object attributes | ✔ | 🛠️ |

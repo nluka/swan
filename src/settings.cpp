@@ -104,6 +104,9 @@ try {
     write_bool("explorer_clear_filter_on_cwd_change", this->explorer_clear_filter_on_cwd_change);
     write_bool("explorer_file_extension_icons", this->explorer_file_extension_icons);
 
+    write_bool("file_operations_src_path_full", this->file_operations_src_path_full);
+    write_bool("file_operations_dst_path_full", this->file_operations_dst_path_full);
+
     write_bool("startup_with_window_maximized", this->startup_with_window_maximized);
     write_bool("startup_with_previous_window_pos_and_size", this->startup_with_previous_window_pos_and_size);
 
@@ -997,6 +1000,13 @@ try {
             }
             else if (property == "explorer_file_extension_icons") {
                 this->explorer_file_extension_icons = extract_bool();
+            }
+
+            else if (property == "file_operations_src_path_full") {
+                this->file_operations_src_path_full = extract_bool();
+            }
+            else if (property == "file_operations_dst_path_full") {
+                this->file_operations_dst_path_full = extract_bool();
             }
 
             else if (property == "startup_with_window_maximized") {

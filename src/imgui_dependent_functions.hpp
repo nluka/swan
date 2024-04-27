@@ -36,6 +36,8 @@ ImGuiStyle swan_default_imgui_style() noexcept;
 typedef wchar_t* filter_chars_callback_user_data_t;
 s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept;
 
+void render_path_with_stylish_separators(char const *path) noexcept;
+
 struct debug_log_package
 {
     char const *fmt;

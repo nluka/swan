@@ -691,3 +691,35 @@ generic_result open_file(char const *file_name, char const *file_directory, bool
         return { false, err };
     }
 }
+
+void render_path_with_stylish_separators(char const *path) noexcept
+{
+    swan_path segmented_path = path_create(path);
+    assert(!path_is_empty(segmented_path));
+
+    static std::vector<char const *> s_segments = {};
+    s_segments.clear();
+
+    {
+        char const *segment = strtok(segmented_path.data(), "\\/");
+        assert(segment != nullptr);
+
+        while (segment != nullptr) {
+            s_segments.push_back(segment);
+            segment = strtok(nullptr, "\\/");
+        }
+    }
+
+    char const *separator = ICON_CI_TRIANGLE_RIGHT;
+    imgui::ScopedStyle<f32> s(imgui::GetStyle().ItemSpacing.x, 2);
+    imgui::AlignTextToFramePadding();
+
+    for (u64 i = 0; i < s_segments.size() - 1; ++i) {
+        char const *segment = s_segments[i];
+        imgui::Button(segment);
+        imgui::SameLine();
+        imgui::TextDisabled(separator);
+        imgui::SameLine();
+    }
+    imgui::Button(s_segments.back());
+}

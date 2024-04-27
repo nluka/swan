@@ -233,6 +233,13 @@ void imgui::SetInitialFocusOnNextWidget() noexcept
     }
 }
 
+bool imgui::IsColumnTextVisuallyTruncated(s32 table_column_index, char const *column_text, f32 column_text_offset_x) noexcept
+{
+    f32 text_width = imgui::CalcTextSize(column_text).x;
+    f32 column_width = imgui::GetColumnWidth(table_column_index);
+    return text_width > (column_width - column_text_offset_x + imgui::GetStyle().CellPadding.x);
+}
+
 bool imgui::RenderTooltipWhenColumnTextTruncated(s32 table_column_index,
                                                  char const *possibly_truncated_text,
                                                  f32 possibly_truncated_text_offset_x,
@@ -436,8 +443,17 @@ ImVec4 imgui::RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept
     return ImVec4(newr, newg, newb, newa);
 }
 
-ImU32 imgui::ImVec4_to_ImU32(ImVec4 const &vec) noexcept
+ImU32 imgui::ImVec4_to_ImU32(ImVec4 vec, bool attempt_denormalization) noexcept
 {
+    auto is_normalized = [&](f32 channel) noexcept { return channel >= 0.f && channel <= 1.f; };
+
+    if (attempt_denormalization && is_normalized(vec.x) && is_normalized(vec.y) && is_normalized(vec.z) && is_normalized(vec.w)) {
+        vec.x *= 255.f;
+        vec.y *= 255.f;
+        vec.z *= 255.f;
+        vec.w *= 255.f;
+    }
+
     ImU32 retval = IM_COL32(vec.x, vec.y, vec.z, vec.w);
     return retval;
 }

@@ -11,7 +11,7 @@ namespace ImGui
 {
     ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;
 
-    ImU32 ImVec4_to_ImU32(ImVec4 const &vec) noexcept;
+    ImU32 ImVec4_to_ImU32(ImVec4 vec, bool attempt_denormalization = false) noexcept;
 
     f32 CalcLineLength(ImVec2 const &p1, ImVec2 const &p2) noexcept;
 
@@ -34,6 +34,8 @@ namespace ImGui
     void TableDrawCellBorderTop(ImVec2 cell_rect_min, f32 cell_width) noexcept;
 
     void HighlightTextRegion(ImVec2 const &text_rect_min, char const *text, u64 highlight_start_idx, u64 highlight_len, ImVec4 color) noexcept;
+
+    bool IsColumnTextVisuallyTruncated(s32 table_column_index, char const *column_text, f32 column_text_offset_x = 0) noexcept;
 
     bool RenderTooltipWhenColumnTextTruncated(s32 table_column_index, char const *possibly_truncated_text, f32 possibly_truncated_text_offset_x = 0, char const *tooltip_content = nullptr) noexcept;
 

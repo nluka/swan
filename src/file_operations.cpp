@@ -463,6 +463,7 @@ void swan_windows::render_file_operations(bool &open) noexcept
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
     bool any_popup_modals_open = global_state::popup_modals_are_any_open();
     auto completed_file_operations = global_state::completed_file_operations_get();
+    bool settings_change = false;
 
     // handle keybind actions
     if (!any_popup_modals_open && window_hovered) {
@@ -484,9 +485,6 @@ void swan_windows::render_file_operations(bool &open) noexcept
         }
     }
 
-    imgui::AlignTextToFramePadding();
-    imgui::Text("%zu completed operations", completed_file_operations.container->size());
-    imgui::SameLine();
     {
         imgui::ScopedDisable d(completed_file_operations.container->empty());
 
@@ -505,6 +503,16 @@ void swan_windows::render_file_operations(bool &open) noexcept
             );
         }
     }
+    imgui::SameLineSpaced(0);
+    imgui::AlignTextToFramePadding();
+    imgui::Text("%zu completed operations", completed_file_operations.container->size());
+
+    auto &settings = global_state::settings();
+
+    imgui::SameLineSpaced(2);
+    settings_change |= imgui::Checkbox("Full source path", &settings.file_operations_src_path_full);
+    imgui::SameLineSpaced(1);
+    settings_change |= imgui::Checkbox("Full destination path", &settings.file_operations_dst_path_full);
 
     enum file_ops_table_col : s32
     {
@@ -528,6 +536,8 @@ void swan_windows::render_file_operations(bool &open) noexcept
     if (imgui::BeginTable("completed_file_operations_get", file_ops_table_col_count, table_flags)) {
         static std::optional< std::deque<completed_file_operation>::iterator > s_context_menu_target_iter = std::nullopt;
                               std::deque<completed_file_operation>::iterator   remove_single_iter         = completed_file_operations.container->end();
+
+        static std::optional<ImRect> s_context_menu_target_rect = std::nullopt;
 
         static u64 s_num_selected_when_context_menu_opened = 0;
         static u64 s_num_deletes_selected_when_context_menu_opened = 0;
@@ -559,21 +569,6 @@ void swan_windows::render_file_operations(bool &open) noexcept
             auto &file_op  = *elem_iter;
 
             imgui::TableNextRow();
-
-            if (imgui::TableSetColumnIndex(file_ops_table_col_group)) {
-                bool new_group_block = group_block != file_op.group_id;
-                group_block = file_op.group_id;
-
-                if (new_group_block) {
-                    ImVec2 cell_rect_min = imgui::GetCursorScreenPos() - imgui::GetStyle().CellPadding;
-                    f32 cell_width = imgui::GetColumnWidth() + (2 * imgui::GetStyle().CellPadding.x);
-                    imgui::TableDrawCellBorderTop(cell_rect_min, cell_width);
-                }
-
-                if (file_op.group_id != 0) {
-                    imgui::Text("%zu", file_op.group_id);
-                }
-            }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_op_type)) {
                 char const *icon = get_icon(file_op.obj_type);
@@ -614,7 +609,9 @@ void swan_windows::render_file_operations(bool &open) noexcept
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_src_path)) {
-                auto label = make_str_static<1200>("%s##%zu", file_op.src_path.data(), i);
+                char const *src_path = settings.file_operations_src_path_full ? file_op.src_path.data() : get_file_name(file_op.src_path.data());
+                auto label = make_str_static<1200>("%s##%zu", src_path, i);
+
                 if (imgui::Selectable(label.data(), file_op.selected, ImGuiSelectableFlags_SpanAllColumns)) {
                     bool selection_state_before_activate = file_op.selected;
 
@@ -642,8 +639,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 }
 
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                    imgui::OpenPopup("## completed_file_operations_get context_menu");
+                    s_context_menu_target_rect = ImRect(imgui::GetItemRectMin(), imgui::GetItemRectMax());
                     s_context_menu_target_iter = elem_iter;
+
+                    imgui::OpenPopup("## completed_file_operations_get context_menu");
 
                     for (auto const &cfo : *completed_file_operations.container) {
                         s_num_selected_when_context_menu_opened += u64(cfo.selected);
@@ -652,12 +651,59 @@ void swan_windows::render_file_operations(bool &open) noexcept
                     }
                 }
             }
-            imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_src_path, file_op.src_path.data());
+            if (imgui::TableGetHoveredColumn() == file_ops_table_col_src_path && imgui::IsItemHovered()) {
+                bool show_full = settings.file_operations_src_path_full;
+                bool show_full_and_truncated = show_full && imgui::IsColumnTextVisuallyTruncated(file_ops_table_col_src_path, file_op.src_path.data());
+                if (!show_full || show_full_and_truncated) {
+                    if (imgui::BeginTooltip()) {
+                        render_path_with_stylish_separators(file_op.src_path.data());
+                        imgui::EndTooltip();
+                    }
+                }
+            }
+
+            if (imgui::TableSetColumnIndex(file_ops_table_col_group)) {
+                bool new_group_block = group_block != file_op.group_id;
+                group_block = file_op.group_id;
+
+                bool context_menu_open_on_this_row = (s_context_menu_target_iter.has_value() && &*s_context_menu_target_iter.value() == &file_op);
+
+                if (new_group_block && !context_menu_open_on_this_row) {
+                    ImVec2 cell_rect_min = imgui::GetCursorScreenPos() - imgui::GetStyle().CellPadding;
+                    f32 cell_width = imgui::GetColumnWidth() + (2 * imgui::GetStyle().CellPadding.x);
+                    imgui::TableDrawCellBorderTop(cell_rect_min, cell_width);
+                }
+
+                if (file_op.group_id != 0) {
+                    imgui::Text("%zu", file_op.group_id);
+                }
+            }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_dst_path)) {
-                imgui::TextUnformatted(file_op.dst_path.data());
+                char const *dst_path = settings.file_operations_dst_path_full ? file_op.dst_path.data() : get_file_name(file_op.dst_path.data());
+                imgui::TextUnformatted(dst_path);
             }
-            imgui::RenderTooltipWhenColumnTextTruncated(file_ops_table_col_dst_path, file_op.dst_path.data());
+            if (imgui::TableGetHoveredColumn() == file_ops_table_col_dst_path && imgui::IsItemHovered()) {
+                bool show_full = settings.file_operations_dst_path_full;
+                bool show_full_and_truncated = show_full && imgui::IsColumnTextVisuallyTruncated(file_ops_table_col_dst_path, file_op.dst_path.data());
+                if (!show_full || show_full_and_truncated) {
+                    if (imgui::BeginTooltip()) {
+                        render_path_with_stylish_separators(file_op.dst_path.data());
+                        imgui::EndTooltip();
+                    }
+                }
+            }
+        }
+
+        if (imgui::IsPopupOpen("## completed_file_operations_get context_menu")) {
+            assert(s_context_menu_target_rect.has_value());
+            ImVec2 min = s_context_menu_target_rect.value().Min;
+            min.x += 1; // to avoid overlap with table left V border
+            ImVec2 const &max = s_context_menu_target_rect.value().Max;
+            ImGui::GetWindowDrawList()->AddRect(min, max, imgui::ImVec4_to_ImU32(imgui::GetStyleColorVec4(ImGuiCol_TextDisabled), true));
+        } else {
+            s_context_menu_target_iter = std::nullopt;
+            s_context_menu_target_rect = std::nullopt;
         }
 
         bool execute_forget_single_immediately = false;
@@ -669,7 +715,229 @@ void swan_windows::render_file_operations(bool &open) noexcept
             assert(s_context_menu_target_iter.value() != completed_file_operations.container->end());
             completed_file_operation &context_target = *s_context_menu_target_iter.value();
 
-            {
+            if (imgui::BeginMenu("Undelete ## completed_file_operations context_menu")) {
+                {
+                    bool can_be_undeleted = context_target.op_type == file_operation_type::del && !context_target.undone();
+                    bool has_recycle_bin_entry = !path_is_empty(context_target.dst_path);
+
+                    if (can_be_undeleted && has_recycle_bin_entry && imgui::Selectable("This")) {
+                        if (context_target.obj_type == basic_dirent::kind::directory) {
+                            swan_path restore_dir_utf8 = path_create(context_target.src_path.data(),
+                                                                    get_everything_minus_file_name(context_target.src_path.data()).length());
+
+                            auto res = enqueue_undelete_directory(context_target.dst_path.data(), restore_dir_utf8.data(), context_target.src_path.data());
+
+                            if (!res.success) {
+                                std::string action = make_str("Undelete directory [%s].", context_target.src_path.data());
+                                swan_popup_modals::open_error(action.c_str(), res.error_or_utf8_path.c_str());
+                            }
+                        }
+                        else {
+                            auto res = undelete_file(context_target.dst_path.data());
+
+                            if (res.success()) {
+                                context_target.undo_time = current_time_system();
+                                context_target.selected = false;
+                                (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
+                            }
+                            else {
+                                std::string action = make_str("Undelete file [%s].", context_target.src_path.data());
+                                std::string failure;
+                                auto winapi_err = get_last_winapi_error().formatted_message.c_str();
+
+                                if      (!res.step0_convert_hardlink_path_to_utf16) failure = make_str("Failed to convert hardlink path [%s] from UTF-8 to UTF-16.", context_target.dst_path.data());
+                                else if (!res.step1_metadata_file_opened          ) failure = make_str("Failed to open metadata file corresponding to [%s], %s", context_target.dst_path.data(), winapi_err);
+                                else if (!res.step2_metadata_file_read            ) failure = make_str("Failed to read contents of metadata file corresponding to [%s]", context_target.dst_path.data());
+                                else if (!res.step3_new_hardlink_created          ) failure = make_str("Failed to create hardlink [%s], %s The backup hardlink [%s] was probably deleted.", context_target.src_path.data(), winapi_err, context_target.dst_path.data());
+                                else if (!res.step4_old_hardlink_deleted          ) failure = make_str("Failed to delete hardlink [%s], %s", context_target.dst_path.data(), winapi_err);
+                                else if (!res.step5_metadata_file_deleted         ) failure = make_str("Failed to delete metadata file corresponding to [%s], %s", context_target.dst_path.data(), winapi_err);
+                                else                                                assert(false && "Bad code path");
+
+                                swan_popup_modals::open_error(action.c_str(), failure.c_str());
+
+                                if (res.step3_new_hardlink_created) {
+                                    // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
+                                    context_target.undo_time = current_time_system();
+                                    (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                {
+                    bool disabled = true; // s_num_deletes_in_group_when_context_menu_opened > 0 && context_target.group_id != 0;
+                    {
+                        imgui::ScopedDisable d(disabled);
+
+                        if (imgui::Selectable("Group")) {
+                            // TODO
+                        }
+                    }
+                    if (disabled) {
+                        imgui::SameLine();
+                        imgui::TextDisabled("(?)");
+                        if (imgui::IsItemHovered()) {
+                            imgui::SetTooltip("Not implemented.");
+                            // if (context_target.group_id == 0) {
+                            //     imgui::SetTooltip("Target has no group");
+                            // } else {
+                            //     imgui::SetTooltip("Target's group has no delete operations to undo");
+                            // }
+                        }
+                    }
+                }
+
+                {
+                    bool disabled = true; // s_num_deletes_selected_when_context_menu_opened > 0;
+                    {
+                        imgui::ScopedDisable d(disabled);
+
+                        if (imgui::Selectable("Selection")) {
+                            // TODO
+                        }
+                    }
+                    if (disabled) {
+                        imgui::SameLine();
+                        imgui::TextDisabled("(?)");
+                        if (imgui::IsItemHovered()) {
+                            imgui::SetTooltip("Not implemented.");
+                        }
+                    }
+                }
+
+                imgui::EndMenu();
+            }
+
+            if (imgui::BeginMenu("Copy ## completed_file_operations context_menu")) {
+                if (s_num_selected_when_context_menu_opened > 0) {
+                    auto compute_clipboard = [&](std::function<std::string_view (completed_file_operation const &)> extract) noexcept
+                    {
+                        std::string clipboard = {};
+
+                        for (u64 i = 0; i < completed_file_operations.container->size(); ++i) {
+                            auto const &cfo = completed_file_operations.container->operator[](i);
+                            if (cfo.selected) {
+                                std::string_view copy_content = extract(cfo);
+                                clipboard.append(copy_content);
+                                clipboard += '\n';
+                            }
+                        }
+
+                        return clipboard;
+                    };
+
+                    if (imgui::Selectable("Selection source names")) {
+                        std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
+                            char const *file_name = cget_file_name(cfo.src_path.data());
+                            return std::string_view(file_name);
+                        });
+                        imgui::SetClipboardText(clipboard.c_str());
+                    }
+                    if (imgui::Selectable("Selection source locations")) {
+                        std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
+                            std::string_view location = get_everything_minus_file_name(cfo.src_path.data());
+                            return location;
+                        });
+                        imgui::SetClipboardText(clipboard.c_str());
+                    }
+                    if (imgui::Selectable("Selection source full paths")) {
+                        std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
+                            return std::string_view(cfo.src_path.data());
+                        });
+                        imgui::SetClipboardText(clipboard.c_str());
+                    }
+
+                    if (!path_is_empty(context_target.dst_path)) {
+                        imgui::Separator();
+
+                        if (imgui::Selectable("Selection destination names")) {
+                            std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
+                                char const *file_name = cget_file_name(cfo.dst_path.data());
+                                return std::string_view(file_name);
+                            });
+                            imgui::SetClipboardText(clipboard.c_str());
+                        }
+                        if (imgui::Selectable("Selection destination locations")) {
+                            std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
+                                std::string_view location = get_everything_minus_file_name(cfo.dst_path.data());
+                                return location;
+                            });
+                            imgui::SetClipboardText(clipboard.c_str());
+                        }
+                        if (imgui::Selectable("Selection destination full paths")) {
+                            std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
+                                return std::string_view(cfo.dst_path.data());
+                            });
+                            imgui::SetClipboardText(clipboard.c_str());
+                        }
+                    }
+
+                    imgui::Separator();
+                }
+
+                if (imgui::Selectable("This source name")) {
+                    char const *name = cget_file_name(context_target.src_path.data());
+                    imgui::SetClipboardText(name);
+                }
+                if (imgui::IsItemHovered()) {
+                    char const *name = cget_file_name(context_target.src_path.data());
+                    imgui::SetTooltip(name);
+                }
+
+                if (imgui::Selectable("This source location")) {
+                    std::string_view location = get_everything_minus_file_name(context_target.src_path.data());
+                    std::string location_str(location);
+                    imgui::SetClipboardText(location_str.c_str());
+                }
+                if (imgui::IsItemHovered()) {
+                    std::string_view location = get_everything_minus_file_name(context_target.src_path.data());
+                    swan_path location_path = path_create(location.data(), location.size());
+                    imgui::SetTooltip(location_path.data());
+                }
+
+                if (imgui::Selectable("This source full path")) {
+                    imgui::SetClipboardText(context_target.src_path.data());
+                }
+                if (imgui::IsItemHovered()) {
+                    imgui::SetTooltip(context_target.src_path.data());
+                }
+
+                if (!path_is_empty(context_target.dst_path)) {
+                    imgui::Separator();
+
+                    if (imgui::Selectable("This destination name")) {
+                        char const *name = cget_file_name(context_target.dst_path.data());
+                        imgui::SetClipboardText(name);
+                    }
+                    if (imgui::IsItemHovered()) {
+                        char const *name = cget_file_name(context_target.dst_path.data());
+                        imgui::SetTooltip(name);
+                    }
+
+                    if (imgui::Selectable("This destination location")) {
+                        std::string_view location = get_everything_minus_file_name(context_target.dst_path.data());
+                        std::string location_str(location);
+                        imgui::SetClipboardText(location_str.c_str());
+                    }
+                    if (imgui::IsItemHovered()) {
+                        std::string_view location = get_everything_minus_file_name(context_target.dst_path.data());
+                        swan_path location_path = path_create(location.data(), location.size());
+                        imgui::SetTooltip(location_path.data());
+                    }
+
+                    if (imgui::Selectable("This destination full path")) {
+                        imgui::SetClipboardText(context_target.dst_path.data());
+                    }
+                    if (imgui::IsItemHovered()) {
+                        imgui::SetTooltip(context_target.dst_path.data());
+                    }
+                }
+
+                imgui::EndMenu();
+            }
+
+            if (imgui::BeginMenu("Reveal ## completed_file_operations context_menu")) {
                 auto reveal = [](swan_path const &full_path) noexcept {
                     explorer_window &expl = global_state::explorers()[0];
 
@@ -712,203 +980,54 @@ void swan_windows::render_file_operations(bool &open) noexcept
                 };
 
                 if (context_target.op_type == file_operation_type::del && context_target.undone()) {
-                    if (imgui::Selectable("Reveal source path (undo result) in Explorer 1")) {
+                    if (imgui::Selectable("Source path in Explorer 1")) {
                         reveal(context_target.src_path);
                     }
                 }
                 else if (!path_is_empty(context_target.dst_path)) {
-                    if (imgui::Selectable("Reveal destination path (result) in Explorer 1")) {
+                    if (imgui::Selectable("Destination path in Explorer 1")) {
                         reveal(context_target.dst_path);
                     }
                 }
+
+                imgui::EndMenu();
             }
 
-            imgui::Separator();
+            if (imgui::BeginMenu("Forget ## completed_file_operations context_menu")) {
+                if (imgui::Selectable("This")) {
+                    execute_forget_single_immediately = imgui::OpenConfirmationModal(
+                        swan_id_confirm_completed_file_operations_forget_single,
+                        "Are you sure you want to forget this single file operation? This action cannot be undone.",
+                        &global_state::settings().confirm_completed_file_operations_forget_single);
+                }
+                if (context_target.group_id != 0 && imgui::Selectable("Group")) {
+                    execute_forget_group_immediately = imgui::OpenConfirmationModal(
+                        swan_id_confirm_completed_file_operations_forget_group,
+                        "Are you sure you want to forget this group of file operations? This action cannot be undone.",
+                        &global_state::settings().confirm_completed_file_operations_forget_group);
+                }
+                {
+                    bool disabled = s_num_selected_when_context_menu_opened == 0;
+                    {
+                        imgui::ScopedDisable d(disabled);
 
-            {
-                bool can_be_undeleted = context_target.op_type == file_operation_type::del && !context_target.undone();
-                bool has_recycle_bin_entry = !path_is_empty(context_target.dst_path);
-
-                if (can_be_undeleted && has_recycle_bin_entry && imgui::Selectable("Undelete this one")) {
-                    if (context_target.obj_type == basic_dirent::kind::directory) {
-                        swan_path restore_dir_utf8 = path_create(context_target.src_path.data(),
-                                                                   get_everything_minus_file_name(context_target.src_path.data()).length());
-
-                        auto res = enqueue_undelete_directory(context_target.dst_path.data(), restore_dir_utf8.data(), context_target.src_path.data());
-
-                        if (!res.success) {
-                            std::string action = make_str("Undelete directory [%s].", context_target.src_path.data());
-                            swan_popup_modals::open_error(action.c_str(), res.error_or_utf8_path.c_str());
+                        if (imgui::Selectable("Selection")) {
+                            execute_forget_selection_immediately = imgui::OpenConfirmationModal(
+                                swan_id_confirm_completed_file_operations_forget_selected,
+                                make_str("Are you sure you want to forget the %zu selected file operations? This action cannot be undone.", s_num_selected_when_context_menu_opened).c_str(),
+                                &global_state::settings().confirm_completed_file_operations_forget_selected);
                         }
                     }
-                    else {
-                        auto res = undelete_file(context_target.dst_path.data());
-
-                        if (res.success()) {
-                            context_target.undo_time = current_time_system();
-                            context_target.selected = false;
-                            (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
-                        }
-                        else {
-                            std::string action = make_str("Undelete file [%s].", context_target.src_path.data());
-                            std::string failure;
-                            auto winapi_err = get_last_winapi_error().formatted_message.c_str();
-
-                            if      (!res.step0_convert_hardlink_path_to_utf16) failure = make_str("Failed to convert hardlink path [%s] from UTF-8 to UTF-16.", context_target.dst_path.data());
-                            else if (!res.step1_metadata_file_opened          ) failure = make_str("Failed to open metadata file corresponding to [%s], %s", context_target.dst_path.data(), winapi_err);
-                            else if (!res.step2_metadata_file_read            ) failure = make_str("Failed to read contents of metadata file corresponding to [%s]", context_target.dst_path.data());
-                            else if (!res.step3_new_hardlink_created          ) failure = make_str("Failed to create hardlink [%s], %s The backup hardlink [%s] was probably deleted.", context_target.src_path.data(), winapi_err, context_target.dst_path.data());
-                            else if (!res.step4_old_hardlink_deleted          ) failure = make_str("Failed to delete hardlink [%s], %s", context_target.dst_path.data(), winapi_err);
-                            else if (!res.step5_metadata_file_deleted         ) failure = make_str("Failed to delete metadata file corresponding to [%s], %s", context_target.dst_path.data(), winapi_err);
-                            else                                                assert(false && "Bad code path");
-
-                            swan_popup_modals::open_error(action.c_str(), failure.c_str());
-
-                            if (res.step3_new_hardlink_created) {
-                                // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
-                                context_target.undo_time = current_time_system();
-                                (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
-                            }
+                    if (disabled) {
+                        imgui::SameLine();
+                        imgui::TextDisabled("(?)");
+                        if (imgui::IsItemHovered()) {
+                            imgui::SetTooltip("Select at least one record.");
                         }
                     }
                 }
-            }
 
-            {
-                bool disabled = true; // s_num_deletes_in_group_when_context_menu_opened > 0 && context_target.group_id != 0;
-                {
-                    imgui::ScopedDisable d(disabled);
-
-                    if (imgui::Selectable("Undelete group")) {
-                        // TODO
-                    }
-                }
-                if (disabled) {
-                    imgui::SameLine();
-                    imgui::TextDisabled("(?)");
-                    if (imgui::IsItemHovered()) {
-                        imgui::SetTooltip("Not implemented.");
-                        // if (context_target.group_id == 0) {
-                        //     imgui::SetTooltip("Target has no group");
-                        // } else {
-                        //     imgui::SetTooltip("Target's group has no delete operations to undo");
-                        // }
-                    }
-                }
-            }
-
-            {
-                bool disabled = true; // s_num_deletes_selected_when_context_menu_opened > 0;
-                {
-                    imgui::ScopedDisable d(disabled);
-
-                    if (imgui::Selectable("Undelete selection")) {
-                        // TODO
-                    }
-                }
-                if (disabled) {
-                    imgui::SameLine();
-                    imgui::TextDisabled("(?)");
-                    if (imgui::IsItemHovered()) {
-                        imgui::SetTooltip("Not implemented.");
-                    }
-                }
-            }
-
-            imgui::Separator();
-
-            if (s_num_selected_when_context_menu_opened == 0) {
-                if (imgui::Selectable("Copy source name")) {
-                    char const *name = cget_file_name(context_target.src_path.data());
-                    imgui::SetClipboardText(name);
-                }
-                if (imgui::Selectable("Copy source location")) {
-                    std::string_view location = get_everything_minus_file_name(context_target.src_path.data());
-                    std::string location_str(location);
-                    imgui::SetClipboardText(location_str.c_str());
-                }
-                if (imgui::Selectable("Copy source full path")) {
-                    imgui::SetClipboardText(context_target.src_path.data());
-                }
-
-                imgui::Separator();
-
-                if (!path_is_empty(context_target.dst_path)) {
-                    if (imgui::Selectable("Copy destination name")) {
-                        char const *name = cget_file_name(context_target.dst_path.data());
-                        imgui::SetClipboardText(name);
-                    }
-                    if (imgui::Selectable("Copy destination location")) {
-                        std::string_view location = get_everything_minus_file_name(context_target.dst_path.data());
-                        std::string location_str(location);
-                        imgui::SetClipboardText(location_str.c_str());
-                    }
-                    if (imgui::Selectable("Copy destination full path")) {
-                        imgui::SetClipboardText(context_target.dst_path.data());
-                    }
-                }
-            }
-        #if 0
-            else {
-                if (imgui::Selectable("Copy selection source names")) {
-
-                }
-                if (imgui::Selectable("Copy selection source locations")) {
-
-                }
-                if (imgui::Selectable("Copy selection source full paths")) {
-
-                }
-
-                imgui::Separator();
-
-                if (!path_is_empty(context_target.dst_path)) {
-                    if (imgui::Selectable("Copy selection destination names")) {
-
-                    }
-                    if (imgui::Selectable("Copy selection destination locations")) {
-
-                    }
-                    if (imgui::Selectable("Copy selection destination full paths")) {
-
-                    }
-                }
-            }
-        #endif
-
-            imgui::Separator();
-
-            if (imgui::Selectable("Forget this one")) {
-                execute_forget_single_immediately = imgui::OpenConfirmationModal(
-                    swan_id_confirm_completed_file_operations_forget_single,
-                    "Are you sure you want to forget this single file operation? This action cannot be undone.",
-                    &global_state::settings().confirm_completed_file_operations_forget_single);
-            }
-            if (context_target.group_id != 0 && imgui::Selectable("Forget group")) {
-                execute_forget_group_immediately = imgui::OpenConfirmationModal(
-                    swan_id_confirm_completed_file_operations_forget_group,
-                    "Are you sure you want to forget this group of file operations? This action cannot be undone.",
-                    &global_state::settings().confirm_completed_file_operations_forget_group);
-            }
-            {
-                bool disabled = s_num_selected_when_context_menu_opened == 0;
-                {
-                    imgui::ScopedDisable d(disabled);
-
-                    if (imgui::Selectable("Forget selection")) {
-                        execute_forget_selection_immediately = imgui::OpenConfirmationModal(
-                            swan_id_confirm_completed_file_operations_forget_selected,
-                            make_str("Are you sure you want to forget the %zu selected file operations? This action cannot be undone.", s_num_selected_when_context_menu_opened).c_str(),
-                            &global_state::settings().confirm_completed_file_operations_forget_selected);
-                    }
-                }
-                if (disabled) {
-                    imgui::SameLine();
-                    imgui::TextDisabled("(?)");
-                    if (imgui::IsItemHovered()) {
-                        imgui::SetTooltip("Select at least one record.");
-                    }
-                }
+                imgui::EndMenu();
             }
 
             imgui::EndPopup();
@@ -978,6 +1097,10 @@ void swan_windows::render_file_operations(bool &open) noexcept
     }
 
     imgui::End();
+
+    if (settings_change) {
+        global_state::settings().save_to_disk();
+    }
 }
 
 void print_SIGDN_values(char const *func_label, char const *item_name, IShellItem *item) noexcept

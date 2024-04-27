@@ -157,11 +157,15 @@ struct swan_settings
     char dir_separator_utf8 = '\\';
 
     bool show_debug_info = false;
+
     bool explorer_show_dotdot_dir = false;
     bool explorer_cwd_entries_table_alt_row_bg = true;
     bool explorer_cwd_entries_table_borders_in_body = true;
     bool explorer_clear_filter_on_cwd_change = true;
     bool explorer_file_extension_icons = true;
+
+    bool file_operations_src_path_full = true;
+    bool file_operations_dst_path_full = true;
 
     bool startup_with_window_maximized = true;
     bool startup_with_previous_window_pos_and_size = true;
