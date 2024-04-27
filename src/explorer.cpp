@@ -731,6 +731,8 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
             this->cwd_entries.clear();
 
             if (parent_dir != "") {
+                bool inside_recycle_bin;
+
                 wchar_t search_path_utf16[512]; init_empty_cstr(search_path_utf16);
                 {
                     scoped_timer<timer_unit::MICROSECONDS> searchpath_setup_timer(&timers.searchpath_setup_us);
@@ -741,6 +743,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                     }
                     swan_path parent_dir_trimmed = {};
                     strncpy(parent_dir_trimmed.data(), parent_dir.data(), parent_dir.size() - num_trailing_spaces);
+                    path_force_separator(parent_dir_trimmed, '\\');
 
                     (void) utf8_to_utf16(parent_dir_trimmed.data(), search_path_utf16, lengthof(search_path_utf16));
 
@@ -750,6 +753,8 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                         (void) StrCatW(search_path_utf16, dir_sep_w);
                     }
                     (void) StrCatW(search_path_utf16, L"*");
+
+                    inside_recycle_bin = str_starts_with(parent_dir_trimmed.data() + 1, ":\\$Recycle.Bin\\"); // assume drive letter is first char
                 }
 
                 // just for debug log
@@ -803,7 +808,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
                     if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                         entry.basic.type = basic_dirent::kind::directory;
                     }
-                    else if (path_ends_with(entry.basic.path, ".lnk")) {
+                    else if (!inside_recycle_bin && path_ends_with(entry.basic.path, ".lnk")) {
                         // TODO: this branch is quite slow, there should probably be an option to opt out of checking the type and validity of symlinks
 
                         entry.basic.type = basic_dirent::kind::invalid_symlink; // default value, if something fails below
@@ -2168,14 +2173,15 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char) noexcept
     }
 
     static std::vector<char const *> s_slices = {};
-    s_slices.reserve(50);
     s_slices.clear();
 
     swan_path sliced_path = expl.cwd;
-    char const *slice = strtok(sliced_path.data(), "\\/");
-    while (slice != nullptr) {
-        s_slices.push_back(slice);
-        slice = strtok(nullptr, "\\/");
+    {
+        char const *slice = strtok(sliced_path.data(), "\\/");
+        while (slice != nullptr) {
+            s_slices.push_back(slice);
+            slice = strtok(nullptr, "\\/");
+        }
     }
 
     auto cd_to_slice = [&](char const *slice) noexcept {
@@ -2214,25 +2220,22 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char) noexcept
         imgui::CloseCurrentPopup();
     };
 
+    char const *separator = ICON_CI_TRIANGLE_RIGHT;
     imgui::ScopedStyle<f32> s(imgui::GetStyle().ItemSpacing.x, 2);
 
-    {
-        u64 i = 0;
-        for (auto slice_it = s_slices.begin(); slice_it != s_slices.end() - 1; ++slice_it, ++i) {
-            auto label = make_str_static<1200>("%s##slice%zu", *slice_it, i);
+    for (u64 i = 0; i < s_slices.size() - 1; ++i) {
+        char const *slice = s_slices[i];
+        auto label = make_str_static<1200>("%s" "## clicknav %zu", slice, i);
 
-            if (imgui::Button(label.data())) {
-                print_debug_msg("[ %d ] clicked slice [%s]", expl.id, *slice_it);
-                cd_to_slice(*slice_it);
-            }
-
-            imgui::SameLine();
-            imgui::TextDisabled(ICON_CI_TRIANGLE_RIGHT); // imgui::Text("%c", dir_sep_utf8);
-            imgui::SameLine();
+        if (imgui::Button(label.data())) {
+            cd_to_slice(slice);
         }
-    }
 
-    imgui::Text(" %s", s_slices.back());
+        imgui::SameLine();
+        imgui::TextDisabled(separator);
+        imgui::SameLine();
+    }
+    imgui::Button(s_slices.back());
 }
 
 static
@@ -3510,7 +3513,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                     move_dirents_drag_drop_payload &payload,
                     std::wstring &paths,
                     std::wstring const &cwd_utf16,
-                    char const *item_utf8)
+                    char const *item_utf8) noexcept
                 {
                     ++payload.num_items;
 
@@ -3718,6 +3721,38 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                     expl.scroll_to_nth_selected_entry_next_frame = 0;
                 }
             }
+
+            {
+                static progressive_task<std::optional<generic_result>> task = {};
+
+                if (imgui::Selectable("Open with...")) {
+                    global_state::thread_pool().push_task([&expl]() {
+                        task.active_token.store(true);
+
+                        auto res = open_file_with(expl.context_menu_target->basic.path.data(), expl.cwd.data());
+
+                        std::scoped_lock lock(task.result_mutex);
+                        task.result = res;
+                    });
+                }
+
+                if (task.active_token.load() == true) {
+                    std::scoped_lock lock(task.result_mutex);
+
+                    if (task.result.has_value()) {
+                        task.active_token.store(false);
+                        auto const &res = task.result.value();
+                        bool failed = !res.success && res.error_or_utf8_path != "The operation was canceled by the user.";
+
+                        if (failed) {
+                            std::string action = make_str("Open [%s] with...", expl.context_menu_target->basic.path.data());
+                            std::string const &failure = res.error_or_utf8_path;
+                            swan_popup_modals::open_error(action.c_str(), failure.c_str());
+                        }
+                    }
+                }
+            }
+
             if (imgui::Selectable("Copy name")) {
                 imgui::SetClipboardText(expl.context_menu_target->basic.path.data());
             }

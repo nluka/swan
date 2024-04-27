@@ -28,6 +28,7 @@
 #include <pathcch.h>
 #include <ranges>
 #include <regex>
+#include <shlobj.h>
 #include <shlobj_core.h>
 #include <shlwapi.h>
 #include <shobjidl_core.h>

@@ -674,7 +674,7 @@ generic_result open_file(char const *file_name, char const *file_directory, bool
     auto ec = (intptr_t)result;
 
     if (ec > HINSTANCE_ERROR) {
-        print_debug_msg("ShellExecuteW success");
+        print_debug_msg("SUCCESS ShellExecuteW");
         return { true, target_full_path_utf8.data() };
     }
     else if (ec == SE_ERR_NOASSOC) {
@@ -689,6 +689,39 @@ generic_result open_file(char const *file_name, char const *file_directory, bool
         auto err = get_last_winapi_error().formatted_message;
         print_debug_msg("FAILED ShellExecuteW: %s", err.c_str());
         return { false, err };
+    }
+}
+
+generic_result open_file_with(char const *file_name, char const *file_directory) noexcept
+{
+    swan_path target_full_path_utf8 = path_create(file_directory);
+
+    if (!path_append(target_full_path_utf8, file_name, global_state::settings().dir_separator_utf8, true)) {
+        print_debug_msg("FAILED path_append, file_directory = [%s], file_name = [\\%s]", file_directory, file_name);
+        return { false, "Full file path exceeds max path length." };
+    }
+
+    wchar_t target_full_path_utf16[MAX_PATH]; init_empty_cstr(target_full_path_utf16);
+
+    if (!utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16))) {
+        return { false, "Conversion of target's full path from UTF-8 to UTF-16." };
+    }
+
+    OPENASINFO open_info;
+    open_info.pcszClass = NULL;
+    open_info.pcszFile = target_full_path_utf16;
+    open_info.oaifInFlags = OAIF_EXEC;
+
+    HRESULT result = SHOpenWithDialog(NULL, &open_info);
+
+    if (FAILED(result)) {
+        std::string err = _com_error(result).ErrorMessage();
+        print_debug_msg("FAILED SHOpenWithDialog: %s", err.c_str());
+        return { false, err };
+    }
+    else {
+        print_debug_msg("SUCCESS SHOpenWithDialog");
+        return { true, target_full_path_utf8.data() };
     }
 }
 

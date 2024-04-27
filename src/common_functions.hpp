@@ -211,6 +211,8 @@ recycle_bin_info query_recycle_bin() noexcept;
 
 generic_result open_file(char const *file_name, char const *file_directory, bool as_admin = false) noexcept;
 
+generic_result open_file_with(char const *file_name, char const *file_directory) noexcept;
+
 generic_result reveal_in_windows_file_explorer(swan_path const &full_path) noexcept;
 
 winapi_error get_last_winapi_error() noexcept;
