@@ -4,7 +4,6 @@ obj*/
 *.res
 *.ico
 jquery*
-swan.png
 data/
 ignore/
 dist/
