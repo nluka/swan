@@ -9,7 +9,7 @@ static s32 s_debug_log_text_limit_megabytes = 5;
 
 s32 &global_state::debug_log_text_limit_megabytes() noexcept { return s_debug_log_text_limit_megabytes; }
 
-void swan_windows::render_debug_log(bool &open) noexcept
+void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
     if (imgui::Begin(swan_windows::get_name(swan_windows::id::debug_log), &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {

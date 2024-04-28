@@ -14,17 +14,8 @@ void swan_popup_modals::open_new_directory(char const *parent_directory_utf8, s3
     using namespace new_directory_modal_global_state;
 
     g_open = true;
-    bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_new_directory);
-
     g_parent_path_utf8 = path_create(parent_directory_utf8);
     g_initiating_expl_id = initiating_expl_id;
-}
-
-bool swan_popup_modals::is_open_new_directory() noexcept
-{
-    using namespace new_directory_modal_global_state;
-
-    return g_open;
 }
 
 void swan_popup_modals::render_new_directory() noexcept
@@ -43,8 +34,6 @@ void swan_popup_modals::render_new_directory() noexcept
 
     auto cleanup_and_close_popup = [&]() noexcept {
         g_open = false;
-        bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_new_directory);
-
         g_parent_path_utf8 = {};
         g_initiating_expl_id = -1;
 

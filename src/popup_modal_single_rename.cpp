@@ -18,7 +18,6 @@ void swan_popup_modals::open_single_rename(
     using namespace single_rename_modal_global_state;
 
     g_open = true;
-    bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_single_rename);
 
     assert(g_expl_dirent_to_rename == nullptr);
     g_expl_dirent_to_rename = &entry_to_be_renamed;
@@ -27,13 +26,6 @@ void swan_popup_modals::open_single_rename(
     g_expl_opened_from = &expl;
 
     g_on_rename_callback = on_rename_finish_callback;
-}
-
-bool swan_popup_modals::is_open_single_rename() noexcept
-{
-    using namespace single_rename_modal_global_state;
-
-    return g_open;
 }
 
 void swan_popup_modals::render_single_rename() noexcept
@@ -58,8 +50,6 @@ void swan_popup_modals::render_single_rename() noexcept
 
     auto cleanup_and_close_popup = [&]() noexcept {
         g_open = false;
-        bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_single_rename);
-
         g_expl_opened_from = nullptr;
         g_expl_dirent_to_rename = nullptr;
         g_on_rename_callback = {};

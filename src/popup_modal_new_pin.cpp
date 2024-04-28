@@ -14,17 +14,8 @@ void swan_popup_modals::open_new_pin(swan_path const &init_path, bool mutable_pa
     using namespace new_pin_modal_global_state;
 
     g_open = true;
-    bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_new_pin);
-
     g_enable_path_text_input = mutable_path;
     g_initial_path_value = init_path;
-}
-
-bool swan_popup_modals::is_open_new_pin() noexcept
-{
-    using namespace new_pin_modal_global_state;
-
-    return g_open;
 }
 
 void swan_popup_modals::render_new_pin() noexcept
@@ -47,8 +38,6 @@ void swan_popup_modals::render_new_pin() noexcept
 
     auto cleanup_and_close_popup = [&]() noexcept {
         g_open = false;
-        bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_new_pin);
-
         g_enable_path_text_input = true;
         init_empty_cstr(g_initial_path_value.data());
 

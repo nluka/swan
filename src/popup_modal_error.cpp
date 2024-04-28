@@ -14,7 +14,6 @@ void swan_popup_modals::open_error(char const *action, char const *failure, bool
     using namespace error_modal_global_state;
 
     g_open = true;
-    bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_error);
 
     assert(action != nullptr);
     g_action = action;
@@ -46,13 +45,6 @@ void swan_popup_modals::open_error(char const *action, char const *failure, bool
     }
 }
 
-bool swan_popup_modals::is_open_error() noexcept
-{
-    using namespace error_modal_global_state;
-
-    return g_open;
-}
-
 void swan_popup_modals::render_error() noexcept
 {
     using namespace error_modal_global_state;
@@ -70,11 +62,8 @@ void swan_popup_modals::render_error() noexcept
 
     auto cleanup_and_close_popup = [&]() noexcept {
         g_open = false;
-        bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_error);
-
         g_action.clear();
         g_failure.clear();
-
         imgui::CloseCurrentPopup();
     };
 

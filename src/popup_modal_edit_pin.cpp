@@ -13,17 +13,9 @@ void swan_popup_modals::open_edit_pin(pinned_path *pin) noexcept
     using namespace edit_pin_modal_global_state;
 
     g_open = true;
-    bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_edit_pin);
 
     assert(pin != nullptr);
     g_target_pin = pin;
-}
-
-bool swan_popup_modals::is_open_edit_pin() noexcept
-{
-    using namespace edit_pin_modal_global_state;
-
-    return g_open;
 }
 
 void swan_popup_modals::render_edit_pin() noexcept
@@ -48,8 +40,6 @@ void swan_popup_modals::render_edit_pin() noexcept
 
     auto cleanup_and_close_popup = [&]() noexcept {
         g_open = false;
-        bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_edit_pin);
-
         g_target_pin = nullptr;
 
         init_empty_cstr(s_label_input);

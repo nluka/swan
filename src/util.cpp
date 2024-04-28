@@ -103,23 +103,24 @@ std::array<char, 64> compute_when_str(precise_time_point_t start, precise_time_p
     s64 one_hour = one_minute * 60;
     s64 one_day = one_hour * 24;
 
-    if (ms_diff < 0) {
-        strncpy(out.data(), "in the future", out.size());
-    }
-    else if (ms_diff < one_minute) {
-        strncpy(out.data(), "just now", out.size());
+    bool in_future = ms_diff < 0;
+    char const *tense = in_future ? "in future" : "ago";
+    ms_diff = abs(ms_diff);
+
+    if (ms_diff < one_minute) {
+        snprintf(out.data(), out.size(), "just now%s", in_future ? tense : "");
     }
     else if (ms_diff < one_hour) {
         u64 minutes = u64(ms_diff / one_minute);
-        snprintf(out.data(), out.size(), "%zu min%s ago", minutes, minutes == 1 ? "" : "s");
+        snprintf(out.data(), out.size(), "%zu min%s %s", minutes, minutes == 1 ? "" : "s", tense);
     }
     else if (ms_diff < one_day) {
         u64 hours = u64(ms_diff / one_hour);
-        snprintf(out.data(), out.size(), "%zu hour%s ago", hours, hours == 1 ? "" : "s");
+        snprintf(out.data(), out.size(), "%zu hour%s %s", hours, hours == 1 ? "" : "s", tense);
     }
     else {
         u64 days = u64(ms_diff / one_day);
-        snprintf(out.data(), out.size(), "%zu day%s ago", days, days == 1 ? "" : "s");
+        snprintf(out.data(), out.size(), "%zu day%s %s", days, days == 1 ? "" : "s", tense);
     }
 
     return out;
@@ -155,23 +156,24 @@ std::array<char, 64> compute_when_str(system_time_point_t start, system_time_poi
     s64 one_hour = one_minute * 60;
     s64 one_day = one_hour * 24;
 
-    if (ms_diff < 0) {
-        strncpy(out.data(), "in the future", out.size());
-    }
-    else if (ms_diff < one_minute) {
-        strncpy(out.data(), "just now", out.size());
+    bool in_future = ms_diff < 0;
+    char const *tense = in_future ? "in future" : "ago";
+    ms_diff = abs(ms_diff);
+
+    if (ms_diff < one_minute) {
+        snprintf(out.data(), out.size(), "just now%s", in_future ? tense : "");
     }
     else if (ms_diff < one_hour) {
         u64 minutes = u64(ms_diff / one_minute);
-        snprintf(out.data(), out.size(), "%zu min%s ago", minutes, minutes == 1 ? "" : "s");
+        snprintf(out.data(), out.size(), "%zu min%s %s", minutes, minutes == 1 ? "" : "s", tense);
     }
     else if (ms_diff < one_day) {
         u64 hours = u64(ms_diff / one_hour);
-        snprintf(out.data(), out.size(), "%zu hour%s ago", hours, hours == 1 ? "" : "s");
+        snprintf(out.data(), out.size(), "%zu hour%s %s", hours, hours == 1 ? "" : "s", tense);
     }
     else {
         u64 days = u64(ms_diff / one_day);
-        snprintf(out.data(), out.size(), "%zu day%s ago", days, days == 1 ? "" : "s");
+        snprintf(out.data(), out.size(), "%zu day%s %s", days, days == 1 ? "" : "s", tense);
     }
 
     return out;
@@ -588,18 +590,10 @@ bool str_starts_with(char const *str, char const *prefix) noexcept
     return strncmp(prefix, str, strlen(prefix)) == 0;
 }
 
-std::tm make_tm(system_time_point_t const &time) noexcept
-{
-    auto time_t = std::chrono::system_clock::to_time_t(time);
-    std::tm tm = *std::localtime(&time_t);
-    return tm;
-    // return std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
-}
-
 system_time_point_t extract_system_time_from_istream(std::istream &in_stream) noexcept
 {
-    std::tm tm = {};
-    in_stream >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-    system_time_point_t system_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-    return system_time;
+    std::time_t time;
+    in_stream >> time;
+    system_time_point_t time_point = std::chrono::system_clock::from_time_t(time);
+    return time_point;
 }

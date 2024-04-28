@@ -146,7 +146,7 @@ void search_proc(progressive_task<std::vector<finder_window::match>> &search_tas
     }
 }
 
-void swan_windows::render_finder(finder_window &finder, bool &open) noexcept
+void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::finder), &open)) {
         imgui::End();

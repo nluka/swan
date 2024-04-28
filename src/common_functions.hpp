@@ -67,23 +67,23 @@ namespace swan_windows
         }
     }
 
-    void render_explorer(explorer_window &, bool &open, finder_window &) noexcept;
+    void render_explorer(explorer_window &, bool &open, finder_window &, bool any_popups_open) noexcept;
 
-    void render_finder(finder_window &, bool &open) noexcept;
+    void render_finder(finder_window &, bool &open, bool any_popups_open) noexcept;
 
-    void render_pinned(std::array<explorer_window, 4> &, bool &open) noexcept;
+    void render_pinned(std::array<explorer_window, 4> &, bool &open, bool any_popups_open) noexcept;
 
-    void render_debug_log(bool &open) noexcept;
+    void render_debug_log(bool &open, bool any_popups_open) noexcept;
 
-    void render_file_operations(bool &open) noexcept;
+    void render_file_operations(bool &open, bool any_popups_open) noexcept;
 
-    void render_recent_files(bool &open) noexcept;
+    void render_recent_files(bool &open, bool any_popups_open) noexcept;
 
-    void render_settings(GLFWwindow *window, bool &open) noexcept;
+    void render_settings(GLFWwindow *window, bool &open, bool any_popups_open) noexcept;
 
-    void render_icon_library(bool &open) noexcept;
+    void render_icon_library(bool &open, bool any_popups_open) noexcept;
 
-    void render_theme_editor(bool &open, ImGuiStyle const &fallback_style) noexcept;
+    void render_theme_editor(bool &open, ImGuiStyle const &fallback_style, bool any_popups_open) noexcept;
 
 } // namespace render_window
 
@@ -118,14 +118,6 @@ namespace swan_popup_modals
     void open_edit_pin(pinned_path *pin) noexcept;
     void open_new_file(char const *parent_directory_utf8, s32 initiating_expl_id = -1) noexcept;
     void open_new_directory(char const *parent_directory_utf8, s32 initiating_expl_id = -1) noexcept;
-
-    bool is_open_single_rename() noexcept;
-    bool is_open_bulk_rename() noexcept;
-    bool is_open_error() noexcept;
-    bool is_open_new_pin() noexcept;
-    bool is_open_edit_pin() noexcept;
-    bool is_open_new_file() noexcept;
-    bool is_open_new_directory() noexcept;
 
     void render_single_rename() noexcept;
     void render_bulk_rename() noexcept;
@@ -178,9 +170,6 @@ namespace global_state
     swan_windows::id   focused_window_get() noexcept;
     bool               focused_window_set(swan_windows::id window_id) noexcept;
     bool               focused_window_load_from_disk(swan_windows::id &window_id) noexcept;
-
-    u64 &   popup_modals_open_bit_field() noexcept;
-    bool    popup_modals_are_any_open() noexcept;
 
     std::filesystem::path & execution_path() noexcept;
     swan_thread_pool_t &    thread_pool() noexcept;

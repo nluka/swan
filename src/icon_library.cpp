@@ -47,7 +47,7 @@ u64 compute_levenshtein_dist(char const *word1, u64 size1, char const *word2, u6
     return s_verif[size1][size2];
 }
 
-void swan_windows::render_icon_library(bool &open) noexcept
+void swan_windows::render_icon_library(bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::icon_library), &open)) {
         imgui::End();

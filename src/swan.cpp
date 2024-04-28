@@ -218,6 +218,11 @@ try {
     print_debug_msg("Entering render loop...");
 
     while (!glfwWindowShouldClose(window)) {
+        // check before polling events or starting the frame because
+        // ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) unexpectedly returns false after ImGuiKey_Escape is pressed if
+        // this value is queried later in the frame
+        bool any_popups_open = imgui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
+
         glfwPollEvents();
 
         static swan_windows::id last_focused_window_id = window_render_order.back();
@@ -266,49 +271,49 @@ try {
             switch (window_id) {
                 case swan_windows::id::explorer_0: {
                     if (window_visib.explorer_0) {
-                        swan_windows::render_explorer(explorers[0], window_visib.explorer_0, finder);
+                        swan_windows::render_explorer(explorers[0], window_visib.explorer_0, finder, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::explorer_1: {
                     if (window_visib.explorer_1) {
-                        swan_windows::render_explorer(explorers[1], window_visib.explorer_1, finder);
+                        swan_windows::render_explorer(explorers[1], window_visib.explorer_1, finder, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::explorer_2: {
                     if (window_visib.explorer_2) {
-                        swan_windows::render_explorer(explorers[2], window_visib.explorer_2, finder);
+                        swan_windows::render_explorer(explorers[2], window_visib.explorer_2, finder, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::explorer_3: {
                     if (window_visib.explorer_3) {
-                        swan_windows::render_explorer(explorers[3], window_visib.explorer_3, finder);
+                        swan_windows::render_explorer(explorers[3], window_visib.explorer_3, finder, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::finder: {
                     if (window_visib.finder) {
-                        swan_windows::render_finder(finder, window_visib.finder);
+                        swan_windows::render_finder(finder, window_visib.finder, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::pinned: {
                     if (window_visib.pinned) {
-                        swan_windows::render_pinned(explorers, window_visib.pinned);
+                        swan_windows::render_pinned(explorers, window_visib.pinned, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::file_operations: {
                     if (window_visib.file_operations) {
-                        swan_windows::render_file_operations(window_visib.file_operations);
+                        swan_windows::render_file_operations(window_visib.file_operations, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::recent_files: {
                     if (window_visib.recent_files) {
-                        swan_windows::render_recent_files(window_visib.recent_files);
+                        swan_windows::render_recent_files(window_visib.recent_files, any_popups_open);
                     }
                     break;
                 }
@@ -320,13 +325,13 @@ try {
                 }
                 case swan_windows::id::debug_log: {
                     if (window_visib.debug_log) {
-                        swan_windows::render_debug_log(window_visib.debug_log);
+                        swan_windows::render_debug_log(window_visib.debug_log, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::settings: {
                     if (window_visib.settings) {
-                        swan_windows::render_settings(window, window_visib.settings);
+                        swan_windows::render_settings(window, window_visib.settings, any_popups_open);
                     }
                     break;
                 }
@@ -342,40 +347,26 @@ try {
                 }
                 case swan_windows::id::theme_editor: {
                     if (window_visib.theme_editor) {
-                        swan_windows::render_theme_editor(window_visib.theme_editor, our_default_imgui_style);
+                        swan_windows::render_theme_editor(window_visib.theme_editor, our_default_imgui_style, any_popups_open);
                     }
                     break;
                 }
                 case swan_windows::id::icon_library: {
                     if (window_visib.icon_library) {
-                        swan_windows::render_icon_library(window_visib.icon_library);
+                        swan_windows::render_icon_library(window_visib.icon_library, any_popups_open);
                     }
                     break;
                 }
             }
         }
 
-        if (swan_popup_modals::is_open_single_rename()) {
-            swan_popup_modals::render_single_rename();
-        }
-        if (swan_popup_modals::is_open_bulk_rename()) {
-            swan_popup_modals::render_bulk_rename();
-        }
-        if (swan_popup_modals::is_open_new_file()) {
-            swan_popup_modals::render_new_file();
-        }
-        if (swan_popup_modals::is_open_new_directory()) {
-            swan_popup_modals::render_new_directory();
-        }
-        if (swan_popup_modals::is_open_new_pin()) {
-            swan_popup_modals::render_new_pin();
-        }
-        if (swan_popup_modals::is_open_edit_pin()) {
-            swan_popup_modals::render_edit_pin();
-        }
-        if (swan_popup_modals::is_open_error()) {
-            swan_popup_modals::render_error();
-        }
+        swan_popup_modals::render_single_rename();
+        swan_popup_modals::render_bulk_rename();
+        swan_popup_modals::render_new_file();
+        swan_popup_modals::render_new_directory();
+        swan_popup_modals::render_new_pin();
+        swan_popup_modals::render_edit_pin();
+        swan_popup_modals::render_error();
 
         imgui::RenderConfirmationModal();
 

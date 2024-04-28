@@ -65,11 +65,9 @@ try {
     std::scoped_lock lock(g_recent_files_mutex);
 
     for (auto const &file : g_recent_files) {
-        std::tm tm = make_tm(file.action_time);
-
         iss << file.action.size() << ' '
             << file.action.c_str() << ' '
-            << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << ' '
+            << std::chrono::system_clock::to_time_t(file.action_time) << ' '
             << path_length(file.path) << ' '
             << file.path.data() << '\n';
     }
@@ -157,7 +155,7 @@ u64 deselect_all(circular_buffer<recent_file> &recent_files) noexcept
     return num_deselected;
 }
 
-void swan_windows::render_recent_files(bool &open) noexcept
+void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::recent_files), &open)) {
         imgui::End();
@@ -167,8 +165,6 @@ void swan_windows::render_recent_files(bool &open) noexcept
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
         global_state::focused_window_set(swan_windows::id::recent_files);
     }
-
-
 
     {
         imgui::ScopedDisable d(g_recent_files.empty());
@@ -194,14 +190,13 @@ void swan_windows::render_recent_files(bool &open) noexcept
 
     auto &io = imgui::GetIO();
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
-    bool any_popup_modals_open = global_state::popup_modals_are_any_open();
     u64 move_to_front_idx = u64(-1);
     u64 remove_idx = u64(-1);
     bool execute_forget_selection_immediately = false;
     system_time_point_t current_time = current_time_system();
 
     // handle keybind actions
-    if (!any_popup_modals_open && window_hovered) {
+    if (!any_popups_open && window_hovered) {
         if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
             std::scoped_lock recent_files_lock(g_recent_files_mutex);
             deselect_all(g_recent_files);
@@ -532,6 +527,7 @@ void swan_windows::render_recent_files(bool &open) noexcept
             imgui::EndPopup();
 
             if (draw_context_connector) {
+                // TODO: draw rect around row instead
                 imgui::DrawBestLineBetweenRectCorners(file_name_rect.value(), context_menu_rect, ImVec4(255, 255, 255, 100), true, false, 2.f, 2.f);
             }
         }

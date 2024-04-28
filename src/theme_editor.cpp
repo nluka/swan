@@ -2,7 +2,7 @@
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 
-void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_style) noexcept
+void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_style, [[maybe_unused]] bool any_popups_open) noexcept
 {
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
 

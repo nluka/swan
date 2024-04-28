@@ -81,7 +81,6 @@ set(SWAN_SOURCES
     "src/popup_modal_new_file.cpp"
     "src/popup_modal_new_pin.cpp"
     "src/popup_modal_single_rename.cpp"
-    "src/popup_modal_open_state_tracker.cpp"
     "src/recent_files.cpp"
     "src/settings.cpp"
     "src/stdafx.cpp"

@@ -47,13 +47,9 @@ try {
         auto lock = supplied_lock != nullptr ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(*completed_file_operations.mutex);
 
         for (auto const &file_op : *completed_file_operations.container) {
-            std::tm tm_completion = make_tm(file_op.completion_time);
-
-            std::tm tm_undo = make_tm(file_op.undo_time);
-
             out
-                << std::put_time(&tm_completion, "%Y-%m-%d %H:%M:%S") << ' '
-                << std::put_time(&tm_undo, "%Y-%m-%d %H:%M:%S") << ' '
+                << std::chrono::system_clock::to_time_t(file_op.completion_time) << ' '
+                << std::chrono::system_clock::to_time_t(file_op.undo_time) << ' '
                 << u32(file_op.group_id) << ' '
                 << char(file_op.op_type) << ' '
                 << s32(file_op.obj_type) << ' '
@@ -448,7 +444,7 @@ u64 deselect_all(std::deque<completed_file_operation> &completed_operations) noe
     return num_deselected;
 }
 
-void swan_windows::render_file_operations(bool &open) noexcept
+void swan_windows::render_file_operations(bool &open, bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::file_operations), &open)) {
         imgui::End();
@@ -461,12 +457,11 @@ void swan_windows::render_file_operations(bool &open) noexcept
 
     auto &io = imgui::GetIO();
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
-    bool any_popup_modals_open = global_state::popup_modals_are_any_open();
     auto completed_file_operations = global_state::completed_file_operations_get();
     bool settings_change = false;
 
     // handle keybind actions
-    if (!any_popup_modals_open && window_hovered) {
+    if (!any_popups_open && window_hovered) {
         if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
             std::scoped_lock lock(*completed_file_operations.mutex);
             deselect_all(*completed_file_operations.container);

@@ -6,7 +6,7 @@
 static swan_settings g_settings = {};
 swan_settings &global_state::settings() noexcept { return g_settings; }
 
-void swan_windows::render_settings(GLFWwindow *window, bool &open) noexcept
+void swan_windows::render_settings(GLFWwindow *window, bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
     static bool s_regular_change = false;
     static bool s_overridden = false;

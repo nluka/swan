@@ -1014,11 +1014,9 @@ bool explorer_window::save_to_disk() const noexcept
             out << "wd_history.size() "                 << wd_history.size() << '\n';
 
             for (auto const &item : wd_history) {
-                std::tm tm = make_tm(item.time_departed);
-
                 out << path_length(item.path) << ' ';
                 out << item.path.data() << ' ';
-                out << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << ' ';
+                out << std::chrono::system_clock::to_time_t(item.time_departed) << ' ';
                 out << item.called_from.size() << ' ' << item.called_from.c_str();
                 out << '\n';
             }
@@ -1692,6 +1690,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
 
     SCOPE_EXIT { imgui::EndPopup(); };
 
+    imgui::AlignTextToFramePadding();
     imgui::TextUnformatted("History");
 
     imgui::SameLine();
@@ -1699,7 +1698,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
     {
         imgui::ScopedDisable d(expl.wd_history.empty());
 
-        if (imgui::SmallButton("Clear")) {
+        if (imgui::Button(ICON_CI_CLEAR_ALL "## explorer_window History")) {
             expl.wd_history.clear();
             expl.wd_history_pos = 0;
 
@@ -1710,6 +1709,9 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
             expl.save_to_disk();
             cleanup_and_close_popup();
         }
+    }
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("Clear history");
     }
 
     imgui::Separator();
@@ -1738,7 +1740,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
 
                 imgui::TableNextColumn();
                 {
-                    auto label = make_str_static<1200>("%s ##%zu", hist_item.path.data(), i);
+                    auto label = make_str_static<1200>("%s ## %zu", hist_item.path.data(), i);
                     bool pressed;
                     {
                         imgui::ScopedTextColor tc(directory_color());
@@ -1771,7 +1773,10 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
         }
     }
 
-    if (imgui::IsMouseClicked(ImGuiMouseButton_Left) && !imgui::IsWindowHovered()) {
+    ImVec2 popup_pos = imgui::GetWindowPos();
+    ImRect popup_rect(popup_pos, ImVec2(popup_pos.x + imgui::GetWindowWidth(), popup_pos.y + imgui::GetWindowHeight()));
+
+    if (imgui::IsWindowFocused() && imgui::IsMouseClicked(ImGuiMouseButton_Left) && !imgui::IsMouseHoveringRect(popup_rect.Min, popup_rect.Max)) {
         cleanup_and_close_popup();
     }
 
@@ -2451,7 +2456,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
     return retval;
 }
 
-void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_window &finder) noexcept
+void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_window &finder, bool any_popups_open) noexcept
 {
     ImVec4 window_bg_color = imgui::GetStyle().Colors[ImGuiCol_WindowBg];
     if (expl.highlight) {
@@ -2482,7 +2487,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     bool open_bulk_rename_popup = false;
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
     bool window_focused = imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
-    bool any_popups_open = global_state::popup_modals_are_any_open() || imgui::IsPopupOpen("History");
 
     static explorer_window::dirent const *s_dirent_to_be_renamed = nullptr;
 
@@ -3937,7 +3941,8 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
     return retval;
 }
 
-explorer_window::cwd_entries_column_sort_specs_t explorer_window::copy_column_sort_specs(ImGuiTableSortSpecs const *table_sort_specs) noexcept
+explorer_window::cwd_entries_column_sort_specs_t
+explorer_window::copy_column_sort_specs(ImGuiTableSortSpecs const *table_sort_specs) noexcept
 {
     assert(table_sort_specs != nullptr);
 

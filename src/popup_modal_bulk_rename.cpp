@@ -16,7 +16,6 @@ void swan_popup_modals::open_bulk_rename(explorer_window &expl_opened_from, std:
     using namespace bulk_rename_modal_global_state;
 
     g_open = true;
-    bit_set(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_bulk_rename);
 
     g_initiating_expl_selected_dirents.clear();
     for (auto const &dirent : expl_opened_from.cwd_entries) {
@@ -29,13 +28,6 @@ void swan_popup_modals::open_bulk_rename(explorer_window &expl_opened_from, std:
     g_initiating_expl = &expl_opened_from;
 
     g_on_rename_callback = on_rename_callback;
-}
-
-bool swan_popup_modals::is_open_bulk_rename() noexcept
-{
-    using namespace bulk_rename_modal_global_state;
-
-    return g_open;
 }
 
 static
@@ -168,8 +160,6 @@ void swan_popup_modals::render_bulk_rename() noexcept
         s_collisions_us = {};
 
         g_open = false;
-        bit_clear(global_state::popup_modals_open_bit_field(), swan_popup_modals::bit_pos_bulk_rename);
-
         g_initiating_expl = nullptr;
         g_initiating_expl_selected_dirents.clear();
         g_on_rename_callback = {};

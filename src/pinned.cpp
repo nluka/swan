@@ -22,7 +22,11 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
     }
 }
 
-void swan_windows::render_pinned([[maybe_unused]] std::array<explorer_window, global_constants::num_explorers> &explorers, bool &open) noexcept
+void swan_windows::render_pinned(
+    [[maybe_unused]] std::array<explorer_window,
+    global_constants::num_explorers> &explorers,
+    bool &open,
+    [[maybe_unused]] bool any_popups_open) noexcept
 {
     if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &open)) {
         if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
