@@ -96,8 +96,15 @@ namespace ImGui
 
     struct ScopedColor
     {
-        ScopedColor(ImGuiCol which, ImVec4 const &color) noexcept { ImGui::PushStyleColor(which, color); }
-        ~ScopedColor()                                   noexcept { ImGui::PopStyleColor(); }
+        bool m_condition;
+        ScopedColor(ImGuiCol which, ImVec4 const &color, bool condition = true) noexcept
+            : m_condition(condition)
+        {
+            if (m_condition)
+                ImGui::PushStyleColor(which, color);
+        }
+
+        ~ScopedColor() noexcept { if (m_condition) ImGui::PopStyleColor(); }
     };
 
     template <typename Ty>

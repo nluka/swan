@@ -262,35 +262,16 @@ swan_path path_squish_adjacent_separators(swan_path const &path) noexcept
 
 swan_path path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf8) noexcept
 {
-    auto segments = std::string_view(path_utf8) | std::ranges::views::split(dir_sep_utf8);
+    swan_path retval;
 
-    char subpath_utf8[2048] = {};
-
-    char dir_sep_utf8_[] = { dir_sep_utf8, '\0' };
-
-    swan_path retval = path_create("");
-
-    for (auto const &seg : segments) {
-        (void) strncat(subpath_utf8, seg.data(), seg.size());
-        (void) strcat(subpath_utf8, dir_sep_utf8_);
-
-        wchar_t subpath_utf16[MAX_PATH];
-
-        if (utf8_to_utf16(subpath_utf8, subpath_utf16, lengthof(subpath_utf16))) {
-            WIN32_FIND_DATAW find_data;
-            HANDLE find_handle = FindFirstFileW(subpath_utf16, &find_data);
-            SCOPE_EXIT { FindClose(find_handle); };
-
-            char file_name_utf8[MAX_PATH * 2];
-
-            if (utf16_to_utf8(find_data.cFileName, file_name_utf8, lengthof(file_name_utf8))) {
-                bool app_success = path_append(retval, file_name_utf8, dir_sep_utf8, true);
-
-                if (!app_success) {
-                    return path_create("");
-                }
-            }
-        }
+    try {
+        std::filesystem::path fs_path(path_utf8);
+        std::filesystem::path canonical_path = std::filesystem::canonical(fs_path);
+        std::string canonical_string = canonical_path.string();
+        retval = path_create(canonical_string.c_str());
+    }
+    catch (...) {
+        retval = path_create(path_utf8);
     }
 
     return retval;

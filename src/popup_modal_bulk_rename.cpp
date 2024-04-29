@@ -103,10 +103,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
 {
     using namespace bulk_rename_modal_global_state;
 
-    center_window_and_set_size_when_appearing(800, 600);
-
     if (g_open) {
         imgui::OpenPopup(swan_popup_modals::label_bulk_rename);
+        center_window_and_set_size_when_appearing(800, 600);
     }
     if (!imgui::BeginPopupModal(swan_popup_modals::label_bulk_rename, nullptr)) {
         return;

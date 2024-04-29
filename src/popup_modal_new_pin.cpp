@@ -22,18 +22,20 @@ void swan_popup_modals::render_new_pin() noexcept
 {
     using namespace new_pin_modal_global_state;
 
-    center_window_and_set_size_when_appearing(600, 180);
-
     if (g_open) {
         imgui::OpenPopup(swan_popup_modals::label_new_pin);
+        ImVec2 glyph_size = imgui::CalcTextSize("X");
+        auto const &style = imgui::GetStyle();
+        f32 window_height = glyph_size.y*4 + style.FramePadding.y*8 + style.WindowPadding.y*2 + style.ItemSpacing.y*2;
+        center_window_and_set_size_when_appearing(800, window_height);
     }
-    if (!imgui::BeginPopupModal(swan_popup_modals::label_new_pin, nullptr)) {
+    if (!imgui::BeginPopupModal(swan_popup_modals::label_new_pin, nullptr, ImGuiWindowFlags_NoResize)) {
         return;
     }
 
     static char s_label_input[pinned_path::LABEL_MAX_LEN + 1] = {};
     static swan_path s_path_input = {};
-    static ImVec4 s_color_input = directory_color();
+    static ImVec4 s_color_input = imgui::GetStyleColorVec4(ImGuiCol_Text);
     static std::string s_err_msg = {};
 
     auto cleanup_and_close_popup = [&]() noexcept {
@@ -69,7 +71,7 @@ void swan_popup_modals::render_new_pin() noexcept
     {
         imgui::ScopedAvailWidth width(imgui::CalcTextSize(" 00/64").x);
 
-        if (imgui::InputTextWithHint("##pin_label", "Label...", s_label_input, lengthof(s_label_input))) {
+        if (imgui::InputTextWithHint("## pin_label", "Label...", s_label_input, lengthof(s_label_input))) {
             s_err_msg.clear();
         }
     }
@@ -80,16 +82,16 @@ void swan_popup_modals::render_new_pin() noexcept
         [[maybe_unused]] imgui::ScopedDisable disabled(!g_enable_path_text_input);
         [[maybe_unused]] imgui::ScopedAvailWidth width = {};
 
-        if (imgui::InputTextWithHint("##pin_path", "Path...", s_path_input.data(), s_path_input.size(),
+        if (imgui::InputTextWithHint("## pin_path", "Path...", s_path_input.data(), s_path_input.size(),
                                      ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_path_chars()))
         {
             s_err_msg.clear();
         }
     }
 
-    imgui::Spacing(1);
+    // imgui::Spacing();
 
-    if (imgui::Button("Create##pin") && !strempty(s_path_input.data()) && !strempty(s_label_input)) {
+    if (imgui::Button("Create" "## pin") && !strempty(s_path_input.data()) && !strempty(s_label_input)) {
         swan_path path = path_squish_adjacent_separators(s_path_input);
         path_force_separator(path, global_state::settings().dir_separator_utf8);
 
@@ -103,15 +105,18 @@ void swan_popup_modals::render_new_pin() noexcept
 
     imgui::SameLine();
 
-    if (imgui::Button("Cancel##pin")) {
+    if (imgui::Button("Cancel" "## pin")) {
         cleanup_and_close_popup();
     }
 
     imgui::SameLineSpaced(1);
 
-    imgui::ColorEdit4("Edit Color##pin", &s_color_input.x, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
-    imgui::SameLine();
-    imgui::TextColored(s_color_input, "Color");
+    {
+        imgui::ScopedDisable d(true);
+        imgui::ColorEdit4("Edit Color" "## pin", &s_color_input.x, ImGuiColorEditFlags_NoAlpha|ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_NoLabel);
+        imgui::SameLine();
+        imgui::TextColored(s_color_input, "Color");
+    }
 
     if (!s_err_msg.empty()) {
         imgui::TextColored(error_color(), "Error: %s", s_err_msg.c_str());

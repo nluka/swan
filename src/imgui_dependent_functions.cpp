@@ -86,15 +86,18 @@ ImVec4 get_color(basic_dirent::kind t) noexcept
 
 void center_window_and_set_size_when_appearing(f32 width, f32 height) noexcept
 {
+    f32 clamped_width = std::min(width, imgui::GetWindowViewport()->Size.x - 10.f);
+    f32 clamped_height = std::min(height, imgui::GetWindowViewport()->Size.y - 10.f);
+
     imgui::SetNextWindowPos(
         {
-            (f32(global_state::settings().window_w) / 2.f) - (width / 2.f),
-            (f32(global_state::settings().window_h) / 2.f) - (height / 2.f),
+            (f32(global_state::settings().window_w) / 2.f) - (clamped_width / 2.f),
+            (f32(global_state::settings().window_h) / 2.f) - (clamped_height / 2.f),
         },
         ImGuiCond_Appearing
     );
 
-    imgui::SetNextWindowSize({ width, height }, ImGuiCond_Appearing);
+    imgui::SetNextWindowSize({ clamped_width, clamped_height }, ImGuiCond_Appearing);
 }
 
 void serialize_ImGuiStyle_all_except_colors(ImGuiStyle const &style, std::string &out, serialize_ImGuiStyle_mode mode) noexcept

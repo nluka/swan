@@ -32,8 +32,16 @@ void swan_popup_modals::render_single_rename() noexcept
 {
     using namespace single_rename_modal_global_state;
 
+    auto const &style = imgui::GetStyle();
+    f32 stuff_on_the_right_width = imgui::CalcTextSize(ICON_CI_DEBUG_RESTART).x + style.FramePadding.x*2 + style.ItemSpacing.x*2 + imgui::CalcTextSize("(?)").x;
+
     if (g_open) {
         imgui::OpenPopup(swan_popup_modals::label_single_rename);
+        f32 initial_name_width = imgui::CalcTextSize(g_expl_dirent_to_rename->basic.path.data()).x;
+        f32 initial_name_width_plus_paddings = initial_name_width + stuff_on_the_right_width + style.WindowPadding.x*2 + style.FramePadding.x*2;
+        f32 window_width = initial_name_width_plus_paddings + imgui::CalcTextSize(" ").x*5;
+        window_width = std::max(window_width, 500.f);
+        center_window_and_set_size_when_appearing(window_width, 100);
     }
     if (!imgui::BeginPopupModal(swan_popup_modals::label_single_rename, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
@@ -144,7 +152,6 @@ void swan_popup_modals::render_single_rename() noexcept
         s_new_name_utf8 = g_expl_dirent_to_rename->basic.path;
     }
     {
-        auto style = imgui::GetStyle();
         imgui::ScopedAvailWidth w(imgui::CalcTextSize(ICON_CI_DEBUG_RESTART).x + style.FramePadding.x*2 + style.ItemSpacing.x*2 + imgui::CalcTextSize("(?)").x);
 
         if (imgui::InputTextWithHint(
