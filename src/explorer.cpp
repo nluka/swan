@@ -620,13 +620,8 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
 
     using dir_ent_t = explorer_window::dirent;
 
-    // move all filtered entries to the back of the vector
-    std::sort(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const &left, dir_ent_t const &right) noexcept {
-        return left.is_filtered_out < right.is_filtered_out;
-    });
-
-    auto first_filtered_dirent = std::find_if(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const &ent) noexcept {
-        return ent.is_filtered_out;
+    auto first_filtered_dirent = std::partition(cwd_entries.begin(), cwd_entries.end(), [](dir_ent_t const &dirent) noexcept {
+        return !dirent.is_filtered_out;
     });
 
     std::sort(cwd_entries.begin(), first_filtered_dirent, [&](dir_ent_t const &left, dir_ent_t const &right) noexcept -> bool {
@@ -1465,12 +1460,13 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
             // imgui::PlotHistogram("## occupancy", values, lengthof(values), 0, "", 0, 1, { 100, 200 });
 
             for (auto const &entity : occup) {
-                // if (entity.my_count > 0) {
-                    imgui::ScopedStyle<ImVec4> c(imgui::GetStyle().Colors[ImGuiCol_PlotHistogram], entity.type_color);
-                    imgui::ProgressBar(entity.fraction(), {});
-                    imgui::SameLineSpaced(1);
-                    imgui::Text("%s   %zu ", entity.type_name, entity.my_count);
+                // if (entity.my_count == 0) {
+                //    continue;
                 // }
+                imgui::ScopedStyle<ImVec4> c(imgui::GetStyle().Colors[ImGuiCol_PlotHistogram], entity.type_color);
+                imgui::ProgressBar(entity.fraction(), {});
+                imgui::SameLineSpaced(1);
+                imgui::Text("%s   %zu ", entity.type_name, entity.my_count);
             }
 
         #else
@@ -3597,10 +3593,11 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 if (dirent.basic.is_directory()) {
                     type_text = { "Directory" };
                 } else {
-                    bool has_dot_ch = std::strchr(dirent.basic.path.data(), '.');
-                    if (has_dot_ch) {
+                    if (std::strchr(dirent.basic.path.data(), '.')) {
                         char const *extension = cget_file_ext(dirent.basic.path.data());
                         type_text = get_type_text_for_extension(extension);
+                    } else {
+                        type_text = { "File" };
                     }
                 }
                 imgui::TextUnformatted(type_text.data());

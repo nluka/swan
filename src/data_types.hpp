@@ -559,11 +559,11 @@ struct recent_file
 {
     static u64 const ACTION_MAX_LEN = 64;
 
-    boost::static_string<ACTION_MAX_LEN> action;
-    system_time_point_t action_time;
-    swan_path path;
-    bool selected;
-    bool context_menu_active;
+    boost::static_string<ACTION_MAX_LEN> action = {};
+    system_time_point_t action_time = {};
+    swan_path path = {};
+    bool selected = false;
+    bool context_menu_active = false;
 };
 
 struct bulk_rename_compiled_pattern

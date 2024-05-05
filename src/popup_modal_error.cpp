@@ -49,7 +49,6 @@ void swan_popup_modals::render_error() noexcept
 {
     using namespace error_modal_global_state;
 
-
     if (g_open) {
         imgui::OpenPopup(swan_popup_modals::label_error);
         center_window_and_set_size_when_appearing(800, 400);
