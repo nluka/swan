@@ -95,10 +95,11 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
     {
         auto completed_file_operations = global_state::completed_file_operations_get();
 
-        std::scoped_lock lock(*completed_file_operations.mutex);
-
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
+
+        std::scoped_lock lock(*completed_file_operations.mutex);
+
         completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::move,
                                                            src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
@@ -148,15 +149,77 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
         return S_OK;
     }
 
+    // (https://learn.microsoft.com/en-us/windows/win32/shell/manage#connected-files)
+    // IFileOperation does this really hideous thing where it implicitly deletes "connected files".
+    // Non issue if only one of file in the connected pair is being deleted in the IFileOperation.
+    // Issue if both files in the connected pair are being deleted in the IFileOperation, because PostDeleteItem is called twice
+    // for the same item if connected file/directory pair are queued for deletion in the same IFileOperation.
+    // We record any potential files/directories that could be affected by this behaviour into a std::set and
+    // only record a completed_file_operation if we have not seen the file/directory previously in the set.
+    {
+        if (attributes & SFGAO_FOLDER) { // directory
+            static char const *connected_files_directory_extensions[] = {
+                "_archivos",
+                "_arquivos",
+                "_bestanden",
+                "_bylos",
+                "-Dateien",
+                "_datoteke",
+                "_dosyalar",
+                "_elemei",
+                "_failid",
+                "_fails",
+                "_fajlovi",
+                "_ficheiros",
+                "_fichiers",
+                "-filer",
+                ".files",
+                "_files",
+                "_file",
+                "_fitxers",
+                "_fitxategiak",
+                "_pliki",
+                "_soubory",
+                "_tiedostot",
+            };
+
+            for (auto const &directory_extension : connected_files_directory_extensions) {
+                if (path_ends_with(deleted_item_path_utf8, directory_extension)) {
+                    auto [insert_iter, insert_took_place] = connected_files_candidates.emplace(deleted_item_path_utf8.data());
+
+                    if (!insert_took_place) {
+                        // directory already been deleted, don't register another completed_file_operation
+                        return S_OK;
+                    }
+
+                    break;
+                }
+            }
+        }
+        else { // file
+            char const *file_extension = cget_file_ext(deleted_item_path_utf8.data());
+
+            if (streq(file_extension, "htm") || streq(file_extension, "html")) {
+                auto [insert_iter, insert_took_place] = connected_files_candidates.emplace(deleted_item_path_utf8.data());
+
+                if (!insert_took_place) {
+                    // file already been deleted, don't falsely register another completed_file_operation
+                    return S_OK;
+                }
+            }
+        }
+    }
+
     {
         auto completed_file_operations = global_state::completed_file_operations_get();
 
-        std::scoped_lock lock(*completed_file_operations.mutex);
-
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
+
+        std::scoped_lock lock(*completed_file_operations.mutex);
+
         completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::del,
-                                                          deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
+            deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
     }
 
     print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
@@ -212,10 +275,11 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
     {
         auto completed_file_operations = global_state::completed_file_operations_get();
 
-        std::scoped_lock lock(*completed_file_operations.mutex);
-
         basic_dirent::kind obj_type = derive_obj_type(attributes);
         auto completion_time = current_time_system();
+
+        std::scoped_lock lock(*completed_file_operations.mutex);
+
         completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::copy,
                                                            src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }

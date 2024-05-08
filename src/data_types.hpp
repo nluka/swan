@@ -475,6 +475,7 @@ struct completed_file_operation
 
 struct explorer_file_op_progress_sink : public IFileOperationProgressSink
 {
+    std::set<std::string> connected_files_candidates;
     u32 group_id;
     s32 dst_expl_id;
     swan_path dst_expl_cwd_when_operation_started;
