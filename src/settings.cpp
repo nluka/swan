@@ -144,6 +144,7 @@ try {
 
     write_ImVec4("color.success", this->success_color);
     write_ImVec4("color.warning", this->warning_color);
+    write_ImVec4("color.warning_lite", this->warning_lite_color);
     write_ImVec4("color.error", this->error_color);
     write_ImVec4("color.directory", this->directory_color);
     write_ImVec4("color.file", this->file_color);
@@ -151,6 +152,7 @@ try {
 
     write_bool("check.success_color", this->check_success_color);
     write_bool("check.warning_color", this->check_warning_color);
+    write_bool("check.warning_lite_color", this->check_warning_lite_color);
     write_bool("check.error_color", this->check_error_color);
     write_bool("check.directory_color", this->check_directory_color);
     write_bool("check.file_color", this->check_file_color);
@@ -405,6 +407,9 @@ try {
             }
             else if (remainder == "warning") {
                 this->warning_color = extract_ImVec4();
+            }
+            else if (remainder == "warning_lite") {
+                this->warning_lite_color = extract_ImVec4();
             }
             else if (remainder == "error") {
                 this->error_color = extract_ImVec4();
@@ -940,6 +945,9 @@ try {
             }
             else if (remainder == "warning_color") {
                 this->check_warning_color = extract_bool();
+            }
+            else if (remainder == "warning_lite_color") {
+                this->check_warning_lite_color = extract_bool();
             }
             else if (remainder == "error_color") {
                 this->check_error_color = extract_bool();

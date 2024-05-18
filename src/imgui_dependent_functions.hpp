@@ -17,6 +17,7 @@ ImVec4 get_color(basic_dirent::kind t) noexcept;
 
 ImVec4 success_color() noexcept;
 ImVec4 warning_color() noexcept;
+ImVec4 warning_lite_color() noexcept;
 ImVec4 error_color() noexcept;
 ImVec4 directory_color() noexcept;
 ImVec4 symlink_color() noexcept;

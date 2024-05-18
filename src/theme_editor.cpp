@@ -21,9 +21,10 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
     bool ImGuiCol_checks_at_frame_start[ImGuiCol_COUNT] = {};
     bool swan_color_changed = false;
 
-    bool swan_color_checks_at_frame_start[6] = {
+    bool swan_color_checks_at_frame_start[7] = {
         global_state::settings().check_success_color,
         global_state::settings().check_warning_color,
+        global_state::settings().check_warning_lite_color,
         global_state::settings().check_error_color,
         global_state::settings().check_directory_color,
         global_state::settings().check_file_color,
@@ -150,12 +151,13 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
         };
 
         static swan_color_def s_swan_colors[] = {
-            { "Success",    &global_state::settings().success_color,    default_success_color,   &global_state::settings().check_success_color },
-            { "Warning",    &global_state::settings().warning_color,    default_warning_color,   &global_state::settings().check_warning_color },
-            { "Error",      &global_state::settings().error_color,      default_error_color,     &global_state::settings().check_error_color },
-            { "Directory",  &global_state::settings().directory_color,  default_directory_color, &global_state::settings().check_directory_color },
-            { "File",       &global_state::settings().file_color,       default_file_color,      &global_state::settings().check_file_color },
-            { "Symlink",    &global_state::settings().symlink_color,    default_symlink_color,   &global_state::settings().check_symlink_color },
+            { "Success",      &global_state::settings().success_color,      default_success_color,      &global_state::settings().check_success_color },
+            { "Warning",      &global_state::settings().warning_color,      default_warning_color,      &global_state::settings().check_warning_color },
+            { "Warning Lite", &global_state::settings().warning_lite_color, default_warning_lite_color, &global_state::settings().check_warning_lite_color },
+            { "Error",        &global_state::settings().error_color,        default_error_color,        &global_state::settings().check_error_color },
+            { "Directory",    &global_state::settings().directory_color,    default_directory_color,    &global_state::settings().check_directory_color },
+            { "File",         &global_state::settings().file_color,         default_file_color,         &global_state::settings().check_file_color },
+            { "Symlink",      &global_state::settings().symlink_color,      default_symlink_color,      &global_state::settings().check_symlink_color },
         };
 
     #if 1
@@ -179,6 +181,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                     /* confirmation_enabled = */ &(global_state::settings().confirm_theme_editor_color_reset)
                 );
             }
+            if (imgui::IsItemHovered()) {
+                imgui::SetTooltip("Reset all colors");
+            }
             imgui::SameLine();
             imgui::TextUnformatted("Colors");
 
@@ -198,7 +203,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 imgui::SetClipboardText(serialized.c_str());
             }
             if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Click to copy color style properties to clipboard, as C++ source code.");
+                imgui::SetTooltip("Copy colors as C++ source code");
             }
 
             imgui::SameLineSpaced(0);
@@ -210,7 +215,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 imgui::SetClipboardText(serialized.c_str());
             }
             if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Click to copy color style properties to clipboard, as [swan_settings.txt] compatible text.");
+                imgui::SetTooltip("Click styles as [swan_settings.txt] text");
             }
 
             imgui::Separator();
@@ -224,6 +229,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             if (imgui::Button(btn_label.data())) {
                                 *col_def.data = col_def.get_default_data();
                                 swan_color_changed = true;
+                            }
+                            if (imgui::IsItemHovered()) {
+                                imgui::SetTooltip("Reset color [%s]", col_def.label);
                             }
 
                             imgui::SameLine();
@@ -328,6 +336,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             if (imgui::Button(btn_label.data())) {
                                 *data = fallback_val;
                             }
+                            if (imgui::IsItemHovered()) {
+                                imgui::SetTooltip("Reset color [%s]", col_def.label);
+                            }
 
                             imgui::SameLine();
 
@@ -384,6 +395,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                     /* confirmation_enabled = */ &(global_state::settings().confirm_theme_editor_style_reset)
                 );
             }
+            if (imgui::IsItemHovered()) {
+                imgui::SetTooltip("Reset all styles");
+            }
             imgui::SameLine();
             imgui::TextUnformatted("Style");
 
@@ -403,7 +417,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 imgui::SetClipboardText(serialized.c_str());
             }
             if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Click to copy all non-color style properties to clipboard, as C++ source code.");
+                imgui::SetTooltip("Copy styles as C++ code");
             }
 
             imgui::SameLineSpaced(0);
@@ -415,7 +429,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 imgui::SetClipboardText(serialized.c_str());
             }
             if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Click to copy all non-color style properties to clipboard, as [swan_settings.txt] compatible text.");
+                imgui::SetTooltip("Copy styles as [swan_settings.txt] text");
             }
 
             imgui::Separator();
@@ -428,6 +442,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
                             if (imgui::Button(btn_label.data())) {
                                 val = fallback_val;
+                            }
+                            if (imgui::IsItemHovered()) {
+                                imgui::SetTooltip("Reset style [%s]", label);
                             }
 
                             imgui::SameLine();
@@ -452,6 +469,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             if (imgui::Button(btn_label.data())) {
                                 val = fallback_val;
                             }
+                            if (imgui::IsItemHovered()) {
+                                imgui::SetTooltip("Reset style [%s]", label);
+                            }
 
                             imgui::SameLine();
 
@@ -470,6 +490,9 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
                             if (imgui::Button(btn_label.data())) {
                                 val = fallback_val;
+                            }
+                            if (imgui::IsItemHovered()) {
+                                imgui::SetTooltip("Reset style [%s]", label);
                             }
 
                             imgui::SameLine();
@@ -564,8 +587,8 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
     static std::optional<precise_time_point_t> s_last_save_time = std::nullopt;
 
     auto const &ImGui_style_at_frame_end = style;
-     //! this is dodgy because padding bytes have undefined values. But I don't know of a compact way to do this comparison
-     //! because ImGuiStyle does not have any comparison operators
+    //! this is dodgy because padding bytes have undefined values. But I don't know of a compact way to do this comparison
+    //! because ImGuiStyle does not have any comparison operators
     bool ImGui_style_changed = memcmp(&ImGui_style_at_frame_start, &ImGui_style_at_frame_end, sizeof(ImGui_style_at_frame_start)) != 0;
 
     bool ImGuiCol_checks_at_frame_end[ImGuiCol_COUNT] = {};
@@ -575,6 +598,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
     bool swan_color_checks_at_frame_end[sizeof(swan_color_checks_at_frame_start)] = {
         global_state::settings().check_success_color,
         global_state::settings().check_warning_color,
+        global_state::settings().check_warning_lite_color,
         global_state::settings().check_error_color,
         global_state::settings().check_directory_color,
         global_state::settings().check_file_color,

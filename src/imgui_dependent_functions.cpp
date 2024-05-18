@@ -27,6 +27,7 @@ void render_frame(GLFWwindow *window) noexcept
 
 ImVec4 success_color() noexcept { return global_state::settings().success_color; }
 ImVec4 warning_color() noexcept { return global_state::settings().warning_color; }
+ImVec4 warning_lite_color() noexcept { return global_state::settings().warning_lite_color; }
 ImVec4 error_color() noexcept { return global_state::settings().error_color; }
 ImVec4 directory_color() noexcept { return get_color(basic_dirent::kind::directory); }
 ImVec4 symlink_color() noexcept { return get_color(basic_dirent::kind::symlink_ambiguous); }

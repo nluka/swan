@@ -19,6 +19,7 @@ typedef BS::thread_pool swan_thread_pool_t;
 
 inline ImVec4 default_success_color() noexcept { return ImVec4(0, 1, 0, 1); }
 inline ImVec4 default_warning_color() noexcept { return ImVec4(1, 0.5f, 0, 1); }
+inline ImVec4 default_warning_lite_color() noexcept { return ImVec4(1, 1, 0, 1); }
 inline ImVec4 default_error_color() noexcept { return ImVec4(1, 0, 0, 1); }
 inline ImVec4 default_directory_color() noexcept { return ImVec4(1, 1, 0, 1); }
 inline ImVec4 default_symlink_color() noexcept { return ImVec4(220/255.f, 189/255.f, 251/255.f, 1); }
@@ -144,6 +145,7 @@ struct swan_settings
 
     ImVec4 success_color = default_success_color();
     ImVec4 warning_color = default_warning_color();
+    ImVec4 warning_lite_color = default_warning_lite_color();
     ImVec4 error_color = default_error_color();
     ImVec4 directory_color = default_directory_color();
     ImVec4 file_color = default_file_color();
@@ -211,6 +213,7 @@ struct swan_settings
 
     bool check_success_color = false;
     bool check_warning_color = false;
+    bool check_warning_lite_color = false;
     bool check_error_color = false;
     bool check_directory_color = false;
     bool check_file_color = false;
