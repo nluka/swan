@@ -98,11 +98,12 @@ try {
     write_bool("unix_directory_separator", this->dir_separator_utf8 == '/');
 
     write_bool("show_debug_info", this->show_debug_info);
+    write_bool("file_extension_icons", this->file_extension_icons);
+    write_bool("tables_alt_row_bg", this->tables_alt_row_bg);
+    write_bool("table_borders_in_body", this->table_borders_in_body);
+
     write_bool("explorer_show_dotdot_dir", this->explorer_show_dotdot_dir);
-    write_bool("explorer_cwd_entries_table_alt_row_bg", this->explorer_cwd_entries_table_alt_row_bg);
-    write_bool("explorer_cwd_entries_table_borders_in_body", this->explorer_cwd_entries_table_borders_in_body);
     write_bool("explorer_clear_filter_on_cwd_change", this->explorer_clear_filter_on_cwd_change);
-    write_bool("explorer_file_extension_icons", this->explorer_file_extension_icons);
 
     write_bool("file_operations_src_path_full", this->file_operations_src_path_full);
     write_bool("file_operations_dst_path_full", this->file_operations_dst_path_full);
@@ -997,17 +998,17 @@ try {
             else if (property == "explorer_show_dotdot_dir") {
                 this->explorer_show_dotdot_dir = extract_bool();
             }
-            else if (property == "explorer_cwd_entries_table_alt_row_bg") {
-                this->explorer_cwd_entries_table_alt_row_bg = extract_bool();
+            else if (property == "tables_alt_row_bg") {
+                this->tables_alt_row_bg = extract_bool();
             }
-            else if (property == "explorer_cwd_entries_table_borders_in_body") {
-                this->explorer_cwd_entries_table_borders_in_body = extract_bool();
+            else if (property == "table_borders_in_body") {
+                this->table_borders_in_body = extract_bool();
             }
             else if (property == "explorer_clear_filter_on_cwd_change") {
                 this->explorer_clear_filter_on_cwd_change = extract_bool();
             }
-            else if (property == "explorer_file_extension_icons") {
-                this->explorer_file_extension_icons = extract_bool();
+            else if (property == "file_extension_icons") {
+                this->file_extension_icons = extract_bool();
             }
 
             else if (property == "file_operations_src_path_full") {

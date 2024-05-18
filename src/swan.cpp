@@ -614,6 +614,9 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
                 }
             }
 
+            setting_change |= imgui::MenuItem("File extension icons", nullptr, &global_state::settings().file_extension_icons);
+            setting_change |= imgui::MenuItem("Alternating table rows background", nullptr, &global_state::settings().tables_alt_row_bg);
+            setting_change |= imgui::MenuItem("Borders in table body", nullptr, &global_state::settings().table_borders_in_body);
             setting_change |= imgui::MenuItem("Show debug info", nullptr, &global_state::settings().show_debug_info);
 
             imgui::Separator();
@@ -628,7 +631,7 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
                     {
                         imgui::ScopedItemWidth w(imgui::CalcTextSize(labels[0]).x + 50);
                         imgui::ScopedStyle<ImVec2> p(imgui::GetStyle().FramePadding, { 6, 4 });
-                        setting_change |= imgui::Combo("##explorer_refresh_mode", (s32 *)&global_state::settings().explorer_refresh_mode, labels, (s32)lengthof(labels));
+                        setting_change |= imgui::Combo("## explorer_refresh_mode", (s32 *)&global_state::settings().explorer_refresh_mode, labels, (s32)lengthof(labels));
                     }
                     imgui::EndMenu();
                 }
@@ -641,9 +644,6 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
                 }
 
                 setting_change |= imgui::MenuItem("Clear filter on navigation", nullptr, &global_state::settings().explorer_clear_filter_on_cwd_change);
-                setting_change |= imgui::MenuItem("File extension icons", nullptr, &global_state::settings().explorer_file_extension_icons);
-                setting_change |= imgui::MenuItem("Alternating table rows", nullptr, &global_state::settings().explorer_cwd_entries_table_alt_row_bg);
-                setting_change |= imgui::MenuItem("Borders in table body", nullptr, &global_state::settings().explorer_cwd_entries_table_borders_in_body);
 
                 imgui::EndMenu();
             }

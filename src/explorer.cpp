@@ -1890,8 +1890,8 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         ImGuiTableFlags_BordersInnerV|
         ImGuiTableFlags_Reorderable|
         ImGuiTableFlags_Resizable|ImGuiTableFlags_BordersV|
-        (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)|
-        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
+        (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)|
+        (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
     ;
 
     if (imgui::BeginTable("drives", drive_table_col_id_count, table_flags)) {
@@ -2902,8 +2902,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 // ImGuiTableFlags_ScrollY| //! breaks scroll_to_nth_selected_entry_next_frame logic
                 ImGuiTableFlags_SortMulti|
                 // ImGuiTableFlags_SortTristate|
-                (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
-                (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
+                (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+                (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
             ;
 
             if (!expl.cwd_entries.empty() && cnt.filtered_dirents < expl.cwd_entries.size() && imgui::BeginTable("cwd_entries", explorer_window::cwd_entries_table_col_count, table_flags)) {
@@ -3283,7 +3283,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_path)) {
                 char const *icon = nullptr;
-                if (dirent.basic.is_file() && global_state::settings().explorer_file_extension_icons) {
+                if (dirent.basic.is_file() && global_state::settings().file_extension_icons) {
                     file_name_extension_splitter splitter(path);
                     icon = get_icon_for_extension(splitter.ext);
                 } else {

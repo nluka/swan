@@ -525,7 +525,8 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         ImGuiTableFlags_BordersV|
         ImGuiTableFlags_Reorderable|
         ImGuiTableFlags_ScrollY|
-        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
+        (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+        (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
     ;
 
     if (imgui::BeginTable("completed_file_operations_get", file_ops_table_col_count, table_flags)) {

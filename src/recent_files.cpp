@@ -230,7 +230,8 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         ImGuiTableFlags_Reorderable|
         ImGuiTableFlags_Resizable|
         ImGuiTableFlags_ScrollY|
-        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
+        (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+        (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
     ;
 
     std::optional<ImRect> file_name_rect = std::nullopt;
@@ -275,8 +276,14 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
 
             if (imgui::TableSetColumnIndex(recent_files_table_col_file_name)) {
                 {
-                    file_name_extension_splitter splitter(file_name);
-                    imgui::TextColored(get_color(basic_dirent::kind::file), get_icon_for_extension(splitter.ext));
+                    char const *icon = nullptr;
+                    if (global_state::settings().file_extension_icons) {
+                        file_name_extension_splitter splitter(file_name);
+                        icon = get_icon_for_extension(splitter.ext);
+                    } else {
+                        icon = get_icon(basic_dirent::kind::file);
+                    }
+                    imgui::TextColored(get_color(basic_dirent::kind::file), icon);
                 }
 
                 imgui::SameLine();

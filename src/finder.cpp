@@ -311,8 +311,8 @@ void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
         ImGuiTableFlags_Reorderable|
         ImGuiTableFlags_BordersV|
         ImGuiTableFlags_ScrollY|
-        (global_state::settings().explorer_cwd_entries_table_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
-        (global_state::settings().explorer_cwd_entries_table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
+        (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+        (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
     ;
 
     if (imgui::BeginChild("## finder matches child")) {
