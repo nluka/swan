@@ -82,10 +82,10 @@ struct swan_path final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
 struct basic_dirent
 {
     enum class kind : s8 {
-        nil,
+        nil = -1,
         directory,
-        file,
         symlink_to_directory,
+        file,
         symlink_to_file,
         symlink_ambiguous,
         invalid_symlink,
@@ -110,6 +110,9 @@ struct basic_dirent
     char const *kind_cstr() const noexcept;
     char const *kind_short_cstr() const noexcept;
     char const *kind_icon() const noexcept;
+
+    static bool is_symlink(kind t) noexcept;
+    static char const *kind_description(kind t) noexcept;
 };
 
 struct drive_info

@@ -23,6 +23,7 @@
 #include <future>
 #include <iostream>
 #include <mutex>
+#include <numbers>
 #include <numeric>
 #include <oleidl.h>
 #include <pathcch.h>
@@ -51,6 +52,7 @@
 #include "imgui/imgui_internal.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
+#include "imgui/imgui_stdlib.h"
 #include "imgui/font_awesome.h"
 #include "imgui/material_design.h"
 #include "imgui/codicons.h"

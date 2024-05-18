@@ -598,7 +598,7 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     imgui::SameLine();
 
                     auto when_undone_str = compute_when_str(file_op.undo_time, current_time_system());
-                    char const *verb = file_op.op_type == file_operation_type::del ? "Restored" : "Undone";
+                    char const *verb = ICON_CI_DEBUG_STEP_BACK;
                     imgui::Text("%s %s", verb, when_undone_str.data());
                 }
             }

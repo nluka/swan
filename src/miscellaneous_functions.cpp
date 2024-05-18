@@ -4,14 +4,23 @@
 #include "imgui_dependent_functions.hpp"
 #include "path.hpp"
 
+std::initializer_list<basic_dirent::kind> const symlink_types = {
+    basic_dirent::kind::symlink_to_directory,
+    basic_dirent::kind::symlink_to_file,
+    basic_dirent::kind::symlink_ambiguous,
+    basic_dirent::kind::invalid_symlink
+};
+
 bool basic_dirent::is_path_dotdot()          const noexcept { return path_equals_exactly(path, ".."); }
-bool basic_dirent::is_dotdot_dir()           const noexcept { return type == basic_dirent::kind::directory && path_equals_exactly(path, ".."); }
-bool basic_dirent::is_directory()            const noexcept { return type == basic_dirent::kind::directory; }
-bool basic_dirent::is_symlink()              const noexcept { return one_of(type, { kind::symlink_to_directory, kind::symlink_to_file, kind::invalid_symlink }); }
-bool basic_dirent::is_symlink_to_file()      const noexcept { return type == basic_dirent::kind::symlink_to_file; }
-bool basic_dirent::is_symlink_to_directory() const noexcept { return type == basic_dirent::kind::symlink_to_directory; }
-bool basic_dirent::is_symlink_ambiguous()    const noexcept { return type == basic_dirent::kind::symlink_ambiguous; }
-bool basic_dirent::is_file()                 const noexcept { return type == basic_dirent::kind::file; }
+bool basic_dirent::is_dotdot_dir()           const noexcept { return type == kind::directory && path_equals_exactly(path, ".."); }
+bool basic_dirent::is_directory()            const noexcept { return type == kind::directory; }
+bool basic_dirent::is_symlink()              const noexcept { return one_of(type, symlink_types); }
+bool basic_dirent::is_symlink_to_file()      const noexcept { return type == kind::symlink_to_file; }
+bool basic_dirent::is_symlink_to_directory() const noexcept { return type == kind::symlink_to_directory; }
+bool basic_dirent::is_symlink_ambiguous()    const noexcept { return type == kind::symlink_ambiguous; }
+bool basic_dirent::is_file()                 const noexcept { return type == kind::file; }
+
+bool basic_dirent::is_symlink(kind t) noexcept { return one_of(t, symlink_types); }
 
 char const *basic_dirent::kind_cstr() const noexcept
 {
@@ -24,6 +33,23 @@ char const *basic_dirent::kind_cstr() const noexcept
         case basic_dirent::kind::symlink_to_file:      return "symlink_to_file";
         case basic_dirent::kind::symlink_ambiguous:    return "symlink_ambiguous";
         case basic_dirent::kind::invalid_symlink:      return "invalid_symlink";
+        default: return "";
+    }
+}
+
+char const *basic_dirent::kind_description(basic_dirent::kind t) noexcept
+{
+    assert(t >= basic_dirent::kind::nil && t <= basic_dirent::kind::count);
+
+    switch (t) {
+        case basic_dirent::kind::nil:                  return "(Nil)";
+        case basic_dirent::kind::directory:            return "Directory";
+        case basic_dirent::kind::file:                 return "File";
+        case basic_dirent::kind::symlink_to_directory: return "Directory Link";
+        case basic_dirent::kind::symlink_to_file:      return "File Link";
+        case basic_dirent::kind::symlink_ambiguous:    return "Link";
+        case basic_dirent::kind::invalid_symlink:      return "Invalid Link";
+        case basic_dirent::kind::count:                return "(Count)";
         default: return "";
     }
 }

@@ -297,7 +297,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
                     HANDLE accessible = CreateFileW(
                         full_path_to_delete_utf16.c_str(),
                         FILE_LIST_DIRECTORY,
-                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
                         NULL,
                         OPEN_EXISTING,
                         FILE_FLAG_BACKUP_SEMANTICS,
@@ -640,15 +640,14 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
                 }
                 case explorer_window::cwd_entries_table_col_object: {
                     s32 precedence_table[(u64)basic_dirent::kind::count] = {
-                        4,  // nil
                         10, // directory
-                        8,  // file
                         9,  // symlink_to_directory
+                        8,  // file
                         7,  // symlink_to_file
                         6,  // symlink_ambiguous
                         5,  // invalid_symlink
                     };
-
+                    assert((s32)right.basic.type >= 0);
                     delta = precedence_table[(u64)left.basic.type] - precedence_table[(u64)right.basic.type];
                     break;
                 }
@@ -898,10 +897,9 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
             this->filter_error.clear();
 
             bool dirent_type_to_visibility_table[(u64)basic_dirent::kind::count] = {
-                false, // nil
                 this->filter_show_directories, // directory
-                this->filter_show_files, // file
                 this->filter_show_symlink_directories, // symlink_to_directory
+                this->filter_show_files, // file
                 this->filter_show_symlink_files, // symlink_to_file
                 true, // symlink_ambiguous
                 this->filter_show_invalid_symlinks // invalid_symlink
@@ -910,6 +908,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
             u64 filter_text_len = strlen(this->filter_text.data());
 
             for (auto &dirent : this->cwd_entries) {
+                assert((s32)dirent.basic.type != -1);
                 bool this_type_of_dirent_is_visible = dirent_type_to_visibility_table[(u64)dirent.basic.type];
 
                 dirent.is_filtered_out = !this_type_of_dirent_is_visible;
@@ -1717,7 +1716,11 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
     imgui::Separator();
 
     if (!expl.wd_history.empty()) {
-        ImGuiTableFlags table_flags = ImGuiTableFlags_SizingStretchProp|ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_Resizable;
+        ImGuiTableFlags table_flags =
+            ImGuiTableFlags_SizingStretchProp|
+            ImGuiTableFlags_BordersInnerV|
+            ImGuiTableFlags_Resizable
+        ;
 
     #if DEBUG_MODE
         s32 num_columns = 5;
@@ -2969,7 +2972,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             cwd_entries_table_max = imgui::GetItemRectMax();
         }
 
-        imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 0); // to remove spacing between end of table and "leftovers" rectangle
+        imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 0); // to remove spacing between end of table and footer
 
         imgui::EndChild();
 
@@ -2979,10 +2982,13 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     ImVec2 cwd_entries_child_min = imgui::GetItemRectMin();
     ImVec2 cwd_entries_child_max = imgui::GetItemRectMax();
 
-    ImVec2 leftovers_rect_min(cwd_entries_child_min.x, cwd_entries_table_max.y);
-    ImVec2 leftovers_rect_max = cwd_entries_child_max;
+    ImVec2 footer_rect_min(cwd_entries_child_min.x, cwd_entries_table_max.y);
+    ImVec2 footer_rect_max = cwd_entries_child_max;
 
-    if (!any_popups_open && imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max)) {
+    bool mouse_hovering_cwd_entries_child = imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max);
+    bool mouse_hovering_footer = imgui::IsMouseHoveringRect(footer_rect_min, footer_rect_max);
+
+    if (!any_popups_open && (mouse_hovering_cwd_entries_child || mouse_hovering_footer)) {
         auto handle_file_op_failure = [](char const *operation, generic_result const &result) noexcept {
             if (!result.success) {
                 u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
@@ -3058,7 +3064,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     #endif
     }
-    if (cwd_exists_after_edit && imgui::IsMouseClicked(ImGuiMouseButton_Right) && imgui::IsMouseHoveringRect(leftovers_rect_min, leftovers_rect_max)) {
+    if (cwd_exists_after_edit && imgui::IsMouseClicked(ImGuiMouseButton_Right) && mouse_hovering_footer) {
         imgui::OpenPopup("## cwd_entries_child_leftovers context_menu");
     }
     if (imgui::BeginPopup("## cwd_entries_child_leftovers context_menu")) {
@@ -3080,11 +3086,13 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     if (!drives_table_rendered) {
         render_footer(expl, cnt, style, cwd_exists_after_edit);
 
-        if (!path_is_empty(expl.cwd) && cwd_exists_after_edit) {
-            imgui::OpenPopupOnItemClick("##explorer_footer_context", ImGuiPopupFlags_MouseButtonRight);
-            if (!g_file_op_payload.items.empty() && imgui::BeginPopup("##explorer_footer_context")) {
+        if (!path_is_empty(expl.cwd) && cwd_exists_after_edit && !g_file_op_payload.items.empty()) {
+            imgui::OpenPopupOnItemClick("## explorer_footer_context", ImGuiPopupFlags_MouseButtonRight);
+
+            if (imgui::BeginPopup("## explorer_footer_context")) {
                 if (imgui::Selectable("Paste")) {
                     auto result = g_file_op_payload.execute(expl);
+                    // TODO: why is result unused?
                 }
                 imgui::EndPopup();
             }
@@ -3107,7 +3115,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             }
         });
     }
-
 
     imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Appearing);
     imgui::SetNextWindowSize(imgui::GetContentRegionAvail(), ImGuiCond_Appearing);

@@ -5529,6 +5529,12 @@ ImGuiID ImGui::GetItemID()
     return g.LastItemData.ID;
 }
 
+ImRect ImGui::GetItemRect()
+{
+    ImGuiContext& g = *GImGui;
+    return g.LastItemData.Rect;
+}
+
 ImVec2 ImGui::GetItemRectMin()
 {
     ImGuiContext& g = *GImGui;

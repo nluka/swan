@@ -528,8 +528,6 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcep
 
 void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept
 {
-    imgui::ScopedStyle<f32> s(ImGui::GetStyle().FramePadding.y, 10.0f);
-
     if (imgui::BeginMainMenuBar()) {
         bool setting_change = false;
         static_assert((false | false) == false);

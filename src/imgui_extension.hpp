@@ -21,7 +21,7 @@ namespace ImGui
 
     bool DrawBestLineBetweenRectCorners(ImRect const &rect1, ImRect const &rect2, ImVec4 const &color,
                                         bool draw_border_for_rect1 = false, bool draw_border_for_rect2 = false,
-                                        f32 circle_radius_target_corner = 0, f32 circle_radius_menu_TL = 0) noexcept;
+                                        f32 rect1_corner_circle_radius = 0, f32 rect2_corner_circle_radius = 0) noexcept;
 
     void Spacing(u64 n) noexcept;
 
@@ -53,14 +53,20 @@ namespace ImGui
 
     struct EnumButton
     {
-    public:
-        EnumButton(char const *name) noexcept : name(name) {}
-        bool Render(s32 &enum_value, s32 enum_first, s32 enum_count, char const *labels[], u64 num_labels) noexcept;
+        struct RenderResult
+        {
+            bool hovered;
+            bool activated;
+            bool right_clicked;
+        };
+
+        EnumButton(char const *id) noexcept : id(id) { assert(id != nullptr); }
+
+        RenderResult Render(s32 &enum_value, s32 enum_first, s32 enum_count, char const *labels[], u64 num_labels) noexcept;
+
     private:
-        char const *name = nullptr;
+        char const *id = nullptr;
         char const *current_label = nullptr;
-        u64 rand_1 = {};
-        u64 rand_2 = {};
     };
 
     std::pair<u64, u64> SelectRange(u64 prev_select_idx, u64 curr_select_idx) noexcept;
@@ -90,13 +96,22 @@ namespace ImGui
 
     struct ScopedTextColor
     {
-        ScopedTextColor(ImVec4 const &color) noexcept { ImGui::PushStyleColor(ImGuiCol_Text, color); }
-        ~ScopedTextColor()                   noexcept { ImGui::PopStyleColor(); }
+        bool m_condition;
+
+        ScopedTextColor(ImVec4 const &color, bool condition = true) noexcept
+            : m_condition(condition)
+        {
+            if (m_condition)
+                ImGui::PushStyleColor(ImGuiCol_Text, color);
+        }
+
+        ~ScopedTextColor() noexcept { if (m_condition) ImGui::PopStyleColor(); }
     };
 
     struct ScopedColor
     {
         bool m_condition;
+
         ScopedColor(ImGuiCol which, ImVec4 const &color, bool condition = true) noexcept
             : m_condition(condition)
         {

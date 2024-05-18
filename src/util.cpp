@@ -494,13 +494,21 @@ bool set_thread_priority(s32 priority_relative_to_normal) noexcept
     return result;
 }
 
+char const *ltrim(char const *s, std::initializer_list<char> const &chars) noexcept
+{
+    char const *retval = s;
+    while (one_of(*retval, chars)) {
+        ++retval;
+    }
+    return retval;
+}
+
 char *rtrim(char *szX) noexcept
 {
     auto i = (s64)strlen(szX);
-
-    while(szX[--i] == ' ')
+    while(szX[--i] == ' ') {
         szX[i] = '\0';
-
+    }
     return szX;
 }
 
@@ -596,4 +604,16 @@ system_time_point_t extract_system_time_from_istream(std::istream &in_stream) no
     in_stream >> time;
     system_time_point_t time_point = std::chrono::system_clock::from_time_t(time);
     return time_point;
+}
+
+// from https://stackoverflow.com/a/744822
+bool str_ends_with(const char *str, const char *suffix) noexcept
+{
+    if (!str || !suffix)
+        return 0;
+    size_t lenstr = strlen(str);
+    size_t lensuffix = strlen(suffix);
+    if (lensuffix >  lenstr)
+        return 0;
+    return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }

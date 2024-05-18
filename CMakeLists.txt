@@ -36,6 +36,7 @@ add_library(imgui STATIC
     src/imgui/imgui_impl_opengl3.cpp
     src/imgui/imgui_tables.cpp
     src/imgui/imgui_widgets.cpp
+    src/imgui/imgui_stdlib.cpp
 )
 set_property(TARGET imgui PROPERTY
     MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`

@@ -33,30 +33,28 @@ ImVec4 directory_color() noexcept { return get_color(basic_dirent::kind::directo
 ImVec4 symlink_color() noexcept { return get_color(basic_dirent::kind::symlink_ambiguous); }
 ImVec4 file_color() noexcept { return get_color(basic_dirent::kind::file); }
 
-bool imgui::EnumButton::Render(s32 &enum_value, s32 enum_first, s32 enum_count, char const *labels[], [[maybe_unused]] u64 num_labels) noexcept
+imgui::EnumButton::RenderResult
+imgui::EnumButton::Render(s32 &enum_value, s32 enum_first, s32 enum_count, char const *labels[], [[maybe_unused]] u64 num_labels) noexcept
 {
+    RenderResult retval = {};
+
     [[maybe_unused]] u64 num_enums = enum_count - enum_first;
     assert(num_enums > 1);
     assert(num_enums == num_labels);
 
     this->current_label = labels[enum_value];
 
-    if (this->name != nullptr && !strempty(this->name)) {
-        imgui::AlignTextToFramePadding();
-        imgui::TextUnformatted(this->name);
-        imgui::SameLine();
-    }
+    auto label = make_str_static<128>("%s" "## %s", this->current_label, this->id);
+    retval.activated = imgui::Button(label.data());
 
-    auto label = make_str_static<128>("%s##%zu-%zu", this->current_label, this->rand_1, this->rand_2);
-    bool activated = imgui::Button(label.data());
+    retval.hovered = imgui::IsItemHovered();
+    retval.right_clicked = imgui::IsItemClicked(ImGuiMouseButton_Right);
 
-    if (activated) {
+    if (retval.activated) {
         inc_or_wrap(enum_value, enum_first, enum_count - 1);
-        this->rand_1 = fast_rand(0, UINT32_MAX);
-        this->rand_2 = fast_rand(0, UINT32_MAX);
     }
 
-    return activated;
+    return retval;
 }
 
 s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept

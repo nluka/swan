@@ -61,6 +61,7 @@ bool streq(char const *s1, char const *s2) noexcept;
 bool strempty(char const *s) noexcept;
 
 bool str_starts_with(char const *str, char const *prefix) noexcept;
+bool str_ends_with(char const *str, char const *suffix) noexcept;
 
 u64 remove_adjacent_spaces(char *str, u64 len = 0) noexcept;
 
@@ -106,6 +107,7 @@ void init_empty_cstr(wchar_t *s) noexcept;
 
 bool set_thread_priority(s32 priority_relative_to_normal) noexcept;
 
+char const *ltrim(char const *s, std::initializer_list<char> const &chars) noexcept;
 char *rtrim(char *szX) noexcept;
 
 bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept;
@@ -173,4 +175,23 @@ template <typename Ty>
 void bit_clear(Ty &val, u64 bit_pos) noexcept
 {
     val = val & ~(u64(1) << bit_pos);
+}
+
+template <typename IntTy>
+constexpr
+u8 count_digits(IntTy n) noexcept
+{
+    // who knows, maybe there will be 128 or 256 bit integers in the future...
+    static_assert(sizeof(IntTy) <= 8);
+
+    if (n == 0)
+        return 1;
+
+    u8 count = 0;
+    while (n != 0) {
+        n = n / 10;
+        ++count;
+    }
+
+    return count;
 }

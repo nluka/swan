@@ -7,7 +7,12 @@ swan_path path_create(char const *data, u64 count) noexcept
 
 #if DEBUG_MODE
     assert(data != nullptr);
-    assert(strlen(data) < p.max_size());
+
+    if (count != u64(-1)) {
+        assert(count < p.max_size()); // leave one for NUL
+    } else {
+        assert(strlen(data) < p.max_size());
+    }
 #endif
 
     strncpy(p.data(), data, std::min(count, p.max_size() - 1));
