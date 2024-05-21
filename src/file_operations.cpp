@@ -772,8 +772,8 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     }
                     if (disabled) {
                         imgui::SameLine();
-                        imgui::TextDisabled("(?)");
-                        if (imgui::IsItemHovered()) {
+                        auto help = render_help_indicator(false);
+                        if (help.hovered) {
                             imgui::SetTooltip("Not implemented.");
                             // if (context_target.group_id == 0) {
                             //     imgui::SetTooltip("Target has no group");
@@ -795,8 +795,8 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     }
                     if (disabled) {
                         imgui::SameLine();
-                        imgui::TextDisabled("(?)");
-                        if (imgui::IsItemHovered()) {
+                        auto help = render_help_indicator(false);
+                        if (help.hovered) {
                             imgui::SetTooltip("Not implemented.");
                         }
                     }
@@ -1016,8 +1016,8 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     }
                     if (disabled) {
                         imgui::SameLine();
-                        imgui::TextDisabled("(?)");
-                        if (imgui::IsItemHovered()) {
+                        auto help = render_help_indicator(false);
+                        if (help.hovered) {
                             imgui::SetTooltip("Select at least one record.");
                         }
                     }

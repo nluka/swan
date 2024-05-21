@@ -113,7 +113,7 @@ void swan_popup_modals::render_new_file() noexcept
 
     imgui::SetKeyboardFocusHere(0);
     {
-        imgui::ScopedAvailWidth w(imgui::CalcTextSize("(?)").x + imgui::GetStyle().ItemSpacing.x);
+        imgui::ScopedAvailWidth w(help_indicator_size().x + imgui::GetStyle().ItemSpacing.x);
 
         if (imgui::InputTextWithHint("##file_name_input", "File name", s_file_name_utf8.data(), s_file_name_utf8.max_size(),
                                      ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars()))
@@ -126,8 +126,8 @@ void swan_popup_modals::render_new_file() noexcept
     }
 
     imgui::SameLine();
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
+    auto help = render_help_indicator(true);
+    if (help.hovered) {
         imgui::SetTooltip("[Enter]   Create\n"
                           "[Escape]  Exit");
     }

@@ -126,8 +126,8 @@ void swan_windows::render_icon_library(bool &open, [[maybe_unused]] bool any_pop
 
     recompute_matches |= imgui::Checkbox("Prioritize Sub Words", &s_prioritize_sub_word_matching);
     imgui::SameLine();
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
+    auto help = render_help_indicator(true);
+    if (help.hovered) {
         imgui::SetTooltip("When enabled, icon names with exact word matches will appear first,\n"
                           "icon names that don't have a matching word will appear as the second partition.\n"
                           "Levenshtein edit distance is used to sort the two partitions.\n"

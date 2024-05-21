@@ -171,8 +171,8 @@ void swan_popup_modals::render_bulk_rename() noexcept
     imgui::AlignTextToFramePadding();
     imgui::TextUnformatted("Pattern");
     imgui::SameLine();
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+    auto help = render_help_indicator(true);
+    if (help.hovered && ImGui::BeginTooltip()) {
         char const *tooltip =
             "Interpolate the pattern with:\n"
             "\n"
@@ -184,7 +184,6 @@ void swan_popup_modals::render_bulk_rename() noexcept
             "<counter>   Uses start and step inputs            \n"
             "<bytes>     File size in bytes                    \n"
         ;
-
         ImGui::TextUnformatted(tooltip);
         ImGui::EndTooltip();
     }

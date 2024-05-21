@@ -860,6 +860,8 @@ void render_ntest_output_window([[maybe_unused]] swan_path const &output_directo
         }
 
         imgui::TextColored(error_color(), "%zu assertions failed.", g_failed_assertions.size());
+        imgui::SameLine();
+        imgui::TextDisabled("Double click Line to open in VSCode.");
 
         imgui::Separator();
 
@@ -900,7 +902,7 @@ void render_ntest_output_window([[maybe_unused]] swan_path const &output_directo
 
                     imgui::TableNextColumn();
                     if (path_is_empty(a.expected_path) || path_is_empty(a.actual_path)) {
-                        imgui::TextUnformatted("--");
+                        imgui::TextDisabled("N/A");
                     } else {
                         auto label = make_str_static<256>("Open" "## %zu", i);
 

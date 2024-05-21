@@ -13,6 +13,10 @@ namespace ImGui
 
     ImU32 ImVec4_to_ImU32(ImVec4 vec, bool attempt_denormalization = false) noexcept;
 
+    ImVec4 Denormalize(ImVec4 vec) noexcept;
+
+    ImVec4 ReduceAlphaTo(ImVec4 vec, f32 new_alpha) noexcept;
+
     f32 CalcLineLength(ImVec2 const &p1, ImVec2 const &p2) noexcept;
 
     [[deprecated( "Prefer DrawBestLineBetweenRectCorners" )]]

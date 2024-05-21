@@ -357,7 +357,8 @@ void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
                     ImVec2 path_text_rect_min = imgui::GetCursorScreenPos();
                     char const *file_name = cget_file_name(m.basic.path.data());
                     imgui::TextUnformatted(file_name);
-                    imgui::HighlightTextRegion(path_text_rect_min, file_name, m.highlight_start_idx, m.highlight_len, ImVec4(255, 100, 0, 60));
+                    imgui::HighlightTextRegion(path_text_rect_min, file_name, m.highlight_start_idx, m.highlight_len,
+                                               imgui::ReduceAlphaTo(imgui::Denormalize(warning_lite_color()), 75));
 
                     f32 offset_for_icon = imgui::CalcTextSize(icon).x + imgui::GetStyle().ItemSpacing.x;
 

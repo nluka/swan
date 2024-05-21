@@ -1887,9 +1887,10 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
 
     s32 table_flags =
         ImGuiTableFlags_SizingStretchSame|
+        ImGuiTableFlags_BordersV|
         ImGuiTableFlags_BordersInnerV|
         ImGuiTableFlags_Reorderable|
-        ImGuiTableFlags_Resizable|ImGuiTableFlags_BordersV|
+        ImGuiTableFlags_Resizable|
         (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)|
         (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
     ;
@@ -1913,10 +1914,9 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
 
             if (imgui::TableSetColumnIndex(drive_table_col_id_name)) {
                 bool selected = false;
+                char const *label = strempty(drive.name_utf8) ? "Local Disk" : drive.name_utf8;
 
-                if (imgui::Selectable(drive.name_utf8[0] == '\0' ? "Local Disk" : drive.name_utf8,
-                                        &selected, ImGuiSelectableFlags_SpanAllColumns))
-                {
+                if (imgui::Selectable(label, &selected, ImGuiSelectableFlags_SpanAllColumns)) {
                     char root[] = { drive.letter, ':', dir_sep_utf8, '\0' };
                     expl.cwd = expl.latest_valid_cwd = path_create(root);
                     expl.set_latest_valid_cwd(expl.cwd);
@@ -2309,84 +2309,155 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
 static
 void render_help_icon() noexcept
 {
-    imgui::AlignTextToFramePadding();
-    imgui::TextUnformatted("(?)");
+    auto help = render_help_indicator(true);
 
-    if (imgui::IsItemHovered()) {
-        if (imgui::BeginTooltip()) {
-            imgui::ScopedStyle<ImVec2> s(imgui::GetStyle().CellPadding, { 15.f, 6.f });
+    if (help.hovered && !imgui::IsPopupOpen("## explorer help")) {
+        imgui::SetTooltip("Click to see [Explorer] help");
+    }
+    if (help.clicked) {
+        imgui::OpenPopup("## explorer help");
+    }
 
-            if (imgui::BeginTable("help_icon_table", 3, ImGuiTableFlags_SizingFixedFit)) {
-                struct tooltip_table_row
-                {
-                    char const *keybind = nullptr;
-                    char const *action = nullptr;
-                    char const *description = nullptr;
+    if (imgui::BeginPopup("## explorer help")) {
+        static std::string s_search_input = {};
+
+        imgui::AlignTextToFramePadding();
+        imgui::TextUnformatted("[Explorer] Help");
+        imgui::SameLineSpaced(1);
+        bool search_edited = imgui::InputTextWithHint("## explorer help search", ICON_CI_SEARCH, &s_search_input);
+
+        imgui::Separator();
+        imgui::Spacing();
+
+        ImGuiTableFlags table_flags =
+            ImGuiTableFlags_SizingFixedFit|
+            ImGuiTableFlags_BordersV|
+            (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+            (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
+        ;
+
+        if (imgui::BeginTable("help_icon_table", 3, table_flags)) {
+            struct keybind_cell
+            {
+                char const *const content = nullptr;
+                u64 highlight_start_idx = 0;
+                u64 highlight_len = 0;
+            };
+            struct keybind_row
+            {
+                keybind_cell keybind;
+                keybind_cell action;
+                keybind_cell description;
+            };
+            static keybind_row s_table_row_data[] = {
+                { {"Ctrl F"}, {"Filter"}, {"Toggle controls to filter (hide/find) entries in the current working directory."} },
+                { {"Ctrl Shift F"}, {"Finder"}, {"Open current working directory in Finder."} },
+                { {"Ctrl Shift A F"}, {"Add to Finder"}, {"Add current working directory to Finder."} },
+                { {"Ctrl C"}, {"Copy selected entries to clipboard"}, {"Add copy operation to the clipboard for each selected entry in the current working directory."} },
+                { {"Ctrl X"}, {"Cut selected entries to clipboard"}, {"Add move operation to the clipboard for each selected entry in the current working directory."} },
+                { {"Ctrl V"}, {"Paste"}, {"Execute operations from the clipboard into the current working directory."} },
+                { {"Del"}, {"Delete selected entries"}, {"Initiate revertable delete operation for all selected entries in the current working directory, including filtered ones."} },
+                { {"Escape"}, {"Deselect all entries"}, {"Deselect all entries in the current working directory, including filtered ones."} },
+                { {"Ctrl A"}, {"Select all visible entries"}, {"Select all visible entries in the current working directory."} },
+                { {"Ctrl I"}, {"Invert selection"}, {"Invert selection state of all visible entries in the current working directory."} },
+                { {"Ctrl R, F2"}, {"Rename selected entries"}, {"Open bulk rename modal if multiple entries are selected, or the simpler single rename modal if only one entry is selected."} },
+                { {"Ctrl N F"}, {"New file"}, {"Open modal for creating a new empty file."} },
+                { {"Ctrl N D"}, {"New directory"}, {"Open modal for creating a new empty directory."} },
+                { {"Ctrl H"}, {"Open history"}, {"Open history modal where you can view and navigate to previous working directories."} },
+                { {"Ctrl P"}, {"Pin current working directory"}, {"Open modal to pin the current working directory, or modify the existing pin."} },
+                { {"Ctrl O"}, {"Open pins"}, {"Open modal where pinned directories can be accessed."} },
+            };
+
+            imgui::TableSetupColumn("KEYBIND", {}, {}, 0);
+            imgui::TableSetupColumn("ACTION", {}, {}, 1);
+            imgui::TableSetupColumn("DESCRIPTION", {}, {}, 2);
+            imgui::TableHeadersRow();
+
+            for (auto &table_row : s_table_row_data) {
+                imgui::TableNextRow();
+
+                auto render_cell = [search_edited](keybind_cell &cell) noexcept {
+                    if (search_edited) {
+                        char const *match = StrStrIA(cell.content, s_search_input.c_str());
+                        if (!match) {
+                            cell.highlight_start_idx = cell.highlight_len = 0;
+                        } else {
+                            cell.highlight_start_idx = std::distance(cell.content, match);
+                            cell.highlight_len = s_search_input.size();
+                        }
+                    }
+                    imgui::TableNextColumn();
+                    imgui::TextUnformatted(cell.content);
+                    if (cell.highlight_len > 0) {
+                        ImVec2 content_rect_TL = imgui::GetItemRectMin();
+                        imgui::HighlightTextRegion(content_rect_TL, cell.content, cell.highlight_start_idx, cell.highlight_len,
+                                                   imgui::ReduceAlphaTo(imgui::Denormalize(warning_lite_color()), 75));
+                    }
                 };
-
-                tooltip_table_row const table_row_data[] = {
-                    { "Ctrl F", "(F)ilter", "Toggle controls to filter (hide/find) entries in the current working directory." },
-                    { "Ctrl Shift F", "(F)inder", "Open current working directory in Finder." },
-                    { "Ctrl Shift A F", "(A)dd to (F)inder", "Add current working directory to Finder." },
-                    { "Ctrl C", "(C)opy selected entries to clipboard", "Add copy operation to the clipboard for each selected entry in the current working directory." },
-                    { "Ctrl X", "Cut selected entries to clipboard", "Add move operation to the clipboard for each selected entry in the current working directory." },
-                    { "Ctrl V", "Paste", "Execute file operations from the clipboard into the current working directory." },
-                    { "Del", "(Del)ete selected entries", "Initiate revertable delete operation for all selected entries in the current working directory, including filtered ones." },
-                    { "Escape", "Deselect all entries", "Deselect all entries in the current working directory, including filtered ones." },
-                    { "Ctrl A", "Select (a)ll visible entries", "Select all visible entries in the current working directory." },
-                    { "Ctrl I", "(I)nvert selection", "Invert selection state of all visible entries in the current working directory." },
-                    { "Ctrl R, F2", "(R)ename selected entries", "Open bulk rename modal if multiple entries are selected, or the simpler single rename modal if only one entry is selected." },
-                    { "Ctrl N F", "(N)ew (f)ile", "Open modal for creating a new empty file." },
-                    { "Ctrl N D", "(N)ew (d)irectory", "Open modal for creating a new empty directory." },
-                    { "Ctrl H", "Open (h)istory", "Open history modal where you can view and navigate to previous working directories." },
-                    { "Ctrl P", "(P)in current working directory", "Open modal to pin the current working directory, or modify the existing pin." },
-                    { "Ctrl O", "(O)pen pins", "Open modal where pinned directories can be accessed." },
-                };
-
-                imgui::TableSetupColumn("[Keybind]", {}, {}, 0);
-                imgui::TableSetupColumn("[Action]", {}, {}, 1);
-                imgui::TableSetupColumn("[Description]", {}, {}, 2);
-                imgui::TableHeadersRow();
-
-                for (auto const &table_row : table_row_data) {
-                    imgui::TableNextRow();
-
-                    imgui::TableNextColumn();
-                    imgui::Text(" %s", table_row.keybind);
-
-                    imgui::TableNextColumn();
-                    imgui::Text(" %s", table_row.action);
-
-                    imgui::TableNextColumn();
-                    imgui::Text(" %s ", table_row.description);
-                }
-
-                imgui::EndTable();
+                render_cell(table_row.keybind);
+                render_cell(table_row.action);
+                render_cell(table_row.description);
             }
 
-            imgui::Spacing();
-
-            imgui::TextUnformatted("[General navigation]");
-            imgui::TextUnformatted(" - Left click an entry to toggle it's selection state (all other entries will be deselected).");
-            imgui::TextUnformatted(" - Shift left click an entry to select a range starting from previously selected entry, or the first entry if none have been selected yet.");
-            imgui::TextUnformatted(" - Ctrl left click an entry to toggle it's selection state without altering other selections.");
-            imgui::TextUnformatted(" - Double left click a file to open it.");
-            imgui::TextUnformatted(" - Double left click a directory to enter it.");
-            imgui::TextUnformatted(" - Double left click a symlink to open or enter it.");
-            imgui::TextUnformatted(" - Right click an entry to open the context menu for selected entries, or the hovered entry if none are selected.");
-
-            imgui::Spacing();
-
-            imgui::TextUnformatted("[Terminology]");
-            imgui::TextUnformatted(" - Directory: Known as a folder in the Windows File Explorer. Contains other entries.");
-            imgui::TextUnformatted(" - File: Anything that isn't a directory or symlink. Contains data.");
-            imgui::TextUnformatted(" - Symlink: Known as a shortcut in the Windows File Explorer. Points to an entry, possibly in a different directory.");
-            imgui::TextUnformatted(" - Entry: Generic term for a directory, file, or symlink.");
-
-            imgui::Spacing();
-
-            imgui::EndTooltip();
+            imgui::EndTable();
         }
+
+        struct line
+        {
+            char const *const content = nullptr;
+            u64 highlight_start_idx = 0;
+            u64 highlight_len = 0;
+        };
+        auto render_line = [search_edited](line &l) noexcept {
+            if (search_edited) {
+                char const *match = StrStrIA(l.content, s_search_input.c_str());
+                if (!match) {
+                    l.highlight_start_idx = l.highlight_len = 0;
+                } else {
+                    l.highlight_start_idx = std::distance(l.content, match);
+                    l.highlight_len = s_search_input.size();
+                }
+            }
+
+            imgui::TextUnformatted(l.content);
+
+            if (l.highlight_len > 0) {
+                ImVec2 content_rect_TL = imgui::GetItemRectMin();
+                imgui::HighlightTextRegion(content_rect_TL, l.content, l.highlight_start_idx, l.highlight_len,
+                                           imgui::ReduceAlphaTo(imgui::Denormalize(warning_lite_color()), 75));
+            }
+        };
+
+        imgui::Spacing();
+        {
+            static line s_lines[] = {
+                {" - Left click an entry to toggle it's selection state (all other entries will be deselected)."},
+                {" - Shift left click an entry to select a range starting from previously selected entry, or the first entry if none have been selected yet."},
+                {" - Ctrl left click an entry to toggle it's selection state without altering other selections."},
+                {" - Double left click an entry to open it."},
+                {" - Right click an entry to open the context menu for selected entries, or the hovered entry if none are selected."},
+            };
+            imgui::TextUnformatted("[General navigation]");
+            for (auto &l : s_lines) {
+                render_line(l);
+            }
+        }
+        imgui::Spacing();
+        {
+            static line s_lines[] = {
+                {" - Entry: Generic term for a filesystem object - directory, file, or symlink."},
+                {" - Directory: Known as a folder in the Windows File Explorer. Contains other entries."},
+                {" - File: Anything that isn't a directory or symlink. Contains data."},
+                {" - Symlink: Known as a shortcut in the Windows File Explorer. Points to an entry, possibly in a different directory."},
+            };
+            imgui::TextUnformatted("[Terminology]");
+            for (auto &l : s_lines) {
+                render_line(l);
+            }
+        }
+        imgui::Spacing();
+
+        imgui::EndPopup();
     }
 }
 
@@ -2736,7 +2807,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         // imgui::SameLine();
 
-        f32 avail_width_subtract_amt = imgui::CalcTextSize("(?)").x + imgui::GetStyle().ItemSpacing.x; // for help icon
+        f32 avail_width_subtract_amt = help_indicator_size().x + imgui::GetStyle().ItemSpacing.x; // for help icon
         render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, avail_width_subtract_amt, cwd_exists_before_edit);
 
         imgui::SameLine();
@@ -3064,7 +3135,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     #endif
     }
-    if (cwd_exists_after_edit && imgui::IsMouseClicked(ImGuiMouseButton_Right) && mouse_hovering_footer) {
+    if (!any_popups_open && cwd_exists_after_edit && imgui::IsMouseClicked(ImGuiMouseButton_Right) && mouse_hovering_footer) {
         imgui::OpenPopup("## cwd_entries_child_leftovers context_menu");
     }
     if (imgui::BeginPopup("## cwd_entries_child_leftovers context_menu")) {
@@ -3457,7 +3528,8 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 }
 
                 if (dirent.highlight_len > 0) {
-                    imgui::HighlightTextRegion(path_text_rect_min, dirent.basic.path.data(), dirent.highlight_start_idx, dirent.highlight_len, ImVec4(255, 100, 0, 60));
+                    imgui::HighlightTextRegion(path_text_rect_min, dirent.basic.path.data(), dirent.highlight_start_idx, dirent.highlight_len,
+                                               imgui::ReduceAlphaTo(imgui::Denormalize(warning_lite_color()), 75));
                 }
 
                 if (dirent.basic.is_path_dotdot()) {

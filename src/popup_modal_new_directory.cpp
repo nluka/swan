@@ -102,7 +102,7 @@ void swan_popup_modals::render_new_directory() noexcept
 
     imgui::SetKeyboardFocusHere(0);
     {
-        imgui::ScopedAvailWidth w(imgui::CalcTextSize("(?)").x + imgui::GetStyle().ItemSpacing.x);
+        imgui::ScopedAvailWidth w(help_indicator_size().x + imgui::GetStyle().ItemSpacing.x);
 
         if (imgui::InputTextWithHint("##dir_name_input", "Directory name", s_dir_name_utf8.data(), s_dir_name_utf8.max_size(),
                                      ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_filename_chars()))
@@ -115,8 +115,8 @@ void swan_popup_modals::render_new_directory() noexcept
     }
 
     imgui::SameLine();
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
+    auto help = render_help_indicator(true);
+    if (help.hovered) {
         imgui::SetTooltip("[Enter]   Create\n"
                           "[Escape]  Exit");
     }

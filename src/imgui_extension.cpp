@@ -1,5 +1,6 @@
 #include "stdafx.hpp"
 #include "imgui_extension.hpp"
+#include "common_functions.hpp"
 
 namespace imgui_confirmation_global_state
 {
@@ -185,8 +186,8 @@ void imgui::RenderConfirmationModal() noexcept
 
         imgui::SameLine();
 
-        imgui::TextUnformatted("(?)");
-        if (imgui::IsItemHovered()) {
+        auto help = render_help_indicator(true);
+        if (help.hovered) {
             imgui::SetTooltip("[Enter]   Yes\n"
                               "[Escape]  No");
         }
@@ -440,10 +441,13 @@ ImVec4 imgui::RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept
     return ImVec4(newr, newg, newb, newa);
 }
 
+bool is_normalized(f32 channel) noexcept
+{
+    return channel >= 0.f && channel <= 1.f;
+}
+
 ImU32 imgui::ImVec4_to_ImU32(ImVec4 vec, bool attempt_denormalization) noexcept
 {
-    auto is_normalized = [&](f32 channel) noexcept { return channel >= 0.f && channel <= 1.f; };
-
     if (attempt_denormalization && is_normalized(vec.x) && is_normalized(vec.y) && is_normalized(vec.z) && is_normalized(vec.w)) {
         vec.x *= 255.f;
         vec.y *= 255.f;
@@ -453,6 +457,24 @@ ImU32 imgui::ImVec4_to_ImU32(ImVec4 vec, bool attempt_denormalization) noexcept
 
     ImU32 retval = IM_COL32(vec.x, vec.y, vec.z, vec.w);
     return retval;
+}
+
+ImVec4 imgui::Denormalize(ImVec4 vec) noexcept
+{
+    if (is_normalized(vec.x) && is_normalized(vec.y) && is_normalized(vec.z) && is_normalized(vec.w)) {
+        vec.x *= 255.f;
+        vec.y *= 255.f;
+        vec.z *= 255.f;
+        vec.w *= 255.f;
+    }
+
+    return vec;
+}
+
+ImVec4 imgui::ReduceAlphaTo(ImVec4 vec, f32 new_alpha) noexcept
+{
+    vec.w = new_alpha;
+    return vec;
 }
 
 std::pair<u64, u64> imgui::SelectRange(u64 prev_select_idx, u64 curr_select_idx) noexcept

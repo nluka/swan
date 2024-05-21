@@ -782,3 +782,21 @@ void render_path_with_stylish_separators(char const *path) noexcept
     }
     imgui::Button(s_segments.back());
 }
+
+// static char const *g_help_indicator = "(?)";
+static char const *g_help_indicator = ICON_FA_INFO_CIRCLE;
+
+help_indicator render_help_indicator(bool align_text_to_frame_padding) noexcept
+{
+    help_indicator retval = {};
+    if (align_text_to_frame_padding) imgui::AlignTextToFramePadding();
+    imgui::TextDisabled(g_help_indicator);
+    retval.hovered = imgui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+    retval.clicked = imgui::IsItemClicked();
+    return retval;
+}
+
+ImVec2 help_indicator_size() noexcept
+{
+    return imgui::CalcTextSize(g_help_indicator);
+}

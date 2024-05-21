@@ -473,8 +473,8 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 }
                 if (disabled) {
                     imgui::SameLine();
-                    imgui::TextDisabled("(?)");
-                    if (imgui::IsItemHovered()) {
+                    auto help = render_help_indicator(false);
+                    if (help.hovered) {
                         imgui::SetTooltip("Select at least one record.");
                     }
                 }
@@ -520,8 +520,8 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 }
                 if (disabled) {
                     imgui::SameLine();
-                    imgui::TextDisabled("(?)");
-                    if (imgui::IsItemHovered()) {
+                    auto help = render_help_indicator(false);
+                    if (help.hovered) {
                         imgui::SetTooltip("Select at least one record.");
                     }
                 }

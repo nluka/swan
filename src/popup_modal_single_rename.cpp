@@ -33,7 +33,7 @@ void swan_popup_modals::render_single_rename() noexcept
     using namespace single_rename_modal_global_state;
 
     auto const &style = imgui::GetStyle();
-    f32 stuff_on_the_right_width = imgui::CalcTextSize(ICON_CI_DEBUG_RESTART).x + style.FramePadding.x*2 + style.ItemSpacing.x*2 + imgui::CalcTextSize("(?)").x;
+    f32 stuff_on_the_right_width = imgui::CalcTextSize(ICON_CI_DEBUG_RESTART).x + style.FramePadding.x*2 + style.ItemSpacing.x*2 + help_indicator_size().x;
 
     if (g_open) {
         imgui::OpenPopup(swan_popup_modals::label_single_rename);
@@ -152,7 +152,7 @@ void swan_popup_modals::render_single_rename() noexcept
         s_new_name_utf8 = g_expl_dirent_to_rename->basic.path;
     }
     {
-        imgui::ScopedAvailWidth w(imgui::CalcTextSize(ICON_CI_DEBUG_RESTART).x + style.FramePadding.x*2 + style.ItemSpacing.x*2 + imgui::CalcTextSize("(?)").x);
+        imgui::ScopedAvailWidth w(imgui::CalcTextSize(ICON_CI_DEBUG_RESTART).x + style.FramePadding.x*2 + style.ItemSpacing.x*2 + help_indicator_size().x);
 
         if (imgui::InputTextWithHint(
             "##New name", "New name...", s_new_name_utf8.data(), s_new_name_utf8.size(),
@@ -180,8 +180,8 @@ void swan_popup_modals::render_single_rename() noexcept
 
     imgui::SameLine();
 
-    imgui::TextUnformatted("(?)");
-    if (imgui::IsItemHovered()) {
+    auto help = render_help_indicator(true);
+    if (help.hovered) {
         imgui::SetTooltip("[Enter]   Rename\n"
                           "[Escape]  Exit");
     }

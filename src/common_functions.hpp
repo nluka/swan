@@ -235,3 +235,12 @@ bulk_rename_find_collisions_result bulk_rename_find_collisions(
 
 std::optional<ntest::report_result> run_tests(std::filesystem::path const &output_path,
                                               void (*assertion_callback)(ntest::assertion const &, bool)) noexcept;
+
+struct help_indicator
+{
+    bool hovered;
+    bool clicked;
+};
+help_indicator render_help_indicator(bool align_text_to_frame_padding) noexcept;
+
+ImVec2 help_indicator_size() noexcept;
