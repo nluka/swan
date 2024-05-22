@@ -25,13 +25,27 @@ inline ImVec4 default_directory_color() noexcept { return ImVec4(1, 1, 0, 1); }
 inline ImVec4 default_symlink_color() noexcept { return ImVec4(220/255.f, 189/255.f, 251/255.f, 1); }
 inline ImVec4 default_file_color() noexcept { return ImVec4(0.85f, 1, 0.85f, 1); }
 
-/// Bundle of state for a "progressive" task - a cancellable async function.
-/// Provides a facility to safely query the result as the task progresses, and cancel the task.
+/// Bundle of state for an asynchronous "progressive" task.
+/// Provides a facility to cancel the task and safely query the result before completion (hence progressive).
+/// Use when you need to read the result in a partially completed state.
 template <typename Result>
 struct progressive_task
 {
     Result result = {};
     std::mutex result_mutex = {};
+    std::atomic_bool started = false;
+    std::atomic_bool active_token = false;
+    std::atomic_bool cancellation_token = false;
+};
+
+/// Bundle of state for an asynchronous task.
+/// Provides a facility to cancel the task, but does not provide a way to safely query the result before completion.
+/// Use when you DON'T need to read the result until the task is completed or cancelled.
+/// If you DO need to read the result in a partially completed state, use `progressive_task` instead.
+template <typename Result>
+struct async_task
+{
+    Result result = {};
     std::atomic_bool cancellation_token = false;
     std::atomic_bool active_token = false;
 };
@@ -365,6 +379,7 @@ struct explorer_window
     mutable u64 num_file_finds = 0;
     mutable f64 check_if_pinned_us = 0;
     mutable f64 unpin_us = 0;
+    mutable f64 update_cwd_entries_culmulative_us = 0;
 
     //? mutable because they are debug counters/timers
 
@@ -573,78 +588,40 @@ struct recent_file
     bool context_menu_active = false;
 };
 
-struct bulk_rename_compiled_pattern
+struct bulk_rename_transform
 {
-    struct op
-    {
-        enum class type : u8
-        {
-            insert_char,
-            insert_name,
-            insert_ext,
-            insert_dotext,
-            insert_size,
-            insert_counter,
-            insert_slice,
-        };
-
-        type kind;
-        char ch = 0;
-        bool explicit_first = false;
-        bool explicit_last = false;
-        u16 slice_first = 0;
-        u16 slice_last = UINT16_MAX;
-
-        bool operator!=(op const &other) const noexcept; // for ntest
-        friend std::ostream& operator<<(std::ostream &os, op const &r); // for ntest
+    enum class status : u8 {
+        error_name_empty,
+        execute_failed,
+        revert_failed,
+        ready,
+        execute_success,
+        revert_success,
+        name_unchanged,
+        count
     };
 
-    std::vector<op> ops;
-    bool squish_adjacent_spaces;
-};
+    std::string error = {};
+    precise_time_point_t last_updated_time = current_time_precise();
+    bool input_focused = false;
+    bool selected = false;
 
-struct bulk_rename_compile_pattern_result
-{
-    bool success;
-    bulk_rename_compiled_pattern compiled_pattern;
-    std::array<char, 256> error;
-};
-
-struct bulk_rename_transform_result
-{
-    bool success;
-    std::array<char, 256> error;
-};
-
-struct bulk_rename_op
-{
-    basic_dirent *before = nullptr;
+    std::atomic<status> stat;
+    basic_dirent::kind obj_type;
+    swan_path before;
     swan_path after;
-    std::atomic_char result = 0;
 
-    bulk_rename_op(basic_dirent *before, char const *after) noexcept;
+    bulk_rename_transform(basic_dirent const *before, char const *after) noexcept;
+    bulk_rename_transform(basic_dirent::kind obj_type, char const *before, char const *after) noexcept;
 
-    bulk_rename_op(bulk_rename_op const &other) noexcept; // for emplace_back
-    bulk_rename_op &operator=(bulk_rename_op const &other) noexcept; // for emplace_back
+    bulk_rename_transform(bulk_rename_transform const &other) noexcept; // for emplace_back
+    bulk_rename_transform &operator=(bulk_rename_transform const &other) noexcept; // for emplace_back
 
-    bool operator!=(bulk_rename_op const &other) const noexcept; // for ntest
-    friend std::ostream& operator<<(std::ostream &os, bulk_rename_op const &r); // for ntest
-};
+    bool operator!=(bulk_rename_transform const &other) const noexcept; // for ntest
+    friend std::ostream& operator<<(std::ostream &os, bulk_rename_transform const &r); // for ntest
 
-struct bulk_rename_collision
-{
-    basic_dirent *dest_dirent;
-    u64 first_rename_pair_idx;
-    u64 last_rename_pair_idx;
-
-    bool operator!=(bulk_rename_collision const &other) const noexcept; // for ntest
-    friend std::ostream& operator<<(std::ostream &os, bulk_rename_collision const &c); // for ntest
-};
-
-struct bulk_rename_find_collisions_result
-{
-    std::vector<bulk_rename_collision> collisions;
-    std::vector<bulk_rename_op> sorted_renames;
+    std::string execute(wchar_t const *working_directory, std::wstring &builder_before, std::wstring &builder_after) const noexcept;
+    std::string revert(wchar_t const *working_directory, std::wstring &builder_before, std::wstring &builder_after) const noexcept;
 };
 
 struct icon_font_glyph

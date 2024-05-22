@@ -14,6 +14,7 @@ void render_frame(GLFWwindow *window) noexcept;
 void center_window_and_set_size_when_appearing(f32 width, f32 height) noexcept;
 
 ImVec4 get_color(basic_dirent::kind t) noexcept;
+ImVec4 get_color(bulk_rename_transform::status s) noexcept;
 
 ImVec4 success_color() noexcept;
 ImVec4 warning_color() noexcept;

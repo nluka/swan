@@ -126,6 +126,19 @@ namespace ImGui
         ~ScopedColor() noexcept { if (m_condition) ImGui::PopStyleColor(); }
     };
 
+    struct ScopedItemFlag
+    {
+        bool m_condition;
+
+        ScopedItemFlag(ImGuiItemFlags const &flag, bool condition = true) noexcept
+            : m_condition(condition)
+        {
+            ImGui::PushItemFlag(flag, m_condition);
+        }
+
+        ~ScopedItemFlag() noexcept { if (m_condition) ImGui::PopItemFlag(); }
+    };
+
     template <typename Ty>
     struct ScopedStyle
     {

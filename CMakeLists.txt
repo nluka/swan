@@ -61,7 +61,6 @@ set_property(TARGET stb_image PROPERTY
 
 set(SWAN_SOURCES
     "src/libs/ntest.cpp"
-    "src/bulk_rename_logic.cpp"
     "src/debug_log.cpp"
     "src/explorer.cpp"
     "src/explorer_file_op_progress_sink.cpp"

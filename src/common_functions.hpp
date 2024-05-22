@@ -216,22 +216,11 @@ void perform_file_operations(
     bool *init_done,
     std::string *init_error) noexcept;
 
-bulk_rename_compile_pattern_result bulk_rename_compile_pattern(char const *pattern, bool squish_adjacent_spaces) noexcept;
-
-bulk_rename_transform_result bulk_rename_transform(
-    bulk_rename_compiled_pattern compiled_pattern,
-    swan_path &after,
-    char const *name,
-    char const *ext,
-    s32 counter,
-    u64 bytes) noexcept;
-
-void sort_renames_dup_elem_sequences_after_non_dups(std::vector<bulk_rename_op> &renames) noexcept;
-
-// Slow function which allocates & deallocates memory. Cache the result, don't call this function every frame.
-bulk_rename_find_collisions_result bulk_rename_find_collisions(
-    std::vector<explorer_window::dirent> &dest,
-    std::vector<bulk_rename_op> const &renames) noexcept;
+std::tuple<bool, std::string, u64> bulk_rename_parse_text_import(
+    char const *text,
+    std::vector<swan_path> &transforms_after,
+    u64 max_idx,
+    std::vector<std::string> &errors) noexcept;
 
 std::optional<ntest::report_result> run_tests(std::filesystem::path const &output_path,
                                               void (*assertion_callback)(ntest::assertion const &, bool)) noexcept;

@@ -13,7 +13,6 @@
 
 #include "libs/ntest.cpp"
 
-#include "bulk_rename_logic.cpp"
 #include "debug_log.cpp"
 #include "explorer.cpp"
 #include "explorer_file_op_progress_sink.cpp"

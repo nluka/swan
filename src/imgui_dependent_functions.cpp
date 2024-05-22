@@ -83,6 +83,20 @@ ImVec4 get_color(basic_dirent::kind t) noexcept
     }
 }
 
+ImVec4 get_color(bulk_rename_transform::status s) noexcept
+{
+    switch (s) {
+        case bulk_rename_transform::status::name_unchanged:   return imgui::GetStyle().Colors[ImGuiCol_TextDisabled];
+        case bulk_rename_transform::status::execute_failed:   return global_state::settings().error_color;
+        case bulk_rename_transform::status::revert_failed:    return global_state::settings().error_color;
+        case bulk_rename_transform::status::ready:            return global_state::settings().warning_lite_color;
+        case bulk_rename_transform::status::error_name_empty: return global_state::settings().error_color;
+        case bulk_rename_transform::status::execute_success:  return global_state::settings().success_color;
+        case bulk_rename_transform::status::revert_success:   return global_state::settings().success_color;
+        default:                                              return imgui::GetStyle().Colors[ImGuiCol_Text];
+    }
+}
+
 void center_window_and_set_size_when_appearing(f32 width, f32 height) noexcept
 {
     f32 clamped_width = std::min(width, imgui::GetWindowViewport()->Size.x - 10.f);
