@@ -10976,7 +10976,7 @@ void ImGui::ClosePopupToLevel(int remaining, bool restore_focus_to_window_under_
 }
 
 // Close the popup we have begin-ed into.
-void ImGui::CloseCurrentPopup()
+void ImGui::CloseCurrentPopup(bool restore_focus_to_window_under_popup)
 {
     ImGuiContext& g = *GImGui;
     int popup_idx = g.BeginPopupStack.Size - 1;
@@ -10997,7 +10997,7 @@ void ImGui::CloseCurrentPopup()
         popup_idx--;
     }
     IMGUI_DEBUG_LOG_POPUP("[popup] CloseCurrentPopup %d -> %d\n", g.BeginPopupStack.Size - 1, popup_idx);
-    ClosePopupToLevel(popup_idx, true);
+    ClosePopupToLevel(popup_idx, restore_focus_to_window_under_popup);
 
     // A common pattern is to close a popup when selecting a menu item/selectable that will open another window.
     // To improve this usage pattern, we avoid nav highlight for a single frame in the parent window.

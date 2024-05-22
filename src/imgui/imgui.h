@@ -708,7 +708,7 @@ namespace ImGui
     IMGUI_API void          OpenPopup(const char* str_id, ImGuiPopupFlags popup_flags = 0);                     // call to mark popup as open (don't call every frame!).
     IMGUI_API void          OpenPopup(ImGuiID id, ImGuiPopupFlags popup_flags = 0);                             // id overload to facilitate calling from nested stacks
     IMGUI_API void          OpenPopupOnItemClick(const char* str_id = NULL, ImGuiPopupFlags popup_flags = 1);   // helper to open popup when clicked on last item. Default to ImGuiPopupFlags_MouseButtonRight == 1. (note: actually triggers on the mouse _released_ event to be consistent with popup behaviors)
-    IMGUI_API void          CloseCurrentPopup();                                                                // manually close the popup we have begin-ed into.
+    IMGUI_API void          CloseCurrentPopup(bool restore_focus_to_window_under_popup = true);                 // manually close the popup we have begin-ed into.
 
     // Popups: open+begin combined functions helpers
     //  - Helpers to do OpenPopup+BeginPopup where the Open action is triggered by e.g. hovering an item and right-clicking.
