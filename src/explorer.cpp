@@ -697,6 +697,10 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
     std::string_view parent_dir,
     std::source_location sloc) noexcept
 {
+    f64 time_inside_func_us = 0;
+    SCOPE_EXIT { this->update_cwd_entries_culmulative_us += time_inside_func_us; };
+    scoped_timer<timer_unit::MICROSECONDS> function_timer(&time_inside_func_us);
+
     update_cwd_entries_result retval = {};
 
     print_debug_msg("[ %d ] expl.update_cwd_entries(%d) called from [%s:%d]", this->id, actions, cget_file_name(sloc.file_name()), sloc.line());
@@ -1161,7 +1165,7 @@ void explorer_window::push_history_item(swan_path const &new_latest_entry, std::
     swan_path new_latest_entry_clean = new_latest_entry;
     path_force_separator(new_latest_entry_clean, dir_sep_utf8);
     while (path_pop_back_if(new_latest_entry_clean, dir_sep_utf8));
-    new_latest_entry_clean = path_reconstruct_canonically(new_latest_entry_clean.data(), dir_sep_utf8);
+    new_latest_entry_clean = path_reconstruct_canonically(new_latest_entry_clean.data());
 
     bool history_empty = this->wd_history.empty();
 
@@ -1290,10 +1294,9 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
     auto [cwd_exists, _] = expl.update_cwd_entries(query_filesystem, new_cwd_canoncial_utf8.data());
 
     if (!cwd_exists) {
-        print_debug_msg("[ %d ] target directory not found", expl.id);
         descend_result res;
         res.success = false;
-        res.err_msg = make_str("Target directory [%s] not found.", new_cwd_canoncial_utf8.data());
+        res.err_msg = "Directory not found.";
         return res;
     }
 
@@ -1376,6 +1379,8 @@ void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
 
     imgui::Text("entries_to_select_sort: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_sort);
     imgui::Text("entries_to_select_search: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_search);
+
+    imgui::Text("update_cwd_entries_culmulative_us: %.0lf us", expl.update_cwd_entries_culmulative_us);
 
 #if 0
     {
@@ -2517,7 +2522,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
             cwd_exists_after_edit = cwd_exists;
 
             if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
-                expl.cwd = path_reconstruct_canonically(expl.cwd.data(), dir_sep_utf8);
+                expl.cwd = path_reconstruct_canonically(expl.cwd.data());
                 expl.push_history_item(expl.cwd);
                 expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -3420,8 +3425,6 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
                             if (imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !io.KeyCtrl && path_equals_exactly(current_click_path, s_last_click_path)) {
                                 if (dirent.basic.is_directory()) {
-                                    print_debug_msg("[ %d ] double clicked directory [%s]", expl.id, dirent.basic.path.data());
-
                                     if (dirent.basic.is_path_dotdot()) {
                                         auto result = try_ascend_directory(expl);
 

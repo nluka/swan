@@ -44,4 +44,4 @@ bool path_equals_exactly(swan_path const &p1, char const *p2) noexcept;
 
 swan_path path_squish_adjacent_separators(swan_path const &path) noexcept;
 
-swan_path path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf8) noexcept;
+swan_path path_reconstruct_canonically(char const *path_utf8) noexcept;

@@ -265,7 +265,7 @@ swan_path path_squish_adjacent_separators(swan_path const &path) noexcept
     return cleaned_path;
 }
 
-swan_path path_reconstruct_canonically(char const *path_utf8, char dir_sep_utf8) noexcept
+swan_path path_reconstruct_canonically(char const *path_utf8) noexcept
 {
     swan_path retval;
 
