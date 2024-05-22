@@ -27,6 +27,7 @@ endif()
 
 add_compile_options(/EHsc /MP /MT)
 add_link_options(/NODEFAULTLIB:MSVCRTD)
+add_link_options(/NODEFAULTLIB:LIBCMT)
 
 add_library(imgui STATIC
     src/imgui/imgui.cpp
