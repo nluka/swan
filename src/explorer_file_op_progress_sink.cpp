@@ -84,7 +84,7 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
     bool dst_expl_cwd_same = path_loosely_same(dst_expl.cwd, this->dst_expl_cwd_when_operation_started);
 
     if (dst_expl_cwd_same) {
-        print_debug_msg("PostMoveItem [%s]", new_name_utf8.data());
+        // Avoid asking the receiving explorer to select the moved item on refresh if the explorer has since changed cwd
         std::scoped_lock lock(dst_expl.select_cwd_entries_on_next_update_mutex);
         dst_expl.select_cwd_entries_on_next_update.push_back(new_name_utf8);
     }
@@ -199,7 +199,7 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
         else { // file
             char const *file_extension = cget_file_ext(deleted_item_path_utf8.data());
 
-            if (streq(file_extension, "htm") || streq(file_extension, "html")) {
+            if (file_extension && (streq(file_extension, "htm") || streq(file_extension, "html"))) {
                 auto [insert_iter, insert_took_place] = connected_files_candidates.emplace(deleted_item_path_utf8.data());
 
                 if (!insert_took_place) {
@@ -227,7 +227,13 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
     return S_OK;
 }
 
-HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item, IShellItem *, LPCWSTR, HRESULT result, IShellItem *dst_item) noexcept
+HRESULT explorer_file_op_progress_sink::PostCopyItem(
+    DWORD,
+    IShellItem *src_item,
+    IShellItem *,
+    LPCWSTR new_name_utf16,
+    HRESULT result,
+    IShellItem *dst_item) noexcept
 {
     if (FAILED(result)) {
         return S_OK;
@@ -268,6 +274,22 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(DWORD, IShellItem *src_item
     SCOPE_EXIT { if (dst_path_utf16_needs_free) CoTaskMemFree(dst_path_utf16); };
 
     print_debug_msg("PostCopyItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
+
+    swan_path new_name_utf8;
+
+    if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
+        return S_OK;
+    }
+
+    explorer_window &dst_expl = global_state::explorers()[this->dst_expl_id];
+
+    bool dst_expl_cwd_same = path_loosely_same(dst_expl.cwd, this->dst_expl_cwd_when_operation_started);
+
+    if (dst_expl_cwd_same) {
+        // Avoid asking the receiving explorer to select the moved item on refresh if the explorer has since changed cwd
+        std::scoped_lock lock(dst_expl.select_cwd_entries_on_next_update_mutex);
+        dst_expl.select_cwd_entries_on_next_update.push_back(new_name_utf8);
+    }
 
     path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
     path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);

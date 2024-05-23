@@ -192,9 +192,8 @@ void imgui::RenderConfirmationModal() noexcept
                               "[Escape]  No");
         }
 
-        imgui::SameLineSpaced(1);
-
         if (g_confirmation_enabled != nullptr) {
+            imgui::SameLineSpaced(2);
             imgui::Checkbox("Ask for this operation", g_confirmation_enabled);
         }
 

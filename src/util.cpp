@@ -48,8 +48,17 @@ s32 directory_exists(char const *path) noexcept
     return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
+std::array<char, 32> format_file_size(u64 file_size, u64 unit_multiplier) noexcept
+{
+    std::array<char, 32> retval;
+    format_file_size(file_size, retval.data(), retval.max_size(), unit_multiplier);
+    return retval;
+}
+
 void format_file_size(u64 file_size, char *out, u64 out_size, u64 unit_multiplier) noexcept
 {
+    assert(unit_multiplier == 1000 || unit_multiplier == 1024);
+
     char const *units[] = { "B", "KB", "MB", "GB", "TB" };
     u64 constexpr largest_unit_idx = (sizeof(units) / sizeof(*units)) - 1;
     u64 unit_idx = 0;

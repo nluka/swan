@@ -91,6 +91,7 @@ struct swan_path final : std::array<char, ((MAX_PATH - 1) * 4) + 1>
     // swan_path reconstruct_canonically(char dir_sep_utf8) noexcept;
 
     bool operator>(swan_path const &other) const noexcept { return strcmp(this->data(), other.data()) > 0; }
+    bool operator<(swan_path const &other) const noexcept { return strcmp(this->data(), other.data()) < 0; }
 };
 
 struct basic_dirent
@@ -253,9 +254,12 @@ struct explorer_window
         ptrdiff_t highlight_start_idx = 0;
         u64 highlight_len = 0;
         u32 spotlight_frames_remaining = 0;
-        bool is_filtered_out = false;
-        bool is_selected = false;
-        bool is_cut = false;
+        std::array<char, 64> creation_time;
+        std::array<char, 64> last_write_time;
+        std::array<char, 32> formatted_size;
+        bool filtered = false;
+        bool selected = false;
+        bool cut = false;
         bool context_menu_active = false;
     };
 
@@ -274,7 +278,7 @@ struct explorer_window
         cwd_entries_table_col_path,
         cwd_entries_table_col_object,
         cwd_entries_table_col_type,
-        cwd_entries_table_col_size_pretty,
+        cwd_entries_table_col_size_formatted,
         cwd_entries_table_col_size_bytes,
         cwd_entries_table_col_creation_time,
         cwd_entries_table_col_last_write_time,
@@ -380,6 +384,8 @@ struct explorer_window
     mutable f64 check_if_pinned_us = 0;
     mutable f64 unpin_us = 0;
     mutable f64 update_cwd_entries_culmulative_us = 0;
+    mutable f64 filetime_to_string_culmulative_us = 0;
+    mutable f64 format_file_size_culmulative_us = 0;
 
     //? mutable because they are debug counters/timers
 

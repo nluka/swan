@@ -190,7 +190,7 @@ bulk_rename_find_collisions(std::vector<explorer_window::dirent> &dest, std::vec
     unaffected_dirents.reserve(dest.size());
 
     for (auto &dest_dirent : dest) {
-        if (!dest_dirent.is_selected) {
+        if (!dest_dirent.selected) {
             unaffected_dirents.push_back(&dest_dirent);
         }
     }
@@ -604,7 +604,7 @@ void swan_popup_modals::open_bulk_rename(explorer_window &expl_opened_from, std:
 
     g_initiating_expl_selected_dirents.clear();
     for (auto const &dirent : expl_opened_from.cwd_entries) {
-        if (dirent.is_selected) {
+        if (dirent.selected) {
             g_initiating_expl_selected_dirents.push_back(dirent);
         }
     }
@@ -1521,10 +1521,10 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("file1.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
-                { .basic = create_basic_dirent("file2.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
-                { .basic = create_basic_dirent("file3.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
-                { .basic = create_basic_dirent("file4.cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+                { .basic = create_basic_dirent("file1.cpp", ent_kind::file), .filtered = 0, .selected = 0 },
+                { .basic = create_basic_dirent("file2.cpp", ent_kind::file), .filtered = 0, .selected = 0 },
+                { .basic = create_basic_dirent("file3.cpp", ent_kind::file), .filtered = 0, .selected = 0 },
+                { .basic = create_basic_dirent("file4.cpp", ent_kind::file), .filtered = 0, .selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 // none
@@ -1540,10 +1540,10 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+                { .basic = create_basic_dirent("file0", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file1", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file2", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file3", ent_kind::file), .filtered = 0, .selected = 1 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "file1" ),
@@ -1562,10 +1562,10 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+                { .basic = create_basic_dirent("file0", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file1", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file2", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file3", ent_kind::file), .filtered = 0, .selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "file1" ),
@@ -1587,10 +1587,10 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+                { .basic = create_basic_dirent("file0", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file1", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file2", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file3", ent_kind::file), .filtered = 0, .selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "file3" ),
@@ -1608,10 +1608,10 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent(".cpp", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+                { .basic = create_basic_dirent(".cpp", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent(".cpp", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent(".cpp", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent(".cpp", ent_kind::file), .filtered = 0, .selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "file5" ),
@@ -1629,12 +1629,12 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
-                { .basic = create_basic_dirent("file4", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
-                { .basic = create_basic_dirent("file5", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+                { .basic = create_basic_dirent("file0", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file1", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file2", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file3", ent_kind::file), .filtered = 0, .selected = 0 },
+                { .basic = create_basic_dirent("file4", ent_kind::file), .filtered = 0, .selected = 0 },
+                { .basic = create_basic_dirent("file5", ent_kind::file), .filtered = 0, .selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "file3" ),
@@ -1658,9 +1658,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+                { .basic = create_basic_dirent("file0", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file1", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file2", ent_kind::file), .filtered = 0, .selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "file2" ),
@@ -1677,11 +1677,11 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("file0", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file1", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
-                { .basic = create_basic_dirent("file2", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("file3", ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
-                { .basic = create_basic_dirent("file4", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+                { .basic = create_basic_dirent("file0", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file1", ent_kind::file), .filtered = 0, .selected = 0 },
+                { .basic = create_basic_dirent("file2", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("file3", ent_kind::file), .filtered = 0, .selected = 0 },
+                { .basic = create_basic_dirent("file4", ent_kind::file), .filtered = 0, .selected = 1 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "file1" ),
@@ -1704,11 +1704,11 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("00b4dP", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("00BbVr", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("01MWKO", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("01Sw7U", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("02MugF", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
+                { .basic = create_basic_dirent("00b4dP", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("00BbVr", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("01MWKO", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("01Sw7U", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("02MugF", ent_kind::file), .filtered = 0, .selected = 1 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "0b" ),
@@ -1729,9 +1729,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
         {
             std::vector<explorer_window::dirent> dest = {
-                { .basic = create_basic_dirent("bla_bla", ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("test1",   ent_kind::file), .is_filtered_out = 0, .is_selected = 1 },
-                { .basic = create_basic_dirent("test2",   ent_kind::file), .is_filtered_out = 0, .is_selected = 0 },
+                { .basic = create_basic_dirent("bla_bla", ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("test1",   ent_kind::file), .filtered = 0, .selected = 1 },
+                { .basic = create_basic_dirent("test2",   ent_kind::file), .filtered = 0, .selected = 0 },
             };
             std::vector<bulk_rename_op> input_renames = {
                 bulk_rename_op( &dest[0].basic, "bla_2" ),

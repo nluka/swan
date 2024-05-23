@@ -54,6 +54,9 @@ void swan_windows::render_pinned(
                 auto label = make_str_static<pinned_path::LABEL_MAX_LEN + 32>("%s ## %zu", pin.label.c_str(), i);
                 imgui::Selectable(label.data(), false);
             }
+            if (imgui::IsItemHovered({}, 1.f)) {
+                imgui::SetTooltip(pin.path.data());
+            }
             if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
                 s_context_target = &pin;
                 imgui::OpenPopup("## pinned context_menu");

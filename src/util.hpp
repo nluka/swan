@@ -46,6 +46,7 @@ u64 two_u32_to_one_u64(u32 low, u32 high) noexcept;
 
 s32 directory_exists(char const *path) noexcept;
 
+std::array<char, 32> format_file_size(u64 file_size, u64 unit_multiplier) noexcept;
 void format_file_size(u64 file_size, char *out, u64 out_size, u64 unit_multiplier) noexcept;
 
 void seed_fast_rand(u64) noexcept;

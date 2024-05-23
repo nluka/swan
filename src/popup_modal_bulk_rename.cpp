@@ -34,7 +34,7 @@ void swan_popup_modals::open_bulk_rename(explorer_window &expl_opened_from, std:
     g_transforms.clear();
 
     for (auto const &dirent : expl_opened_from.cwd_entries) {
-        if (dirent.is_selected) {
+        if (dirent.selected) {
             assert(dirent.basic.type != basic_dirent::kind::nil);
             g_transforms.emplace_back(&dirent.basic, dirent.basic.path.data());
             g_obj_types_present[(u64)dirent.basic.type] = true;
