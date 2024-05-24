@@ -161,7 +161,7 @@ void swan_popup_modals::render_single_rename() noexcept
             s_err_msg.clear();
         }
     }
-    if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter) && !strempty(s_new_name_utf8.data())) {
+    if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter) && !cstr_empty(s_new_name_utf8.data())) {
         attempt_rename();
     }
 

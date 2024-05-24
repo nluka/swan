@@ -74,7 +74,7 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
 
     f64 current_time = ImGui::GetTime();
     s32 max_size = global_state::debug_log_text_limit_megabytes() * 1024 * 1024;
-    char const *full_file_name = cget_file_name(pack.loc.file_name());
+    char const *full_file_name = path_cfind_filename(pack.loc.file_name());
     s32 thread_id = GetCurrentThreadId();
 
     u64 const file_name_max_len = 30;
@@ -99,5 +99,14 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
         debug_buffer.appendf("%-5d %10.3lf %*s:%-5d ", thread_id, current_time, file_name_max_len, shortened_file_name, pack.loc.line());
         debug_buffer.appendf(pack.fmt, args...);
         debug_buffer.append("\n");
+    }
+
+    auto log_file_path = global_state::execution_path() / "debug.txt";
+    FILE *file = fopen(log_file_path.string().c_str(), "a");
+    if (file) {
+        fprintf(file, "%-5d %10.3lf %*s:%-5d ", thread_id, current_time, (int)file_name_max_len, shortened_file_name, (int)pack.loc.line());
+        fprintf(file, pack.fmt, args...);
+        fprintf(file, "\n");
+        fclose(file);
     }
 }

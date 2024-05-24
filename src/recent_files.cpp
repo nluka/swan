@@ -28,7 +28,7 @@ void global_state::recent_files_move_to_front(u64 recent_file_idx, char const *n
     std::scoped_lock lock(g_recent_files_mutex);
 
     auto temp = g_recent_files[recent_file_idx];
-    temp.action_time = current_time_system();
+    temp.action_time = get_time_system();
     if (new_action) {
         temp.action.clear();
         temp.action = new_action;
@@ -43,7 +43,7 @@ void global_state::recent_files_add(char const *action, char const *full_file_pa
     swan_path path = path_create(full_file_path);
 
     std::scoped_lock lock(g_recent_files_mutex);
-    g_recent_files.push_front({ action, current_time_system(), path });
+    g_recent_files.push_front({ action, get_time_system(), path });
 }
 
 void global_state::recent_files_remove(u64 recent_file_idx) noexcept
@@ -113,7 +113,7 @@ try {
         iss.read(buffer, std::min(stored_action_len, lengthof(buffer) - 1));
         iss.ignore(1);
 
-        system_time_point_t stored_time = extract_system_time_from_istream(iss);
+        time_point_system_t stored_time = extract_system_time_from_istream(iss);
         iss.ignore(1);
 
         iss >> (u64 &)stored_path_len;
@@ -193,7 +193,7 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
     u64 move_to_front_idx = u64(-1);
     u64 remove_idx = u64(-1);
     bool execute_forget_selection_immediately = false;
-    system_time_point_t current_time = current_time_system();
+    time_point_system_t current_time = get_time_system();
 
     // handle keybind actions
     if (!any_popups_open && window_hovered) {
@@ -254,8 +254,8 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
             auto &file = g_recent_files[i];
             char *full_path = file.path.data();
-            char *file_name = get_file_name(full_path);
-            auto directory = get_everything_minus_file_name(full_path);
+            char *file_name = path_find_filename(full_path);
+            auto directory = path_extract_location(full_path);
             swan_path file_directory = path_create(directory.data(), directory.size());
 
             bool right_clicked = false;
@@ -268,7 +268,7 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
             }
 
             if (imgui::TableSetColumnIndex(recent_files_table_col_when)) {
-                auto when = compute_when_str(file.action_time, current_time);
+                auto when = time_diff_str(file.action_time, current_time);
                 imgui::Text("%s %s", file.action.c_str(), when.data());
             }
 
@@ -278,7 +278,7 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 {
                     char const *icon = nullptr;
                     if (global_state::settings().file_extension_icons) {
-                        file_name_extension_splitter splitter(file_name);
+                        temp_filename_extension_splitter splitter(file_name);
                         icon = get_icon_for_extension(splitter.ext);
                     } else {
                         icon = get_icon(basic_dirent::kind::file);
@@ -322,7 +322,7 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
             }
 
             if (imgui::TableSetColumnIndex(recent_files_table_col_location)) {
-                std::string_view location = get_everything_minus_file_name(full_path);
+                std::string_view location = path_extract_location(full_path);
                 imgui::TextUnformatted(location.data(), location.data() + location.size());
             }
 
@@ -360,8 +360,8 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
 
             auto &expl = global_state::explorers()[0];
             char *full_path = s_context_menu_target->path.data();
-            char *file_name = get_file_name(full_path);
-            auto directory = get_everything_minus_file_name(full_path);
+            char *file_name = path_find_filename(full_path);
+            auto directory = path_extract_location(full_path);
             swan_path parent_directory = path_create(directory.data(), directory.size());
 
             if (imgui::Selectable("Open file location")) {

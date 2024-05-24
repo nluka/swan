@@ -42,9 +42,13 @@ u64 two_u32_to_one_u64(u32 low, u32 high) noexcept
     return result;
 }
 
-s32 directory_exists(char const *path) noexcept
+s32 directory_exists(char const *path_utf8) noexcept
 {
-    DWORD attributes = GetFileAttributesA(path);
+    wchar_t path_utf16[MAX_PATH];
+    if (!utf8_to_utf16(path_utf8, path_utf16, lengthof(path_utf16))) {
+        return false;
+    }
+    DWORD attributes = GetFileAttributesW(path_utf16);
     return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
@@ -82,7 +86,7 @@ void format_file_size(u64 file_size, char *out, u64 out_size, u64 unit_multiplie
     snprintf(out, out_size, fmt, size, units[unit_idx]);
 }
 
-s64 compute_diff_ms(precise_time_point_t start, precise_time_point_t end) noexcept
+s64 time_diff_ms(time_point_precise_t start, time_point_precise_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(end);
@@ -90,7 +94,7 @@ s64 compute_diff_ms(precise_time_point_t start, precise_time_point_t end) noexce
     return diff_ms.count();
 }
 
-s64 compute_diff_us(precise_time_point_t start, precise_time_point_t end) noexcept
+s64 time_diff_us(time_point_precise_t start, time_point_precise_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::microseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::microseconds>(end);
@@ -98,16 +102,16 @@ s64 compute_diff_us(precise_time_point_t start, precise_time_point_t end) noexce
     return diff_us.count();
 }
 
-precise_time_point_t current_time_precise() noexcept
+time_point_precise_t get_time_precise() noexcept
 {
     return std::chrono::high_resolution_clock::now();
 }
 
-std::array<char, 64> compute_when_str(precise_time_point_t start, precise_time_point_t end) noexcept
+std::array<char, 64> time_diff_str(time_point_precise_t start, time_point_precise_t end) noexcept
 {
     std::array<char, 64> out = {};
 
-    s64 ms_diff = compute_diff_ms(start, end);
+    s64 ms_diff = time_diff_ms(start, end);
     s64 one_minute = 60'000;
     s64 one_hour = one_minute * 60;
     s64 one_day = one_hour * 24;
@@ -135,12 +139,12 @@ std::array<char, 64> compute_when_str(precise_time_point_t start, precise_time_p
     return out;
 }
 
-system_time_point_t current_time_system() noexcept
+time_point_system_t get_time_system() noexcept
 {
     return std::chrono::system_clock::now();
 }
 
-s64 compute_diff_ms(system_time_point_t start, system_time_point_t end) noexcept
+s64 time_diff_ms(time_point_system_t start, time_point_system_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(end);
@@ -148,7 +152,7 @@ s64 compute_diff_ms(system_time_point_t start, system_time_point_t end) noexcept
     return diff_ms.count();
 }
 
-s64 compute_diff_us(system_time_point_t start, system_time_point_t end) noexcept
+s64 time_diff_us(time_point_system_t start, time_point_system_t end) noexcept
 {
     auto start_ms = std::chrono::time_point_cast<std::chrono::microseconds>(start);
     auto end_ms = std::chrono::time_point_cast<std::chrono::microseconds>(end);
@@ -156,11 +160,11 @@ s64 compute_diff_us(system_time_point_t start, system_time_point_t end) noexcept
     return diff_us.count();
 }
 
-std::array<char, 64> compute_when_str(system_time_point_t start, system_time_point_t end) noexcept
+std::array<char, 64> time_diff_str(time_point_system_t start, time_point_system_t end) noexcept
 {
     std::array<char, 64> out = {};
 
-    s64 ms_diff = compute_diff_ms(start, end);
+    s64 ms_diff = time_diff_ms(start, end);
     s64 one_minute = 60'000;
     s64 one_hour = one_minute * 60;
     s64 one_day = one_hour * 24;
@@ -220,12 +224,12 @@ s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capa
     return chars_written;
 }
 
-bool streq(char const *s1, char const *s2) noexcept
+bool cstr_eq(char const *s1, char const *s2) noexcept
 {
     return strcmp(s1, s2) == 0;
 }
 
-u64 remove_adjacent_spaces(char *str, u64 len) noexcept
+u64 cstr_erase_adjacent_spaces(char *str, u64 len) noexcept
 {
     assert(str != nullptr);
 
@@ -296,24 +300,24 @@ char const *lorem_ipsum() noexcept
     return data;
 }
 
-file_name_extension_splitter::file_name_extension_splitter(char *path) noexcept
+temp_filename_extension_splitter::temp_filename_extension_splitter(char *path) noexcept
 {
-    this->name = get_file_name(path);
-    this->ext = get_file_ext(name);
+    this->name = path_find_filename(path);
+    this->ext = path_find_file_ext(name);
     this->dot = ext ? ext - 1 : nullptr;
     if (this->dot) {
         *this->dot = '\0';
     }
 }
 
-file_name_extension_splitter::~file_name_extension_splitter() noexcept
+temp_filename_extension_splitter::~temp_filename_extension_splitter() noexcept
 {
     if (this->dot) {
         *this->dot = '.';
     }
 }
 
-char *get_file_name(char *path) noexcept
+char *path_find_filename(char *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
     //                  ^^^^^^^^^^^^^^^^^^^ what we are after
@@ -335,7 +339,7 @@ char *get_file_name(char *path) noexcept
     return just_the_file_name;
 }
 
-wchar_t *get_file_name(wchar_t *path) noexcept
+wchar_t *path_find_filename(wchar_t *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
     //                  ^^^^^^^^^^^^^^^^^^^ what we are after
@@ -357,7 +361,7 @@ wchar_t *get_file_name(wchar_t *path) noexcept
     return just_the_file_name;
 }
 
-wchar_t const *cget_file_name(wchar_t const *path) noexcept
+wchar_t const *path_cfind_filename(wchar_t const *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
     //                  ^^^^^^^^^^^^^^^^^^^ what we are after
@@ -379,7 +383,7 @@ wchar_t const *cget_file_name(wchar_t const *path) noexcept
     return just_the_file_name;
 }
 
-char const *cget_file_name(char const *path) noexcept
+char const *path_cfind_filename(char const *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
     //                  ^^^^^^^^^^^^^^^^^^^ what we are after
@@ -401,7 +405,7 @@ char const *cget_file_name(char const *path) noexcept
     return just_the_file_name;
 }
 
-char *get_file_ext(char *path) noexcept
+char *path_find_file_ext(char *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
     //                                  ^^^ what we are after
@@ -424,7 +428,7 @@ char *get_file_ext(char *path) noexcept
     }
 }
 
-char const *cget_file_ext(char const *path) noexcept
+char const *path_cfind_file_ext(char const *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
     //                                  ^^^ what we are after
@@ -447,7 +451,7 @@ char const *cget_file_ext(char const *path) noexcept
     }
 }
 
-std::string_view get_everything_minus_file_name(char const *path) noexcept
+std::string_view path_extract_location(char const *path) noexcept
 {
     // C:\code\swan\src\explorer_window.cpp
     // ^^^^^^^^^^^^^^^^^ what we are after
@@ -468,7 +472,7 @@ std::string_view get_everything_minus_file_name(char const *path) noexcept
     }
 }
 
-bool strempty(char const *s) noexcept
+bool cstr_empty(char const *s) noexcept
 {
     assert(s != nullptr);
     return s[0] == '\0';
@@ -484,13 +488,13 @@ wchar_t const *windows_illegal_path_chars() noexcept
     return L"<>\"|?*";
 }
 
-void init_empty_cstr(char *s) noexcept
+void cstr_clear(char *s) noexcept
 {
     assert(s != nullptr);
     s[0] = '\0';
 }
 
-void init_empty_cstr(wchar_t *s) noexcept
+void cstr_clear(wchar_t *s) noexcept
 {
     assert(s != nullptr);
     s[0] = L'\0';
@@ -503,7 +507,7 @@ bool set_thread_priority(s32 priority_relative_to_normal) noexcept
     return result;
 }
 
-char const *ltrim(char const *s, std::initializer_list<char> const &chars) noexcept
+char const *cstr_ltrim(char const *s, std::initializer_list<char> const &chars) noexcept
 {
     char const *retval = s;
     while (one_of(*retval, chars)) {
@@ -512,7 +516,7 @@ char const *ltrim(char const *s, std::initializer_list<char> const &chars) noexc
     return retval;
 }
 
-char *rtrim(char *szX) noexcept
+char *cstr_rtrim(char *szX) noexcept
 {
     auto i = (s64)strlen(szX);
     while(szX[--i] == ' ') {
@@ -521,7 +525,7 @@ char *rtrim(char *szX) noexcept
     return szX;
 }
 
-bool last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept
+bool cstr_last_non_whitespace_is_one_of(char const *str, u64 len, char const *test_str) noexcept
 {
     if (str == NULL || test_str == NULL || len == 0) {
         // Handle invalid input
@@ -599,7 +603,7 @@ std::pair<s32, std::array<char, 64>> filetime_to_string(FILETIME *time) noexcept
     return { length, buffer_final };
 }
 
-bool str_starts_with(char const *str, char const *prefix) noexcept
+bool cstr_starts_with(char const *str, char const *prefix) noexcept
 {
     assert(str != nullptr);
     assert(prefix != nullptr);
@@ -607,16 +611,16 @@ bool str_starts_with(char const *str, char const *prefix) noexcept
     return strncmp(prefix, str, strlen(prefix)) == 0;
 }
 
-system_time_point_t extract_system_time_from_istream(std::istream &in_stream) noexcept
+time_point_system_t extract_system_time_from_istream(std::istream &in_stream) noexcept
 {
     std::time_t time;
     in_stream >> time;
-    system_time_point_t time_point = std::chrono::system_clock::from_time_t(time);
+    time_point_system_t time_point = std::chrono::system_clock::from_time_t(time);
     return time_point;
 }
 
 // from https://stackoverflow.com/a/744822
-bool str_ends_with(const char *str, const char *suffix) noexcept
+bool cstr_ends_with(const char *str, const char *suffix) noexcept
 {
     if (!str || !suffix)
         return 0;
@@ -625,4 +629,14 @@ bool str_ends_with(const char *str, const char *suffix) noexcept
     if (lensuffix >  lenstr)
         return 0;
     return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+}
+
+void cstr_fill(wchar_t *s, wchar_t fill_ch) noexcept
+{
+    assert(s != nullptr);
+
+    while (*s != L'\0') {
+        *s = fill_ch;
+        ++s;
+    }
 }

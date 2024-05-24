@@ -41,7 +41,7 @@ try {
 
 #if RELEASE_MODE
     for (u64 i = 1; i < argc; ++i) {
-        if (streq(argv[i], "--tests-only")) {
+        if (cstr_eq(argv[i], "--tests-only")) {
             return run_tests_only(ntest_output_directory_path);
         }
     }
@@ -51,6 +51,16 @@ try {
     if (window == nullptr) {
         return 1;
     }
+
+    // clear log file
+    {
+        auto log_file_path = global_state::execution_path() / "debug.txt";
+        FILE *file = fopen(log_file_path.string().c_str(), "w");
+        if (file) {
+            fclose(file);
+        }
+    }
+
     print_debug_msg("SUCCESS barebones window created");
 
     SCOPE_EXIT {
@@ -87,7 +97,7 @@ try {
         run_tests_integrated(ntest_output_directory_path);
     #else
         for (u64 i = 1; i < argc; ++i) {
-            if (streq(argv[i], "--with-tests")) {
+            if (cstr_eq(argv[i], "--with-tests")) {
                 run_tests_integrated(ntest_output_directory_path);
                 break;
             }
@@ -103,7 +113,7 @@ try {
 
         imgui::GetStyle() = our_default_imgui_style;
 
-        seed_fast_rand((u64)current_time_precise().time_since_epoch().count());
+        seed_fast_rand((u64)get_time_precise().time_since_epoch().count());
 
         SYSTEM_INFO system_info;
         GetSystemInfo(&system_info);
@@ -199,19 +209,19 @@ try {
         }
     }
 
-    static precise_time_point_t last_window_move_or_resize_time = current_time_precise();
+    static time_point_precise_t last_window_move_or_resize_time = get_time_precise();
     static bool window_pos_or_size_needs_write = false;
 
     glfwSetWindowPosCallback(window, [](GLFWwindow *, s32 new_x, s32 new_y) noexcept {
         global_state::settings().window_x = new_x;
         global_state::settings().window_y = new_y;
-        last_window_move_or_resize_time = current_time_precise();
+        last_window_move_or_resize_time = get_time_precise();
         window_pos_or_size_needs_write = true;
     });
     glfwSetWindowSizeCallback(window, [](GLFWwindow *, s32 new_w, s32 new_h) noexcept {
         global_state::settings().window_w = new_w;
         global_state::settings().window_h = new_h;
-        last_window_move_or_resize_time = current_time_precise();
+        last_window_move_or_resize_time = get_time_precise();
         window_pos_or_size_needs_write = true;
     });
 
@@ -241,7 +251,7 @@ try {
             }
         }
 
-        if (window_pos_or_size_needs_write && compute_diff_ms(last_window_move_or_resize_time, current_time_precise()) > 250) {
+        if (window_pos_or_size_needs_write && time_diff_ms(last_window_move_or_resize_time, get_time_precise()) > 250) {
             // we check that some time has passed since last_window_move_or_resize_time to avoid spamming the disk as the user moves or resizes the window
             print_debug_msg("window_pos_or_size_needs_write");
             (void) global_state::settings().save_to_disk();
@@ -723,7 +733,7 @@ void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcep
             for (u64 i = 0; i < lengthof(essential); ++i) {
                 auto &file = essential[i];
                 std::filesystem::path full_path = global_state::execution_path() / file.path_relative_to_executable;
-                if (streq(file.type, "directory")) {
+                if (cstr_eq(file.type, "directory")) {
                     file.found = std::filesystem::is_directory(full_path);
                 } else {
                     file.found = std::filesystem::is_regular_file(full_path);
@@ -916,7 +926,7 @@ void render_ntest_output_window([[maybe_unused]] swan_path const &output_directo
                     if (path_is_empty(a.expected_path)) {
                         imgui::TextUnformatted(serialized.expected);
                     } else {
-                        char const *file_name = cget_file_name(a.expected_path.data());
+                        char const *file_name = path_cfind_filename(a.expected_path.data());
                         auto label = make_str_static<256>("%s ## %zu", file_name, i);
 
                         imgui::Selectable(label.data(), false, ImGuiSelectableFlags_AllowDoubleClick);
@@ -930,7 +940,7 @@ void render_ntest_output_window([[maybe_unused]] swan_path const &output_directo
                     if (path_is_empty(a.actual_path)) {
                         imgui::TextUnformatted(serialized.actual);
                     } else {
-                        char const *file_name = cget_file_name(a.actual_path.data());
+                        char const *file_name = path_cfind_filename(a.actual_path.data());
                         auto label = make_str_static<256>("%s ## %zu", file_name, i);
 
                         imgui::Selectable(label.data(), false, ImGuiSelectableFlags_AllowDoubleClick);

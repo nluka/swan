@@ -563,7 +563,7 @@ bulk_rename_transform_result bulk_rename_transform(
 
     u64 spaces_removed = 0;
     if (compiled_pattern.squish_adjacent_spaces) {
-        spaces_removed = remove_adjacent_spaces(after.data(), path_length(after));
+        spaces_removed = cstr_erase_adjacent_spaces(after.data(), path_length(after));
     }
 
     result.success = true;
@@ -827,7 +827,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
                 s32 counter = s_counter_start;
 
                 for (auto &dirent : selection) {
-                    file_name_extension_splitter name_ext(dirent.basic.path.data());
+                    temp_filename_extension_splitter name_ext(dirent.basic.path.data());
                     swan_path after;
 
                     auto transform = bulk_rename_execute_transform(s_pattern_compile_res.compiled_pattern, after, name_ext.name,
@@ -1154,9 +1154,9 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
                     auto &rename = rename_ops[i];
 
-                    wchar_t buffer_cwd_utf16[MAX_PATH];     init_empty_cstr(buffer_cwd_utf16);
-                    wchar_t buffer_before_utf16[MAX_PATH];  init_empty_cstr(buffer_before_utf16);
-                    wchar_t buffer_after_utf16[MAX_PATH];   init_empty_cstr(buffer_after_utf16);
+                    wchar_t buffer_cwd_utf16[MAX_PATH];     cstr_clear(buffer_cwd_utf16);
+                    wchar_t buffer_before_utf16[MAX_PATH];  cstr_clear(buffer_before_utf16);
+                    wchar_t buffer_after_utf16[MAX_PATH];   cstr_clear(buffer_after_utf16);
 
                     if (!utf8_to_utf16(expl_cwd.data(), buffer_cwd_utf16, lengthof(buffer_cwd_utf16))) {
                         ++s_num_renames_fail;

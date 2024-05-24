@@ -262,7 +262,7 @@ void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
             finder.search_task.cancellation_token.store(true);
         }
     } else {
-        bool search_value_empty = strempty(finder.search_value.data());
+        bool search_value_empty = cstr_empty(finder.search_value.data());
         bool any_search_dirs_not_found = std::any_of(finder.search_directories.begin(), finder.search_directories.end(),
                                                      [](finder_window::search_directory const &sd) { return !sd.found; });
 
@@ -355,7 +355,7 @@ void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
                     imgui::SameLine();
 
                     ImVec2 path_text_rect_min = imgui::GetCursorScreenPos();
-                    char const *file_name = cget_file_name(m.basic.path.data());
+                    char const *file_name = path_cfind_filename(m.basic.path.data());
                     imgui::TextUnformatted(file_name);
                     imgui::HighlightTextRegion(path_text_rect_min, file_name, m.highlight_start_idx, m.highlight_len,
                                                imgui::ReduceAlphaTo(imgui::Denormalize(warning_lite_color()), 75));
@@ -370,7 +370,7 @@ void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
                 }
 
                 if (imgui::TableSetColumnIndex(matches_table_col_parent)) {
-                    std::string_view parent = get_everything_minus_file_name(m.basic.path.data());
+                    std::string_view parent = path_extract_location(m.basic.path.data());
                     imgui::TextUnformatted(parent.data(), parent.data() + parent.length() - 1);
                 }
             }

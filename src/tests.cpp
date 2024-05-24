@@ -314,24 +314,24 @@ try {
     }
     #endif
 
-    // file_name_extension_splitter;
+    // temp_filename_extension_splitter;
     #if 1
     {
         {
             char name[] = "src/swan.cpp";
-            file_name_extension_splitter sut(name);
+            temp_filename_extension_splitter sut(name);
             ntest::assert_cstr("swan", sut.name);
             ntest::assert_cstr("cpp", sut.ext);
         }
         {
             char name[] = "C:/code/swan/src/explorer_window.cpp";
-            file_name_extension_splitter sut(name);
+            temp_filename_extension_splitter sut(name);
             ntest::assert_cstr("explorer_window", sut.name);
             ntest::assert_cstr("cpp", sut.ext);
         }
         {
             char name[] = "a.b.c";
-            file_name_extension_splitter sut(name);
+            temp_filename_extension_splitter sut(name);
             ntest::assert_cstr("a.b", sut.name);
             ntest::assert_cstr("c", sut.ext);
         }

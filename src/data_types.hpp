@@ -329,7 +329,7 @@ struct explorer_window
 
     struct history_item
     {
-        system_time_point_t time_departed;
+        time_point_system_t time_departed;
         std::string called_from;
         swan_path path;
     };
@@ -358,8 +358,8 @@ struct explorer_window
     u64 nth_last_cwd_dirent_scrolled = u64(-1);
     u64 scroll_to_nth_selected_entry_next_frame = u64(-1);
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
-    precise_time_point_t read_dir_changes_refresh_request_time = {};
-    precise_time_point_t last_filesystem_query_time = {};
+    time_point_precise_t read_dir_changes_refresh_request_time = {};
+    time_point_precise_t last_filesystem_query_time = {};
     dirent *context_menu_target = nullptr;
 
     static u64 const NUM_TIMING_SAMPLES = 10;
@@ -481,8 +481,8 @@ struct file_operation_command_buf
 
 struct completed_file_operation
 {
-    system_time_point_t completion_time = {};
-    system_time_point_t undo_time = {};
+    time_point_system_t completion_time = {};
+    time_point_system_t undo_time = {};
     u32 group_id = {};
     swan_path src_path = {};
     swan_path dst_path = {};
@@ -490,9 +490,9 @@ struct completed_file_operation
     basic_dirent::kind obj_type = basic_dirent::kind::nil;
     bool selected = false;
 
-    bool undone() noexcept { return undo_time != system_time_point_t(); }
+    bool undone() noexcept { return undo_time != time_point_system_t(); }
 
-    completed_file_operation(system_time_point_t completion_time, system_time_point_t undo_time, file_operation_type op_type,
+    completed_file_operation(time_point_system_t completion_time, time_point_system_t undo_time, file_operation_type op_type,
                              char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id = 0) noexcept;
 
     completed_file_operation() noexcept;
@@ -588,7 +588,7 @@ struct recent_file
     static u64 const ACTION_MAX_LEN = 64;
 
     boost::static_string<ACTION_MAX_LEN> action = {};
-    system_time_point_t action_time = {};
+    time_point_system_t action_time = {};
     swan_path path = {};
     bool selected = false;
     bool context_menu_active = false;
@@ -608,7 +608,7 @@ struct bulk_rename_transform
     };
 
     std::string error = {};
-    precise_time_point_t last_updated_time = current_time_precise();
+    time_point_precise_t last_updated_time = get_time_precise();
     bool input_focused = false;
     bool selected = false;
 

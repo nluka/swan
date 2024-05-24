@@ -255,7 +255,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                     };
 
                     for (auto &c : s_swan_colors) {
-                        if (strempty(s_search_input.data()) || StrStrIA(c.label, s_search_input.data())) {
+                        if (cstr_empty(s_search_input.data()) || StrStrIA(c.label, s_search_input.data())) {
                             render_swan_color_picker(c);
                         }
                     }
@@ -363,7 +363,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                     u64 i = 0;
                     for (; i < lengthof(imgui_colors); ++i) {
                         auto &c = imgui_colors[i];
-                        if (strempty(s_search_input.data()) || StrStrIA(c.label, s_search_input.data())) {
+                        if (cstr_empty(s_search_input.data()) || StrStrIA(c.label, s_search_input.data())) {
                             render_imgui_color_picker(c);
                         }
                     }
@@ -436,7 +436,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
 
             if (imgui::BeginChild("## theme_editor Style child")) {
                 auto render_input_f32 = [](char const *label, f32 &val, f32 const &fallback_val, char const *format, f32 min = NAN, f32 max = NAN) noexcept {
-                    if (strempty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
+                    if (cstr_empty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
                         imgui::TableNextColumn();
                         {
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
@@ -462,7 +462,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 };
 
                 auto render_input_bool = [](char const *label, bool &val, bool const &fallback_val) noexcept {
-                    if (strempty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
+                    if (cstr_empty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
                         imgui::TableNextColumn();
                         {
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
@@ -484,7 +484,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                 };
 
                 auto render_input_ImGuiDir = [](char const *label, ImGuiDir &val, ImGuiDir const &fallback_val) noexcept {
-                    if (strempty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
+                    if (cstr_empty(s_search_input.data()) || StrStrIA(label, s_search_input.data())) {
                         imgui::TableNextColumn();
                         {
                             auto btn_label = make_str_static<64>(ICON_CI_REFRESH "## %s", label);
@@ -584,7 +584,7 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
     }
 
     static bool s_save_requested = false;
-    static std::optional<precise_time_point_t> s_last_save_time = std::nullopt;
+    static std::optional<time_point_precise_t> s_last_save_time = std::nullopt;
 
     auto const &ImGui_style_at_frame_end = style;
     //! this is dodgy because padding bytes have undefined values. But I don't know of a compact way to do this comparison
@@ -614,14 +614,14 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
         if (!s_last_save_time.has_value()) {
             // first save, don't wait
             (void) global_state::settings().save_to_disk();
-            s_last_save_time = current_time_precise();
+            s_last_save_time = get_time_precise();
             s_save_requested = false;
         }
         else {
-            s64 ms_since_last_save = compute_diff_ms(s_last_save_time.value(), current_time_precise());
+            s64 ms_since_last_save = time_diff_ms(s_last_save_time.value(), get_time_precise());
             if (ms_since_last_save >= 250) {
                 (void) global_state::settings().save_to_disk();
-                s_last_save_time = current_time_precise();
+                s_last_save_time = get_time_precise();
                 s_save_requested = false;
             } else {
                 // wait to avoid spamming disk

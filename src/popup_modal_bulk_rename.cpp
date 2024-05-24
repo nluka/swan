@@ -591,7 +591,7 @@ render_table_result render_table(
     bool obj_type_filters[num_obj_types],
     bool status_filters[num_status_types],
     std::vector<bulk_rename_transform>::iterator const &filtered_transforms_partition_iter,
-    precise_time_point_t const &last_edit_time,
+    time_point_precise_t const &last_edit_time,
     bool obj_types_present[num_obj_types],
     u64 transforms_size_digits) noexcept
 {
@@ -745,7 +745,7 @@ render_table_result render_table(
                     if (after_edited) {
                         using status_t = bulk_rename_transform::status;
 
-                        if (strempty(transform.after.data())) {
+                        if (cstr_empty(transform.after.data())) {
                             transform.stat.store(status_t::error_name_empty);
                         }
                         else if (path_equals_exactly(transform.before, transform.after)) {
@@ -755,11 +755,11 @@ render_table_result render_table(
                             transform.stat.store(status_t::name_unchanged);
                         }
 
-                        if (strempty(transform.after.data())) {
+                        if (cstr_empty(transform.after.data())) {
                             retval.any_inputs_blank = true;
                         } else {
                             retval.any_inputs_blank = std::any_of(transforms.begin(), transforms.end(), [](bulk_rename_transform const &op) noexcept {
-                                return strempty(op.after.data());
+                                return cstr_empty(op.after.data());
                             });
                         }
                     }
@@ -770,7 +770,7 @@ render_table_result render_table(
                 // which will not render out of view rows. this way the cost of updating is spread over many frames in the case when the user
                 // is scrolling the list, or not paid at all if the user never brings the row into view.
                 if (transform.last_updated_time < last_edit_time) {
-                    transform.last_updated_time = current_time_precise();
+                    transform.last_updated_time = get_time_precise();
 
                     using status_t = bulk_rename_transform::status;
 
@@ -780,7 +780,7 @@ render_table_result render_table(
                     if (!transform_executed) {
                         auto new_status = status_t::ready;
 
-                        if (strempty(transform.after.data())) {
+                        if (cstr_empty(transform.after.data())) {
                             new_status = status_t::error_name_empty;
                         }
                         else if (path_equals_exactly(transform.before, transform.after.data())) {
@@ -875,7 +875,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     static std::string s_informational_msg = {};
     static bool s_exported = false;
     static bool s_empty_inputs = false;
-    static precise_time_point_t s_last_edit_time = {};
+    static time_point_precise_t s_last_edit_time = {};
     static progressive_task<int /* dummy type, result not used */> s_transaction_task = {};
     static transaction_counters s_transaction_counters = {};
 
@@ -1061,7 +1061,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
     u64 transforms_size_digits = count_digits(g_transforms.size());
     bool transact_started = s_transaction_task.started.load();
     bool transact_active = s_transaction_task.active_token.load();
-    bool transact_cancelled = s_transaction_task.cancellation_token.load();
+    // bool transact_cancelled = s_transaction_task.cancellation_token.load();
 
     bool revert_all_button_pressed;
     {
@@ -1209,7 +1209,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
     if (imported || reset_all_button_pressed || table.any_after_text_edited) {
         print_debug_msg("change made (%d %d %d) updating s_last_edit_time", imported, reset_all_button_pressed, table.any_after_text_edited);
-        s_last_edit_time = current_time_precise();
+        s_last_edit_time = get_time_precise();
     }
 
     if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape) && !transact_active) {
@@ -1300,7 +1300,7 @@ std::tuple<bool, std::string, u64> bulk_rename_parse_text_import(
     char const *line = strtok(text_sanitized.data(), "\n");
 
     for (u64 line_num = 1; line != nullptr; ++line_num, line = strtok(nullptr, "\n")) {
-        if (strempty(line)) {
+        if (cstr_empty(line)) {
             continue;
         }
         std::string_view line_vw(line, strlen(line));

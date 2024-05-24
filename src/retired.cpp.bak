@@ -7,7 +7,7 @@
 
 {
     time_point_t now = current_time();
-    s64 diff_ms = compute_diff_ms(expl.last_refresh_time, now);
+    s64 diff_ms = time_diff_ms(expl.last_refresh_time, now);
     s32 min_refresh_itv_ms = explorer_options::min_tolerable_refresh_interval_ms;
 
     if (diff_ms >= max(min_refresh_itv_ms, opts.auto_refresh_interval_ms.load())) {
@@ -122,7 +122,7 @@ void explorer_change_notif_thread_func(explorer_window &expl, std::atomic<s32> c
                         if (expl.is_window_visible.load()) {
                             time_point_t now = current_time();
 
-                            if (compute_diff_ms(last_refresh_notif_sent, now) >= global_state::settings().min_tolerable_refresh_interval_ms) {
+                            if (time_diff_ms(last_refresh_notif_sent, now) >= global_state::settings().min_tolerable_refresh_interval_ms) {
                                 print_debug_msg("[ %d ] refresh notif SEND", expl.id);
 
                                 expl.refresh_notif_time.store(now, std::memory_order::seq_cst);

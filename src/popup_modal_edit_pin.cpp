@@ -44,8 +44,8 @@ void swan_popup_modals::render_edit_pin() noexcept
         g_open = false;
         g_target_pin = nullptr;
 
-        init_empty_cstr(s_label_input);
-        init_empty_cstr(s_path_input.data());
+        cstr_clear(s_label_input);
+        cstr_clear(s_path_input.data());
         s_err_msg.clear();
 
         imgui::CloseCurrentPopup();
@@ -94,7 +94,7 @@ void swan_popup_modals::render_edit_pin() noexcept
         print_debug_msg("pinned_save_to_disk: %d", success);
     };
 
-    if (imgui::Button("Save" "## pin") && !strempty(s_path_input.data()) && !strempty(s_label_input)) {
+    if (imgui::Button("Save" "## pin") && !cstr_empty(s_path_input.data()) && !cstr_empty(s_label_input)) {
         apply_changes();
         cleanup_and_close_popup();
     }

@@ -596,8 +596,8 @@ drive_list_t query_drive_list() noexcept
             char letter = 'A' + (char)i;
 
             wchar_t drive_root[] = { wchar_t(letter), L':', L'\\', L'\0' };
-            wchar_t volume_name[MAX_PATH + 1];          init_empty_cstr(volume_name);
-            wchar_t filesystem_name_utf8[MAX_PATH + 1]; init_empty_cstr(filesystem_name_utf8);
+            wchar_t volume_name[MAX_PATH + 1];          cstr_clear(volume_name);
+            wchar_t filesystem_name_utf8[MAX_PATH + 1]; cstr_clear(filesystem_name_utf8);
             DWORD serial_num = 0;
             DWORD max_component_length = 0;
             DWORD filesystem_flags = 0;
@@ -687,7 +687,7 @@ generic_result open_file(char const *file_name, char const *file_directory, bool
         return { false, "Full file path exceeds max path length." };
     }
 
-    wchar_t target_full_path_utf16[MAX_PATH]; init_empty_cstr(target_full_path_utf16);
+    wchar_t target_full_path_utf16[MAX_PATH]; cstr_clear(target_full_path_utf16);
 
     if (!utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16))) {
         return { false, "Conversion of target's full path from UTF-8 to UTF-16." };
@@ -727,7 +727,7 @@ generic_result open_file_with(char const *file_name, char const *file_directory)
         return { false, "Full file path exceeds max path length." };
     }
 
-    wchar_t target_full_path_utf16[MAX_PATH]; init_empty_cstr(target_full_path_utf16);
+    wchar_t target_full_path_utf16[MAX_PATH]; cstr_clear(target_full_path_utf16);
 
     if (!utf8_to_utf16(target_full_path_utf8.data(), target_full_path_utf16, lengthof(target_full_path_utf16))) {
         return { false, "Conversion of target's full path from UTF-8 to UTF-16." };

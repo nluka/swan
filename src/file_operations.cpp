@@ -99,10 +99,10 @@ try {
         swan_path stored_src_path = {};
         swan_path stored_dst_path = {};
 
-        system_time_point_t stored_time_completion = extract_system_time_from_istream(iss);
+        time_point_system_t stored_time_completion = extract_system_time_from_istream(iss);
         iss.ignore(1);
 
-        system_time_point_t stored_time_undo = extract_system_time_from_istream(iss);
+        time_point_system_t stored_time_undo = extract_system_time_from_istream(iss);
         iss.ignore(1);
 
         iss >> stored_group_id;
@@ -152,7 +152,7 @@ completed_file_operation::completed_file_operation() noexcept
 {
 }
 
-completed_file_operation::completed_file_operation(system_time_point_t completion_time, system_time_point_t undo_time, file_operation_type op_type,
+completed_file_operation::completed_file_operation(time_point_system_t completion_time, time_point_system_t undo_time, file_operation_type op_type,
                                                    char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id) noexcept
     : completion_time(completion_time)
     , undo_time(undo_time)
@@ -225,7 +225,7 @@ undelete_file_result undelete_file(char const *recycle_bin_hardlink_path_utf8) n
     wchar_t recycle_bin_metadata_path_utf16[MAX_PATH];
     (void) StrCpyNW(recycle_bin_metadata_path_utf16, recycle_bin_hardlink_path_utf16, lengthof(recycle_bin_metadata_path_utf16));
     {
-        wchar_t *metadata_file_name = get_file_name(recycle_bin_metadata_path_utf16);
+        wchar_t *metadata_file_name = path_find_filename(recycle_bin_metadata_path_utf16);
         metadata_file_name[1] = L'I'; // $RXXXXXX[.ext] -> $IXXXXXX[.ext]
     }
 
@@ -371,7 +371,7 @@ void perform_undelete_directory(
     prog_sink.destination_full_path_utf8 = destination_full_path_utf8;
     DWORD cookie = {};
 
-    wchar_t const *restored_name = cget_file_name(destination_dir_path_utf16);
+    wchar_t const *restored_name = path_cfind_filename(destination_dir_path_utf16);
     result = file_op->MoveItem(item_to_restore, destination, restored_name, &prog_sink);
     if (FAILED(result)) {
         return set_init_error_and_notify(make_str("FAILED IFileOperation::MoveItem, %s", _com_error(result).ErrorMessage()));
@@ -581,7 +581,7 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_completion_time)) {
-                auto when_completed_str = compute_when_str(file_op.completion_time, current_time_system());
+                auto when_completed_str = time_diff_str(file_op.completion_time, get_time_system());
 
                 ImVec2 cursor_start = imgui::GetCursorScreenPos();
                 imgui::TextUnformatted(when_completed_str.data());
@@ -598,14 +598,14 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
 
                     imgui::SameLine();
 
-                    auto when_undone_str = compute_when_str(file_op.undo_time, current_time_system());
+                    auto when_undone_str = time_diff_str(file_op.undo_time, get_time_system());
                     char const *verb = ICON_CI_DEBUG_STEP_BACK;
                     imgui::Text("%s %s", verb, when_undone_str.data());
                 }
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_src_path)) {
-                char const *src_path = settings.file_operations_src_path_full ? file_op.src_path.data() : get_file_name(file_op.src_path.data());
+                char const *src_path = settings.file_operations_src_path_full ? file_op.src_path.data() : path_find_filename(file_op.src_path.data());
                 auto label = make_str_static<1200>("%s##%zu", src_path, i);
 
                 if (imgui::Selectable(label.data(), file_op.selected, ImGuiSelectableFlags_SpanAllColumns)) {
@@ -676,7 +676,7 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_dst_path)) {
-                char const *dst_path = settings.file_operations_dst_path_full ? file_op.dst_path.data() : get_file_name(file_op.dst_path.data());
+                char const *dst_path = settings.file_operations_dst_path_full ? file_op.dst_path.data() : path_find_filename(file_op.dst_path.data());
                 imgui::TextUnformatted(dst_path);
             }
             if (imgui::TableGetHoveredColumn() == file_ops_table_col_dst_path && imgui::IsItemHovered()) {
@@ -719,7 +719,7 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     if (can_be_undeleted && has_recycle_bin_entry && imgui::Selectable("This")) {
                         if (context_target.obj_type == basic_dirent::kind::directory) {
                             swan_path restore_dir_utf8 = path_create(context_target.src_path.data(),
-                                                                    get_everything_minus_file_name(context_target.src_path.data()).length());
+                                                                    path_extract_location(context_target.src_path.data()).length());
 
                             auto res = enqueue_undelete_directory(context_target.dst_path.data(), restore_dir_utf8.data(), context_target.src_path.data());
 
@@ -732,7 +732,7 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                             auto res = undelete_file(context_target.dst_path.data());
 
                             if (res.success()) {
-                                context_target.undo_time = current_time_system();
+                                context_target.undo_time = get_time_system();
                                 context_target.selected = false;
                                 (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                             }
@@ -753,7 +753,7 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
 
                                 if (res.step3_new_hardlink_created) {
                                     // not a complete success but enough to consider the deletion undone, as the last 2 steps are merely cleanup of the recycle bin
-                                    context_target.undo_time = current_time_system();
+                                    context_target.undo_time = get_time_system();
                                     (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                                 }
                             }
@@ -825,14 +825,14 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
 
                     if (imgui::Selectable("Selection source names")) {
                         std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
-                            char const *file_name = cget_file_name(cfo.src_path.data());
+                            char const *file_name = path_cfind_filename(cfo.src_path.data());
                             return std::string_view(file_name);
                         });
                         imgui::SetClipboardText(clipboard.c_str());
                     }
                     if (imgui::Selectable("Selection source locations")) {
                         std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
-                            std::string_view location = get_everything_minus_file_name(cfo.src_path.data());
+                            std::string_view location = path_extract_location(cfo.src_path.data());
                             return location;
                         });
                         imgui::SetClipboardText(clipboard.c_str());
@@ -849,14 +849,14 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
 
                         if (imgui::Selectable("Selection destination names")) {
                             std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
-                                char const *file_name = cget_file_name(cfo.dst_path.data());
+                                char const *file_name = path_cfind_filename(cfo.dst_path.data());
                                 return std::string_view(file_name);
                             });
                             imgui::SetClipboardText(clipboard.c_str());
                         }
                         if (imgui::Selectable("Selection destination locations")) {
                             std::string clipboard = compute_clipboard([](completed_file_operation const &cfo) noexcept {
-                                std::string_view location = get_everything_minus_file_name(cfo.dst_path.data());
+                                std::string_view location = path_extract_location(cfo.dst_path.data());
                                 return location;
                             });
                             imgui::SetClipboardText(clipboard.c_str());
@@ -873,21 +873,21 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 }
 
                 if (imgui::Selectable("This source name")) {
-                    char const *name = cget_file_name(context_target.src_path.data());
+                    char const *name = path_cfind_filename(context_target.src_path.data());
                     imgui::SetClipboardText(name);
                 }
                 if (imgui::IsItemHovered()) {
-                    char const *name = cget_file_name(context_target.src_path.data());
+                    char const *name = path_cfind_filename(context_target.src_path.data());
                     imgui::SetTooltip(name);
                 }
 
                 if (imgui::Selectable("This source location")) {
-                    std::string_view location = get_everything_minus_file_name(context_target.src_path.data());
+                    std::string_view location = path_extract_location(context_target.src_path.data());
                     std::string location_str(location);
                     imgui::SetClipboardText(location_str.c_str());
                 }
                 if (imgui::IsItemHovered()) {
-                    std::string_view location = get_everything_minus_file_name(context_target.src_path.data());
+                    std::string_view location = path_extract_location(context_target.src_path.data());
                     swan_path location_path = path_create(location.data(), location.size());
                     imgui::SetTooltip(location_path.data());
                 }
@@ -903,21 +903,21 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     imgui::Separator();
 
                     if (imgui::Selectable("This destination name")) {
-                        char const *name = cget_file_name(context_target.dst_path.data());
+                        char const *name = path_cfind_filename(context_target.dst_path.data());
                         imgui::SetClipboardText(name);
                     }
                     if (imgui::IsItemHovered()) {
-                        char const *name = cget_file_name(context_target.dst_path.data());
+                        char const *name = path_cfind_filename(context_target.dst_path.data());
                         imgui::SetTooltip(name);
                     }
 
                     if (imgui::Selectable("This destination location")) {
-                        std::string_view location = get_everything_minus_file_name(context_target.dst_path.data());
+                        std::string_view location = path_extract_location(context_target.dst_path.data());
                         std::string location_str(location);
                         imgui::SetClipboardText(location_str.c_str());
                     }
                     if (imgui::IsItemHovered()) {
-                        std::string_view location = get_everything_minus_file_name(context_target.dst_path.data());
+                        std::string_view location = path_extract_location(context_target.dst_path.data());
                         swan_path location_path = path_create(location.data(), location.size());
                         imgui::SetTooltip(location_path.data());
                     }
@@ -937,8 +937,8 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 auto reveal = [](swan_path const &full_path) noexcept {
                     explorer_window &expl = global_state::explorers()[0];
 
-                    swan_path reveal_name_utf8 = path_create(cget_file_name(full_path.data()));
-                    std::string_view path_no_name_utf8 = get_everything_minus_file_name(full_path.data());
+                    swan_path reveal_name_utf8 = path_create(path_cfind_filename(full_path.data()));
+                    std::string_view path_no_name_utf8 = path_extract_location(full_path.data());
 
                     expl.deselect_all_cwd_entries();
                     {
@@ -1117,7 +1117,7 @@ void print_SIGDN_values(char const *func_label, char const *item_name, IShellIte
     for (auto const &val : values) {
         wchar_t *data = nullptr;
         if (SUCCEEDED(item->GetDisplayName(val.first, &data))) {
-            char data_utf8[2048]; init_empty_cstr(data_utf8);
+            char data_utf8[2048]; cstr_clear(data_utf8);
             if (utf16_to_utf8(data, data_utf8, lengthof(data_utf8))) {
                 print_debug_msg("%s %s %s = [%s]", func_label, item_name, val.second, data_utf8);
             }

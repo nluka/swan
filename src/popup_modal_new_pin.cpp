@@ -41,10 +41,10 @@ void swan_popup_modals::render_new_pin() noexcept
     auto cleanup_and_close_popup = [&]() noexcept {
         g_open = false;
         g_enable_path_text_input = true;
-        init_empty_cstr(g_initial_path_value.data());
+        cstr_clear(g_initial_path_value.data());
 
-        init_empty_cstr(s_label_input);
-        init_empty_cstr(s_path_input.data());
+        cstr_clear(s_label_input);
+        cstr_clear(s_path_input.data());
         s_err_msg.clear();
 
         imgui::CloseCurrentPopup();
@@ -58,7 +58,7 @@ void swan_popup_modals::render_new_pin() noexcept
 
         // set initial label input value to filename if it fits
         {
-            char const *filename = get_file_name(g_initial_path_value.data());
+            char const *filename = path_find_filename(g_initial_path_value.data());
             u64 filename_len = strlen(filename);
             if (filename_len <= pinned_path::LABEL_MAX_LEN) {
                 strncpy(s_label_input, filename, lengthof(s_label_input));
@@ -91,7 +91,7 @@ void swan_popup_modals::render_new_pin() noexcept
 
     // imgui::Spacing();
 
-    if (imgui::Button("Create" "## pin") && !strempty(s_path_input.data()) && !strempty(s_label_input)) {
+    if (imgui::Button("Create" "## pin") && !cstr_empty(s_path_input.data()) && !cstr_empty(s_label_input)) {
         swan_path path = path_squish_adjacent_separators(s_path_input);
         path_force_separator(path, global_state::settings().dir_separator_utf8);
 

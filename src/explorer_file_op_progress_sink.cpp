@@ -96,11 +96,11 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
         auto completed_file_operations = global_state::completed_file_operations_get();
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
-        auto completion_time = current_time_system();
+        auto completion_time = get_time_system();
 
         std::scoped_lock lock(*completed_file_operations.mutex);
 
-        completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::move,
+        completed_file_operations.container->emplace_front(completion_time, time_point_system_t(), file_operation_type::move,
                                                            src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 
@@ -197,9 +197,9 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
             }
         }
         else { // file
-            char const *file_extension = cget_file_ext(deleted_item_path_utf8.data());
+            char const *file_extension = path_cfind_file_ext(deleted_item_path_utf8.data());
 
-            if (file_extension && (streq(file_extension, "htm") || streq(file_extension, "html"))) {
+            if (file_extension && (cstr_eq(file_extension, "htm") || cstr_eq(file_extension, "html"))) {
                 auto [insert_iter, insert_took_place] = connected_files_candidates.emplace(deleted_item_path_utf8.data());
 
                 if (!insert_took_place) {
@@ -214,11 +214,11 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
         auto completed_file_operations = global_state::completed_file_operations_get();
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
-        auto completion_time = current_time_system();
+        auto completion_time = get_time_system();
 
         std::scoped_lock lock(*completed_file_operations.mutex);
 
-        completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::del,
+        completed_file_operations.container->emplace_front(completion_time, time_point_system_t(), file_operation_type::del,
             deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
     }
 
@@ -298,11 +298,11 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
         auto completed_file_operations = global_state::completed_file_operations_get();
 
         basic_dirent::kind obj_type = derive_obj_type(attributes);
-        auto completion_time = current_time_system();
+        auto completion_time = get_time_system();
 
         std::scoped_lock lock(*completed_file_operations.mutex);
 
-        completed_file_operations.container->emplace_front(completion_time, system_time_point_t(), file_operation_type::copy,
+        completed_file_operations.container->emplace_front(completion_time, time_point_system_t(), file_operation_type::copy,
                                                            src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
 

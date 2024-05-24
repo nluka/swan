@@ -30,14 +30,6 @@ void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
             debug_log_package::clear_buffer();
         }
 
-        imgui::SameLine();
-
-    #if 0
-        if (imgui::Button("Save")) {
-            // TODO
-        }
-    #endif
-
         imgui::SameLineSpaced(1);
 
         imgui::Checkbox("Logging enabled", &debug_log_package::s_logging_enabled);
@@ -60,7 +52,7 @@ void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
 
         // second line
 
-        imgui::Text("%-5s %10s %40s:%-6s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
+        imgui::Text("%-5s %10s %30s:%-5s %s", "tid", "ssssss.mmm", "source_file", "line", "message");
         imgui::Separator();
 
         // third line

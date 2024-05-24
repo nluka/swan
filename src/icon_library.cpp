@@ -135,7 +135,7 @@ void swan_windows::render_icon_library(bool &open, [[maybe_unused]] bool any_pop
                           "When disabled, only Levenshtein edit distance is used to sort matches.");
     }
 
-    if (!strempty(s_search_input)) {
+    if (!cstr_empty(s_search_input)) {
         imgui::SameLineSpaced(3);
         imgui::TextDisabled("Icons appear in order of closest to furthest match");
     }

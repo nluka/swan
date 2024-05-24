@@ -47,7 +47,7 @@ HRESULT undelete_directory_progress_sink::FinishOperations(HRESULT) noexcept
         );
 
         if (found != completed_file_operations.container->end()) {
-            found->undo_time = current_time_system();
+            found->undo_time = get_time_system();
             (void) global_state::completed_file_operations_save_to_disk(&lock);
         }
     }

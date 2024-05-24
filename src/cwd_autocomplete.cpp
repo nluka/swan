@@ -67,11 +67,11 @@ void find_cwd_completion_suggestions(directory_completion_suggestions &completio
         if (path_equals_exactly(found_file_name, ".") || path_equals_exactly(found_file_name, "..")) {
             continue;
         }
-        if (streq(found_file_name.data(), search_value.data())) {
+        if (cstr_eq(found_file_name.data(), search_value.data())) {
             continue;
         }
 
-        if (str_starts_with(found_file_name.data(), search_value.data())) {
+        if (cstr_starts_with(found_file_name.data(), search_value.data())) {
             std::scoped_lock lock(search_task.result_mutex);
             search_task.result.emplace_back(directory_completion_suggestions::match::type::starts_with, found_file_name);
         }
@@ -84,13 +84,13 @@ void find_cwd_completion_suggestions(directory_completion_suggestions &completio
 }
 
 #if 0
-    if (!strempty(cget_file_name(s_cwd_input.data()))) {
+    if (!cstr_empty(path_cfind_filename(s_cwd_input.data()))) {
         // cancel existing task, do this as early as possible to maximize chance of ack being received by the time we are
         // ready to launch the new search task
         expl.cwd_completion_suggestions.search_task.cancellation_token.store(true);
         expl.cwd_completion_suggestions.waiting_for_cancel_ack = true;
         expl.cwd_completion_suggestions.final_sort_done = false;
-        std::string_view parent = get_everything_minus_file_name(expl.cwd.data());
+        std::string_view parent = path_extract_location(expl.cwd.data());
         expl.cwd_completion_suggestions.parent_dir = path_create(parent.data(), parent.size());
     }
 #endif
@@ -103,7 +103,7 @@ void find_cwd_completion_suggestions(directory_completion_suggestions &completio
             expl.cwd_completion_suggestions.search_task.cancellation_token.store(false);
             expl.cwd_completion_suggestions.search_task.result.clear();
 
-            swan_path search_value = path_create(cget_file_name(s_cwd_input.data()));
+            swan_path search_value = path_create(path_cfind_filename(s_cwd_input.data()));
 
             auto &thread_pool = global_state::thread_pool();
             thread_pool.push_task(find_cwd_completion_suggestions, std::ref(expl.cwd_completion_suggestions), search_value);
