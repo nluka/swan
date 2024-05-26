@@ -697,9 +697,19 @@ void render_analytics() noexcept
         }
 
         auto &io = imgui::GetIO();
-        imgui::Text("Build mode : %s", get_build_mode().str);
-        imgui::Text("FPS        : %.1f FPS", io.Framerate);
-        imgui::Text("ms/frame   : %.3f", 1000.0f / io.Framerate);
+
+        imgui::Text("%s build", get_build_mode().str);
+        imgui::SameLineSpaced(2);
+        imgui::Text("%.0f FPS", io.Framerate);
+        imgui::SameLineSpaced(2);
+        imgui::Text("%.3f ms/frame", 1000.0f / io.Framerate);
+
+        imgui::Spacing();
+
+        imgui::Text("IsMouseClicked(left): %d", imgui::IsMouseClicked(ImGuiMouseButton_Left));
+        imgui::Text("IsMouseDown(left): %d", imgui::IsMouseDown(ImGuiMouseButton_Left));
+        imgui::Text("IsMouseDragging(left): %d", imgui::IsMouseDragging(ImGuiMouseButton_Left));
+        imgui::Text("IsMouseReleased(left): %d", imgui::IsMouseReleased(ImGuiMouseButton_Left));
     }
     imgui::End();
 }

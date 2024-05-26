@@ -254,9 +254,14 @@ struct explorer_window
         ptrdiff_t highlight_start_idx = 0;
         u64 highlight_len = 0;
         u32 spotlight_frames_remaining = 0;
+
+    #define CACHE_FORMATTED_STRING_COLUMNS 1
+    #if CACHE_FORMATTED_STRING_COLUMNS
         std::array<char, 64> creation_time;
         std::array<char, 64> last_write_time;
         std::array<char, 32> formatted_size;
+    #endif
+
         bool filtered = false;
         bool selected = false;
         bool cut = false;
@@ -567,6 +572,7 @@ struct move_dirents_drag_drop_payload
     s32 src_explorer_id;
     u64 num_items;
     wchar_t *absolute_paths_delimited_by_newlines;
+    u64 obj_type_counts[(u64)basic_dirent::kind::count - 1 /* nil */];
 };
 
 struct pin_drag_drop_payload

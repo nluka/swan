@@ -62,8 +62,9 @@ set_property(TARGET stb_image PROPERTY
 set(SWAN_SOURCES
     "src/libs/ntest.cpp"
     "src/debug_log.cpp"
-    "src/explorer.cpp"
+    "src/explorer_drop_source.cpp"
     "src/explorer_file_op_progress_sink.cpp"
+    "src/explorer.cpp"
     "src/file_operations.cpp"
     "src/finder.cpp"
     "src/focused_window.cpp"

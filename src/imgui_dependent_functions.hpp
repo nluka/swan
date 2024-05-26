@@ -107,6 +107,7 @@ void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] A
         fprintf(file, "%-5d %10.3lf %*s:%-5d ", thread_id, current_time, (int)file_name_max_len, shortened_file_name, (int)pack.loc.line());
         fprintf(file, pack.fmt, args...);
         fprintf(file, "\n");
+        fflush(file);
         fclose(file);
     }
 }

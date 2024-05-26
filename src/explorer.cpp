@@ -4,6 +4,7 @@
 #include "path.hpp"
 #include "scoped_timer.hpp"
 #include "util.hpp"
+#include "explorer_drop_source.hpp"
 
 static IShellLinkW *g_shell_link = nullptr;
 static IPersistFile *g_persist_file_interface = nullptr;
@@ -22,22 +23,29 @@ void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexc
             retry = false;
             what_failed = nullptr;
 
-            HRESULT result = CoInitialize(nullptr);
+            HRESULT result_ole = OleInitialize(nullptr);
 
-            if (FAILED(result)) {
+            if (FAILED(result_ole)) {
+                what_failed = "OleInitialize";
+                // apparently OleUninitialize() is only necessary for successful calls to OleInitialize()
+            }
+
+            HRESULT result_co = CoInitialize(nullptr);
+
+            if (FAILED(result_co)) {
                 CoUninitialize();
                 what_failed = "CoInitialize";
             }
             else {
-                result = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&g_shell_link);
+                result_co = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&g_shell_link);
 
-                if (FAILED(result)) {
+                if (FAILED(result_co)) {
                     what_failed = "CoCreateInstance(CLSID_ShellLink, ..., CLSCTX_INPROC_SERVER, IID_IShellLinkW, ...)";
                 }
                 else {
-                    result = g_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&g_persist_file_interface);
+                    result_co = g_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&g_persist_file_interface);
 
-                    if (FAILED(result)) {
+                    if (FAILED(result_co)) {
                         g_persist_file_interface->Release();
                         CoUninitialize();
                         what_failed = "IUnknown::QueryInterface(IID_IPersistFile, ...)";
@@ -68,6 +76,7 @@ try {
     g_persist_file_interface->Release();
     g_shell_link->Release();
     CoUninitialize();
+    OleUninitialize();
 }
 catch (...) {}
 
@@ -2558,15 +2567,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
 
 void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_window &finder, bool any_popups_open) noexcept
 {
-    ImVec4 window_bg_color = imgui::GetStyle().Colors[ImGuiCol_WindowBg];
-    if (expl.highlight) {
-        expl.highlight = false;
-        imgui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.15f, 0.06f, 0.06f, 1);
-    }
-    SCOPE_EXIT { imgui::GetStyle().Colors[ImGuiCol_WindowBg] = window_bg_color; };
-
     imgui::SetNextWindowSize({ 1280, 720 }, ImGuiCond_Appearing);
-
     {
         bool is_explorer_visible = imgui::Begin(expl.name, &open, ImGuiWindowFlags_NoCollapse);
         if (!is_explorer_visible) {
@@ -2631,6 +2632,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                                                      [](explorer_window::dirent const &e) noexcept { return e.selected; });
 
             if (num_entries_selected == 0) {
+                // TODO notification
                 // swan_popup_modals::open_error("Keybind for rename was pressed.", "Nothing is selected.");
             }
             else if (num_entries_selected == 1) {
@@ -3459,7 +3461,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_ascend_directory
                                         }
 
-                                        return std::nullopt;
+                                        return context_menu_target_name_rect;
                                     }
                                     else {
                                         char const *target = dirent.basic.path.data();
@@ -3473,7 +3475,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
                                         }
 
-                                        return std::nullopt;
+                                        return context_menu_target_name_rect;
                                     }
                                 }
                                 else if (dirent.basic.is_symlink()) {
@@ -3575,7 +3577,14 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
             } // path column
 
-            if (!dirent.basic.is_path_dotdot() && imgui::BeginDragDropSource()) {
+            static bool s_prevent_drag_drop = false;
+
+            if (s_prevent_drag_drop && imgui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                // once the mouse has been clicked, stop preventing drag drop
+                s_prevent_drag_drop = false;
+            }
+
+            if (!s_prevent_drag_drop && !dirent.basic.is_path_dotdot() && imgui::BeginDragDropSource()) {
                 auto cwd_to_utf16 = [&]() noexcept {
                     std::wstring retval;
 
@@ -3594,24 +3603,34 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                     move_dirents_drag_drop_payload &payload,
                     std::wstring &paths,
                     std::wstring const &cwd_utf16,
-                    char const *item_utf8) noexcept
+                    basic_dirent const &dirent) noexcept
                 {
-                    ++payload.num_items;
+                    static std::wstring dirent_full_path_utf16 = {};
+                    dirent_full_path_utf16.clear();
 
-                    paths += cwd_utf16;
-                    if (paths.back() != dir_sep_utf16) {
-                        paths += dir_sep_utf16;
+                    wchar_t dirent_name_utf16[MAX_PATH];
+                    if (!utf8_to_utf16(dirent.path.data(), dirent_name_utf16, lengthof(dirent_name_utf16))) {
+                        return;
                     }
 
-                    wchar_t item_utf16[MAX_PATH];
+                    try {
+                        dirent_full_path_utf16 = cwd_utf16;
+                        if (dirent_full_path_utf16.back() != dir_sep_utf16) {
+                            dirent_full_path_utf16 += dir_sep_utf16;
+                        }
+                        dirent_full_path_utf16 += dirent_name_utf16;
 
-                    if (utf8_to_utf16(item_utf8, item_utf16, lengthof(item_utf16))) {
-                        paths += item_utf16;
-                        paths += L'\n';
+                        paths += dirent_full_path_utf16 += L'\n';
+                        payload.num_items += 1;
+                        payload.obj_type_counts[(u64)dirent.type] += 1;
+                    }
+                    catch (...) {
+                        // TODO report error
                     }
                 };
 
-                auto compute_and_submit_drag_drop_payload = [&]() noexcept {
+                // don't compute payload until someone accepts or it gets dropped
+                if (!global_state::move_dirents_payload_set()) {
                     std::wstring cwd_utf16 = cwd_to_utf16();
                     assert(!cwd_utf16.empty());
                     move_dirents_drag_drop_payload payload = {};
@@ -3622,43 +3641,83 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                     if (dirent.selected) {
                         for (auto const &dirent_ : expl.cwd_entries) {
                             if (!dirent_.filtered && dirent_.selected) {
-                                add_payload_item(payload, paths, cwd_utf16, dirent_.basic.path.data());
+                                add_payload_item(payload, paths, cwd_utf16, dirent_.basic);
                             }
                         }
                     }
                     else {
-                        add_payload_item(payload, paths, cwd_utf16, dirent.basic.path.data());
+                        add_payload_item(payload, paths, cwd_utf16, dirent.basic);
                         global_state::move_dirents_payload_set() = true;
                     }
 
                     wchar_t *paths_data = new wchar_t[paths.size() + 1];
                     StrCpyNW(paths_data, paths.c_str(), s32(paths.size() + 1));
+
                     payload.absolute_paths_delimited_by_newlines = paths_data;
-
                     imgui::SetDragDropPayload("move_dirents_drag_drop_payload", (void *)&payload, sizeof(payload), ImGuiCond_Once);
-
+                    print_debug_msg("SetDragDropPayload(move_dirents_drag_drop_payload)");
                     global_state::move_dirents_payload_set() = true;
+
                     // WCOUT_IF_DEBUG("payload.src_explorer_id = " << payload.src_explorer_id << '\n');
                     // WCOUT_IF_DEBUG("payload.absolute_paths_delimited_by_newlines:\n" << payload.absolute_paths_delimited_by_newlines << '\n');
-                };
-
-                if (!global_state::move_dirents_payload_set()) {
-                    compute_and_submit_drag_drop_payload();
-                } else {
-                    // don't recompute payload until someone accepts or it gets dropped
                 }
 
                 auto payload_wrapper = imgui::GetDragDropPayload();
                 if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
                     auto payload_data = reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data);
                     u64 num_items = payload_data->num_items;
-                    imgui::Text("Move %zu item%s", num_items, num_items == 1 ? "" : "s");
+                    auto const &obj_type_counts = payload_data->obj_type_counts;
+
+                    imgui::Text("%zu", num_items);
+                    for (u64 j = 0; j < (u64)basic_dirent::kind::count - 1 /* nil */; ++j) {
+                        if (bool obj_type_present = obj_type_counts[j] > 0) {
+                            basic_dirent::kind obj_type = basic_dirent::kind(j);
+                            imgui::SameLine();
+                            imgui::TextColored(get_color(obj_type), "%s", get_icon(obj_type));
+                        }
+                    }
+
+                    if (io.KeyCtrl || io.KeyShift) {
+                        explorer_drop_source *drop_obj = new explorer_drop_source();
+                        SCOPE_EXIT { drop_obj->Release(); }; // will `delete drop_obj`
+
+                        // make a copy, don't want race conditions or use after free bugs
+                        drop_obj->absolute_paths_delimited_by_newlines = payload_data->absolute_paths_delimited_by_newlines;
+                        DWORD effect;
+
+                    #if 0 // ! when moving DoDragDrop to separate thread, need to remember to OleInitialize on that thread
+                        HRESULT result_ole = OleInitialize(nullptr);
+                        if (FAILED(result_ole)) {
+                            print_debug_msg("FAILED OleInitialize, aborting DoDragDrop");
+                            return;
+                            // apparently OleUninitialize() is only necessary for successful calls to OleInitialize()
+                        }
+                        SCOPE_EXIT { OleUninitialize(); };
+                    #endif
+
+                        HRESULT result_drag = DoDragDrop(drop_obj, drop_obj, DROPEFFECT_LINK, &effect);
+                        s_prevent_drag_drop = true;
+
+                        // After DoDragDrop completes, IsMouseDown && IsMouseReleased state remains true which is incorrect,
+                        // simulate a release to clear the stuck state.
+                        imgui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Left, false); // release left mouse btn
+
+                        switch (result_drag) {
+                            case DRAGDROP_S_DROP:   print_debug_msg("DoDragDrop The OLE drag-and-drop operation was successful."); break;
+                            case DRAGDROP_S_CANCEL: print_debug_msg("DoDragDrop The OLE drag-and-drop operation was canceled."); break;
+                            case E_UNEXPECTED:      print_debug_msg("DoDragDrop Unexpected error occurred."); break;
+                            default:                print_debug_msg("DoDragDrop (%X) %s", result_drag, _com_error(result_drag).ErrorMessage()); break;
+                        }
+                    }
                 }
 
                 imgui::EndDragDropSource();
             }
 
-            if (!dirent.basic.is_file() && imgui::BeginDragDropTarget()) {
+            if (s_prevent_drag_drop) {
+                imgui::ClearDragDrop(); // Close the fallback "..." imgui payload preview tooltip
+            }
+            else if (!dirent.basic.is_file() && !dirent.basic.is_symlink_to_file() && !dirent.selected && imgui::BeginDragDropTarget()) {
                 auto payload_wrapper = imgui::GetDragDropPayload();
 
                 if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
@@ -3682,6 +3741,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                     if (payload_wrapper != nullptr) {
                         auto payload_data = reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data);
                         assert(payload_data != nullptr);
+                        cstr_fill(payload_data->absolute_paths_delimited_by_newlines, L'!'); // fill with some nonsense for easier debugging
                         delete[] payload_data->absolute_paths_delimited_by_newlines;
                     }
                 }
@@ -3711,7 +3771,16 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_size_formatted)) {
                 if (!dirent.basic.is_directory()) {
-        #if 0
+            #if CACHE_FORMATTED_STRING_COLUMNS
+                    if (cstr_empty(dirent.formatted_size.data())) {
+                        f64 func_us = 0;
+                        SCOPE_EXIT { expl.format_file_size_culmulative_us += func_us; };
+                        scoped_timer<timer_unit::MICROSECONDS> timer(&func_us);
+                        dirent.formatted_size = format_file_size(dirent.basic.size, size_unit_multiplier);
+                    }
+                    imgui::TextUnformatted(dirent.formatted_size.data());
+                    imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_size_formatted, dirent.formatted_size.data());
+            #else
                     std::array<char, 32> formatted_size;
                     {
                         f64 func_us = 0;
@@ -3721,16 +3790,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                     }
                     imgui::TextUnformatted(formatted_size.data());
                     imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_size_formatted, formatted_size.data());
-        #else
-                    if (cstr_empty(dirent.formatted_size.data())) {
-                        f64 func_us = 0;
-                        SCOPE_EXIT { expl.format_file_size_culmulative_us += func_us; };
-                        scoped_timer<timer_unit::MICROSECONDS> timer(&func_us);
-                        dirent.formatted_size = format_file_size(dirent.basic.size, size_unit_multiplier);
-                    }
-                    imgui::TextUnformatted(dirent.formatted_size.data());
-                    imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_size_formatted, dirent.formatted_size.data());
-        #endif
+            #endif
                 }
             }
 
@@ -3743,7 +3803,16 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
             }
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_creation_time)) {
-        #if 0
+            #if CACHE_FORMATTED_STRING_COLUMNS
+                if (cstr_empty(dirent.creation_time.data())) {
+                    f64 func_us = 0;
+                    SCOPE_EXIT { expl.filetime_to_string_culmulative_us += func_us; };
+                    scoped_timer<timer_unit::MICROSECONDS> timer(&func_us);
+                    dirent.creation_time = filetime_to_string(&dirent.basic.creation_time_raw).second;
+                }
+                imgui::TextUnformatted(dirent.creation_time.data());
+                imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_creation_time, dirent.creation_time.data());
+            #else
                 std::pair<s32, std::array<char, 64U>> result;
                 {
                     f64 func_us = 0;
@@ -3753,20 +3822,20 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 }
                 imgui::TextUnformatted(result.second.data());
                 imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_creation_time, result.second.data());
-        #else
-                if (cstr_empty(dirent.creation_time.data())) {
-                    f64 func_us = 0;
-                    SCOPE_EXIT { expl.filetime_to_string_culmulative_us += func_us; };
-                    scoped_timer<timer_unit::MICROSECONDS> timer(&func_us);
-                    dirent.creation_time = filetime_to_string(&dirent.basic.creation_time_raw).second;
-                }
-                imgui::TextUnformatted(dirent.creation_time.data());
-                imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_creation_time, dirent.creation_time.data());
-        #endif
+            #endif
             }
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_last_write_time)) {
-        #if 0
+            #if CACHE_FORMATTED_STRING_COLUMNS
+                if (cstr_empty(dirent.last_write_time.data())) {
+                    f64 func_us = 0;
+                    SCOPE_EXIT { expl.filetime_to_string_culmulative_us += func_us; };
+                    scoped_timer<timer_unit::MICROSECONDS> timer(&func_us);
+                    dirent.last_write_time = filetime_to_string(&dirent.basic.last_write_time_raw).second;
+                }
+                imgui::TextUnformatted(dirent.last_write_time.data());
+                imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_last_write_time, dirent.last_write_time.data());
+            #else
                 std::pair<s32, std::array<char, 64U>> result;
                 {
                     f64 func_us = 0;
@@ -3776,16 +3845,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 }
                 imgui::TextUnformatted(result.second.data());
                 imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_last_write_time, result.second.data());
-        #else
-                if (cstr_empty(dirent.last_write_time.data())) {
-                    f64 func_us = 0;
-                    SCOPE_EXIT { expl.filetime_to_string_culmulative_us += func_us; };
-                    scoped_timer<timer_unit::MICROSECONDS> timer(&func_us);
-                    dirent.last_write_time = filetime_to_string(&dirent.basic.last_write_time_raw).second;
-                }
-                imgui::TextUnformatted(dirent.last_write_time.data());
-                imgui::RenderTooltipWhenColumnTextTruncated(explorer_window::cwd_entries_table_col_last_write_time, dirent.last_write_time.data());
-        #endif
+            #endif
             }
 
             dirent.spotlight_frames_remaining -= 1 * (dirent.spotlight_frames_remaining > 0);
@@ -3902,10 +3962,10 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                     imgui::SetClipboardText(full_path.data());
                 }
             }
-            if (imgui::Selectable("Copy size (bytes)")) {
+            if (imgui::Selectable("Copy size bytes")) {
                 imgui::SetClipboardText(std::to_string(expl.context_menu_target->basic.size).c_str());
             }
-            if (imgui::Selectable("Copy size (pretty)")) {
+            if (imgui::Selectable("Copy size formatted")) {
                 auto formatted_size = format_file_size(expl.context_menu_target->basic.size, settings.size_unit_multiplier);
                 imgui::SetClipboardText(formatted_size.data());
             }
