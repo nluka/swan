@@ -496,7 +496,7 @@ generic_result handle_drag_drop_onto_dirent(
     }
 }
 
-generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const *cwd) noexcept
+generic_result symlink_data::load(char const *lnk_file_path_utf8, char const *cwd) noexcept
 {
     assert(lnk_file_path_utf8 != nullptr);
 
@@ -520,21 +520,19 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
     }
 
     com_handle = g_persist_file_interface->Load(lnk_file_path_utf16, STGM_READ);
-
     if (com_handle != S_OK) {
         return { false, "IPersistFile::Load(..., STGM_READ)." };
     }
 
     com_handle = g_shell_link->GetIDList(&item_id_list);
-
     if (com_handle != S_OK) {
         auto err = get_last_winapi_error().formatted_message;
-        return { false, err + " (IShellLinkW::GetIDList)." };
+        return { false, err + " (from IShellLinkW::GetIDList)." };
     }
 
     if (!SHGetPathFromIDListW(item_id_list, this->target_path_utf16)) {
-        auto err = get_last_winapi_error().formatted_message;
-        return { false, err + " (SHGetPathFromIDListW)." };
+        auto err = cstr_empty(this->target_path_utf16) ? "Empty target path." : get_last_winapi_error().formatted_message;
+        return { false, err + " (from SHGetPathFromIDListW)." };
     }
 
     if (!utf16_to_utf8(this->target_path_utf16, this->target_path_utf8.data(), this->target_path_utf8.size())) {
@@ -542,27 +540,90 @@ generic_result symlink_data::extract(char const *lnk_file_path_utf8, char const 
     }
 
     com_handle = g_shell_link->GetWorkingDirectory(this->working_directory_path_utf16, MAX_PATH);
-
     if (com_handle != S_OK) {
-        return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetWorkingDirectory)." };
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::GetWorkingDirectory)." };
     }
 
     com_handle = g_shell_link->GetArguments(this->arguments_utf16, 1024);
-
     if (com_handle != S_OK) {
-        return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetArguments)." };
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::GetArguments)." };
     }
 
     com_handle = g_shell_link->GetShowCmd(&this->show_cmd);
-
     if (com_handle != S_OK) {
-        return { false, get_last_winapi_error().formatted_message + " (IShellLinkW::GetShowCmd)" };
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::GetShowCmd)" };
     }
 
     return { true, "" }; // success
 }
 
-/// @brief Attempts to extract information from a .lnk file and do something with it depending on the target type.
+generic_result symlink_data::save(char const *lnk_file_path_utf8, char const *cwd) noexcept
+{
+    assert(lnk_file_path_utf8 != nullptr);
+    assert(this->target_path_utf8.data() != nullptr);
+
+    swan_path lnk_file_full_path_utf8;
+    wchar_t lnk_file_path_utf16[MAX_PATH];
+    cstr_clear(lnk_file_path_utf16);
+    HRESULT com_handle = {};
+
+    if (cwd) {
+        lnk_file_full_path_utf8 = path_create(cwd);
+
+        if (!path_append(lnk_file_full_path_utf8, lnk_file_path_utf8, global_state::settings().dir_separator_utf8, true)) {
+            return { false, "Max path length exceeded when appending symlink name to current working directory path." };
+        }
+    } else {
+        lnk_file_full_path_utf8 = path_create(lnk_file_path_utf8);
+    }
+
+    if (!utf8_to_utf16(lnk_file_full_path_utf8.data(), lnk_file_path_utf16, lengthof(lnk_file_path_utf16))) {
+        return { false, "Conversion of symlink path from UTF-8 to UTF-16 failed." };
+    }
+
+    if (!utf8_to_utf16(this->target_path_utf8.data(), this->target_path_utf16, MAX_PATH)) {
+        return { false, "Conversion of symlink target path from UTF-8 to UTF-16 failed." };
+    }
+
+    com_handle = g_shell_link->SetPath(this->target_path_utf16);
+    if (com_handle != S_OK) {
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::SetPath)." };
+    }
+
+    com_handle = g_shell_link->SetWorkingDirectory(this->working_directory_path_utf16);
+    if (com_handle != S_OK) {
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::SetWorkingDirectory)." };
+    }
+
+    com_handle = g_shell_link->SetArguments(this->arguments_utf16);
+    if (com_handle != S_OK) {
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::SetArguments)." };
+    }
+
+    com_handle = g_shell_link->SetShowCmd(this->show_cmd);
+    if (com_handle != S_OK) {
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::SetShowCmd)." };
+    }
+
+    com_handle = g_shell_link->SetDescription(L"");
+    if (com_handle != S_OK) {
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::SetDescription)." };
+    }
+
+    com_handle = g_shell_link->QueryInterface(IID_IPersistFile, reinterpret_cast<void**>(&g_persist_file_interface));
+    if (com_handle != S_OK) {
+        return { false, get_last_winapi_error().formatted_message + " (from IShellLinkW::QueryInterface(IID_IPersistFile)." };
+    }
+
+    com_handle = g_persist_file_interface->Save(lnk_file_path_utf16, TRUE);
+    if (com_handle != S_OK) {
+        return { false, get_last_winapi_error().formatted_message + " (from IPersistFile::Save)." };
+    }
+
+    return { true, "" }; // success
+}
+
+/// @brief Attempts to load information from a .lnk file and do something with it depending on the target type.
 /// @param dirent The .lnk file.
 /// @param expl Contextual explorer window.
 /// @return If symlink points to a file, attempt ShellExecuteW("open") and return the result.
@@ -572,7 +633,7 @@ static
 generic_result open_symlink(explorer_window::dirent const &dirent, explorer_window &expl) noexcept
 {
     symlink_data lnk_data = {};
-    auto extract_result = lnk_data.extract(dirent.basic.path.data(), expl.cwd.data());
+    auto extract_result = lnk_data.load(dirent.basic.path.data(), expl.cwd.data());
     if (!extract_result.success) {
         return extract_result; // propogate failure to caller
     }
@@ -3891,7 +3952,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
             if (expl.context_menu_target->basic.is_symlink_to_file() && imgui::Selectable("Open file location")) {
                 symlink_data lnk_data = {};
-                auto extract_result = lnk_data.extract(expl.context_menu_target->basic.path.data(), expl.cwd.data());
+                auto extract_result = lnk_data.load(expl.context_menu_target->basic.path.data(), expl.cwd.data());
 
                 if (!extract_result.success) {
                     std::string action = make_str("Open file location of [%s].", expl.context_menu_target->basic.path.data());
@@ -3997,7 +4058,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                 }
             };
 
-            if (imgui::Selectable("Cut##single")) {
+            if (imgui::Selectable("Cut" "## single")) {
                 if (!io.KeyShift) {
                     g_file_op_payload.clear();
                 }
@@ -4006,7 +4067,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                 auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("cut", result);
             }
-            if (imgui::Selectable("Copy##single")) {
+            if (imgui::Selectable("Copy" "## single")) {
                 if (!io.KeyShift) {
                     g_file_op_payload.clear();
                 }
@@ -4020,7 +4081,38 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
             imgui::Separator();
 
-            if (imgui::Selectable("Delete##single")) {
+            if (imgui::Selectable("Create shortcut" "## single")) {
+                swan_path lnk_path = expl.context_menu_target->basic.path;
+                // TODO add something to end of path to avoid overwriting existing .lnk file
+
+                if (!path_append(lnk_path, ".lnk")) {
+                    std::string action = make_str("Create link path for [%s].", expl.context_menu_target->basic.path.data());
+                    char const *failed = "Max path length exceeded when appending [.lnk] to file name.";
+                    swan_popup_modals::open_error(action.c_str(), failed);
+                }
+                else {
+                    symlink_data lnk;
+                    lnk.show_cmd = SW_SHOWDEFAULT;
+                    lnk.target_path_utf8 = expl.context_menu_target->basic.path;
+                    cstr_clear(lnk.target_path_utf16);
+                    cstr_clear(lnk.arguments_utf16);
+                    cstr_clear(lnk.working_directory_path_utf16);
+
+                    swan_path cwd_canonical = path_reconstruct_canonically(expl.cwd.data());
+                    if (!utf8_to_utf16(cwd_canonical.data(), lnk.working_directory_path_utf16, lengthof(lnk.working_directory_path_utf16))) {
+                        // TODO notification (warning)
+                    }
+
+                    auto result = lnk.save(lnk_path.data(), expl.cwd.data());
+
+                    if (!result.success) {
+                        std::string action = make_str("Create link file for [%s].", expl.context_menu_target->basic.path.data());
+                        char const *failed = result.error_or_utf8_path.c_str();
+                        swan_popup_modals::open_error(action.c_str(), failed);
+                    }
+                }
+            }
+            if (imgui::Selectable("Delete" "## single")) {
                 expl.deselect_all_cwd_entries();
                 expl.context_menu_target->selected = true;
 
@@ -4042,7 +4134,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                     /* confirmation_enabled = */ &(global_state::settings().confirm_explorer_delete_via_context_menu)
                 );
             }
-            if (imgui::Selectable("Rename##single")) {
+            if (imgui::Selectable("Rename" "## single")) {
                 retval.open_single_rename_popup = true;
                 retval.single_dirent_to_be_renamed = expl.context_menu_target;
             }
@@ -4091,14 +4183,14 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                 }
             };
 
-            if (imgui::Selectable("Cut##multi")) {
+            if (imgui::Selectable("Cut" "## multi")) {
                 if (!io.KeyShift) {
                     g_file_op_payload.clear();
                 }
                 auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("Cut", result);
             }
-            if (imgui::Selectable("Copy##multi")) {
+            if (imgui::Selectable("Copy" "## multi")) {
                 if (!io.KeyShift) {
                     g_file_op_payload.clear();
                 }
@@ -4108,7 +4200,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
             imgui::Separator();
 
-            if (imgui::Selectable("Delete##multi")) {
+            if (imgui::Selectable("Delete" "## multi")) {
                 auto result = delete_selected_entries(expl);
                 handle_failure("Delete", result);
             }

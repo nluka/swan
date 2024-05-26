@@ -809,7 +809,7 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
                 }
             };
 
-            attempt_load_font("fonts/RobotoMono-Regular.ttf", 18.0f, false);
+            attempt_load_font("fonts/RobotoMono-Regular.ttf", 17.0f, false);
             // attempt_load_font("C:/Windows/Fonts/consola.ttf", 17.0f, false, false);
             // attempt_load_font("C:/Windows/Fonts/arialuni.ttf", 20.0f, false, false);
             attempt_load_font("fonts/CascadiaMonoPL.ttf", 16.0f, true, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());

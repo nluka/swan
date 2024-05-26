@@ -452,12 +452,13 @@ struct finder_window
 struct symlink_data
 {
     s32 show_cmd;
-    wchar_t target_path_utf16[MAX_PATH];
     swan_path target_path_utf8;
+    wchar_t target_path_utf16[MAX_PATH];
     wchar_t working_directory_path_utf16[MAX_PATH];
     wchar_t arguments_utf16[1024];
 
-    generic_result extract(char const *lnk_file_path_utf8, char const *cwd = nullptr) noexcept;
+    generic_result load(char const *lnk_file_path_utf8, char const *cwd = nullptr) noexcept;
+    generic_result save(char const *lnk_file_path_utf8, char const *cwd = nullptr) noexcept;
 };
 
 enum class file_operation_type : char

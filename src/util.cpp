@@ -478,6 +478,12 @@ bool cstr_empty(char const *s) noexcept
     return s[0] == '\0';
 }
 
+bool cstr_empty(wchar_t const *s) noexcept
+{
+    assert(s != nullptr);
+    return s[0] == L'\0';
+}
+
 wchar_t const *windows_illegal_filename_chars() noexcept
 {
     return L"\\/<>\"|?*";

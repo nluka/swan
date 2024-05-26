@@ -84,6 +84,7 @@
 
     bool cstr_eq(char const *s1, char const *s2) noexcept;
     bool cstr_empty(char const *s) noexcept;
+    bool cstr_empty(wchar_t const *s) noexcept;
     bool cstr_starts_with(char const *str, char const *prefix) noexcept;
     bool cstr_ends_with(char const *str, char const *suffix) noexcept;
     u64 cstr_erase_adjacent_spaces(char *str, u64 len = 0) noexcept;
