@@ -3756,7 +3756,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                         SCOPE_EXIT { OleUninitialize(); };
                     #endif
 
-                        HRESULT result_drag = DoDragDrop(drop_obj, drop_obj, DROPEFFECT_LINK, &effect);
+                        HRESULT result_drag = DoDragDrop(drop_obj, drop_obj, DROPEFFECT_LINK|DROPEFFECT_COPY, &effect);
                         s_prevent_drag_drop = true;
 
                         // After DoDragDrop completes, IsMouseDown && IsMouseReleased state remains true which is incorrect,

@@ -382,10 +382,6 @@ try {
 
     if (format_etc->cfFormat == CF_HDROP) {
         auto &paths = absolute_paths_delimited_by_newlines;
-        if (paths.ends_with(L'\n')) {
-            paths.pop_back();
-        }
-
         size_t total_payload_size = sizeof(DROPFILES) + (sizeof(wchar_t) * (paths.size() + 1));
 
         // Allocate global memory for the DROPFILES structure
