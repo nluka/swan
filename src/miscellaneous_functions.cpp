@@ -533,23 +533,19 @@ std::array<char, 64> get_type_text_for_extension(char const *extension) noexcept
         { "zip", "Zip Archive" },
     };
 
-    // std::equal_range is weird, it doesn't return .end() if the value isn't found... hence I am using std::binary_search to check
-    // if the extension exists first before using std::equal_range to find the matching element in `extension_to_type_text`
+    auto [first_iter, last_iter] = std::equal_range(extension_to_type_text.begin(), extension_to_type_text.end(),
+        extension_pair_t(extension, nullptr), [](extension_pair_t const &lhs, extension_pair_t const &rhs) noexcept {
+            return strcmp(lhs.first, rhs.first) < 0;
+        });
 
-    bool found = std::binary_search(extension_to_type_text.begin(), extension_to_type_text.end(), extension_pair_t(extension, nullptr),
-        [](extension_pair_t const &lhs, extension_pair_t const &rhs) noexcept { return strcmp(lhs.first, rhs.first) < 0; });
-
-    if (found) {
-        auto matching_elem_it = std::lower_bound(extension_to_type_text.begin(), extension_to_type_text.end(), extension_pair_t(extension, nullptr),
-            [](extension_pair_t const &lhs, extension_pair_t const &rhs) noexcept { return strcmp(lhs.first, rhs.first) < 0; });
-
-        return make_str_static<64>(matching_elem_it->second);
+    if (bool found = std::distance(first_iter, last_iter) == 1) {
+        return make_str_static<64>(first_iter->second);
     }
-
-    auto res = make_str_static<64>("%s File", extension);
-    std::_Buffer_to_uppercase(res.data(), res.data() + strlen(extension)); //! risky to use this function, but IntelliSense found it in <format>... YOLO
-
-    return res;
+    else {
+        auto res = make_str_static<64>("%s File", extension);
+        std::_Buffer_to_uppercase(res.data(), res.data() + strlen(extension));
+        return res;
+    }
 }
 
 winapi_error get_last_winapi_error() noexcept

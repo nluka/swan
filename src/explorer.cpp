@@ -1474,6 +1474,7 @@ void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
     imgui::Text("update_cwd_entries_culmulative: %.0lf ms", expl.update_cwd_entries_culmulative_us / 1000.);
     imgui::Text("filetime_to_string_culmulative: %.0lf ms", expl.filetime_to_string_culmulative_us / 1000.);
     imgui::Text("format_file_size_culmulative: %.0lf ms", expl.format_file_size_culmulative_us / 1000.);
+    imgui::Text("type_description_culmulative_us: %.0lf ms", expl.type_description_culmulative_us / 1000.);
 
 #if 0
     {
@@ -3815,15 +3816,25 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
             }
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_type)) {
+            // #if CACHE_FORMATTED_STRING_COLUMNS
+                // Not worth caching, miniscule cost to compute each frame
+
                 std::array<char, 64> type_text;
-                if (dirent.basic.is_directory()) {
-                    type_text = { "Directory" };
-                } else {
-                    if (std::strchr(dirent.basic.path.data(), '.')) {
-                        char const *extension = path_cfind_file_ext(dirent.basic.path.data());
-                        type_text = get_type_text_for_extension(extension);
+                {
+                    f64 func_us = 0;
+                    SCOPE_EXIT { expl.type_description_culmulative_us += func_us; };
+                    scoped_timer<timer_unit::MICROSECONDS> timer(&func_us);
+
+                    if (dirent.basic.is_directory()) {
+                        type_text = { "Directory" };
                     } else {
-                        type_text = { "File" };
+                        if (std::strchr(dirent.basic.path.data(), '.')) {
+
+                            char const *extension = path_cfind_file_ext(dirent.basic.path.data());
+                            type_text = get_type_text_for_extension(extension);
+                        } else {
+                            type_text = { "File" };
+                        }
                     }
                 }
                 imgui::TextUnformatted(type_text.data());

@@ -391,6 +391,7 @@ struct explorer_window
     mutable f64 update_cwd_entries_culmulative_us = 0;
     mutable f64 filetime_to_string_culmulative_us = 0;
     mutable f64 format_file_size_culmulative_us = 0;
+    mutable f64 type_description_culmulative_us = 0;
 
     //? mutable because they are debug counters/timers
 
