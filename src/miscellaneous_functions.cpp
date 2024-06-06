@@ -788,7 +788,8 @@ help_indicator render_help_indicator(bool align_text_to_frame_padding) noexcept
     if (align_text_to_frame_padding) imgui::AlignTextToFramePadding();
     imgui::TextDisabled(g_help_indicator);
     retval.hovered = imgui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
-    retval.clicked = imgui::IsItemClicked();
+    retval.left_clicked = imgui::IsItemClicked(ImGuiMouseButton_Left);
+    retval.right_clicked = imgui::IsItemClicked(ImGuiMouseButton_Right);
     return retval;
 }
 

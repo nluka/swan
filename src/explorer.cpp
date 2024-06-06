@@ -119,7 +119,7 @@ static
 void accept_move_dirents_drag_drop(explorer_window &expl) noexcept;
 
 static
-void render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle &style, bool cwd_exists_after_edit) noexcept;
+ImRect render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle &style, bool cwd_exists_after_edit) noexcept;
 
 u64 explorer_window::deselect_all_cwd_entries() noexcept
 {
@@ -1425,6 +1425,7 @@ void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
     imgui::Text("select_cwd_entries_on_next_update.size(): %zu", expl.select_cwd_entries_on_next_update.size());
     imgui::Text("cwd_latest_selected_dirent_idx: %zu", expl.cwd_latest_selected_dirent_idx);
     imgui::Text("latest_save_to_disk_result: %d", expl.latest_save_to_disk_result);
+    imgui::Text("footer_hovered: %d", expl.footer_hovered);
 
     imgui::Spacing();
     imgui::SeparatorText("Memory");
@@ -2404,16 +2405,26 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
 }
 
 static
-void render_help_icon() noexcept
+void render_help_icon(explorer_window &expl) noexcept
 {
+    expl.highlight_footer = false;
+
     auto help = render_help_indicator(true);
 
     if (help.hovered && !imgui::IsPopupOpen("## explorer help")) {
-        imgui::SetTooltip("Click to see [Explorer] help");
+        imgui::SetTooltip("Left click to see help about [Explorer]\n"
+                          "\n"
+                          "Right click to open debug info window");
     }
-    if (help.clicked) {
+    if (help.left_clicked) {
         imgui::OpenPopup("## explorer help");
     }
+    if (help.right_clicked) {
+        expl.debug_window_open = true;
+    }
+
+    imgui::SetNextWindowSizeConstraints(ImVec2(200, 200), ImVec2(imgui::GetMainViewport()->Size.x, 800));
+    // imgui::SetNextWindowSize()
 
     if (imgui::BeginPopup("## explorer help")) {
         static std::string s_search_input = {};
@@ -2534,7 +2545,7 @@ void render_help_icon() noexcept
                 {" - Double left click an entry to open it."},
                 {" - Right click an entry to open the context menu for selected entries, or the hovered entry if none are selected."},
             };
-            imgui::TextUnformatted("[General navigation]");
+            imgui::TextUnformatted("[General Navigation]");
             for (auto &l : s_lines) {
                 render_line(l);
             }
@@ -2551,6 +2562,20 @@ void render_help_icon() noexcept
             for (auto &l : s_lines) {
                 render_line(l);
             }
+        }
+        imgui::Spacing();
+        {
+            // static line s_lines[] = {
+            //     {},
+            // };
+            imgui::TextUnformatted("[Tips]");
+            imgui::TextUnformatted(" - Left click when hovering footer to clear selection. (Hover to highlight footer)");
+            if (imgui::IsItemHovered()) {
+                expl.highlight_footer = true;
+            }
+            // for (auto &l : s_lines) {
+            //     render_line(l);
+            // }
         }
         imgui::Spacing();
 
@@ -2867,9 +2892,9 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
     // refresh logic end
 
-    if (global_state::settings().show_debug_info) {
+    if (expl.debug_window_open) {
         auto window_name = make_str_static<64>(" Explorer %d Debug Info ", expl.id + 1);
-        if (imgui::Begin(window_name.data(), nullptr)) {
+        if (imgui::Begin(window_name.data(), &expl.debug_window_open)) {
             render_debug_info(expl, size_unit_multiplier);
         }
         imgui::End();
@@ -2902,7 +2927,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         imgui::SameLine();
 
-        render_help_icon();
+        render_help_icon(expl);
     }
 
 #if 0
@@ -3109,7 +3134,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 }
 
                 // opens "Context" popup if a rendered dirent is right clicked
-                auto context_menu_target_name_rect = render_table_rows_for_cwd_entries(expl, cnt, size_unit_multiplier, any_popups_open, dir_sep_utf8, dir_sep_utf16);
+                auto context_menu_target_row_rect = render_table_rows_for_cwd_entries(expl, cnt, size_unit_multiplier, any_popups_open, dir_sep_utf8, dir_sep_utf16);
 
                 auto result = render_dirent_context_menu(expl, cnt, global_state::settings());
                 open_bulk_rename_popup   |= result.open_bulk_rename_popup;
@@ -3118,13 +3143,12 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     s_dirent_to_be_renamed = result.single_dirent_to_be_renamed;
                 }
 
-                if (result.context_menu_rect.has_value() && context_menu_target_name_rect.has_value() && cnt.selected_dirents <= 1) {
-                    ImVec2 surrounding_rect_padding = { 5.f, 5.f };
-                    context_menu_target_name_rect.value().Min -= surrounding_rect_padding;
-                    context_menu_target_name_rect.value().Max += surrounding_rect_padding;
-
-                    // (void) imgui::DrawBestLineBetweenContextMenuAndTarget(context_menu_target_name_rect.value(), result.context_menu_rect.value().GetTL(), ImVec4(255, 0, 0, 200));
-                    (void) imgui::DrawBestLineBetweenRectCorners(context_menu_target_name_rect.value(), result.context_menu_rect.value(), ImVec4(255, 255, 255, 100), true, false, 2.f, 2.f);
+                if (result.context_menu_rect.has_value() && context_menu_target_row_rect.has_value() && cnt.selected_dirents <= 1) {
+                    assert(result.context_menu_rect.has_value());
+                    ImVec2 min = context_menu_target_row_rect.value().Min;
+                    min.x += 1; // to avoid overlap with table left V border
+                    ImVec2 const &max = context_menu_target_row_rect.value().Max;
+                    ImGui::GetWindowDrawList()->AddRect(min, max, imgui::ImVec4_to_ImU32(imgui::GetStyleColorVec4(ImGuiCol_NavHighlight), true));
                 }
 
                 imgui::EndTable();
@@ -3145,13 +3169,14 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     ImVec2 cwd_entries_child_min = imgui::GetItemRectMin();
     ImVec2 cwd_entries_child_max = imgui::GetItemRectMax();
 
-    ImVec2 footer_rect_min(cwd_entries_child_min.x, cwd_entries_table_max.y);
-    ImVec2 footer_rect_max = cwd_entries_child_max;
+    // ImVec2 footer_rect_min(cwd_entries_child_min.x, cwd_entries_table_max.y);
+    // ImVec2 footer_rect_max = cwd_entries_table_max + ImVec2(0, imgui::GetContentRegionAvail().y);
 
     bool mouse_hovering_cwd_entries_child = imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max);
-    bool mouse_hovering_footer = imgui::IsMouseHoveringRect(footer_rect_min, footer_rect_max);
+    // bool mouse_hovering_footer = imgui::IsMouseHoveringRect(footer_rect_min, footer_rect_max);
+    // expl.footer_hovered = mouse_hovering_footer;
 
-    if (!any_popups_open && (mouse_hovering_cwd_entries_child || mouse_hovering_footer)) {
+    if (!any_popups_open && mouse_hovering_cwd_entries_child) {
         auto handle_file_op_failure = [](char const *operation, generic_result const &result) noexcept {
             if (!result.success) {
                 u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
@@ -3227,7 +3252,35 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     #endif
     }
-    if (!any_popups_open && cwd_exists_after_edit && imgui::IsMouseClicked(ImGuiMouseButton_Right) && mouse_hovering_footer) {
+
+    if (!drives_table_rendered) {
+        expl.footer_rect = render_footer(expl, cnt, style, cwd_exists_after_edit);
+
+        if (!path_is_empty(expl.cwd) && cwd_exists_after_edit && !g_file_op_payload.items.empty()) {
+            imgui::OpenPopupOnItemClick("## explorer_footer_context", ImGuiPopupFlags_MouseButtonRight);
+
+            if (imgui::BeginPopup("## explorer_footer_context")) {
+                if (imgui::Selectable("Paste")) {
+                    auto result = g_file_op_payload.execute(expl);
+                    // TODO: why is result unused?
+                }
+                imgui::EndPopup();
+            }
+        }
+    }
+
+    if (expl.footer_rect.has_value()) {
+        expl.footer_hovered = imgui::IsMouseHoveringRect(expl.footer_rect.value().Min, expl.footer_rect.value().Max);
+        if (expl.footer_hovered && imgui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            expl.deselect_all_cwd_entries();
+        }
+        if (expl.highlight_footer) {
+            imgui::GetWindowDrawList()->AddRectFilled(expl.footer_rect.value().Min, expl.footer_rect.value().Max,
+                                                      imgui::ImVec4_to_ImU32(imgui::ReduceAlphaTo(imgui::Denormalize(warning_lite_color()), 75)));
+        }
+    }
+
+    if (!any_popups_open && cwd_exists_after_edit && imgui::IsMouseClicked(ImGuiMouseButton_Right) && expl.footer_hovered) {
         imgui::OpenPopup("## cwd_entries_child_leftovers context_menu");
     }
     if (imgui::BeginPopup("## cwd_entries_child_leftovers context_menu")) {
@@ -3244,22 +3297,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
 
         imgui::EndPopup();
-    }
-
-    if (!drives_table_rendered) {
-        render_footer(expl, cnt, style, cwd_exists_after_edit);
-
-        if (!path_is_empty(expl.cwd) && cwd_exists_after_edit && !g_file_op_payload.items.empty()) {
-            imgui::OpenPopupOnItemClick("## explorer_footer_context", ImGuiPopupFlags_MouseButtonRight);
-
-            if (imgui::BeginPopup("## explorer_footer_context")) {
-                if (imgui::Selectable("Paste")) {
-                    auto result = g_file_op_payload.execute(expl);
-                    // TODO: why is result unused?
-                }
-                imgui::EndPopup();
-            }
-        }
     }
 
     if (open_single_rename_popup) {
@@ -3414,7 +3451,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
     char dir_sep_utf8,
     wchar_t dir_sep_utf16) noexcept
 {
-    std::optional<ImRect> context_menu_target_name_rect = std::nullopt;
+    std::optional<ImRect> context_menu_target_row_rect = std::nullopt;
 
     auto io = imgui::GetIO();
 
@@ -3429,6 +3466,8 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
         for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
             auto &dirent = expl.cwd_entries[i];
             [[maybe_unused]] char *path = dirent.basic.path.data();
+
+            ImRect selectable_rect;
 
             imgui::TableNextRow();
 
@@ -3464,10 +3503,6 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 imgui::SameLine();
 
                 ImVec2 path_text_rect_min = imgui::GetCursorScreenPos();
-
-                ImVec2 name_TL = imgui::GetCursorScreenPos();
-                ImVec2 name_BR = {};
-
                 {
                     imgui::ScopedTextColor tc_spotlight(dirent.spotlight_frames_remaining > 0 ? error_color() : imgui::GetStyle().Colors[ImGuiCol_Text]);
                     // imgui::ScopedStyle<ImVec4> tc_context(imgui::GetStyle().Colors[ImGuiCol_Text], error_color(), dirent.context_menu_active);
@@ -3523,7 +3558,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_ascend_directory
                                         }
 
-                                        return context_menu_target_name_rect;
+                                        return context_menu_target_row_rect;
                                     }
                                     else {
                                         char const *target = dirent.basic.path.data();
@@ -3537,7 +3572,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
                                         }
 
-                                        return context_menu_target_name_rect;
+                                        return context_menu_target_row_rect;
                                     }
                                 }
                                 else if (dirent.basic.is_symlink()) {
@@ -3609,7 +3644,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
                     } // imgui::Selectable
 
-                    name_BR = name_TL + imgui::CalcTextSize(dirent.basic.path.data());
+                    selectable_rect = imgui::GetItemRect();
 
                     {
                         f32 offset_for_icon_and_space = imgui::CalcTextSize(icon).x + imgui::CalcTextSize(" ").x;
@@ -3627,14 +3662,10 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 }
 
                 if (imgui::IsItemClicked(ImGuiMouseButton_Right) && !any_popups_open && !dirent.basic.is_path_dotdot()) {
-                    print_debug_msg("[ %d ] right clicked [%s]", expl.id, dirent.basic.path.data());
+                    // print_debug_msg("[ %d ] right clicked [%s]", expl.id, dirent.basic.path.data());
                     imgui::OpenPopup("## explorer context_menu");
                     expl.context_menu_target = &dirent;
                     dirent.context_menu_active = true;
-                }
-
-                if (dirent.context_menu_active) {
-                    context_menu_target_name_rect.emplace(name_TL, name_BR);
                 }
 
             } // path column
@@ -3920,11 +3951,15 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
             #endif
             }
 
-            dirent.spotlight_frames_remaining -= 1 * (dirent.spotlight_frames_remaining > 0);
+            if (dirent.context_menu_active) {
+                context_menu_target_row_rect.emplace(selectable_rect.Min, selectable_rect.Max);
+            }
+
+            dirent.spotlight_frames_remaining -= (dirent.spotlight_frames_remaining > 0);
         }
     }
 
-    return context_menu_target_name_rect;
+    return context_menu_target_row_rect;
 }
 
 static
@@ -3994,7 +4029,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                 static progressive_task<std::optional<generic_result>> task = {};
 
                 if (imgui::Selectable("Open with...")) {
-                    global_state::thread_pool().push_task([&expl]() {
+                    global_state::thread_pool().push_task([&expl]() noexcept {
                         task.active_token.store(true);
 
                         auto res = open_file_with(expl.context_menu_target->basic.path.data(), expl.cwd.data());
@@ -4279,7 +4314,7 @@ void accept_move_dirents_drag_drop(explorer_window &expl) noexcept
 }
 
 static
-void render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle &style, bool cwd_exists_after_edit) noexcept
+ImRect render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle &style, bool cwd_exists_after_edit) noexcept
 {
     if (imgui::BeginChild("explorer_footer", { 0, imgui::CalcTextSize("1").y + style.WindowPadding.y + 5*2 }), ImGuiWindowFlags_NoNav) {
         imgui::ScopedStyle<f32> s2(style.ItemSpacing.y, 5);
@@ -4330,4 +4365,6 @@ void render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyle 
     }
 
     imgui::EndChild();
+
+    return imgui::GetItemRect();
 }

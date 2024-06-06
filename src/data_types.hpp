@@ -354,6 +354,10 @@ struct explorer_window
     std::vector<dirent> cwd_entries = {};                           // all direct children of the cwd
     std::vector<swan_path> select_cwd_entries_on_next_update = {};  // entries to select on the next update of cwd_entries
 
+    // 16 byte alignment members
+
+    std::optional<ImRect> footer_rect = std::nullopt;
+
     // 8 byte alignment members
 
     char const *name = nullptr;
@@ -416,9 +420,11 @@ struct explorer_window
     bool filter_show_symlink_files = true;        // persisted in file
     bool filter_show_invalid_symlinks = true;     // persisted in file
 
+    bool debug_window_open = false;
     bool show_filter_window = false;
     bool cwd_latest_selected_dirent_idx_changed = false;
-    bool highlight = false;
+    bool footer_hovered = false;
+    bool highlight_footer = false;
 
     update_cwd_entries_actions update_request_from_outside = nil; /* how code from outside the Begin()/End() of the explorer window
                                                                      signals to the explorer to call update_cwd_entries */

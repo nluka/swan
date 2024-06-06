@@ -85,6 +85,8 @@ namespace swan_windows
 
     void render_theme_editor(bool &open, ImGuiStyle const &fallback_style, bool any_popups_open) noexcept;
 
+    void render_analytics() noexcept;
+
 } // namespace render_window
 
 namespace swan_popup_modals
@@ -228,7 +230,8 @@ std::optional<ntest::report_result> run_tests(std::filesystem::path const &outpu
 struct help_indicator
 {
     bool hovered;
-    bool clicked;
+    bool left_clicked;
+    bool right_clicked;
 };
 help_indicator render_help_indicator(bool align_text_to_frame_padding) noexcept;
 

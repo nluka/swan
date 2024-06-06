@@ -272,7 +272,8 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 imgui::Text("%s %s", file.action.c_str(), when.data());
             }
 
-            ImVec2 file_name_TL;
+            // ImVec2 file_name_TL;
+            ImRect selectable_rect;
 
             if (imgui::TableSetColumnIndex(recent_files_table_col_file_name)) {
                 {
@@ -287,8 +288,6 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 }
 
                 imgui::SameLine();
-
-                file_name_TL = imgui::GetCursorScreenPos();
 
                 auto label = make_str_static<1200>("%s##recent_file_%zu", file_name, i);
                 if (imgui::Selectable(label.data(), file.selected, ImGuiSelectableFlags_SpanAllColumns|ImGuiSelectableFlags_AllowDoubleClick)) {
@@ -319,6 +318,7 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                     double_clicked |= imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
                 }
                 right_clicked |= imgui::IsItemClicked(ImGuiMouseButton_Right);
+                selectable_rect = imgui::GetItemRect();
             }
 
             if (imgui::TableSetColumnIndex(recent_files_table_col_location)) {
@@ -347,11 +347,7 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
             }
 
             if (file.context_menu_active) {
-                ImVec2 file_name_BR = file_name_TL + imgui::CalcTextSize(file_name);
-                file_name_rect.emplace(file_name_TL, file_name_BR);
-                ImVec2 surrounding_rect_padding = { 5.f, 5.f };
-                file_name_rect.value().Min -= surrounding_rect_padding;
-                file_name_rect.value().Max += surrounding_rect_padding;
+                ImGui::GetWindowDrawList()->AddRect(selectable_rect.Min, selectable_rect.Max, imgui::ImVec4_to_ImU32(imgui::GetStyleColorVec4(ImGuiCol_NavHighlight), true));
             }
         }
 
@@ -532,11 +528,6 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
             ImRect context_menu_rect = { popup_pos, popup_pos + popup_size };
 
             imgui::EndPopup();
-
-            if (draw_context_connector) {
-                // TODO: draw rect around row instead
-                imgui::DrawBestLineBetweenRectCorners(file_name_rect.value(), context_menu_rect, ImVec4(255, 255, 255, 100), true, false, 2.f, 2.f);
-            }
         }
         else {
             if (s_context_menu_target != nullptr) {

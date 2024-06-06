@@ -692,11 +692,13 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         }
 
         if (imgui::IsPopupOpen("## completed_file_operations_get context_menu")) {
-            assert(s_context_menu_target_rect.has_value());
-            ImVec2 min = s_context_menu_target_rect.value().Min;
-            min.x += 1; // to avoid overlap with table left V border
-            ImVec2 const &max = s_context_menu_target_rect.value().Max;
-            ImGui::GetWindowDrawList()->AddRect(min, max, imgui::ImVec4_to_ImU32(imgui::GetStyleColorVec4(ImGuiCol_TextDisabled), true));
+            if (s_num_selected_when_context_menu_opened <= 1) {
+                assert(s_context_menu_target_rect.has_value());
+                ImVec2 min = s_context_menu_target_rect.value().Min;
+                min.x += 1; // to avoid overlap with table left V border
+                ImVec2 const &max = s_context_menu_target_rect.value().Max;
+                ImGui::GetWindowDrawList()->AddRect(min, max, imgui::ImVec4_to_ImU32(imgui::GetStyleColorVec4(ImGuiCol_NavHighlight), true));
+            }
         } else {
             s_context_menu_target_iter = std::nullopt;
             s_context_menu_target_rect = std::nullopt;
