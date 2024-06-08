@@ -509,6 +509,8 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
     imgui::SameLineSpaced(1);
     settings_change |= imgui::Checkbox("Full destination path", &settings.file_operations_dst_path_full);
 
+    imgui::Separator();
+
     enum file_ops_table_col : s32
     {
         file_ops_table_col_group,

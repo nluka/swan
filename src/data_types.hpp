@@ -357,6 +357,9 @@ struct explorer_window
     // 16 byte alignment members
 
     std::optional<ImRect> footer_rect = std::nullopt;
+    std::optional<ImRect> footer_filter_info_rect = std::nullopt;
+    std::optional<ImRect> footer_selection_info_rect = std::nullopt;
+    std::optional<ImRect> footer_clipboard_rect = std::nullopt;
 
     // 8 byte alignment members
 
@@ -422,8 +425,12 @@ struct explorer_window
 
     bool debug_window_open = false;
     bool show_filter_window = false;
+    bool filter_text_input_focused = false;
     bool cwd_latest_selected_dirent_idx_changed = false;
     bool footer_hovered = false;
+    bool footer_filter_info_hovered = false;
+    bool footer_selection_info_hovered = false;
+    bool footer_clipboard_hovered = false;
     bool highlight_footer = false;
 
     update_cwd_entries_actions update_request_from_outside = nil; /* how code from outside the Begin()/End() of the explorer window
