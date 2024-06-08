@@ -2,14 +2,13 @@
 #include "imgui_dependent_functions.hpp"
 #include "util.hpp"
 
-void new_frame(char const *ini_file_path) noexcept
+void BeginFrame_GLFW_OpenGL3(char const *ini_file_path) noexcept
 {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     imgui::NewFrame(ini_file_path);
 }
-
-void render_frame(GLFWwindow *window) noexcept
+void EndFrame_GLFW_OpenGL3(GLFWwindow *window) noexcept
 {
     imgui::Render();
 

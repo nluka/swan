@@ -1,3 +1,6 @@
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include "glfw3native.h"
+
 #include "stdafx.hpp"
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
@@ -20,7 +23,6 @@ static void         find_essential_files(GLFWwindow *window, char const *ini_fil
 static void         load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept;
 static void         set_window_icon(GLFWwindow *window) noexcept;
 static void         render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
-static void         render_analytics() noexcept;
 static void         render_ntest_output_window(swan_path const &output_directory_path) noexcept;
 static void         run_tests_integrated(swan_path const &ntest_output_directory_path) noexcept;
 static s32          run_tests_only(swan_path const &ntest_output_directory_path) noexcept;
@@ -28,16 +30,34 @@ static s32          run_tests_only(swan_path const &ntest_output_directory_path)
 #if RELEASE_MODE
 #   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 #endif
-s32 main([[maybe_unused]] s32 argc, char const *argv[])
+s32 APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+// s32 main([[maybe_unused]] s32 argc, char const *argv[])
 try {
+    (void) hInstance;
+    (void) hPrevInstance;
+    (void) lpCmdLine;
+    // (void) nCmdShow;
+
     SetUnhandledExceptionFilter(custom_exception_handler);
 
+#if 0
     {
         std::filesystem::path swan_exec_path = argv[0];
         swan_exec_path = swan_exec_path.remove_filename();
         global_state::execution_path() = swan_exec_path;
     }
     swan_path ntest_output_directory_path = path_create( (global_state::execution_path() / "ntest").string().c_str() );
+#else
+    {
+        char exe_path[MAX_PATH];
+        GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+
+        std::filesystem::path swan_exec_path = exe_path;
+        swan_exec_path = swan_exec_path.remove_filename();
+        global_state::execution_path() = swan_exec_path;
+    }
+    swan_path ntest_output_directory_path = path_create( (global_state::execution_path() / "ntest").string().c_str() );
+#endif
 
 #if RELEASE_MODE
     for (u64 i = 1; i < argc; ++i) {
@@ -51,6 +71,7 @@ try {
     if (window == nullptr) {
         return 1;
     }
+    global_state::window_handle() = glfwGetWin32Window(window);
 
     // clear log file
     {
@@ -88,9 +109,9 @@ try {
 
     // block until COM is successfully initialized. the user is notified if an error occurs,
     // and has the ability to "Retry" which will attempt to re-initialize COM.
-    init_COM_for_explorers(window, ini_file_path.c_str());
+    init_explorer_COM_GLFW_OpenGL3(window, ini_file_path.c_str());
     print_debug_msg("SUCCESS COM initialized");
-    SCOPE_EXIT { clean_COM_for_explorers(); };
+    SCOPE_EXIT { cleanup_explorer_COM(); };
 
     {
     #if DEBUG_MODE
@@ -258,12 +279,12 @@ try {
             window_pos_or_size_needs_write = false;
         }
 
-        new_frame(ini_file_path.c_str());
+        BeginFrame_GLFW_OpenGL3(ini_file_path.c_str());
 
         auto visib_at_frame_start = global_state::settings().show;
 
         SCOPE_EXIT {
-            render_frame(window);
+            EndFrame_GLFW_OpenGL3(window);
 
             bool window_visibilities_changed = memcmp(&global_state::settings().show, &visib_at_frame_start, sizeof(visib_at_frame_start)) != 0;
             if (window_visibilities_changed) {
@@ -329,7 +350,7 @@ try {
                 }
                 case swan_windows::id::analytics: {
                     if (window_visib.analytics) {
-                        render_analytics();
+                        swan_windows::render_analytics();
                     }
                     break;
                 }
@@ -341,7 +362,12 @@ try {
                 }
                 case swan_windows::id::settings: {
                     if (window_visib.settings) {
-                        swan_windows::render_settings(window, window_visib.settings, any_popups_open);
+                        bool changes_applied = swan_windows::render_settings(window_visib.settings, any_popups_open);
+                        if (changes_applied) {
+                            glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
+                            glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
+                            (void) global_state::settings().save_to_disk();
+                        }
                     }
                     break;
                 }
@@ -384,25 +410,31 @@ try {
             imgui::OpenPopup(" Test Output ");
             render_ntest_output_window(ntest_output_directory_path);
         }
-    }
 
-    //? I don't know if this is safe to do, would be good to look into it,
-    //? but as of now the program seems to work...
-    std::exit(0); // kill all change notif threads
+        // free memory if explorer payload was not accepted and the user dropped it
+        if (!imgui::IsMouseDragging(ImGuiMouseButton_Left) && global_state::move_dirents_payload_set() == true) {
+        // if (imgui::IsMouseReleased(ImGuiMouseButton_Left) && !imgui::IsDragDropPayloadBeingAccepted()) {
+            free_explorer_drag_drop_payload();
+        }
+    }
 
     return 0;
 }
 catch (std::exception const &except) {
     fprintf(stderr, "fatal: %s\n", except.what());
+    return 1;
 }
 catch (std::string const &err) {
     fprintf(stderr, "fatal: %s\n", err.c_str());
+    return 1;
 }
 catch (char const *err) {
     fprintf(stderr, "fatal: %s\n", err);
+    return 1;
 }
 catch (...) {
     fprintf(stderr, "fatal: unknown error, catch(...)\n");
+    return 1;
 }
 
 static
@@ -432,7 +464,7 @@ GLFWwindow *create_barebones_window() noexcept
         s32 screen_width = GetSystemMetrics(SM_CXSCREEN);
         s32 screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-        std::string window_title = make_str("swan - %s - built %s %s", get_build_mode().str, __DATE__, __TIME__);
+        std::string window_title = make_str("swan - %s - GLFW + OpenGL3 - built %s %s", get_build_mode().str, __DATE__, __TIME__);
 
         window = glfwCreateWindow(screen_width, screen_height, window_title.c_str(), nullptr, nullptr);
         if (window == nullptr) {
@@ -689,32 +721,6 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 }
 
 static
-void render_analytics() noexcept
-{
-    if (imgui::Begin(swan_windows::get_name(swan_windows::id::analytics), &global_state::settings().show.analytics)) {
-        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::focused_window_set(swan_windows::id::analytics);
-        }
-
-        auto &io = imgui::GetIO();
-
-        imgui::Text("%s build", get_build_mode().str);
-        imgui::SameLineSpaced(2);
-        imgui::Text("%.0f FPS", io.Framerate);
-        imgui::SameLineSpaced(2);
-        imgui::Text("%.3f ms/frame", 1000.0f / io.Framerate);
-
-        imgui::Spacing();
-
-        imgui::Text("IsMouseClicked(left): %d", imgui::IsMouseClicked(ImGuiMouseButton_Left));
-        imgui::Text("IsMouseDown(left): %d", imgui::IsMouseDown(ImGuiMouseButton_Left));
-        imgui::Text("IsMouseDragging(left): %d", imgui::IsMouseDragging(ImGuiMouseButton_Left));
-        imgui::Text("IsMouseReleased(left): %d", imgui::IsMouseReleased(ImGuiMouseButton_Left));
-    }
-    imgui::End();
-}
-
-static
 void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept
 {
     struct essential_file
@@ -758,7 +764,7 @@ void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcep
             break;
         }
 
-        new_frame(ini_file_path);
+        BeginFrame_GLFW_OpenGL3(ini_file_path);
 
         if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
             imgui::TextColored(error_color(), "Application is unable to continue, essential file(s) not found:");
@@ -774,7 +780,7 @@ void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcep
         }
         imgui::End();
 
-        render_frame(window);
+        EndFrame_GLFW_OpenGL3(window);
     }
 }
 
@@ -850,7 +856,7 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
             break;
         }
 
-        new_frame(ini_file_path);
+        BeginFrame_GLFW_OpenGL3(ini_file_path);
 
         if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
             imgui::TextColored(error_color(), "Application is unable to continue, font(s) failed to load:");
@@ -863,7 +869,7 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
         }
         imgui::End();
 
-        render_frame(window);
+        EndFrame_GLFW_OpenGL3(window);
     }
 }
 

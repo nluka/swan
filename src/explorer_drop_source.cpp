@@ -1,6 +1,8 @@
 #include "stdafx.hpp"
 #include "explorer_drop_source.hpp"
 #include "imgui_dependent_functions.hpp"
+#include "imgui_extension.hpp"
+#include "util.hpp"
 
 std::pair<IID, char const *> const g_IIDs[] = {
     { IID_IMarshal, "IID_IMarshal" },
@@ -115,7 +117,7 @@ ULONG explorer_drop_source::Release() noexcept
     ULONG count = InterlockedDecrement(&this->ref_count);
     if (count == 0) {
         delete this;
-        absolute_paths_delimited_by_newlines.~absolute_paths_delimited_by_newlines();
+        full_paths_delimited_by_newlines.~full_paths_delimited_by_newlines();
     }
     return count;
 }
@@ -162,14 +164,18 @@ HRESULT explorer_drop_source::QueryContinueDrag(BOOL escape_pressed, DWORD key_s
         print_debug_msg("QueryContinueDrag: Cancel, user pressed escape");
         return DRAGDROP_S_CANCEL;
     }
-    else if ((key_state & MK_LBUTTON) == false) {
+    if ((key_state & MK_LBUTTON) == false) {
         print_debug_msg("QueryContinueDrag: Drop, user released mouse 1");
         return DRAGDROP_S_DROP;
     }
-    else {
-        // user still holding mouse1, continue dragging
-        return S_OK;
+
+    std::optional<bool> mouse_inside_window = win32_is_mouse_inside_window(global_state::window_handle());
+    if (mouse_inside_window.has_value() && mouse_inside_window.value() == true) {
+        print_debug_msg("QueryContinueDrag: Cancel, mouse cursor inside main window");
+        return DRAGDROP_S_CANCEL;
     }
+
+    return S_OK;
 }
 
 HRESULT explorer_drop_source::GiveFeedback(DWORD effect) noexcept
@@ -381,7 +387,7 @@ try {
     }
 
     if (format_etc->cfFormat == CF_HDROP) {
-        auto &paths = absolute_paths_delimited_by_newlines;
+        auto &paths = full_paths_delimited_by_newlines;
         size_t total_payload_size = sizeof(DROPFILES) + (sizeof(wchar_t) * (paths.size() + 1));
 
         // Allocate global memory for the DROPFILES structure

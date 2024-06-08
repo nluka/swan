@@ -44,7 +44,9 @@ bool global_state::focused_window_set(swan_windows::id window_id) noexcept
             success = false;
         }
 
-        print_debug_msg("%s global_state::save_focused_window (%s)", success ? "SUCCESS" : "FAILED", swan_windows::get_name(window_id));
+        if (!success) {
+            print_debug_msg("%s global_state::save_focused_window (%s)", success ? "SUCCESS" : "FAILED", swan_windows::get_name(window_id));
+        }
     }
 
     return success;

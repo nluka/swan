@@ -646,3 +646,27 @@ void cstr_fill(wchar_t *s, wchar_t fill_ch) noexcept
         ++s;
     }
 }
+
+std::optional<bool> win32_is_mouse_inside_window(HWND hwnd) noexcept
+{
+    POINT cp;
+    if (!GetCursorPos(&cp)) {
+        print_debug_msg("FAILED GetCursorPos: %s", get_last_winapi_error().formatted_message.c_str());
+        return std::nullopt;
+    }
+
+    RECT wr;
+    if (!GetWindowRect(hwnd, &wr)) {
+        print_debug_msg("FAILED GetWindowRect: %s", get_last_winapi_error().formatted_message.c_str());
+        return std::nullopt;
+    }
+
+    bool result = cp.x >= wr.left && cp.x <= wr.right && cp.y >= wr.top && cp.y <= wr.bottom;
+
+// #if DEBUG_MODE
+//     print_debug_msg("%s " ICON_FA_MOUSE_POINTER " (%d, %d) " ICON_CI_SCREEN_FULL " (%d, %d), (%d, %d)",
+//         (result ? ICON_CI_PASS_FILLED : ICON_CI_CIRCLE_LARGE_FILLED), cp.x, cp.y, wr.left, wr.top, wr.right, wr.bottom);
+// #endif
+
+    return result;
+}

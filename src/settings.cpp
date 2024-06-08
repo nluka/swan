@@ -6,14 +6,16 @@
 static swan_settings g_settings = {};
 swan_settings &global_state::settings() noexcept { return g_settings; }
 
-void swan_windows::render_settings(GLFWwindow *window, bool &open, [[maybe_unused]] bool any_popups_open) noexcept
+bool swan_windows::render_settings(bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
+    bool retval_changes_applied = false;
+
     static bool s_regular_change = false;
     static bool s_overridden = false;
 
-    if (!imgui::Begin(swan_windows::get_name(swan_windows::id::settings), &open)) {
+    if (!imgui::Begin(swan_windows::get_name(swan_windows::id::settings), &open, ImGuiWindowFlags_AlwaysAutoResize)) {
         imgui::End();
-        return;
+        return retval_changes_applied;
     }
 
     if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
@@ -33,9 +35,7 @@ void swan_windows::render_settings(GLFWwindow *window, bool &open, [[maybe_unuse
             imgui::SameLine();
             if (imgui::Button("Apply")) {
                 s_overridden = false;
-                glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
-                glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
-                (void) settings.save_to_disk();
+                retval_changes_applied = true;
             }
         }
     #if 1
@@ -57,6 +57,8 @@ void swan_windows::render_settings(GLFWwindow *window, bool &open, [[maybe_unuse
     }
 
     imgui::End();
+
+    return retval_changes_applied;
 }
 
 bool swan_settings::save_to_disk() const noexcept

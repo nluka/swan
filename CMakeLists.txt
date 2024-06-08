@@ -28,6 +28,7 @@ endif()
 add_compile_options(/EHsc /MP /MT)
 add_link_options(/NODEFAULTLIB:MSVCRTD)
 add_link_options(/NODEFAULTLIB:LIBCMT)
+add_link_options(/SUBSYSTEM:WINDOWS)
 
 add_library(imgui STATIC
     src/imgui/imgui.cpp
@@ -88,7 +89,7 @@ set(SWAN_SOURCES
     "src/settings.cpp"
     "src/stdafx.cpp"
     "src/style.cpp"
-    "src/swan.cpp"
+    "src/swan_glfw_opengl3.cpp"
     "src/tests.cpp"
     "src/theme_editor.cpp"
     "src/undelete_directory_progress_sink.cpp"

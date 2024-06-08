@@ -8,8 +8,8 @@
 #include "common_functions.hpp"
 #include "imgui_extension.hpp"
 
-void new_frame(char const *ini_file_path) noexcept;
-void render_frame(GLFWwindow *window) noexcept;
+void BeginFrame_GLFW_OpenGL3(char const *ini_file_path) noexcept;
+void EndFrame_GLFW_OpenGL3(GLFWwindow *) noexcept;
 
 void center_window_and_set_size_when_appearing(f32 width, f32 height) noexcept;
 

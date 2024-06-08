@@ -13,7 +13,7 @@ static file_operation_command_buf g_file_op_payload = {};
 
 std::array<explorer_window, global_constants::num_explorers> &global_state::explorers() noexcept { return g_explorers; }
 
-void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexcept
+void init_explorer_COM_GLFW_OpenGL3(GLFWwindow *window, char const *ini_file_path) noexcept
 {
     bool retry = true; // start true to do initial load
     char const *what_failed = nullptr;
@@ -58,7 +58,7 @@ void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexc
             break;
         }
 
-        new_frame(ini_file_path);
+        BeginFrame_GLFW_OpenGL3(ini_file_path);
 
         if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
             imgui::TextColored(error_color(), "Application is unable to continue, critical initialization failed:");
@@ -67,11 +67,11 @@ void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexc
         }
         imgui::End();
 
-        render_frame(window);
+        EndFrame_GLFW_OpenGL3(window);
     }
 }
 
-void clean_COM_for_explorers() noexcept
+void cleanup_explorer_COM() noexcept
 try {
     g_persist_file_interface->Release();
     g_shell_link->Release();
@@ -430,7 +430,7 @@ generic_result delete_selected_entries(explorer_window &expl) noexcept
     return { initialization_error.empty(), initialization_error };
 }
 
-generic_result move_files_into(swan_path const &destination_utf8, explorer_window &expl, move_dirents_drag_drop_payload &payload) noexcept
+generic_result move_files_into(swan_path const &destination_utf8, explorer_window &expl, explorer_drag_drop_payload &payload) noexcept
 {
     /*
         ? Moving files via shlwapi is a blocking operation.
@@ -440,7 +440,7 @@ generic_result move_files_into(swan_path const &destination_utf8, explorer_windo
         ? After worker thread signals that initialization is complete, we proceed with execution and let PerformOperations happen asynchronously.
     */
 
-    SCOPE_EXIT { delete[] payload.absolute_paths_delimited_by_newlines; };
+    SCOPE_EXIT { free_explorer_drag_drop_payload(); };
 
     wchar_t destination_utf16[MAX_PATH]; cstr_clear(destination_utf16);
 
@@ -454,7 +454,7 @@ generic_result move_files_into(swan_path const &destination_utf8, explorer_windo
     global_state::thread_pool().push_task(perform_file_operations,
         expl.id,
         destination_utf16,
-        std::wstring(payload.absolute_paths_delimited_by_newlines),
+        std::wstring(payload.full_paths_delimited_by_newlines),
         std::vector<file_operation_type>(payload.num_items, file_operation_type::move),
         &expl.shlwapi_task_initialization_mutex,
         &expl.shlwapi_task_initialization_cond,
@@ -476,7 +476,7 @@ generic_result handle_drag_drop_onto_dirent(
     ImGuiPayload const *payload_wrapper,
     char dir_sep_utf8) noexcept
 {
-    auto payload_data = (move_dirents_drag_drop_payload *)payload_wrapper->Data;
+    auto payload_data = (explorer_drag_drop_payload *)payload_wrapper->Data;
     assert(payload_data != nullptr);
     swan_path destination_utf8 = expl.cwd;
 
@@ -3670,14 +3670,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
 
             } // path column
 
-            static bool s_prevent_drag_drop = false;
-
-            if (s_prevent_drag_drop && imgui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                // once the mouse has been clicked, stop preventing drag drop
-                s_prevent_drag_drop = false;
-            }
-
-            if (!s_prevent_drag_drop && !dirent.basic.is_path_dotdot() && imgui::BeginDragDropSource()) {
+            if (!dirent.basic.is_path_dotdot() && imgui::BeginDragDropSource()) {
                 auto cwd_to_utf16 = [&]() noexcept {
                     std::wstring retval;
 
@@ -3693,7 +3686,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 };
 
                 auto add_payload_item = [&](
-                    move_dirents_drag_drop_payload &payload,
+                    explorer_drag_drop_payload &payload,
                     std::wstring &paths,
                     std::wstring const &cwd_utf16,
                     basic_dirent const &dirent) noexcept
@@ -3726,7 +3719,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 if (!global_state::move_dirents_payload_set()) {
                     std::wstring cwd_utf16 = cwd_to_utf16();
                     assert(!cwd_utf16.empty());
-                    move_dirents_drag_drop_payload payload = {};
+                    explorer_drag_drop_payload payload = {};
                     std::wstring paths = {};
 
                     payload.src_explorer_id = expl.id;
@@ -3743,21 +3736,25 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                         global_state::move_dirents_payload_set() = true;
                     }
 
-                    wchar_t *paths_data = new wchar_t[paths.size() + 1];
-                    StrCpyNW(paths_data, paths.c_str(), s32(paths.size() + 1));
+                    u64 paths_len_including_trailing_newline = paths.size() + 1;
 
-                    payload.absolute_paths_delimited_by_newlines = paths_data;
-                    imgui::SetDragDropPayload("move_dirents_drag_drop_payload", (void *)&payload, sizeof(payload), ImGuiCond_Once);
-                    print_debug_msg("SetDragDropPayload(move_dirents_drag_drop_payload)");
+                    wchar_t *paths_data = new wchar_t[paths_len_including_trailing_newline];
+                    StrCpyNW(paths_data, paths.c_str(), s32(paths_len_including_trailing_newline));
+
+                    payload.full_paths_delimited_by_newlines = paths_data;
+                    payload.full_paths_delimited_by_newlines_len = paths_len_including_trailing_newline;
+
+                    imgui::SetDragDropPayload("explorer_drag_drop_payload", (void *)&payload, sizeof(payload), ImGuiCond_Once);
+                    print_debug_msg("SetDragDropPayload(explorer_drag_drop_payload) - %s", format_file_size(payload.get_num_heap_bytes_allocated(), 1024));
                     global_state::move_dirents_payload_set() = true;
 
                     // WCOUT_IF_DEBUG("payload.src_explorer_id = " << payload.src_explorer_id << '\n');
-                    // WCOUT_IF_DEBUG("payload.absolute_paths_delimited_by_newlines:\n" << payload.absolute_paths_delimited_by_newlines << '\n');
+                    // WCOUT_IF_DEBUG("payload.full_paths_delimited_by_newlines:\n" << payload.full_paths_delimited_by_newlines << '\n');
                 }
 
                 auto payload_wrapper = imgui::GetDragDropPayload();
-                if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
-                    auto payload_data = reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data);
+                if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "explorer_drag_drop_payload")) {
+                    auto payload_data = reinterpret_cast<explorer_drag_drop_payload *>(payload_wrapper->Data);
                     u64 num_items = payload_data->num_items;
                     auto const &obj_type_counts = payload_data->obj_type_counts;
 
@@ -3770,36 +3767,44 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                         }
                     }
 
-                    if (io.KeyCtrl || io.KeyShift) {
+
+                    std::optional<bool> mouse_inside_window = win32_is_mouse_inside_window(global_state::window_handle());
+
+                    if (!mouse_inside_window.value_or(true)) {
                         explorer_drop_source *drop_obj = new explorer_drop_source();
                         SCOPE_EXIT { drop_obj->Release(); }; // will `delete drop_obj`
 
                         // make a copy, don't want race conditions or use after free bugs
-                        drop_obj->absolute_paths_delimited_by_newlines = payload_data->absolute_paths_delimited_by_newlines;
+                        drop_obj->full_paths_delimited_by_newlines = payload_data->full_paths_delimited_by_newlines;
                         DWORD effect;
 
-                    #if 0 // ! when moving DoDragDrop to separate thread, need to remember to OleInitialize on that thread
-                        HRESULT result_ole = OleInitialize(nullptr);
-                        if (FAILED(result_ole)) {
-                            print_debug_msg("FAILED OleInitialize, aborting DoDragDrop");
-                            return;
-                            // apparently OleUninitialize() is only necessary for successful calls to OleInitialize()
-                        }
-                        SCOPE_EXIT { OleUninitialize(); };
-                    #endif
-
                         HRESULT result_drag = DoDragDrop(drop_obj, drop_obj, DROPEFFECT_LINK|DROPEFFECT_COPY, &effect);
-                        s_prevent_drag_drop = true;
-
-                        // After DoDragDrop completes, IsMouseDown && IsMouseReleased state remains true which is incorrect,
-                        // simulate a release to clear the stuck state.
-                        imgui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Left, false); // release left mouse btn
 
                         switch (result_drag) {
-                            case DRAGDROP_S_DROP:   print_debug_msg("DoDragDrop The OLE drag-and-drop operation was successful."); break;
-                            case DRAGDROP_S_CANCEL: print_debug_msg("DoDragDrop The OLE drag-and-drop operation was canceled."); break;
-                            case E_UNEXPECTED:      print_debug_msg("DoDragDrop Unexpected error occurred."); break;
-                            default:                print_debug_msg("DoDragDrop (%X) %s", result_drag, _com_error(result_drag).ErrorMessage()); break;
+                            case DRAGDROP_S_DROP: {
+                                print_debug_msg("DoDragDrop: The OLE drag-and-drop operation was successful.");
+                                // s_prevent_drag_drop = true;
+
+                                // After DoDragDrop completes, IsMouseDown && IsMouseReleased && io.KeyCtrl state remains true which is incorrect,
+                                // simulate a release to clear the stuck state.
+                                imgui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+
+                                free_explorer_drag_drop_payload();
+
+                                break;
+                            }
+                            case DRAGDROP_S_CANCEL: {
+                                print_debug_msg("DoDragDrop: The OLE drag-and-drop operation was canceled.");
+                                break;
+                            }
+                            case E_UNEXPECTED: {
+                                print_debug_msg("DoDragDrop: Unexpected error occurred.");
+                                break;
+                            }
+                            default: {
+                                print_debug_msg("DoDragDrop (%X) %s", result_drag, _com_error(result_drag).ErrorMessage());
+                                break;
+                            }
                         }
                     }
                 }
@@ -3807,37 +3812,17 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                 imgui::EndDragDropSource();
             }
 
-            if (s_prevent_drag_drop) {
-                imgui::ClearDragDrop(); // Close the fallback "..." imgui payload preview tooltip
-            }
-            else if (!dirent.basic.is_file() && !dirent.basic.is_symlink_to_file() && !dirent.selected && imgui::BeginDragDropTarget()) {
+            if (!dirent.basic.is_file() && !dirent.basic.is_symlink_to_file() && !dirent.selected && imgui::BeginDragDropTarget()) {
                 auto payload_wrapper = imgui::GetDragDropPayload();
 
-                if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
-                    payload_wrapper = imgui::AcceptDragDropPayload("move_dirents_drag_drop_payload");
+                if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "explorer_drag_drop_payload")) {
+                    payload_wrapper = imgui::AcceptDragDropPayload("explorer_drag_drop_payload");
                     if (payload_wrapper != nullptr) {
                         handle_drag_drop_onto_dirent(expl, dirent, payload_wrapper, dir_sep_utf8);
                     }
                 }
 
                 imgui::EndDragDropTarget();
-            }
-
-            // free memory if the payload was not accepted and the user dropped it
-            if (imgui::IsMouseReleased(ImGuiMouseButton_Left) && !imgui::IsDragDropPayloadBeingAccepted()) {
-                global_state::move_dirents_payload_set() = false;
-
-                auto payload_wrapper = imgui::GetDragDropPayload();
-
-                if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "move_dirents_drag_drop_payload")) {
-                    payload_wrapper = imgui::AcceptDragDropPayload("move_dirents_drag_drop_payload");
-                    if (payload_wrapper != nullptr) {
-                        auto payload_data = reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data);
-                        assert(payload_data != nullptr);
-                        cstr_fill(payload_data->absolute_paths_delimited_by_newlines, L'!'); // fill with some nonsense for easier debugging
-                        delete[] payload_data->absolute_paths_delimited_by_newlines;
-                    }
-                }
             }
 
             if (imgui::TableSetColumnIndex(explorer_window::cwd_entries_table_col_object)) {
@@ -4292,12 +4277,12 @@ void accept_move_dirents_drag_drop(explorer_window &expl) noexcept
         auto payload_wrapper = imgui::GetDragDropPayload();
 
         if (payload_wrapper != nullptr &&
-            cstr_eq(payload_wrapper->DataType, "move_dirents_drag_drop_payload") &&
-            reinterpret_cast<move_dirents_drag_drop_payload *>(payload_wrapper->Data)->src_explorer_id != expl.id)
+            cstr_eq(payload_wrapper->DataType, "explorer_drag_drop_payload") &&
+            reinterpret_cast<explorer_drag_drop_payload *>(payload_wrapper->Data)->src_explorer_id != expl.id)
         {
-            payload_wrapper = imgui::AcceptDragDropPayload("move_dirents_drag_drop_payload");
+            payload_wrapper = imgui::AcceptDragDropPayload("explorer_drag_drop_payload");
             if (payload_wrapper != nullptr) {
-                auto payload_data = (move_dirents_drag_drop_payload *)payload_wrapper->Data;
+                auto payload_data = (explorer_drag_drop_payload *)payload_wrapper->Data;
                 assert(payload_data != nullptr);
                 s32 src_explorer_id = payload_data->src_explorer_id;
                 if (src_explorer_id != expl.id) {
@@ -4367,4 +4352,32 @@ ImRect render_footer(explorer_window &expl, cwd_count_info const &cnt, ImGuiStyl
     imgui::EndChild();
 
     return imgui::GetItemRect();
+}
+
+void free_explorer_drag_drop_payload() noexcept
+{
+    global_state::move_dirents_payload_set() = false;
+
+    auto payload_wrapper = imgui::GetDragDropPayload();
+
+    if (payload_wrapper != nullptr && cstr_eq(payload_wrapper->DataType, "explorer_drag_drop_payload")) {
+        payload_wrapper = imgui::AcceptDragDropPayload("explorer_drag_drop_payload", ImGuiDragDropFlags_AcceptBeforeDelivery);
+
+        if (payload_wrapper != nullptr) {
+            auto payload_data = reinterpret_cast<explorer_drag_drop_payload *>(payload_wrapper->Data);
+            assert(payload_data != nullptr);
+
+            wchar_t *&paths_data = payload_data->full_paths_delimited_by_newlines;
+            u64 &paths_len = payload_data->full_paths_delimited_by_newlines_len;
+
+            print_debug_msg("FreeDragDropPayload(explorer_drag_drop_payload) - %s",
+                            format_file_size(payload_data->get_num_heap_bytes_allocated(), 1024).data());
+
+            cstr_fill(paths_data, L'!'); // fill with some nonsense for easier debugging
+            delete[] paths_data;
+
+            paths_data = nullptr;
+            paths_len = 0;
+        }
+    }
 }

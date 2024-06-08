@@ -575,12 +575,16 @@ struct undelete_directory_progress_sink : public IFileOperationProgressSink
     HRESULT QueryInterface(const IID &riid, void **ppv) noexcept;
 };
 
-struct move_dirents_drag_drop_payload
+struct explorer_drag_drop_payload
 {
     s32 src_explorer_id;
     u64 num_items;
-    wchar_t *absolute_paths_delimited_by_newlines;
+    u64 full_paths_delimited_by_newlines_len;
+    wchar_t *full_paths_delimited_by_newlines;
     u64 obj_type_counts[(u64)basic_dirent::kind::count - 1 /* nil */];
+
+    u64 get_num_heap_bytes_allocated() noexcept { assert(full_paths_delimited_by_newlines != nullptr);
+                                                  return sizeof(wchar_t) * full_paths_delimited_by_newlines_len; }
 };
 
 struct pin_drag_drop_payload

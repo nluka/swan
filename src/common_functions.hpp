@@ -79,7 +79,7 @@ namespace swan_windows
 
     void render_recent_files(bool &open, bool any_popups_open) noexcept;
 
-    void render_settings(GLFWwindow *window, bool &open, bool any_popups_open) noexcept;
+    bool render_settings(bool &open, bool any_popups_open) noexcept;
 
     void render_icon_library(bool &open, bool any_popups_open) noexcept;
 
@@ -173,6 +173,7 @@ namespace global_state
     bool               focused_window_set(swan_windows::id window_id) noexcept;
     bool               focused_window_load_from_disk(swan_windows::id &window_id) noexcept;
 
+    HWND &                  window_handle() noexcept;
     std::filesystem::path & execution_path() noexcept;
     swan_thread_pool_t &    thread_pool() noexcept;
     swan_settings &         settings() noexcept;
@@ -184,9 +185,9 @@ namespace global_state
 
 } // namespace global_state
 
-void init_COM_for_explorers(GLFWwindow *window, char const *ini_file_path) noexcept;
+void init_explorer_COM_GLFW_OpenGL3(GLFWwindow *window, char const *ini_file_path) noexcept;
 
-void clean_COM_for_explorers() noexcept;
+void cleanup_explorer_COM() noexcept;
 
 void apply_swan_style_overrides() noexcept;
 
@@ -236,3 +237,5 @@ struct help_indicator
 help_indicator render_help_indicator(bool align_text_to_frame_padding) noexcept;
 
 ImVec2 help_indicator_size() noexcept;
+
+void free_explorer_drag_drop_payload() noexcept;

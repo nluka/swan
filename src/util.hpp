@@ -68,6 +68,8 @@
 
     std::string make_str(char const *fmt, ...) noexcept;
 
+    std::optional<bool> win32_is_mouse_inside_window(HWND hwnd) noexcept;
+
 // FILESYSTEM RELATED FUNCTIONS
 
     /// Returns truthy int if `path_utf8` is a valid directory. Accepts Unicode characters. Performs UTF8 to UTF16 conversion. Expensive function, don't call it often.

@@ -6,7 +6,6 @@ struct explorer_drop_source final
     : public IDropSource // https://learn.microsoft.com/en-us/windows/win32/api/oleidl/nn-oleidl-idropsource
     , public IDataObject // https://learn.microsoft.com/en-us/windows/win32/api/objidl/nn-objidl-idataobject
 {
-    std::wstring absolute_paths_delimited_by_newlines = {};
 
     ULONG AddRef() noexcept override;
 
@@ -35,6 +34,8 @@ struct explorer_drop_source final
     HRESULT DUnadvise(DWORD dwConnection) noexcept override;
 
     HRESULT EnumDAdvise(IEnumSTATDATA **ppenumAdvise) noexcept override;
+
+    std::wstring full_paths_delimited_by_newlines = {};
 
 private:
 
