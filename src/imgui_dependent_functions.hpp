@@ -40,73 +40,82 @@ s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept;
 
 void render_path_with_stylish_separators(char const *path) noexcept;
 
-struct debug_log_package
+struct debug_log_record
+{
+    std::string message;                static_assert(sizeof(message) == 32);
+    std::source_location loc;           static_assert(sizeof(loc) == 24);
+    time_point_system_t system_time;    static_assert(sizeof(system_time) == 8);
+    f64 imgui_time;
+    s32 thread_id;
+};
+
+struct debug_log
 {
     char const *fmt;
     std::source_location loc;
 
-    static ImGuiTextBuffer s_buffer;
-    static std::mutex s_mutex;
-    static bool s_logging_enabled;
+    static std::vector<debug_log_record> g_records;
+    static std::mutex g_mutex;
+    static bool g_logging_enabled;
 
-    debug_log_package(char const *f, std::source_location l = std::source_location::current()) noexcept
+    debug_log(char const *f, std::source_location l = std::source_location::current()) noexcept
         : fmt(f)
         , loc(l)
     {}
 
     static void clear_buffer() noexcept
     {
-        s_buffer.clear();
+        g_records.clear();
     }
 };
 
 /// @brief Writes a message to the debug log window (not stdout!). Information such as time, thread id, source location are handled for you.
 /// Use this function like you would sprintf, pass it a format string followed by your variadic arguments. Operation is threadsafe, you can
-/// print messages from any thread at any time safely.
+/// print messages from any thread at any time.
 template <typename... Args>
-void print_debug_msg([[maybe_unused]] debug_log_package pack, [[maybe_unused]] Args&&... args) noexcept
+void print_debug_msg([[maybe_unused]] debug_log pack, [[maybe_unused]] Args&&... args) noexcept
 {
     // https://stackoverflow.com/questions/57547273/how-to-use-source-location-in-a-variadic-template-function
 
-    if (!debug_log_package::s_logging_enabled) {
+    if (!debug_log::g_logging_enabled) {
         return;
     }
 
-    f64 current_time = ImGui::GetTime();
-    s32 max_size = global_state::debug_log_text_limit_megabytes() * 1024 * 1024;
-    char const *full_file_name = path_cfind_filename(pack.loc.file_name());
-    s32 thread_id = GetCurrentThreadId();
+    u64 max_size = global_state::debug_log_size_limit_megabytes() * 1024 * 1024;
 
-    u64 const file_name_max_len = 30;
-    char shortened_buf[file_name_max_len+1];
-    char const *shortened_file_name = full_file_name;
-    if (strlen(full_file_name) > file_name_max_len) {
-        (void) snprintf(shortened_buf, lengthof(shortened_buf), "%.*s{..}", s32(file_name_max_len - lengthof("{..}")), full_file_name);
-        shortened_file_name = shortened_buf;
-    }
+    auto formatted_message = make_str_static<256>(pack.fmt, args...);
+    f64 imgui_time = imgui::GetTime();
+    s32 thread_id = GetCurrentThreadId();
+    time_point_system_t system_time = get_time_system();
 
     {
-        std::scoped_lock lock(debug_log_package::s_mutex);
+        std::scoped_lock lock(debug_log::g_mutex);
 
-        auto &debug_buffer = debug_log_package::s_buffer;
-
-        debug_buffer.reserve(max_size);
-
-        if (debug_buffer.size() > max_size) {
-            debug_buffer.clear();
+        u64 used_size = sizeof(debug_log_record) * debug_log::g_records.size();
+        if (used_size > max_size) {
+            debug_log::clear_buffer();
         }
 
-        debug_buffer.appendf("%-5d %10.3lf %*s:%-5d ", thread_id, current_time, file_name_max_len, shortened_file_name, pack.loc.line());
-        debug_buffer.appendf(pack.fmt, args...);
-        debug_buffer.append("\n");
+        debug_log::g_records.reserve(max_size / sizeof(debug_log_record));
+
+        debug_log::g_records.emplace_back(formatted_message.data(), pack.loc, system_time, imgui_time, thread_id);
     }
 
-    auto log_file_path = global_state::execution_path() / "debug.txt";
+    auto log_file_path = global_state::execution_path() / "debug_log.md";
     FILE *file = fopen(log_file_path.string().c_str(), "a");
     if (file) {
-        fprintf(file, "%-5d %10.3lf %*s:%-5d ", thread_id, current_time, (int)file_name_max_len, shortened_file_name, (int)pack.loc.line());
-        fprintf(file, pack.fmt, args...);
-        fprintf(file, "\n");
+        std::time_t time = std::chrono::system_clock::to_time_t(system_time);
+        std::tm tm = *std::localtime(&time);
+
+        fprintf(file, "| %d | %d:%02d.%02d | %.3lf | %s | %d | %s | %s |\n",
+            thread_id,
+            tm.tm_hour, tm.tm_min, tm.tm_sec,
+            imgui_time,
+            path_cfind_filename(pack.loc.file_name()),
+            pack.loc.line(),
+            pack.loc.function_name(),
+            formatted_message.data());
+
         fflush(file);
         fclose(file);
     }

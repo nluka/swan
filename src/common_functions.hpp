@@ -178,7 +178,7 @@ namespace global_state
     swan_thread_pool_t &    thread_pool() noexcept;
     swan_settings &         settings() noexcept;
     bool &                  move_dirents_payload_set() noexcept;
-    s32 &                   debug_log_text_limit_megabytes() noexcept;
+    s32 &                   debug_log_size_limit_megabytes() noexcept;
     s32 &                   page_size() noexcept;
 
     std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;

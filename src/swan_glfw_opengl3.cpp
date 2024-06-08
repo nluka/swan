@@ -73,11 +73,13 @@ try {
     }
     global_state::window_handle() = glfwGetWin32Window(window);
 
-    // clear log file
+    // reset log file
     {
-        auto log_file_path = global_state::execution_path() / "debug.txt";
+        auto log_file_path = global_state::execution_path() / "debug_log.md";
         FILE *file = fopen(log_file_path.string().c_str(), "w");
         if (file) {
+            fprintf(file, "| Thread ID | System Time | ImGui Time | File | Line | Function | Message |\n");
+            fprintf(file, "| --------- | ----------- | ---------- | ---- | ---- | -------- | ------- |\n");
             fclose(file);
         }
     }
