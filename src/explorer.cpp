@@ -750,6 +750,15 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
         return !dirent.filtered;
     });
 
+    s32 obj_precedence_table[(u64)basic_dirent::kind::count] = {
+        10, // directory
+        9,  // symlink_to_directory
+        8,  // file
+        7,  // symlink_to_file
+        6,  // symlink_ambiguous
+        5,  // invalid_symlink
+    };
+
     std::sort(cwd_entries.begin(), first_filtered_dirent, [&](dir_ent_t const &left, dir_ent_t const &right) noexcept -> bool {
         s64 delta = 0;
 
@@ -765,20 +774,17 @@ sort_cwd_entries(explorer_window &expl, std::source_location sloc = std::source_
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_object: {
-                    s32 precedence_table[(u64)basic_dirent::kind::count] = {
-                        10, // directory
-                        9,  // symlink_to_directory
-                        8,  // file
-                        7,  // symlink_to_file
-                        6,  // symlink_ambiguous
-                        5,  // invalid_symlink
-                    };
                     assert((s32)right.basic.type >= 0);
-                    delta = precedence_table[(u64)left.basic.type] - precedence_table[(u64)right.basic.type];
+                    delta = obj_precedence_table[(u64)left.basic.type] - obj_precedence_table[(u64)right.basic.type];
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_type: {
-                    delta = lstrcmpiA(path_cfind_file_ext(right.basic.path.data()), path_cfind_file_ext(left.basic.path.data()));
+                    if (left.basic.type != right.basic.type) {
+                        assert((s32)right.basic.type >= 0);
+                        delta = obj_precedence_table[(u64)left.basic.type] - obj_precedence_table[(u64)right.basic.type];
+                    } else {
+                        delta = lstrcmpiA(path_cfind_file_ext(right.basic.path.data()), path_cfind_file_ext(left.basic.path.data()));
+                    }
                     break;
                 }
                 case explorer_window::cwd_entries_table_col_size_formatted:
@@ -1466,8 +1472,9 @@ s32 cwd_text_input_callback(ImGuiInputTextCallbackData *data) noexcept
 }
 
 void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool any_popups_open) noexcept
-// void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
 {
+    (void) any_popups_open;
+
     SCOPE_EXIT { imgui::End(); };
 
     imgui::SetNextWindowSize({ 1000, 720 }, ImGuiCond_Appearing);
@@ -1496,7 +1503,8 @@ void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool
         expl.tree_node_open_debug_performance,
     };
 
-    if (expl.tree_node_open_debug_state = imgui::TreeNode("State")) {
+    expl.tree_node_open_debug_state = imgui::TreeNode("State");
+    if (expl.tree_node_open_debug_state) {
         imgui::Text("latest_valid_cwd: [%s]", expl.latest_valid_cwd.data());
         imgui::Text("select_cwd_entries_on_next_update.size(): %zu", expl.select_cwd_entries_on_next_update.size());
         imgui::Text("cwd_latest_selected_dirent_idx: %zu", expl.cwd_latest_selected_dirent_idx);
@@ -1517,7 +1525,8 @@ void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool
 
     imgui::Separator();
 
-    if (expl.tree_node_open_debug_memory = imgui::TreeNode("Memory")) {
+    expl.tree_node_open_debug_memory = imgui::TreeNode("Memory");
+    if (expl.tree_node_open_debug_memory) {
         std::array<char, 32> cwd_entries_occupied, cwd_entries_capacity, swan_path_occupied, swan_path_wasted;
         f64 swan_path_waste_percent;
         {
@@ -1555,7 +1564,8 @@ void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool
 
     imgui::Separator();
 
-    if (expl.tree_node_open_debug_performance = imgui::TreeNode("Performance")) {
+    expl.tree_node_open_debug_performance = imgui::TreeNode("Performance");
+    if (expl.tree_node_open_debug_performance) {
         imgui::SeparatorText("(Latest)");
         imgui::Text("entries_to_select_sort: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_sort);
         imgui::Text("entries_to_select_search: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_search);
@@ -2709,20 +2719,10 @@ void render_help_icon(explorer_window &expl) noexcept
     }
 }
 
-#if 0
-enum cwd_mode : s32
-{
-    cwd_mode_text_input = 0,
-    cwd_mode_clicknav,
-    cwd_mode_count
-};
-#endif
-
 struct render_cwd_text_input_result
 {
     bool is_hovered;
 };
-
 static
 render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
                                                    bool &cwd_exists_after_edit,
@@ -2738,7 +2738,12 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
 
     bool is_input_text_enter_pressed = false;
 
-    cwd_text_input_callback_user_data user_data = { expl.id, dir_sep_utf16, false, s_cwd_input.data() };
+    cwd_text_input_callback_user_data user_data = {
+        .expl_id = expl.id,
+        .dir_sep_utf16 = dir_sep_utf16,
+        .edit_occurred = false,
+        .text_content = s_cwd_input.data(),
+    };
 
     {
         ImVec4 low_warning = warning_color(); low_warning.w /= 1.5;
@@ -2993,7 +2998,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     // print_debug_msg("[ %d ] GetOverlappedResult FAILED: %d %s", expl.id, GetLastError(), get_last_error_string().c_str());
                 } else {
                     if (global_state::settings().explorer_refresh_mode == swan_settings::explorer_refresh_mode_automatic) {
-                        print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == automatic, refreshing...");
+                        print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == automatic, refreshing...", expl.id);
                         issue_read_dir_changes();
                         if (expl.read_dir_changes_refresh_request_time == time_point_precise_t()) {
                             // no refresh pending, submit request to refresh
@@ -3047,29 +3052,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         render_help_icon(expl);
     }
-
-#if 0
-    if (imgui::BeginPopup("history_popup")) {
-        swan_path backup = expl.cwd;
-        bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
-
-        if (history_item_clicked) {
-            auto [history_item_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-            if (history_item_exists) {
-                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                (void) expl.save_to_disk();
-            } else {
-                std::string action = make_str("Navigate to history item [%s]", expl.cwd.data());
-                char const *failed = "Path not found, maybe it was renamed or deleted?";
-                swan_popup_modals::open_error(action.c_str(), failed);
-
-                expl.cwd = backup;
-                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
-            }
-        }
-    }
-#endif
 
     cwd_count_info cnt = {};
     {
@@ -3316,49 +3298,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         else if (imgui::IsKeyPressed(ImGuiKey_I) && io.KeyCtrl) {
             expl.invert_selection_on_visible_cwd_entries();
         }
-    #if 0 // TODO: pick a better key or check that no text inputs are focused
-        else if (imgui::IsKeyPressed(ImGuiKey_Backspace)) {
-            if (io.KeyCtrl) {
-                // go forward in history
-
-                u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
-
-                if (expl.wd_history_pos != wd_history_last_idx) {
-                    if (io.KeyShift) {
-                        expl.wd_history_pos = wd_history_last_idx;
-                    } else {
-                        expl.wd_history_pos += 1;
-                    }
-
-                    expl.cwd = expl.wd_history[expl.wd_history_pos];
-                    auto [forward_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                    if (forward_dir_exists) {
-                        expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                        (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                    }
-                }
-            }
-            else {
-                // go backward in history
-
-                if (expl.wd_history_pos > 0) {
-                    if (io.KeyShift) {
-                        expl.wd_history_pos = 0;
-                    } else {
-                        expl.wd_history_pos -= 1;
-                    }
-
-                    expl.cwd = expl.wd_history[expl.wd_history_pos];
-                    auto [back_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-                    if (back_dir_exists) {
-                        expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                        (void) expl.update_cwd_entries(filter, expl.cwd.data());
-                        (void) expl.save_to_disk();
-                    }
-                }
-            }
-        }
-    #endif
     }
 
     auto render_footer_context_menu = [&expl]() noexcept {

@@ -169,3 +169,104 @@ void read_dir_changes_callback(DWORD error_code, DWORD num_bytes_transferred, LP
 }
 
 #endif
+
+#if 0
+    if (imgui::BeginPopup("history_popup")) {
+        swan_path backup = expl.cwd;
+        bool history_item_clicked = render_history_browser_popup(expl, cwd_exists_before_edit);
+
+        if (history_item_clicked) {
+            auto [history_item_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+            if (history_item_exists) {
+                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                (void) expl.save_to_disk();
+            } else {
+                std::string action = make_str("Navigate to history item [%s]", expl.cwd.data());
+                char const *failed = "Path not found, maybe it was renamed or deleted?";
+                swan_popup_modals::open_error(action.c_str(), failed);
+
+                expl.cwd = backup;
+                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+            }
+        }
+    }
+#endif
+
+#if 0 // TODO: pick a better key or check that no text inputs are focused
+    else if (imgui::IsKeyPressed(ImGuiKey_Backspace)) {
+        if (io.KeyCtrl) {
+            // go forward in history
+
+            u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
+
+            if (expl.wd_history_pos != wd_history_last_idx) {
+                if (io.KeyShift) {
+                    expl.wd_history_pos = wd_history_last_idx;
+                } else {
+                    expl.wd_history_pos += 1;
+                }
+
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                auto [forward_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                if (forward_dir_exists) {
+                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                }
+            }
+        }
+        else {
+            // go backward in history
+
+            if (expl.wd_history_pos > 0) {
+                if (io.KeyShift) {
+                    expl.wd_history_pos = 0;
+                } else {
+                    expl.wd_history_pos -= 1;
+                }
+
+                expl.cwd = expl.wd_history[expl.wd_history_pos];
+                auto [back_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+                if (back_dir_exists) {
+                    expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, expl.cwd.data());
+                    (void) expl.save_to_disk();
+                }
+            }
+        }
+    }
+#endif
+
+/// @brief Unreliable function, uses ImGui API. Use Win32 API functions instead.
+bool imgui::IsMouseCursorOutsideMainViewport() noexcept
+{
+    bool retval = false;
+    // Get the current mouse position in ImGui coordinates
+    ImVec2 mousePos = ImGui::GetMousePos();
+
+    // Get the main viewport
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 viewportPos = viewport->Pos;
+    ImVec2 viewportSize = viewport->Size;
+    ImRect viewport_rect(viewport->Pos, viewport->Pos + viewport->Size);
+
+    // Check if the cursor is outside the viewport boundaries
+    if (mousePos.x < viewportPos.x ||
+        mousePos.y < viewportPos.y ||
+        mousePos.x > (viewportPos.x + viewportSize.x) ||
+        mousePos.y > (viewportPos.y + viewportSize.y))
+    {
+        retval = true;
+    }
+
+    static time_point_precise_t s_last_print_time = {};
+
+    if (time_diff_ms(s_last_print_time, get_time_precise()) >= 100) {
+        print_debug_msg("IsCursorOutsideViewport: mp(%.0f, %.0f) vp((%.0f %.0f), (%.0f %.0f)) -> %d",
+            mousePos.x, mousePos.y, viewport_rect.GetTL().x, viewport_rect.GetTL().y, viewport_rect.GetBR().x, viewport_rect.GetBR().y, retval);
+
+        s_last_print_time = get_time_precise();
+    }
+
+    return retval;
+}
