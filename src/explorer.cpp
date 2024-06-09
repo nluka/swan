@@ -71,6 +71,52 @@ void init_explorer_COM_GLFW_OpenGL3(GLFWwindow *window, char const *ini_file_pat
     }
 }
 
+init_explorer_COM_Win32_DX11_result init_explorer_COM_Win32_DX11() noexcept
+{
+    init_explorer_COM_Win32_DX11_result retval = {};
+
+    u64 const max_attempts = 10;
+
+    for (retval.num_attempts_made = 1; retval.num_attempts_made < max_attempts; ++retval.num_attempts_made) {
+        retval.what_failed = nullptr;
+
+        HRESULT result_ole = OleInitialize(nullptr);
+
+        if (FAILED(result_ole)) {
+            retval.what_failed = "OleInitialize";
+            continue;
+            // apparently OleUninitialize() is only necessary for successful calls to OleInitialize()
+        }
+
+        HRESULT result_co = CoInitialize(nullptr);
+
+        if (FAILED(result_co)) {
+            retval.what_failed = "CoInitialize";
+            CoUninitialize();
+            continue;
+        }
+
+        result_co = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID *)&g_shell_link);
+
+        if (FAILED(result_co)) {
+            retval.what_failed = "CoCreateInstance(CLSID_ShellLink ... CLSCTX_INPROC_SERVER, IID_IShellLinkW ...)";
+            continue;
+        }
+
+        result_co = g_shell_link->QueryInterface(IID_IPersistFile, (LPVOID *)&g_persist_file_interface);
+
+        if (FAILED(result_co)) {
+            retval.what_failed = "IUnknown::QueryInterface(IID_IPersistFile, ...)";
+            g_persist_file_interface->Release();
+            CoUninitialize();
+            continue;
+        }
+    }
+
+    retval.success = retval.what_failed == nullptr;
+    return retval;
+}
+
 void cleanup_explorer_COM() noexcept
 try {
     g_persist_file_interface->Release();

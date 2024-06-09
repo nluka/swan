@@ -24,6 +24,37 @@ void EndFrame_GLFW_OpenGL3(GLFWwindow *window) noexcept
     glfwSwapBuffers(window);
 }
 
+void BeginFrame_Win32_DX11(char const *ini_file_path) noexcept
+{
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    imgui::NewFrame(ini_file_path);
+}
+bool EndFrame_Win32_DX11(ID3D11DeviceContext *pd3dDeviceContext, ID3D11RenderTargetView *mainRenderTargetView, IDXGISwapChain *pSwapChain) noexcept
+{
+    imgui::Render();
+
+    ImVec4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
+    float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
+
+    pd3dDeviceContext->OMSetRenderTargets(1, &mainRenderTargetView, nullptr);
+    pd3dDeviceContext->ClearRenderTargetView(mainRenderTargetView, clear_color_with_alpha);
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+    // Update and Render additional Platform Windows
+    if (imgui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+    }
+
+    // Present
+    HRESULT hr = pSwapChain->Present(1, 0); // Present with vsync
+    // HRESULT hr = g_pSwapChain->Present(0, 0); // Present without vsync
+
+    bool SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
+    return SwapChainOccluded;
+}
+
 ImVec4 success_color() noexcept { return global_state::settings().success_color; }
 ImVec4 warning_color() noexcept { return global_state::settings().warning_color; }
 ImVec4 warning_lite_color() noexcept { return global_state::settings().warning_lite_color; }

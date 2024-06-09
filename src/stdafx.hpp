@@ -31,7 +31,6 @@
 #include <regex>
 #include <set>
 #include <shlobj.h>
-#include <shlobj_core.h>
 #include <shlwapi.h>
 #include <shobjidl_core.h>
 #include <source_location>
@@ -52,10 +51,14 @@
 #include "imgui/imgui_internal.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx11.h"
 #include "imgui/imgui_stdlib.h"
 #include "imgui/font_awesome.h"
 #include "imgui/material_design.h"
 #include "imgui/codicons.h"
+
+#include <d3d11.h>
 
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers

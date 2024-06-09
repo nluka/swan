@@ -187,6 +187,14 @@ namespace global_state
 
 void init_explorer_COM_GLFW_OpenGL3(GLFWwindow *window, char const *ini_file_path) noexcept;
 
+struct init_explorer_COM_Win32_DX11_result
+{
+    bool success;
+    char const *what_failed;
+    u64 num_attempts_made;
+};
+init_explorer_COM_Win32_DX11_result init_explorer_COM_Win32_DX11() noexcept;
+
 void cleanup_explorer_COM() noexcept;
 
 void apply_swan_style_overrides() noexcept;
@@ -239,3 +247,5 @@ help_indicator render_help_indicator(bool align_text_to_frame_padding) noexcept;
 ImVec2 help_indicator_size() noexcept;
 
 void free_explorer_drag_drop_payload() noexcept;
+
+void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;

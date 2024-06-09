@@ -36,6 +36,8 @@ add_library(imgui STATIC
     src/imgui/imgui_draw.cpp
     src/imgui/imgui_impl_glfw.cpp
     src/imgui/imgui_impl_opengl3.cpp
+    src/imgui/imgui_impl_win32.cpp
+    src/imgui/imgui_impl_dx11.cpp
     src/imgui/imgui_tables.cpp
     src/imgui/imgui_widgets.cpp
     src/imgui/imgui_stdlib.cpp
@@ -74,6 +76,7 @@ set(SWAN_SOURCES
     "src/icon_library.cpp"
     "src/imgui_dependent_functions.cpp"
     "src/imgui_extension.cpp"
+    "src/main_menu_bar.cpp"
     "src/miscellaneous_functions.cpp"
     "src/miscellaneous_globals.cpp"
     "src/path.cpp"
@@ -89,6 +92,7 @@ set(SWAN_SOURCES
     "src/settings.cpp"
     "src/stdafx.cpp"
     "src/style.cpp"
+    # "src/swan_win32_dx11.cpp"
     "src/swan_glfw_opengl3.cpp"
     "src/tests.cpp"
     "src/theme_editor.cpp"
@@ -120,6 +124,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         stb_image
         "opengl32.lib"
         "glfw3.lib"
+        "D3D11.lib"
         "gdi32.lib"
         "shell32.lib"
         "kernel32.lib"
