@@ -131,6 +131,10 @@ try {
     write_bool("show.explorer_1", this->show.explorer_1);
     write_bool("show.explorer_2", this->show.explorer_2);
     write_bool("show.explorer_3", this->show.explorer_3);
+    write_bool("show.explorer_0_debug", this->show.explorer_0_debug);
+    write_bool("show.explorer_1_debug", this->show.explorer_1_debug);
+    write_bool("show.explorer_2_debug", this->show.explorer_2_debug);
+    write_bool("show.explorer_3_debug", this->show.explorer_3_debug);
     write_bool("show.finder", this->show.finder);
     write_bool("show.pinned", this->show.pinned);
     write_bool("show.file_operations", this->show.file_operations);
@@ -370,6 +374,18 @@ try {
             }
             else if (remainder == "explorer_3") {
                 this->show.explorer_3 = extract_bool();
+            }
+            else if (remainder == "explorer_0_debug") {
+                this->show.explorer_0_debug = extract_bool();
+            }
+            else if (remainder == "explorer_1_debug") {
+                this->show.explorer_1_debug = extract_bool();
+            }
+            else if (remainder == "explorer_2_debug") {
+                this->show.explorer_2_debug = extract_bool();
+            }
+            else if (remainder == "explorer_3_debug") {
+                this->show.explorer_3_debug = extract_bool();
             }
             else if (remainder == "finder") {
                 this->show.finder = extract_bool();

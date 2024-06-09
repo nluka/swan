@@ -210,6 +210,10 @@ struct swan_settings
         bool explorer_1 = false;
         bool explorer_2 = false;
         bool explorer_3 = false;
+        bool explorer_0_debug = false;
+        bool explorer_1_debug = false;
+        bool explorer_2_debug = false;
+        bool explorer_3_debug = false;
         bool finder = false;
         bool pinned = false;
         bool file_operations = false;
@@ -423,7 +427,10 @@ struct explorer_window
     bool filter_show_symlink_files = true;        // persisted in file
     bool filter_show_invalid_symlinks = true;     // persisted in file
 
-    bool debug_window_open = false;
+    bool tree_node_open_debug_state = false;        // persisted in file
+    bool tree_node_open_debug_memory = false;       // persisted in file
+    bool tree_node_open_debug_performance = false;  // persisted in file
+
     bool show_filter_window = false;
     bool filter_text_input_focused = false;
     bool cwd_latest_selected_dirent_idx_changed = false;

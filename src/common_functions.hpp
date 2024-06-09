@@ -27,6 +27,10 @@ namespace swan_windows
         explorer_1,
         explorer_2,
         explorer_3,
+        explorer_0_debug,
+        explorer_1_debug,
+        explorer_2_debug,
+        explorer_3_debug,
         finder,
         pinned,
         file_operations,
@@ -68,6 +72,8 @@ namespace swan_windows
     }
 
     void render_explorer(explorer_window &, bool &open, finder_window &, bool any_popups_open) noexcept;
+
+    void render_explorer_debug(explorer_window &, bool &open, bool any_popups_open) noexcept;
 
     void render_finder(finder_window &, bool &open, bool any_popups_open) noexcept;
 

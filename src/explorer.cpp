@@ -1131,6 +1131,10 @@ bool explorer_window::save_to_disk() const noexcept
             out << "filter_show_symlink_files "         << (s32)filter_show_symlink_files << '\n';
             out << "filter_show_invalid_symlinks "      << (s32)filter_show_invalid_symlinks << '\n';
 
+            out << "tree_node_open_debug_state "        << (s32)tree_node_open_debug_state << '\n';
+            out << "tree_node_open_debug_memory "       << (s32)tree_node_open_debug_memory << '\n';
+            out << "tree_node_open_debug_performance "  << (s32)tree_node_open_debug_performance << '\n';
+
             out << "wd_history_pos "                    << wd_history_pos << '\n';
             out << "wd_history.size() "                 << wd_history.size() << '\n';
 
@@ -1233,6 +1237,10 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
         read_bool("filter_show_files", filter_show_files);
         read_bool("filter_show_symlink_files", filter_show_symlink_files);
         read_bool("filter_show_invalid_symlinks", filter_show_invalid_symlinks);
+
+        read_bool("tree_node_open_debug_state", tree_node_open_debug_state);
+        read_bool("tree_node_open_debug_memory", tree_node_open_debug_memory);
+        read_bool("tree_node_open_debug_performance", tree_node_open_debug_performance);
 
         {
             in >> what;
@@ -1457,75 +1465,122 @@ s32 cwd_text_input_callback(ImGuiInputTextCallbackData *data) noexcept
     return 0;
 }
 
-static
-void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
+void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool any_popups_open) noexcept
+// void render_debug_info(explorer_window &expl, u64 size_unit_multiplier) noexcept
 {
-    imgui::SeparatorText("State");
+    SCOPE_EXIT { imgui::End(); };
 
-    imgui::Text("latest_valid_cwd: [%s]", expl.latest_valid_cwd.data());
-    imgui::Text("select_cwd_entries_on_next_update.size(): %zu", expl.select_cwd_entries_on_next_update.size());
-    imgui::Text("cwd_latest_selected_dirent_idx: %zu", expl.cwd_latest_selected_dirent_idx);
-    imgui::Text("latest_save_to_disk_result: %d", expl.latest_save_to_disk_result);
+    imgui::SetNextWindowSize({ 1000, 720 }, ImGuiCond_Appearing);
 
-    // bools
-    imgui::Text("show_filter_window: %d", expl.show_filter_window);
-    imgui::Text("filter_text_input_focused: %d", expl.filter_text_input_focused);
-    imgui::Text("cwd_latest_selected_dirent_idx_changed: %d", expl.cwd_latest_selected_dirent_idx_changed);
-    imgui::Text("footer_hovered: %d", expl.footer_hovered);
-    imgui::Text("footer_filter_info_hovered: %d", expl.footer_filter_info_hovered);
-    imgui::Text("footer_selection_info_hovered: %d", expl.footer_selection_info_hovered);
-    imgui::Text("footer_clipboard_hovered: %d", expl.footer_clipboard_hovered);
-    imgui::Text("highlight_footer: %d", expl.highlight_footer);
-
-    imgui::Spacing();
-    imgui::SeparatorText("Memory");
-
-    std::array<char, 32> cwd_entries_occupied, cwd_entries_capacity, swan_path_occupied, swan_path_wasted;
-    f64 swan_path_waste_percent;
     {
-        u64 elem_size = sizeof(explorer_window::dirent);
-        u64 num_elems = expl.cwd_entries.size();
-        u64 elem_capacity = expl.cwd_entries.capacity();
+        auto window_name = make_str_static<64>(" Explorer %d Debug Info ", expl.id + 1);
 
-        u64 bytes_occupied = num_elems * elem_size;
-        u64 bytes_reserved = elem_capacity * elem_size;
-
-        cwd_entries_occupied = format_file_size(bytes_occupied, size_unit_multiplier);
-        cwd_entries_capacity = format_file_size(bytes_reserved, size_unit_multiplier);
-    }
-    {
-        u64 bytes_occupied = expl.cwd_entries.size() * sizeof(swan_path);
-        u64 bytes_actually_used = 0;
-
-        for (auto const &dirent : expl.cwd_entries) {
-            bytes_actually_used += path_length(dirent.basic.path);
+        if (!imgui::Begin(window_name.data(), &open, ImGuiWindowFlags_NoCollapse)) {
+            return;
         }
-
-        f64 usage_ratio = ( f64(bytes_actually_used) + (bytes_occupied == 0) ) / ( f64(bytes_occupied) + (bytes_occupied == 0) );
-        swan_path_waste_percent = 100.0 - (usage_ratio * 100.0);
-        u64 bytes_wasted = u64( bytes_occupied * (1.0 - usage_ratio) );
-
-        swan_path_occupied = format_file_size(bytes_occupied, size_unit_multiplier);
-        swan_path_wasted = format_file_size(bytes_wasted, size_unit_multiplier);
     }
-    imgui::Text("cwd_entries (used): %s", cwd_entries_occupied.data());
-    imgui::Text("cwd_entries (capacity): %s", cwd_entries_capacity.data());
-    imgui::Text("swan_path footprint: %s, (%3.1lf %% waste, %s)", swan_path_occupied.data(), swan_path_waste_percent, swan_path_wasted.data());
 
-    imgui::Spacing();
-    imgui::SeparatorText("Performance");
+    u64 size_unit_multiplier = global_state::settings().size_unit_multiplier;
 
-    imgui::Text("entries_to_select_sort: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_sort);
-    imgui::Text("entries_to_select_search: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_search);
+    static bool s_initalized = false;
+    if (s_initalized == false) {
+        s_initalized = true;
+        imgui::TreeNodeSetOpen(imgui::GetCurrentWindow()->GetID("State"), expl.tree_node_open_debug_state);
+        imgui::TreeNodeSetOpen(imgui::GetCurrentWindow()->GetID("Memory"), expl.tree_node_open_debug_memory);
+        imgui::TreeNodeSetOpen(imgui::GetCurrentWindow()->GetID("Performance"), expl.tree_node_open_debug_performance);
+    }
 
-    imgui::Spacing();
-    imgui::SeparatorText("Performance (Culmulative)");
+    bool open_states_begin[] = {
+        expl.tree_node_open_debug_state,
+        expl.tree_node_open_debug_memory,
+        expl.tree_node_open_debug_performance,
+    };
 
-    imgui::Text("num_file_finds: %zu", expl.num_file_finds);
-    imgui::Text("update_cwd_entries_culmulative: %.0lf ms", expl.update_cwd_entries_culmulative_us / 1000.);
-    imgui::Text("filetime_to_string_culmulative: %.0lf ms", expl.filetime_to_string_culmulative_us / 1000.);
-    imgui::Text("format_file_size_culmulative: %.0lf ms", expl.format_file_size_culmulative_us / 1000.);
-    imgui::Text("type_description_culmulative_us: %.0lf ms", expl.type_description_culmulative_us / 1000.);
+    if (expl.tree_node_open_debug_state = imgui::TreeNode("State")) {
+        imgui::Text("latest_valid_cwd: [%s]", expl.latest_valid_cwd.data());
+        imgui::Text("select_cwd_entries_on_next_update.size(): %zu", expl.select_cwd_entries_on_next_update.size());
+        imgui::Text("cwd_latest_selected_dirent_idx: %zu", expl.cwd_latest_selected_dirent_idx);
+        imgui::Text("latest_save_to_disk_result: %d", expl.latest_save_to_disk_result);
+
+        // bools
+        imgui::Text("show_filter_window: %d", expl.show_filter_window);
+        imgui::Text("filter_text_input_focused: %d", expl.filter_text_input_focused);
+        imgui::Text("cwd_latest_selected_dirent_idx_changed: %d", expl.cwd_latest_selected_dirent_idx_changed);
+        imgui::Text("footer_hovered: %d", expl.footer_hovered);
+        imgui::Text("footer_filter_info_hovered: %d", expl.footer_filter_info_hovered);
+        imgui::Text("footer_selection_info_hovered: %d", expl.footer_selection_info_hovered);
+        imgui::Text("footer_clipboard_hovered: %d", expl.footer_clipboard_hovered);
+        imgui::Text("highlight_footer: %d", expl.highlight_footer);
+
+        imgui::TreePop();
+    }
+
+    imgui::Separator();
+
+    if (expl.tree_node_open_debug_memory = imgui::TreeNode("Memory")) {
+        std::array<char, 32> cwd_entries_occupied, cwd_entries_capacity, swan_path_occupied, swan_path_wasted;
+        f64 swan_path_waste_percent;
+        {
+            u64 elem_size = sizeof(explorer_window::dirent);
+            u64 num_elems = expl.cwd_entries.size();
+            u64 elem_capacity = expl.cwd_entries.capacity();
+
+            u64 bytes_occupied = num_elems * elem_size;
+            u64 bytes_reserved = elem_capacity * elem_size;
+
+            cwd_entries_occupied = format_file_size(bytes_occupied, size_unit_multiplier);
+            cwd_entries_capacity = format_file_size(bytes_reserved, size_unit_multiplier);
+        }
+        {
+            u64 bytes_occupied = expl.cwd_entries.size() * sizeof(swan_path);
+            u64 bytes_actually_used = 0;
+
+            for (auto const &dirent : expl.cwd_entries) {
+                bytes_actually_used += path_length(dirent.basic.path);
+            }
+
+            f64 usage_ratio = ( f64(bytes_actually_used) + (bytes_occupied == 0) ) / ( f64(bytes_occupied) + (bytes_occupied == 0) );
+            swan_path_waste_percent = 100.0 - (usage_ratio * 100.0);
+            u64 bytes_wasted = u64( bytes_occupied * (1.0 - usage_ratio) );
+
+            swan_path_occupied = format_file_size(bytes_occupied, size_unit_multiplier);
+            swan_path_wasted = format_file_size(bytes_wasted, size_unit_multiplier);
+        }
+        imgui::Text("cwd_entries (used): %s", cwd_entries_occupied.data());
+        imgui::Text("cwd_entries (capacity): %s", cwd_entries_capacity.data());
+        imgui::Text("swan_path footprint: %s, (%3.1lf %% waste, %s)", swan_path_occupied.data(), swan_path_waste_percent, swan_path_wasted.data());
+
+        imgui::TreePop();
+    }
+
+    imgui::Separator();
+
+    if (expl.tree_node_open_debug_performance = imgui::TreeNode("Performance")) {
+        imgui::SeparatorText("(Latest)");
+        imgui::Text("entries_to_select_sort: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_sort);
+        imgui::Text("entries_to_select_search: %.1lf us", expl.update_cwd_entries_timing_samples.empty() ? NAN : expl.update_cwd_entries_timing_samples.back().entries_to_select_search);
+
+        imgui::SeparatorText("(Culmulative)");
+        imgui::Text("num_file_finds: %zu", expl.num_file_finds);
+        imgui::Text("update_cwd_entries_culmulative: %.0lf ms", expl.update_cwd_entries_culmulative_us / 1000.);
+        imgui::Text("filetime_to_string_culmulative: %.0lf ms", expl.filetime_to_string_culmulative_us / 1000.);
+        imgui::Text("format_file_size_culmulative: %.0lf ms", expl.format_file_size_culmulative_us / 1000.);
+        imgui::Text("type_description_culmulative_us: %.0lf ms", expl.type_description_culmulative_us / 1000.);
+
+        imgui::TreePop();
+    }
+
+    bool open_states_end[] = {
+        expl.tree_node_open_debug_state,
+        expl.tree_node_open_debug_memory,
+        expl.tree_node_open_debug_performance,
+    };
+
+    static_assert(lengthof(open_states_begin) == lengthof(open_states_end));
+
+    if (memcmp(open_states_begin, open_states_end, lengthof(open_states_end)) != 0) {
+        (void) expl.save_to_disk();
+    }
 
 #if 0
     {
@@ -2490,7 +2545,8 @@ void render_help_icon(explorer_window &expl) noexcept
         imgui::OpenPopup("## explorer help");
     }
     if (help.right_clicked) {
-        expl.debug_window_open = true;
+        bool *open = &global_state::settings().show.explorer_0_debug + (u64)expl.id;
+        flip_bool(*open);
     }
 
     imgui::SetNextWindowSizeConstraints(ImVec2(200, 200), ImVec2(imgui::GetMainViewport()->Size.x, 800));
@@ -2961,14 +3017,6 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     }
     // refresh logic end
-
-    if (expl.debug_window_open) {
-        auto window_name = make_str_static<64>(" Explorer %d Debug Info ", expl.id + 1);
-        if (imgui::Begin(window_name.data(), &expl.debug_window_open)) {
-            render_debug_info(expl, size_unit_multiplier);
-        }
-        imgui::End();
-    }
 
     // header controls
     {

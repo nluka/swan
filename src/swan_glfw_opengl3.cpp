@@ -199,6 +199,10 @@ try {
         swan_windows::id::explorer_1,
         swan_windows::id::explorer_2,
         swan_windows::id::explorer_3,
+        swan_windows::id::explorer_0_debug,
+        swan_windows::id::explorer_1_debug,
+        swan_windows::id::explorer_2_debug,
+        swan_windows::id::explorer_3_debug,
         swan_windows::id::finder,
         swan_windows::id::pinned,
         swan_windows::id::file_operations,
@@ -322,6 +326,30 @@ try {
                 case swan_windows::id::explorer_3: {
                     if (window_visib.explorer_3) {
                         swan_windows::render_explorer(explorers[3], window_visib.explorer_3, finder, any_popups_open);
+                    }
+                    break;
+                }
+                case swan_windows::id::explorer_0_debug: {
+                    if (window_visib.explorer_0_debug) {
+                        swan_windows::render_explorer_debug(explorers[0], window_visib.explorer_0_debug, any_popups_open);
+                    }
+                    break;
+                }
+                case swan_windows::id::explorer_1_debug: {
+                    if (window_visib.explorer_1_debug) {
+                        swan_windows::render_explorer_debug(explorers[1], window_visib.explorer_1_debug, any_popups_open);
+                    }
+                    break;
+                }
+                case swan_windows::id::explorer_2_debug: {
+                    if (window_visib.explorer_2_debug) {
+                        swan_windows::render_explorer_debug(explorers[2], window_visib.explorer_2_debug, any_popups_open);
+                    }
+                    break;
+                }
+                case swan_windows::id::explorer_3_debug: {
+                    if (window_visib.explorer_3_debug) {
+                        swan_windows::render_explorer_debug(explorers[3], window_visib.explorer_3_debug, any_popups_open);
                     }
                     break;
                 }
