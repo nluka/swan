@@ -1745,9 +1745,9 @@ ImRect render_num_cwd_items_selected(explorer_window &expl, cwd_count_info const
 
     if (cnt.selected_directories == 0) {
         auto formatted_size = format_file_size(cnt.selected_files_size, global_state::settings().size_unit_multiplier);
-        imgui::Text("%zu items selected  %s", cnt.selected_dirents, formatted_size.data());
+        imgui::Text("%zu item%s selected  %s", cnt.selected_dirents, pluralized(cnt.selected_dirents, "", "s"), formatted_size.data());
     } else {
-        imgui::Text("%zu items selected", cnt.selected_dirents);
+        imgui::Text("%zu item%s selected", cnt.selected_dirents, pluralized(cnt.selected_dirents, "", "s"));
     }
 
     retval_text_rect = imgui::GetItemRect();
@@ -2247,9 +2247,9 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
         }
 
         if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-            imgui::SetTooltip("[      L click]  Toggle %s visibility\n"
-                              "[Ctrl  L click]  Solo type\n"
-                              "[Shift L click]  Unmute all type", type_str);
+            imgui::SetTooltip("[      L click] Toggle %s\n"
+                              "[Ctrl  L click] Solo %s\n"
+                              "[Shift L click] Unmute all", type_str, type_str);
         }
 
         if (imgui::IsItemClicked()) {
@@ -2360,7 +2360,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
                 [pin_idx]() noexcept {
                     auto const &pin = global_state::pinned_get()[pin_idx];
 
-                    imgui::TextUnformatted("Are you sure you want to delete the following pin?");
+                    imgui::TextUnformatted("Are you sure you want to delete this pin?");
                     imgui::Spacing(2);
 
                     imgui::SameLineSpaced(1); // indent
@@ -2828,7 +2828,8 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             if (num_entries_selected > 0) {
                 imgui::OpenConfirmationModalWithCallback(
                     /* confirmation_id  = */ swan_id_confirm_explorer_execute_delete,
-                    /* confirmation_msg = */ make_str("Are you sure you want to delete the %zu selected file(s) from Explorer %d?", num_entries_selected, expl.id+1).c_str(),
+                    /* confirmation_msg = */ make_str("Are you sure you want to delete %zu file%s?",
+                                                      num_entries_selected, pluralized(num_entries_selected, "", "s")).c_str(),
                     /* on_yes_callback  = */
                     [&]() noexcept {
                         auto result = delete_selected_entries(expl);
@@ -3727,6 +3728,10 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                     imgui::OpenPopup("## explorer context_menu");
                     expl.context_menu_target = &dirent;
                     dirent.context_menu_active = true;
+
+                    if (!dirent.selected) {
+                        expl.deselect_all_cwd_entries();
+                    }
                 }
 
             } // path column
@@ -4100,28 +4105,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                 }
             }
 
-            if (imgui::Selectable("Copy name")) {
-                imgui::SetClipboardText(expl.context_menu_target->basic.path.data());
-            }
-            if (imgui::Selectable("Copy full path")) {
-                swan_path full_path = path_create(expl.cwd.data());
-                if (!path_append(full_path, expl.context_menu_target->basic.path.data(), settings.dir_separator_utf8, true)) {
-                    std::string action = make_str("Copy full path of [%s].", expl.context_menu_target->basic.path.data());
-                    char const *failed = "Max path length exceeded when appending name to current working directory path.";
-                    swan_popup_modals::open_error(action.c_str(), failed);
-                } else {
-                    imgui::SetClipboardText(full_path.data());
-                }
-            }
-            if (imgui::Selectable("Copy size bytes")) {
-                imgui::SetClipboardText(std::to_string(expl.context_menu_target->basic.size).c_str());
-            }
-            if (imgui::Selectable("Copy size formatted")) {
-                auto formatted_size = format_file_size(expl.context_menu_target->basic.size, settings.size_unit_multiplier);
-                imgui::SetClipboardText(formatted_size.data());
-            }
-
-            if (imgui::Selectable("Reveal in File Explorer")) {
+            if (imgui::Selectable("Reveal in WFE")) {
                 swan_path full_path = expl.cwd;
                 if (!path_append(full_path, expl.context_menu_target->basic.path.data(), L'\\', true)) {
                     std::string action = make_str("Reveal [%s] in File Explorer.", expl.context_menu_target->basic.path.data());
@@ -4208,7 +4192,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
                 imgui::OpenConfirmationModalWithCallback(
                     /* confirmation_id  = */ swan_id_confirm_explorer_execute_delete,
-                    /* confirmation_msg = */ make_str("Are you sure you want to delete the %zu selected file(s) from Explorer %d?", 1, expl.id+1).c_str(),
+                    /* confirmation_msg = */ "Are you sure you want to delete this file?",
                     /* on_yes_callback  = */
                     [&]() noexcept {
                         auto result = delete_selected_entries(expl);
@@ -4228,42 +4212,35 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                 retval.open_single_rename_popup = true;
                 retval.single_dirent_to_be_renamed = expl.context_menu_target;
             }
-        }
-        else { // right click when > 1 dirents selected
-            if (imgui::Selectable("Copy names")) {
-                std::string clipboard = {};
-
-                for (auto const &dirent : expl.cwd_entries) {
-                    if (dirent.selected && !dirent.filtered) {
-                        clipboard += dirent.basic.path.data();
-                        clipboard += '\n';
-                    }
-                }
-
-                imgui::SetClipboardText(clipboard.c_str());
-            }
-            if (imgui::Selectable("Copy full paths")) {
-                std::string clipboard = {};
-
-                for (auto const &dirent : expl.cwd_entries) {
-                    if (dirent.selected && !dirent.filtered) {
-                        swan_path full_path = path_create(expl.cwd.data());
-                        if (!path_append(full_path, dirent.basic.path.data(), settings.dir_separator_utf8, true)) {
-                            std::string action = make_str("Copy full path of [%s].", dirent.basic.path.data());
-                            char const *failed = "Max path length exceeded when appending name to current working directory path.";
-                            swan_popup_modals::open_error(action.c_str(), failed);
-                            break;
-                        }
-                        clipboard += full_path.data();
-                        clipboard += '\n';
-                    }
-                }
-
-                imgui::SetClipboardText(clipboard.c_str());
-            }
 
             imgui::Separator();
 
+            if (imgui::BeginMenu("Copy metadata")) {
+                if (imgui::Selectable("Name")) {
+                    imgui::SetClipboardText(expl.context_menu_target->basic.path.data());
+                }
+                if (imgui::Selectable("Full path")) {
+                    swan_path full_path = path_create(expl.cwd.data());
+                    if (!path_append(full_path, expl.context_menu_target->basic.path.data(), settings.dir_separator_utf8, true)) {
+                        std::string action = make_str("Copy full path of [%s].", expl.context_menu_target->basic.path.data());
+                        char const *failed = "Max path length exceeded when appending name to current working directory path.";
+                        swan_popup_modals::open_error(action.c_str(), failed);
+                    } else {
+                        imgui::SetClipboardText(full_path.data());
+                    }
+                }
+                if (imgui::Selectable("Size in bytes")) {
+                    imgui::SetClipboardText(std::to_string(expl.context_menu_target->basic.size).c_str());
+                }
+                if (imgui::Selectable("Formatted size")) {
+                    auto formatted_size = format_file_size(expl.context_menu_target->basic.size, settings.size_unit_multiplier);
+                    imgui::SetClipboardText(formatted_size.data());
+                }
+
+                imgui::EndMenu();
+            }
+        }
+        else { // right click when > 1 dirents selected
             auto handle_failure = [](char const *operation, generic_result const &result) noexcept {
                 if (!result.success) {
                     u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
@@ -4296,6 +4273,46 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
             }
             if (imgui::Selectable("Bulk Rename")) {
                 retval.open_bulk_rename_popup = true;
+            }
+
+            imgui::Separator();
+
+            if (imgui::BeginMenu("Copy metadata")) {
+                if (imgui::Selectable("Names")) {
+                    std::string clipboard = {};
+
+                    for (auto const &dirent : expl.cwd_entries) {
+                        if (dirent.selected && !dirent.filtered) {
+                            clipboard += dirent.basic.path.data();
+                            clipboard += '\n';
+                        }
+                    }
+
+                    imgui::SetClipboardText(clipboard.c_str());
+                }
+                if (imgui::Selectable("Full paths")) {
+                    std::string clipboard = {};
+
+                    for (auto const &dirent : expl.cwd_entries) {
+                        if (dirent.selected && !dirent.filtered) {
+                            swan_path full_path = path_create(expl.cwd.data());
+                            if (!path_append(full_path, dirent.basic.path.data(), settings.dir_separator_utf8, true)) {
+                                std::string action = make_str("Copy full path of [%s].", dirent.basic.path.data());
+                                char const *failed = "Max path length exceeded when appending name to current working directory path.";
+                                swan_popup_modals::open_error(action.c_str(), failed);
+                                break;
+                            }
+                            clipboard += full_path.data();
+                            clipboard += '\n';
+                        }
+                    }
+
+                    if (clipboard.ends_with('\n')) clipboard.pop_back();
+
+                    imgui::SetClipboardText(clipboard.c_str());
+                }
+
+                imgui::EndMenu();
             }
         }
 

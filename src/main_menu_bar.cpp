@@ -132,9 +132,8 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
                 setting_change |= imgui::MenuItem("[Explorer]         Delete via context menu", nullptr, &global_state::settings().confirm_explorer_delete_via_context_menu);
                 setting_change |= imgui::MenuItem("[Explorer]         Delete via Del key", nullptr, &global_state::settings().confirm_explorer_delete_via_keybind);
                 setting_change |= imgui::MenuItem("[Explorer]         Unpin working directory", nullptr, &global_state::settings().confirm_explorer_unpin_directory);
-                setting_change |= imgui::MenuItem("[File Operations]  Forget single", nullptr, &global_state::settings().confirm_completed_file_operations_forget_single);
+                setting_change |= imgui::MenuItem("[File Operations]  Forget", nullptr, &global_state::settings().confirm_completed_file_operations_forget);
                 setting_change |= imgui::MenuItem("[File Operations]  Forget group", nullptr, &global_state::settings().confirm_completed_file_operations_forget_group);
-                setting_change |= imgui::MenuItem("[File Operations]  Forget selection", nullptr, &global_state::settings().confirm_completed_file_operations_forget_selected);
                 setting_change |= imgui::MenuItem("[File Operations]  Forget all", nullptr, &global_state::settings().confirm_completed_file_operations_forget_all);
                 setting_change |= imgui::MenuItem("[Theme Editor]     Reset colors", nullptr, &global_state::settings().confirm_theme_editor_color_reset);
                 setting_change |= imgui::MenuItem("[Theme Editor]     Reset style", nullptr, &global_state::settings().confirm_theme_editor_style_reset);

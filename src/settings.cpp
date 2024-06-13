@@ -63,7 +63,7 @@ bool swan_windows::render_settings(bool &open, [[maybe_unused]] bool any_popups_
 
 bool swan_settings::save_to_disk() const noexcept
 try {
-    std::filesystem::path full_path = global_state::execution_path() / "data\\swan_settings.xml";
+    std::filesystem::path full_path = global_state::execution_path() / "data\\swan_settings.txt";
     std::ofstream ofs(full_path);
     if (!ofs) {
         return false;
@@ -120,9 +120,8 @@ try {
     write_bool("confirm.recent_files_reveal_selected_in_win_file_expl", this->confirm_recent_files_reveal_selected_in_win_file_expl);
     write_bool("confirm.recent_files_forget_selected", this->confirm_recent_files_forget_selected);
     write_bool("confirm.delete_pin", this->confirm_delete_pin);
-    write_bool("confirm.completed_file_operations_forget_single", this->confirm_completed_file_operations_forget_single);
+    write_bool("confirm.completed_file_operations_forget", this->confirm_completed_file_operations_forget);
     write_bool("confirm.completed_file_operations_forget_group", this->confirm_completed_file_operations_forget_group);
-    write_bool("confirm.completed_file_operations_forget_selected", this->confirm_completed_file_operations_forget_selected);
     write_bool("confirm.completed_file_operations_forget_all", this->confirm_completed_file_operations_forget_all);
     write_bool("confirm.theme_editor_color_reset", this->confirm_theme_editor_color_reset);
     write_bool("confirm.theme_editor_style_reset", this->confirm_theme_editor_style_reset);
@@ -139,6 +138,7 @@ try {
     write_bool("show.pinned", this->show.pinned);
     write_bool("show.file_operations", this->show.file_operations);
     write_bool("show.recent_files", this->show.recent_files);
+    write_bool("show.ntfs_mft_reader", this->show.ntfs_mft_reader);
     write_bool("show.analytics", this->show.analytics);
     write_bool("show.settings", this->show.settings);
     write_bool("show.debug_log", this->show.debug_log);
@@ -237,7 +237,7 @@ catch (...) {
 
 bool swan_settings::load_from_disk() noexcept
 try {
-    std::filesystem::path full_path = global_state::execution_path() / "data\\swan_settings.xml";
+    std::filesystem::path full_path = global_state::execution_path() / "data\\swan_settings.txt";
     std::ifstream ifs(full_path);
     if (!ifs) {
         print_debug_msg("FAILED global_state::settings::load_from_disk, !file");
@@ -301,7 +301,7 @@ try {
             !std::regex_match(line_str, valid_line_key_color))
         {
             print_debug_msg("FAILED global_state::settings::load_from_disk, malformed content at line %zu", line_num);
-            return false;
+            continue;
         }
 
         ss.str(""); ss.clear();
@@ -332,14 +332,11 @@ try {
             else if (remainder == "delete_pin") {
                 this->confirm_delete_pin = extract_bool();
             }
-            else if (remainder == "completed_file_operations_forget_single") {
-                this->confirm_completed_file_operations_forget_single = extract_bool();
+            else if (remainder == "completed_file_operations_forget") {
+                this->confirm_completed_file_operations_forget = extract_bool();
             }
             else if (remainder == "completed_file_operations_forget_group") {
                 this->confirm_completed_file_operations_forget_group = extract_bool();
-            }
-            else if (remainder == "completed_file_operations_forget_selected") {
-                this->confirm_completed_file_operations_forget_selected = extract_bool();
             }
             else if (remainder == "completed_file_operations_forget_all") {
                 this->confirm_completed_file_operations_forget_all = extract_bool();
@@ -362,6 +359,9 @@ try {
             }
             else if (remainder == "recent_files") {
                 this->show.recent_files = extract_bool();
+            }
+            else if (remainder == "ntfs_mft_reader") {
+                this->show.ntfs_mft_reader = extract_bool();
             }
             else if (remainder == "explorer_0") {
                 this->show.explorer_0 = extract_bool();

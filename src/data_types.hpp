@@ -197,9 +197,8 @@ struct swan_settings
     bool confirm_recent_files_reveal_selected_in_win_file_expl = true;
     bool confirm_recent_files_forget_selected = true;
     bool confirm_delete_pin = true;
-    bool confirm_completed_file_operations_forget_single = true;
+    bool confirm_completed_file_operations_forget = true;
     bool confirm_completed_file_operations_forget_group = true;
-    bool confirm_completed_file_operations_forget_selected = true;
     bool confirm_completed_file_operations_forget_all = true;
     bool confirm_theme_editor_color_reset = true;
     bool confirm_theme_editor_style_reset = true;
@@ -517,7 +516,7 @@ struct completed_file_operation
     basic_dirent::kind obj_type = basic_dirent::kind::nil;
     bool selected = false;
 
-    bool undone() noexcept { return undo_time != time_point_system_t(); }
+    bool undone() const noexcept { return undo_time != time_point_system_t(); }
 
     completed_file_operation(time_point_system_t completion_time, time_point_system_t undo_time, file_operation_type op_type,
                              char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id = 0) noexcept;
@@ -623,7 +622,6 @@ struct recent_file
     time_point_system_t action_time = {};
     swan_path path = {};
     bool selected = false;
-    bool context_menu_active = false;
 };
 
 struct bulk_rename_transform
@@ -687,9 +685,8 @@ enum swan_confirmation_id : s32
     swan_id_confirm_explorer_execute_delete,
     swan_id_confirm_explorer_unpin_directory,
 
-    swan_id_confirm_completed_file_operations_forget_single,
+    swan_id_confirm_completed_file_operations_forget,
     swan_id_confirm_completed_file_operations_forget_group,
-    swan_id_confirm_completed_file_operations_forget_selected,
     swan_id_confirm_completed_file_operations_forget_all,
 
     swan_id_confirm_theme_editor_color_reset,

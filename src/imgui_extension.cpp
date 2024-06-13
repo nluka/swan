@@ -1,5 +1,6 @@
 #include "stdafx.hpp"
 #include "imgui_extension.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "common_functions.hpp"
 
 namespace imgui_confirmation_global_state
@@ -141,12 +142,14 @@ void imgui::RenderConfirmationModal() noexcept
     }
 
     imgui::OpenPopup("Confirm ## RenderConfirmationModal");
-
-    imgui::SetNextWindowSize({ std::min(500.f, imgui::GetMainViewport()->Size.x), -1 });
+    center_window_and_set_size_when_appearing(800, 200);
+    // imgui::SetNextWindowSize({ std::min(800.f, imgui::GetMainViewport()->Size.x), -1 });
 
     if (imgui::BeginPopupModal("Confirm ## RenderConfirmationModal", 0, ImGuiWindowFlags_NoResize)) {
         auto cleanup_and_close_popup = []() noexcept {
             if (g_on_yes_callback != nullptr) {
+                g_on_yes_callback();
+
                 g_on_yes_callback = nullptr;
                 g_active_id = -1;
                 g_content = "";

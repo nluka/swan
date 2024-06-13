@@ -24,9 +24,8 @@ enum debug_log_table_col_id : s32
 
 void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
-    SCOPE_EXIT { imgui::End(); };
-
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::debug_log), &open)) {
+        imgui::End();
         return;
     }
 
@@ -170,4 +169,6 @@ void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
         }
         imgui::EndChild();
     }
+
+    imgui::End();
 }
