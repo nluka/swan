@@ -138,7 +138,6 @@ try {
     write_bool("show.pinned", this->show.pinned);
     write_bool("show.file_operations", this->show.file_operations);
     write_bool("show.recent_files", this->show.recent_files);
-    write_bool("show.ntfs_mft_reader", this->show.ntfs_mft_reader);
     write_bool("show.analytics", this->show.analytics);
     write_bool("show.settings", this->show.settings);
     write_bool("show.debug_log", this->show.debug_log);
@@ -359,9 +358,6 @@ try {
             }
             else if (remainder == "recent_files") {
                 this->show.recent_files = extract_bool();
-            }
-            else if (remainder == "ntfs_mft_reader") {
-                this->show.ntfs_mft_reader = extract_bool();
             }
             else if (remainder == "explorer_0") {
                 this->show.explorer_0 = extract_bool();

@@ -39,12 +39,10 @@ void CreateRenderTarget() noexcept;
 void CleanupRenderTarget() noexcept;
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
 
-#if RELEASE_MODE
-#   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
-#endif
-s32 APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR lpCmdLine, int nCmdShow)
-// s32 main([[maybe_unused]] s32 argc, char const *argv[])
+s32 APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 try {
+    (void) hPrevInstance;
+
     SetUnhandledExceptionFilter(custom_exception_handler);
 
     {
@@ -58,11 +56,33 @@ try {
     swan_path ntest_output_directory_path = path_create( (global_state::execution_path() / "ntest").string().c_str() );
 
 #if RELEASE_MODE
+{
+    LPWSTR *argv;
+    s32 argc;
+    argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+
+    std::vector<std::string> args;
+    for (int i = 0; i < argc; ++i) {
+        int size_needed = WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, NULL, 0, NULL, NULL);
+        std::string arg(size_needed, 0);
+        WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, &arg[0], size_needed, NULL, NULL);
+        args.push_back(arg);
+    }
+
     for (u64 i = 1; i < argc; ++i) {
-        if (cstr_eq(argv[i], "--tests-only")) {
+        if (cstr_eq(args[i].c_str(), "--tests-only")) {
+            LocalFree(argv);
             return run_tests_only(ntest_output_directory_path);
         }
     }
+
+    for (u64 i = 1; i < argc; ++i) {
+        if (cstr_eq(args[i].c_str(), "--with-tests")) {
+            run_tests_integrated(ntest_output_directory_path);
+            break;
+        }
+    }
+}
 #endif
 
     // reset log file
@@ -123,18 +143,9 @@ try {
     SCOPE_EXIT { cleanup_explorer_COM(); };
     print_debug_msg("SUCCESS COM initialized");
 
-    {
-    #if DEBUG_MODE
-        run_tests_integrated(ntest_output_directory_path);
-    #else
-        for (u64 i = 1; i < argc; ++i) {
-            if (cstr_eq(argv[i], "--with-tests")) {
-                run_tests_integrated(ntest_output_directory_path);
-                break;
-            }
-        }
-    #endif
-    }
+#if DEBUG_MODE
+    run_tests_integrated(ntest_output_directory_path);
+#endif
 
     ImGuiStyle const our_default_imgui_style = swan_default_imgui_style();
 
@@ -221,7 +232,6 @@ try {
         swan_windows::id::pinned,
         swan_windows::id::file_operations,
         swan_windows::id::recent_files,
-        swan_windows::id::ntfs_mft_reader,
         swan_windows::id::analytics,
         swan_windows::id::debug_log,
         swan_windows::id::settings,
@@ -372,12 +382,6 @@ try {
                 case swan_windows::id::recent_files: {
                     if (window_visib.recent_files) {
                         swan_windows::render_recent_files(window_visib.recent_files, any_popups_open);
-                    }
-                    break;
-                }
-                case swan_windows::id::ntfs_mft_reader: {
-                    if (window_visib.ntfs_mft_reader) {
-                        swan_windows::render_ntfs_mft_reader(window_visib.ntfs_mft_reader, any_popups_open);
                     }
                     break;
                 }

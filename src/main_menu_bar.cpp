@@ -21,7 +21,6 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::recent_files), nullptr, &global_state::settings().show.recent_files);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::analytics), nullptr, &global_state::settings().show.analytics);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::settings), nullptr, &global_state::settings().show.settings);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::ntfs_mft_reader), nullptr, &global_state::settings().show.ntfs_mft_reader);
 
             imgui::Separator();
 

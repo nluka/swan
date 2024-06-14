@@ -26,11 +26,7 @@ static void         render_ntest_output_window(swan_path const &output_directory
 static void         run_tests_integrated(swan_path const &ntest_output_directory_path) noexcept;
 static s32          run_tests_only(swan_path const &ntest_output_directory_path) noexcept;
 
-#if RELEASE_MODE
-#   pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
-#endif
 s32 APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-// s32 main([[maybe_unused]] s32 argc, char const *argv[])
 try {
     (void) hInstance;
     (void) hPrevInstance;
@@ -39,14 +35,6 @@ try {
 
     SetUnhandledExceptionFilter(custom_exception_handler);
 
-#if 0
-    {
-        std::filesystem::path swan_exec_path = argv[0];
-        swan_exec_path = swan_exec_path.remove_filename();
-        global_state::execution_path() = swan_exec_path;
-    }
-    swan_path ntest_output_directory_path = path_create( (global_state::execution_path() / "ntest").string().c_str() );
-#else
     {
         char exe_path[MAX_PATH];
         GetModuleFileNameA(NULL, exe_path, MAX_PATH);
@@ -56,14 +44,35 @@ try {
         global_state::execution_path() = swan_exec_path;
     }
     swan_path ntest_output_directory_path = path_create( (global_state::execution_path() / "ntest").string().c_str() );
-#endif
 
 #if RELEASE_MODE
+{
+    LPWSTR *argv;
+    s32 argc;
+    argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+
+    std::vector<std::string> args;
+    for (int i = 0; i < argc; ++i) {
+        int size_needed = WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, NULL, 0, NULL, NULL);
+        std::string arg(size_needed, 0);
+        WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, &arg[0], size_needed, NULL, NULL);
+        args.push_back(arg);
+    }
+
     for (u64 i = 1; i < argc; ++i) {
-        if (cstr_eq(argv[i], "--tests-only")) {
+        if (cstr_eq(args[i].c_str(), "--tests-only")) {
+            LocalFree(argv);
             return run_tests_only(ntest_output_directory_path);
         }
     }
+
+    for (u64 i = 1; i < argc; ++i) {
+        if (cstr_eq(args[i].c_str(), "--with-tests")) {
+            run_tests_integrated(ntest_output_directory_path);
+            break;
+        }
+    }
+}
 #endif
 
     GLFWwindow *window = create_barebones_window();
@@ -114,18 +123,9 @@ try {
     print_debug_msg("SUCCESS COM initialized");
     SCOPE_EXIT { cleanup_explorer_COM(); };
 
-    {
-    #if DEBUG_MODE
-        run_tests_integrated(ntest_output_directory_path);
-    #else
-        for (u64 i = 1; i < argc; ++i) {
-            if (cstr_eq(argv[i], "--with-tests")) {
-                run_tests_integrated(ntest_output_directory_path);
-                break;
-            }
-        }
-    #endif
-    }
+#if DEBUG_MODE
+    run_tests_integrated(ntest_output_directory_path);
+#endif
 
     ImGuiStyle const our_default_imgui_style = swan_default_imgui_style();
 
