@@ -237,9 +237,6 @@ try {
         swan_windows::id::settings,
         swan_windows::id::theme_editor,
         swan_windows::id::icon_library,
-        swan_windows::id::icon_font_browser_font_awesome,
-        swan_windows::id::icon_font_browser_codicon,
-        swan_windows::id::icon_font_browser_material_design,
         swan_windows::id::imgui_demo,
     };
 

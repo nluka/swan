@@ -397,9 +397,11 @@ try {
 
     return ntest::generate_report("swan_tests", output_path, assertion_callback);
 }
-catch ([[maybe_unused]] std::exception const &err) {
+catch (std::exception const &) {
+    // print_debug_msg("FAILED catch(std::exception) %s", except.what());
     return std::nullopt;
 }
 catch (...) {
+    // print_debug_msg("FAILED catch(...)");
     return std::nullopt;
 }

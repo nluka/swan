@@ -797,3 +797,20 @@ ImVec2 help_indicator_size() noexcept
 {
     return imgui::CalcTextSize(g_help_indicator);
 }
+
+ImVec4 compute_drive_usage_color(f32 fraction_used) noexcept
+{
+    assert(fraction_used >= 0.f);
+    assert(fraction_used <= 1.f);
+
+    f32 red = 0;
+    f32 green = 1.0f;
+    f32 blue = 0;
+
+    if (fraction_used > 0.8f) {
+        red = (fraction_used - 0.8f) / 0.2f; // Linearly interpolate red from 0 to 1 as fraction_used goes from 0.8 to 1.0
+        green = 1.0f - (fraction_used - 0.8f) / 0.2f; // Linearly interpolate green from 1 to 0 as fraction_used goes from 0.8 to 1.0
+    }
+
+    return ImVec4(red, green, blue, 1);
+}

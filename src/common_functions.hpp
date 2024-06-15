@@ -40,9 +40,6 @@ namespace swan_windows
         settings,
         theme_editor,
         icon_library,
-        icon_font_browser_font_awesome,
-        icon_font_browser_codicon,
-        icon_font_browser_material_design,
         imgui_demo,
         count
     };
@@ -54,6 +51,10 @@ namespace swan_windows
             case id::explorer_1: return " Explorer 2 ";
             case id::explorer_2: return " Explorer 3 ";
             case id::explorer_3: return " Explorer 4 ";
+            case id::explorer_0_debug: return " Explorer 1 Debug ";
+            case id::explorer_1_debug: return " Explorer 2 Debug ";
+            case id::explorer_2_debug: return " Explorer 3 Debug ";
+            case id::explorer_3_debug: return " Explorer 4 Debug ";
             case id::finder: return " Finder ";
             case id::pinned: return " Pinned ";
             case id::file_operations: return " File Operations ";
@@ -63,35 +64,34 @@ namespace swan_windows
             case id::settings: return " Settings ";
             case id::theme_editor: return " Theme Editor ";
             case id::icon_library: return " Icon Library ";
-            case id::icon_font_browser_font_awesome: return " Font Awesome Icons ";
-            case id::icon_font_browser_codicon: return " Codicon Icons ";
-            case id::icon_font_browser_material_design: return " Material Design Icons ";
             case id::imgui_demo: return " ImGui Demo ";
             default: assert(false && "Window has no name"); return nullptr;
         }
     }
 
-    void render_explorer(explorer_window &, bool &open, finder_window &, bool any_popups_open) noexcept;
+    //? all render_* functions return the result of imgui::Begin(*)
 
-    void render_explorer_debug(explorer_window &, bool &open, bool any_popups_open) noexcept;
+    bool render_explorer(explorer_window &, bool &open, finder_window &, bool any_popups_open) noexcept;
 
-    void render_finder(finder_window &, bool &open, bool any_popups_open) noexcept;
+    bool render_explorer_debug(explorer_window &, bool &open, bool any_popups_open) noexcept;
 
-    void render_pinned(std::array<explorer_window, 4> &, bool &open, bool any_popups_open) noexcept;
+    bool render_finder(finder_window &, bool &open, bool any_popups_open) noexcept;
 
-    void render_debug_log(bool &open, bool any_popups_open) noexcept;
+    bool render_pinned(std::array<explorer_window, 4> &, bool &open, bool any_popups_open) noexcept;
 
-    void render_file_operations(bool &open, bool any_popups_open) noexcept;
+    bool render_debug_log(bool &open, bool any_popups_open) noexcept;
 
-    void render_recent_files(bool &open, bool any_popups_open) noexcept;
+    bool render_file_operations(bool &open, bool any_popups_open) noexcept;
 
-    bool render_settings(bool &open, bool any_popups_open) noexcept;
+    bool render_recent_files(bool &open, bool any_popups_open) noexcept;
 
-    void render_icon_library(bool &open, bool any_popups_open) noexcept;
+    bool render_settings(bool &open, bool any_popups_open, bool &changes_applied) noexcept;
 
-    void render_theme_editor(bool &open, ImGuiStyle const &fallback_style, bool any_popups_open) noexcept;
+    bool render_icon_library(bool &open, bool any_popups_open) noexcept;
 
-    void render_analytics() noexcept;
+    bool render_theme_editor(bool &open, ImGuiStyle const &fallback_style, bool any_popups_open) noexcept;
+
+    bool render_analytics() noexcept;
 
 } // namespace render_window
 
@@ -255,3 +255,5 @@ ImVec2 help_indicator_size() noexcept;
 void free_explorer_drag_drop_payload() noexcept;
 
 void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
+
+ImVec4 compute_drive_usage_color(f32 fraction_used) noexcept;

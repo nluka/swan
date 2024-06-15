@@ -124,7 +124,12 @@ try {
     CoUninitialize();
     OleUninitialize();
 }
-catch (...) {}
+catch (std::exception const &except) {
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
+}
+catch (...) {
+    print_debug_msg("FAILED catch(...)");
+}
 
 struct cwd_count_info
 {
@@ -1140,24 +1145,25 @@ bool explorer_window::save_to_disk() const noexcept
             out << "tree_node_open_debug_state "        << (s32)tree_node_open_debug_state << '\n';
             out << "tree_node_open_debug_memory "       << (s32)tree_node_open_debug_memory << '\n';
             out << "tree_node_open_debug_performance "  << (s32)tree_node_open_debug_performance << '\n';
+            out << "tree_node_open_debug_other "        << (s32)tree_node_open_debug_other << '\n';
 
             out << "wd_history_pos "                    << wd_history_pos << '\n';
-            out << "wd_history.size() "                 << wd_history.size() << '\n';
 
             for (auto const &item : wd_history) {
-                out << path_length(item.path) << ' ';
-                out << item.path.data() << ' ';
-                out << std::chrono::system_clock::to_time_t(item.time_departed) << ' ';
-                out << item.called_from.size() << ' ' << item.called_from.c_str();
-                out << '\n';
+                out << "wd_history_elem " << path_length(item.path) << ' ' << item.path.data() << ' '
+                    << std::chrono::system_clock::to_time_t(item.time_departed) << '\n';
             }
         }
     }
+    catch (std::exception const &except) {
+        print_debug_msg("FAILED catch(std::exception) %s", except.what());
+    }
     catch (...) {
+        print_debug_msg("FAILED catch(...)");
         result = false;
     }
 
-    print_debug_msg("[%s] save attempted, result: %d", file_name, result);
+    print_debug_msg("%s [%s]", file_name, result ? "SUCCESS" : "FAILED");
     this->latest_save_to_disk_result = (s8)result;
 
     return result;
@@ -1170,130 +1176,356 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
     char file_name[32]; cstr_clear(file_name);
     [[maybe_unused]] s32 written = snprintf(file_name, lengthof(file_name), "data\\explorer_%d.txt", this->id);
     assert(written < lengthof(file_name));
-    std::filesystem::path full_path = global_state::execution_path() / file_name;
+
+    u64 num_lines_parsed = 0;
+    u64 num_lines_skipped = 0;
 
     try {
-        std::ifstream in(full_path);
-        if (!in) {
-            print_debug_msg("FAILED to open file [%s]", file_name);
-            return false;
-        }
 
-        std::string what = {};
-        what.reserve(256);
-
-        auto skip_one_whitespace_char = [](std::ifstream &in_fstream) {
-            char whitespace = 0;
-            in_fstream.read(&whitespace, 1);
-            assert(whitespace == ' ');
-        };
-
-        auto read_bool = [&](char const *label, bool &value) noexcept {
-            in >> what;
-            assert(what == label);
-
-            s32 read_val = 0;
-            in >> read_val;
-
-            value = (bool)read_val;
-            print_debug_msg("[%s] %s = %d", file_name, label, value);
-        };
-
-        {
-            in >> what;
-            assert(what == "cwd");
-
-            u64 cwd_len = 0;
-            in >> cwd_len;
-            print_debug_msg("[%s] cwd_len = %zu", file_name, cwd_len);
-
-            skip_one_whitespace_char(in);
-
-            in.read(cwd.data(), cwd_len);
-            path_force_separator(cwd, dir_separator);
-            print_debug_msg("[%s] cwd = [%s]", file_name, cwd.data());
-        }
-
-        {
-            in >> what;
-            assert(what == "filter");
-
-            u64 filter_len = 0;
-            in >> filter_len;
-            print_debug_msg("[%s] filter_len = %zu", file_name, filter_len);
-
-            skip_one_whitespace_char(in);
-
-            in.read(filter_text.data(), filter_len);
-            print_debug_msg("[%s] filter = [%s]", file_name, filter_text.data());
-        }
-
-        {
-            in >> what;
-            assert(what == "filter_mode");
-
-            in >> (s32 &)filter_mode;
-            print_debug_msg("[%s] filter_mode = %d", file_name, filter_mode);
-        }
-
-        read_bool("filter_case_sensitive", filter_case_sensitive);
-        read_bool("filter_polarity", filter_polarity);
-        read_bool("filter_show_directories", filter_show_directories);
-        read_bool("filter_show_symlink_directories", filter_show_symlink_directories);
-        read_bool("filter_show_files", filter_show_files);
-        read_bool("filter_show_symlink_files", filter_show_symlink_files);
-        read_bool("filter_show_invalid_symlinks", filter_show_invalid_symlinks);
-
-        read_bool("tree_node_open_debug_state", tree_node_open_debug_state);
-        read_bool("tree_node_open_debug_memory", tree_node_open_debug_memory);
-        read_bool("tree_node_open_debug_performance", tree_node_open_debug_performance);
-
-        {
-            in >> what;
-            assert(what == "wd_history_pos");
-
-            in >> wd_history_pos;
-            print_debug_msg("[%s] wd_history_pos = %zu", file_name, wd_history_pos);
-        }
-
-        u64 wd_history_size = 0;
-        {
-            in >> what;
-            assert(what == "wd_history.size()");
-
-            in >> wd_history_size;
-            print_debug_msg("[%s] wd_history_size = %zu", file_name, wd_history_size);
-        }
-
-        wd_history.resize(wd_history_size);
-        for (u64 i = 0; i < wd_history_size; ++i) {
-            u64 path_len = 0;
-            in >> path_len;
-            skip_one_whitespace_char(in);
-
-            in.read(wd_history[i].path.data(), path_len);
-            skip_one_whitespace_char(in);
-
-            wd_history[i].time_departed = extract_system_time_from_istream(in);
-            skip_one_whitespace_char(in);
-
-            u64 sloc_len = 0;
-            in >> sloc_len;
-            skip_one_whitespace_char(in);
-
-            wd_history[i].called_from.resize(sloc_len);
-            in.read(wd_history[i].called_from.data(), sloc_len);
-
-            path_force_separator(wd_history[i].path, dir_separator);
-            print_debug_msg("[%s] history[%zu] = { [%s] [%s] }", file_name, i, wd_history[i].path.data(), wd_history[i].called_from.c_str());
-        }
-    }
-    catch (...) {
+    std::filesystem::path full_path = global_state::execution_path() / file_name;
+    std::ifstream ifs(full_path);
+    if (!ifs) {
+        print_debug_msg("FAILED explorer_window::load_from_disk, !file");
         return false;
     }
 
+    auto content = std::string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+    while (content.back() == '\n') {
+        content.pop_back();
+    }
+
+    auto lines = std::string_view(content) | std::ranges::views::split('\n');
+
+    char const *key_pattern = "[a-z0-9_.]{1,}";
+    char const *uint_pattern = "[0-9]{1,}";
+    char const *uint_or_float_pattern = "[0-9]{1,}.?[0-9]{0,}";
+
+    auto key_numerical_pattern = make_str_static<128>("^%s %s$", key_pattern, uint_or_float_pattern);
+    auto key_ImVec4_pattern = make_str_static<128>("^%s %s %s %s %s$", key_pattern, uint_or_float_pattern, uint_or_float_pattern, uint_or_float_pattern, uint_or_float_pattern);
+    auto key_path_pattern = make_str_static<128>("^%s %s [a-z]:[\\\\/].*$", key_pattern, uint_pattern);
+    auto wd_history_elem_pattern = make_str_static<128>("^wd_history_elem %s [a-z]:[\\\\/].* %s$", uint_pattern, key_pattern);
+
+    std::vector<std::regex> valid_line_regexs = {};
+    valid_line_regexs.emplace_back(key_numerical_pattern.data(), std::regex_constants::icase);
+    valid_line_regexs.emplace_back(key_ImVec4_pattern.data(), std::regex_constants::icase);
+    valid_line_regexs.emplace_back(key_path_pattern.data(), std::regex_constants::icase);
+    valid_line_regexs.emplace_back(wd_history_elem_pattern.data(), std::regex_constants::icase);
+
+    std::stringstream ss;
+    std::string line_str = {};
+    std::string property = {};
+    u64 line_num = 0;
+
+    auto extract_bool = [&]() noexcept -> bool {
+        char bool_ch = {};
+        ss >> bool_ch;
+        return bool_ch == '1';
+    };
+    auto extract_u64 = [&]() noexcept -> u64 {
+        u64 val = {};
+        ss >> val;
+        return val;
+    };
+    auto extract_f32 = [&]() noexcept -> f32 {
+        f32 val = {};
+        ss >> val;
+        return val;
+    };
+    auto extract_ImGuiDir = [&]() noexcept -> ImGuiDir {
+        s32 val = {};
+        ss >> val;
+        return static_cast<ImGuiDir>(val);
+    };
+    auto extract_ImVec4 = [&]() noexcept -> ImVec4 {
+        f32 x, y, z, w;
+        ss >> x >> y >> z >> w;
+        return ImVec4(x, y, z, w);
+    };
+    auto skip_one_whitespace_char = [](std::istream &instream) {
+        char whitespace = 0;
+        instream.read(&whitespace, 1);
+        assert(whitespace == ' ');
+    };
+
+    for (auto const &line : lines) {
+        ++line_num;
+        line_str = std::string(line.data(), line.size());
+
+        if (line_str.empty()) {
+            print_debug_msg("Blank line, skipping...", line_num);
+            ++num_lines_skipped;
+            continue;
+        }
+
+        print_debug_msg("Parsing line %zu [%s]", line_num, line_str.c_str());
+
+        bool malformed_line = false;
+        for (auto const &valid_line_regex : valid_line_regexs) {
+            if (std::regex_match(line_str, valid_line_regex)) {
+                malformed_line = true;
+                break;
+            }
+        }
+        if (!malformed_line) {
+            print_debug_msg("ERROR malformed line %zu, skipping...", line_num);
+            ++num_lines_skipped;
+            continue;
+        }
+
+        ss.str(""); ss.clear();
+        ss << line_str;
+        ss >> property;
+
+        if (property == "cwd") {
+            u64 cwd_len = extract_u64();
+            if (cwd_len > 0) {
+                skip_one_whitespace_char(ss);
+                ss.read(this->cwd.data(), cwd_len);
+                path_force_separator(this->cwd, dir_separator);
+            }
+        }
+        else if (property == "filter") {
+            u64 filter_len = extract_u64();
+            if (filter_len > 0) {
+                skip_one_whitespace_char(ss);
+                ss.read(this->filter_text.data(), filter_len);
+            }
+        }
+        else if (property.starts_with("wd_history_")) {
+            std::string_view remainder(property.c_str() + lengthof("wd_history"));
+
+            if (remainder == "pos") {
+                ss >> (s32 &)this->wd_history_pos;
+            }
+            else if (remainder == "elem") {
+                u64 path_len = extract_u64();
+                assert(path_len > 0);
+
+                explorer_window::history_item elem = {};
+
+                if (path_len > 0) {
+                    skip_one_whitespace_char(ss);
+                    ss.read(elem.path.data(), path_len);
+                    skip_one_whitespace_char(ss);
+                    elem.time_departed = extract_system_time_from_istream(ss);
+                    this->wd_history.push_back(elem);
+                }
+            }
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
+            }
+        }
+        else if (property.starts_with("filter_")) {
+            std::string_view remainder(property.c_str() + lengthof("filter"));
+
+            if (remainder == "mode") {
+                ss >> (s32 &)this->filter_mode;
+            }
+            else if (remainder == "case_sensitive") {
+                this->filter_case_sensitive = extract_bool();
+            }
+            else if (remainder == "polarity") {
+                this->filter_polarity = extract_bool();
+            }
+            else if (remainder == "show_directories") {
+                this->filter_show_directories = extract_bool();
+            }
+            else if (remainder == "show_symlink_directories") {
+                this->filter_show_symlink_directories = extract_bool();
+            }
+            else if (remainder == "show_files") {
+                this->filter_show_files = extract_bool();
+            }
+            else if (remainder == "show_symlink_files") {
+                this->filter_show_symlink_files = extract_bool();
+            }
+            else if (remainder == "show_invalid_symlinks") {
+                this->filter_show_invalid_symlinks = extract_bool();
+            }
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
+            }
+        }
+        else if (property.starts_with("tree_node_open_debug_")) {
+            std::string_view remainder(property.c_str() + lengthof("tree_node_open_debug"));
+
+            if (remainder == "state") {
+                this->tree_node_open_debug_state = extract_bool();
+            }
+            else if (remainder == "memory") {
+                this->tree_node_open_debug_memory = extract_bool();
+            }
+            else if (remainder == "performance") {
+                this->tree_node_open_debug_performance = extract_bool();
+            }
+            else if (remainder == "other") {
+                this->tree_node_open_debug_other = extract_bool();
+            }
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
+            }
+        }
+        else {
+            print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+            ++num_lines_skipped;
+            continue;
+        }
+
+        ++num_lines_parsed;
+    }
+
+    }
+    catch (std::exception const &except) {
+        print_debug_msg("FAILED catch(std::exception) %s", except.what());
+        return false;
+    }
+    catch (...) {
+        print_debug_msg("FAILED catch(...)");
+        return false;
+    }
+
+    print_debug_msg("SUCCESS parsed %zu lines, skipped %zu", num_lines_parsed, num_lines_skipped);
     return true;
 }
+
+// bool explorer_window::load_from_disk(char dir_separator) noexcept
+// {
+//     assert(this->name != nullptr);
+
+//     char file_name[32]; cstr_clear(file_name);
+//     [[maybe_unused]] s32 written = snprintf(file_name, lengthof(file_name), "data\\explorer_%d.txt", this->id);
+//     assert(written < lengthof(file_name));
+//     std::filesystem::path full_path = global_state::execution_path() / file_name;
+
+//     try {
+//         std::ifstream in(full_path);
+//         if (!in) {
+//             print_debug_msg("FAILED to open file [%s]", file_name);
+//             return false;
+//         }
+
+//         std::string what = {};
+//         what.reserve(256);
+
+//         auto skip_one_whitespace_char = [](std::ifstream &in_fstream) {
+//             char whitespace = 0;
+//             in_fstream.read(&whitespace, 1);
+//             assert(whitespace == ' ');
+//         };
+
+//         auto read_bool = [&](char const *label, bool &value) noexcept {
+//             in >> what;
+//             assert(what == label);
+
+//             s32 read_val = 0;
+//             in >> read_val;
+
+//             value = (bool)read_val;
+//             print_debug_msg("[%s] %s = %d", file_name, label, value);
+//         };
+
+//         {
+//             in >> what;
+//             assert(what == "cwd");
+
+//             u64 cwd_len = 0;
+//             in >> cwd_len;
+//             print_debug_msg("[%s] cwd_len = %zu", file_name, cwd_len);
+
+//             skip_one_whitespace_char(in);
+
+//             in.read(cwd.data(), cwd_len);
+//             path_force_separator(cwd, dir_separator);
+//             print_debug_msg("[%s] cwd = [%s]", file_name, cwd.data());
+//         }
+
+//         {
+//             in >> what;
+//             assert(what == "filter");
+
+//             u64 filter_len = 0;
+//             in >> filter_len;
+//             print_debug_msg("[%s] filter_len = %zu", file_name, filter_len);
+
+//             skip_one_whitespace_char(in);
+
+//             in.read(filter_text.data(), filter_len);
+//             print_debug_msg("[%s] filter = [%s]", file_name, filter_text.data());
+//         }
+
+//         {
+//             in >> what;
+//             assert(what == "filter_mode");
+
+//             in >> (s32 &)filter_mode;
+//             print_debug_msg("[%s] filter_mode = %d", file_name, filter_mode);
+//         }
+
+//         read_bool("filter_case_sensitive", filter_case_sensitive);
+//         read_bool("filter_polarity", filter_polarity);
+//         read_bool("filter_show_directories", filter_show_directories);
+//         read_bool("filter_show_symlink_directories", filter_show_symlink_directories);
+//         read_bool("filter_show_files", filter_show_files);
+//         read_bool("filter_show_symlink_files", filter_show_symlink_files);
+//         read_bool("filter_show_invalid_symlinks", filter_show_invalid_symlinks);
+
+//         read_bool("tree_node_open_debug_state", tree_node_open_debug_state);
+//         read_bool("tree_node_open_debug_memory", tree_node_open_debug_memory);
+//         read_bool("tree_node_open_debug_performance", tree_node_open_debug_performance);
+//         read_bool("tree_node_open_debug_other", tree_node_open_debug_other);
+
+//         {
+//             in >> what;
+//             assert(what == "wd_history_pos");
+
+//             in >> wd_history_pos;
+//             print_debug_msg("[%s] wd_history_pos = %zu", file_name, wd_history_pos);
+//         }
+
+//         u64 wd_history_size = 0;
+//         {
+//             in >> what;
+//             assert(what == "wd_history.size()");
+
+//             in >> wd_history_size;
+//             print_debug_msg("[%s] wd_history_size = %zu", file_name, wd_history_size);
+//         }
+
+//         wd_history.resize(wd_history_size);
+//         for (u64 i = 0; i < wd_history_size; ++i) {
+//             u64 path_len = 0;
+//             in >> path_len;
+//             skip_one_whitespace_char(in);
+
+//             in.read(wd_history[i].path.data(), path_len);
+//             skip_one_whitespace_char(in);
+
+//             wd_history[i].time_departed = extract_system_time_from_istream(in);
+//             skip_one_whitespace_char(in);
+
+//             u64 sloc_len = 0;
+//             in >> sloc_len;
+//             skip_one_whitespace_char(in);
+
+//             wd_history[i].called_from.resize(sloc_len);
+//             in.read(wd_history[i].called_from.data(), sloc_len);
+
+//             path_force_separator(wd_history[i].path, dir_separator);
+//             print_debug_msg("[%s] history[%zu] = { [%s] [%s] }", file_name, i, wd_history[i].path.data(), wd_history[i].called_from.c_str());
+//         }
+//     }
+//     catch (...) {
+//         return false;
+//     }
+
+//     return true;
+// }
 
 void explorer_window::push_history_item(swan_path const &new_latest_entry, std::source_location sloc) noexcept
 {
@@ -1471,19 +1703,19 @@ s32 cwd_text_input_callback(ImGuiInputTextCallbackData *data) noexcept
     return 0;
 }
 
-void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool any_popups_open) noexcept
+bool swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool any_popups_open) noexcept
 {
     (void) any_popups_open;
-
-    SCOPE_EXIT { imgui::End(); };
 
     imgui::SetNextWindowSize({ 1000, 720 }, ImGuiCond_Appearing);
 
     {
-        auto window_name = make_str_static<64>(" Explorer %d Debug Info ", expl.id + 1);
+        // auto window_name = make_str_static<64>(" Explorer %d Debug Info ", expl.id + 1);
 
-        if (!imgui::Begin(window_name.data(), &open, ImGuiWindowFlags_NoCollapse)) {
-            return;
+        auto id = (s32)swan_windows::id::explorer_0_debug + expl.id;
+
+        if (!imgui::Begin(swan_windows::get_name(swan_windows::id(id)), &open, ImGuiWindowFlags_NoCollapse)) {
+            return false;
         }
     }
 
@@ -1495,12 +1727,14 @@ void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool
         imgui::TreeNodeSetOpen(imgui::GetCurrentWindow()->GetID("State"), expl.tree_node_open_debug_state);
         imgui::TreeNodeSetOpen(imgui::GetCurrentWindow()->GetID("Memory"), expl.tree_node_open_debug_memory);
         imgui::TreeNodeSetOpen(imgui::GetCurrentWindow()->GetID("Performance"), expl.tree_node_open_debug_performance);
+        imgui::TreeNodeSetOpen(imgui::GetCurrentWindow()->GetID("Other"), expl.tree_node_open_debug_other);
     }
 
     bool open_states_begin[] = {
         expl.tree_node_open_debug_state,
         expl.tree_node_open_debug_memory,
         expl.tree_node_open_debug_performance,
+        expl.tree_node_open_debug_other,
     };
 
     expl.tree_node_open_debug_state = imgui::TreeNode("State");
@@ -1580,10 +1814,35 @@ void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool
         imgui::TreePop();
     }
 
+    imgui::Separator();
+
+    expl.tree_node_open_debug_other = imgui::TreeNode("Other");
+    if (expl.tree_node_open_debug_other) {
+        imgui::SeparatorText("compute_drive_usage_color()");
+        {
+            static f32 s_fraction_used = 0.f;
+            {
+                ImVec4 color = compute_drive_usage_color(s_fraction_used);
+                imgui::ScopedColor c1(ImGuiCol_FrameBg, color);
+                imgui::ScopedColor c2(ImGuiCol_SliderGrab, color);
+                imgui::ScopedColor c3(ImGuiCol_SliderGrabActive, color);
+                imgui::ScopedColor c4(ImGuiCol_FrameBgHovered, color);
+                imgui::ScopedAvailWidth w = {};
+                imgui::SliderFloat("## Fraction", &s_fraction_used, 0.f, 1.f, "%.2f");
+            }
+            // s_fraction_used = std::clamp(s_fraction_used, 0.f, 1.f);
+
+            // imgui::ScopedColor c(ImGuiCol_PlotHistogram, compute_drive_usage_color(s_fraction_used));
+            // imgui::ProgressBar(s_fraction_used);
+        }
+        imgui::TreePop();
+    }
+
     bool open_states_end[] = {
         expl.tree_node_open_debug_state,
         expl.tree_node_open_debug_memory,
         expl.tree_node_open_debug_performance,
+        expl.tree_node_open_debug_other,
     };
 
     static_assert(lengthof(open_states_begin) == lengthof(open_states_end));
@@ -1629,6 +1888,8 @@ void swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool
         }
     }
 #endif
+
+    return true;
 }
 
 static
@@ -2123,6 +2384,7 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         ImGuiTableFlags_BordersInnerV|
         ImGuiTableFlags_Reorderable|
         ImGuiTableFlags_Resizable|
+        ImGuiTableFlags_ScrollY|
         (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)|
         (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
     ;
@@ -2184,11 +2446,8 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
                 imgui::Text("%3.0lf%%", percent_used);
                 imgui::SameLine();
 
-                f32 red = fraction_used < 0.5f ? 0 : ( 4 * ((fraction_used - 0.5f) * (fraction_used - 0.5f)) );
-                f32 green = 1.5f - fraction_used;
-                f32 blue = 0;
-
-                imgui::ScopedColor c(ImGuiCol_PlotHistogram, ImVec4(red, green, blue, 1));
+                ImVec4 drive_usage_color = compute_drive_usage_color(fraction_used);
+                imgui::ScopedColor c(ImGuiCol_PlotHistogram, drive_usage_color);
                 imgui::ProgressBar(f32(used_bytes) / f32(drive.total_bytes), ImVec2(-1, imgui::CalcTextSize("1").y), "");
             }
         }
@@ -2783,15 +3042,12 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
     return retval;
 }
 
-void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_window &finder, bool any_popups_open) noexcept
+bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_window &finder, bool any_popups_open) noexcept
 {
     imgui::SetNextWindowSize({ 1280, 720 }, ImGuiCond_Appearing);
-    {
-        bool is_explorer_visible = imgui::Begin(expl.name, &open, ImGuiWindowFlags_NoCollapse);
-        if (!is_explorer_visible) {
-            imgui::End();
-            return;
-        }
+
+    if (!imgui::Begin(expl.name, &open, ImGuiWindowFlags_NoCollapse)) {
+        return false;
     }
 
     auto &io = imgui::GetIO();
@@ -2809,12 +3065,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
     static explorer_window::dirent const *s_dirent_to_be_renamed = nullptr;
 
-    if (window_focused) {
-        assert(expl.id >= 0);
-        global_state::focused_window_set(swan_windows::id( (s32)swan_windows::id::explorer_0 + expl.id ));
-    }
-
-    auto label_child = make_str_static<64>("%s##main_child", expl.name);
+    auto label_child = make_str_static<64>("%s ## main_child", expl.name);
     if (imgui::BeginChild(label_child.data(), {}, false)) {
 
     if (!any_popups_open) {
@@ -3431,7 +3682,7 @@ void swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         imgui::EndDragDropTarget();
     }
 
-    imgui::End();
+    return true;
 }
 
 void file_operation_command_buf::clear() noexcept

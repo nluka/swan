@@ -22,17 +22,13 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
     }
 }
 
-void swan_windows::render_pinned(
+bool swan_windows::render_pinned(
     [[maybe_unused]] std::array<explorer_window,
     global_constants::num_explorers> &explorers,
     bool &open,
     [[maybe_unused]] bool any_popups_open) noexcept
 {
     if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &open)) {
-        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::focused_window_set(swan_windows::id::pinned);
-        }
-
         std::vector<pinned_path> &pins = global_state::pinned_get();
 
         static pinned_path *s_context_target = nullptr;
@@ -129,9 +125,11 @@ void swan_windows::render_pinned(
             bool success = global_state::pinned_save_to_disk();
             print_debug_msg("delete pins[%zu], global_state::pinned_save_to_disk: %d", pin_to_delete_idx, success);
         }
+
+        return true;
     }
 
-    imgui::End();
+    return false;
 }
 
 std::vector<pinned_path> &global_state::pinned_get() noexcept
@@ -146,7 +144,13 @@ bool global_state::pinned_add(ImVec4 color, char const *label, swan_path &path, 
     try {
         g_pinned_paths.emplace_back(color, label, path);
         return true;
-    } catch (...) {
+    }
+    catch (std::exception const &except) {
+        print_debug_msg("FAILED catch(std::exception) %s", except.what());
+        return false;
+    }
+    catch (...) {
+        print_debug_msg("FAILED catch(...)");
         return false;
     }
 }
@@ -266,10 +270,14 @@ try {
         line.clear();
     }
 
-    print_debug_msg("SUCCESS global_state::pinned_load_from_disk, loaded %zu pins", num_loaded_successfully);
+    print_debug_msg("SUCCESS, loaded %zu pins", num_loaded_successfully);
     return { true, num_loaded_successfully };
 }
+catch (std::exception const &except) {
+    print_debug_msg("FAILED, catch(std::exception) %s", except.what());
+    return { false, 0 };
+}
 catch (...) {
-    print_debug_msg("FAILED global_state::pinned_load_from_disk");
+    print_debug_msg("FAILED, catch(...)");
     return { false, 0 };
 }

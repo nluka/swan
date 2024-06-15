@@ -40,13 +40,18 @@ bool global_state::focused_window_set(swan_windows::id window_id) noexcept
                 success = true;
             }
         }
+        catch (std::exception const &except) {
+            print_debug_msg("FAILED catch(std::exception) %s", except.what());
+            success = false;
+        }
         catch (...) {
+            print_debug_msg("FAILED catch(...)");
             success = false;
         }
 
-        if (!success) {
-            print_debug_msg("%s global_state::save_focused_window (%s)", success ? "SUCCESS" : "FAILED", swan_windows::get_name(window_id));
-        }
+        // if (!success) {
+            print_debug_msg("%s (%s)", success ? "SUCCESS" : "FAILED", swan_windows::get_name(window_id));
+        // }
     }
 
     return success;
@@ -62,18 +67,27 @@ bool global_state::focused_window_load_from_disk(swan_windows::id &out) noexcept
         std::ifstream in(file_path);
 
         if (!in) {
-            print_debug_msg("FAILED global_state::focused_window_load_from_disk: !in");
+            print_debug_msg("FAILED !in");
             return false;
         }
 
         in >> (s32 &)g_focused_window_id;
+
+        if (g_focused_window_id == swan_windows::id::nil_window) {
+            g_focused_window_id = swan_windows::id::explorer_0; // fallback
+        }
+
         out = g_focused_window_id;
 
-        print_debug_msg("SUCCESS focused_window_load_from_disk");
+        print_debug_msg("SUCCESS");
         return true;
     }
+    catch (std::exception const &except) {
+        print_debug_msg("FAILED catch(std::exception) %s", except.what());
+        return false;
+    }
     catch (...) {
-        print_debug_msg("FAILED focused_window_load_from_disk: catch(...)");
+        print_debug_msg("FAILED catch(...)");
         return false;
     }
 }

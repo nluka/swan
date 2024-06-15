@@ -429,6 +429,7 @@ struct explorer_window
     bool tree_node_open_debug_state = false;        // persisted in file
     bool tree_node_open_debug_memory = false;       // persisted in file
     bool tree_node_open_debug_performance = false;  // persisted in file
+    bool tree_node_open_debug_other = false;        // persisted in file
 
     bool show_filter_window = false;
     bool filter_text_input_focused = false;

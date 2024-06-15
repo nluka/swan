@@ -75,8 +75,12 @@ try {
     print_debug_msg("SUCCESS global_state::recent_files_save_to_disk");
     return true;
 }
+catch (std::exception const &except) {
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
+    return false;
+}
 catch (...) {
-    print_debug_msg("FAILED global_state::recent_files_save_to_disk");
+    print_debug_msg("FAILED catch(...)");
     return false;
 }
 
@@ -155,15 +159,10 @@ u64 deselect_all(circular_buffer<recent_file> &recent_files) noexcept
     return num_deselected;
 }
 
-void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcept
+bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::recent_files), &open)) {
-        imgui::End();
-        return;
-    }
-
-    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::focused_window_set(swan_windows::id::recent_files);
+        return false;
     }
 
     {
@@ -570,5 +569,5 @@ void swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         (void) global_state::recent_files_save_to_disk();
     }
 
-    imgui::End();
+    return true;
 }

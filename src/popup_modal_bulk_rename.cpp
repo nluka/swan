@@ -965,7 +965,11 @@ void swan_popup_modals::render_bulk_rename() noexcept
                 }
             }
         }
+        catch (std::exception const &except) {
+            print_debug_msg("FAILED catch(std::exception) %s", except.what());
+        }
         catch (...) {
+            print_debug_msg("FAILED catch(...)");
         }
     };
 
@@ -1035,7 +1039,11 @@ void swan_popup_modals::render_bulk_rename() noexcept
                 }
             }
         }
+        catch (std::exception const &except) {
+            print_debug_msg("FAILED catch(std::exception) %s", except.what());
+        }
         catch (...) {
+            print_debug_msg("FAILED catch(...)");
         }
     };
 
@@ -1389,6 +1397,9 @@ try {
     assert(this->stat.load() == status::ready);
     return do_transform(*this, working_directory, buffer_before, buffer_after, false);
 }
+catch (std::exception const &except) {
+    return except.what();
+}
 catch (...) {
     return "Exception, catch (...)";
 }
@@ -1397,6 +1408,9 @@ std::string bulk_rename_transform::revert(wchar_t const *working_directory, std:
 try {
     assert(this->stat.load() == status::execute_success);
     return do_transform(*this, working_directory, buffer_before, buffer_after, true);
+}
+catch (std::exception const &except) {
+    return except.what();
 }
 catch (...) {
     return "Exception, catch (...)";

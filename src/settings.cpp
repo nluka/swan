@@ -6,20 +6,13 @@
 static swan_settings g_settings = {};
 swan_settings &global_state::settings() noexcept { return g_settings; }
 
-bool swan_windows::render_settings(bool &open, [[maybe_unused]] bool any_popups_open) noexcept
+bool swan_windows::render_settings(bool &open, [[maybe_unused]] bool any_popups_open, bool &out_changes_applied) noexcept
 {
-    bool retval_changes_applied = false;
-
     static bool s_regular_change = false;
     static bool s_overridden = false;
 
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::settings), &open, ImGuiWindowFlags_AlwaysAutoResize)) {
-        imgui::End();
-        return retval_changes_applied;
-    }
-
-    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::focused_window_set(swan_windows::id::settings);
+        return false;
     }
 
     auto &settings = global_state::settings();
@@ -35,7 +28,7 @@ bool swan_windows::render_settings(bool &open, [[maybe_unused]] bool any_popups_
             imgui::SameLine();
             if (imgui::Button("Apply")) {
                 s_overridden = false;
-                retval_changes_applied = true;
+                out_changes_applied = true;
             }
         }
     #if 1
@@ -56,9 +49,7 @@ bool swan_windows::render_settings(bool &open, [[maybe_unused]] bool any_popups_
         (void) settings.save_to_disk();
     }
 
-    imgui::End();
-
-    return retval_changes_applied;
+    return true;
 }
 
 bool swan_settings::save_to_disk() const noexcept
@@ -222,15 +213,15 @@ try {
 
     ofs << serialize_ImGuiStyle(imgui::GetStyle(), 8192, serialize_ImGuiStyle_mode::plain_text);
 
-    print_debug_msg("SUCCESS swan_settings::save_to_disk");
+    print_debug_msg("SUCCESS");
     return true;
 }
 catch (std::exception const &except) {
-    print_debug_msg("FAILED swan_settings::save_to_disk, %s", except.what());
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
     return false;
 }
 catch (...) {
-    print_debug_msg("FAILED swan_settings::save_to_disk");
+    print_debug_msg("FAILED catch(...)");
     return false;
 }
 
@@ -264,6 +255,8 @@ try {
     std::string line_str = {};
     std::string property = {};
     u64 line_num = 0;
+    u64 num_lines_parsed = 0;
+    u64 num_lines_skipped = 0;
 
     auto extract_bool = [&]() noexcept -> bool {
         char bool_ch = {};
@@ -294,12 +287,13 @@ try {
             continue;
         }
 
-        print_debug_msg("PARSING [%s]", line_str.c_str());
+        print_debug_msg("Parsing line [%s]", line_str.c_str());
 
         if (!std::regex_match(line_str, valid_line_key_numerical) &&
             !std::regex_match(line_str, valid_line_key_color))
         {
-            print_debug_msg("FAILED global_state::settings::load_from_disk, malformed content at line %zu", line_num);
+            print_debug_msg("FAILED line %zu malformed, skipping...", line_num);
+            ++num_lines_skipped;
             continue;
         }
 
@@ -340,11 +334,16 @@ try {
             else if (remainder == "completed_file_operations_forget_all") {
                 this->confirm_completed_file_operations_forget_all = extract_bool();
             }
-            else if (remainder == "confirm_theme_editor_color_reset") {
+            else if (remainder == "theme_editor_color_reset") {
                 this->confirm_theme_editor_color_reset = extract_bool();
             }
-            else if (remainder == "confirm_theme_editor_style_reset") {
+            else if (remainder == "theme_editor_style_reset") {
                 this->confirm_theme_editor_style_reset = extract_bool();
+            }
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
             }
         }
         else if (property.starts_with("show.")) {
@@ -413,6 +412,11 @@ try {
             else if (remainder == "md_icons") {
                 this->show.md_icons = extract_bool();
             }
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
+            }
         }
         else if (property.starts_with("color.")) {
             std::string_view remainder(property.c_str() + lengthof("color"));
@@ -437,6 +441,11 @@ try {
             }
             else if (remainder == "symlink") {
                 this->symlink_color = extract_ImVec4();
+            }
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
             }
         }
         else if (property.starts_with("style.")) {
@@ -616,6 +625,12 @@ try {
             else if (remainder == "ColorButtonPosition") {
                 style.ColorButtonPosition = extract_ImGuiDir();
             }
+
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
+            }
         }
         else if (property.starts_with("ImGuiCol.")) {
             std::string_view remainder(property.c_str() + lengthof("ImGuiCol"));
@@ -784,6 +799,11 @@ try {
             }
             else if (remainder == "ModalWindowDimBg") {
                 style.Colors[ImGuiCol_ModalWindowDimBg] = extract_ImVec4();
+            }
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
             }
         }
         else if (property.starts_with("check.")) {
@@ -976,6 +996,12 @@ try {
             else if (remainder == "symlink_color") {
                 this->check_symlink_color = extract_bool();
             }
+
+            else {
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
+            }
         }
         else {
             if (property == "window_x") {
@@ -1040,19 +1066,23 @@ try {
             }
 
             else {
-                print_debug_msg("Unknown property [%s] in [swan_settings.txt]", property.c_str());
+                print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
+                ++num_lines_skipped;
+                continue;
             }
         }
+
+        ++num_lines_parsed;
     }
 
-    print_debug_msg("SUCCESS global_state::settings::load_from_disk");
+    print_debug_msg("SUCCESS parsed %zu lines, skipped %zu", num_lines_parsed, num_lines_skipped);
     return true;
 }
 catch (std::exception const &except) {
-    print_debug_msg("FAILED global_state::settings::load_from_disk, %s", except.what());
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
     return false;
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::settings::load_from_disk, catch(...)");
+    print_debug_msg("FAILED, catch(...)");
     return false;
 }

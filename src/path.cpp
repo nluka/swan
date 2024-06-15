@@ -275,7 +275,12 @@ swan_path path_reconstruct_canonically(char const *path_utf8) noexcept
         std::string canonical_string = canonical_path.string();
         retval = path_create(canonical_string.c_str());
     }
+    catch (std::exception const &) {
+        // print_debug_msg("FAILED catch(std::exception) %s", except.what());
+        retval = path_create(path_utf8);
+    }
     catch (...) {
+        // print_debug_msg("FAILED catch(...)");
         retval = path_create(path_utf8);
     }
 

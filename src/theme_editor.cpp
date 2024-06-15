@@ -2,17 +2,12 @@
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 
-void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_style, [[maybe_unused]] bool any_popups_open) noexcept
+bool swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_style, [[maybe_unused]] bool any_popups_open) noexcept
 {
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse;
 
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::theme_editor), &open, window_flags)) {
-        imgui::End();
-        return;
-    }
-
-    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::focused_window_set(swan_windows::id::theme_editor);
+        return false;
     }
 
     // auto &io = imgui::GetIO();
@@ -629,5 +624,5 @@ void swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
         }
     }
 
-    imgui::End();
+    return true;
 }

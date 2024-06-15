@@ -63,8 +63,12 @@ try {
     print_debug_msg("SUCCESS global_state::completed_file_operations_save_to_disk");
     return true;
 }
+catch (std::exception const &except) {
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
+    return false;
+}
 catch (...) {
-    print_debug_msg("FAILED global_state::completed_file_operations_save_to_disk");
+    print_debug_msg("FAILED catch(...)");
     return false;
 }
 
@@ -135,11 +139,15 @@ try {
         line.clear();
     }
 
-    print_debug_msg("SUCCESS global_state::completed_file_operations_load_from_disk, loaded %zu records", num_loaded_successfully);
+    print_debug_msg("SUCCESS loaded %zu records", num_loaded_successfully);
     return { true, num_loaded_successfully };
 }
+catch (std::exception const &except) {
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
+    return { false, 0 };
+}
 catch (...) {
-    print_debug_msg("FAILED global_state::completed_file_operations_load_from_disk");
+    print_debug_msg("FAILED catch(...)");
     return { false, 0 };
 }
 
@@ -444,15 +452,10 @@ u64 deselect_all(std::deque<completed_file_operation> &completed_operations) noe
     return num_deselected;
 }
 
-void swan_windows::render_file_operations(bool &open, bool any_popups_open) noexcept
+bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::file_operations), &open)) {
-        imgui::End();
-        return;
-    }
-
-    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::focused_window_set(swan_windows::id::file_operations);
+        return false;
     }
 
     auto &io = imgui::GetIO();
@@ -991,11 +994,11 @@ void swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         imgui::EndTable();
     }
 
-    imgui::End();
-
     if (settings_change) {
         global_state::settings().save_to_disk();
     }
+
+    return true;
 }
 
 void print_SIGDN_values(char const *func_label, char const *item_name, IShellItem *item) noexcept

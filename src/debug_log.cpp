@@ -22,15 +22,10 @@ enum debug_log_table_col_id : s32
     debug_log_table_col_id_count,
 };
 
-void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups_open) noexcept
+bool swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::debug_log), &open)) {
-        imgui::End();
-        return;
-    }
-
-    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::focused_window_set(swan_windows::id::debug_log);
+        return false;
     }
 
     static bool s_auto_scroll = true;
@@ -124,6 +119,7 @@ void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
                         }
                         if (imgui::TableSetColumnIndex(debug_log_table_col_id_source_file)) {
                             imgui::TextUnformatted(path_cfind_filename(record.loc.file_name()));
+                            imgui::RenderTooltipWhenColumnTextTruncated(debug_log_table_col_id_source_file, record.loc.file_name());
                         }
                         if (imgui::TableSetColumnIndex(debug_log_table_col_id_source_line)) {
                             auto label = make_str_static<256>("%zu ## Line of elem %zu", record.loc.line(), i);
@@ -136,9 +132,16 @@ void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
                         }
                         if (imgui::TableSetColumnIndex(debug_log_table_col_id_source_function)) {
                             imgui::TextUnformatted(record.loc.function_name());
+                            imgui::RenderTooltipWhenColumnTextTruncated(debug_log_table_col_id_source_function, record.loc.function_name());
                         }
                         if (imgui::TableSetColumnIndex(debug_log_table_col_id_message)) {
-                            imgui::TextUnformatted(record.message.c_str());
+                            imgui::ScopedStyle<ImVec2> fp(imgui::GetStyle().FramePadding, {});
+                            imgui::ScopedColor bgc(ImGuiCol_FrameBg, imgui::GetStyleColorVec4(ImGuiCol_ChildBg));
+                            imgui::ScopedColor bc(ImGuiCol_Border, imgui::GetStyleColorVec4(ImGuiCol_ChildBg));
+                            imgui::ScopedAvailWidth w = {};
+
+                            auto label = make_str_static<64>("## message_%zu", i);
+                            imgui::InputText(label.data(), &record.message, ImGuiInputTextFlags_ReadOnly);
                         }
                     }
                 }
@@ -170,5 +173,5 @@ void swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
         imgui::EndChild();
     }
 
-    imgui::End();
+    return true;
 }

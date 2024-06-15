@@ -174,12 +174,10 @@ try {
             expl.filter_error.reserve(1024);
 
             bool load_result = explorers[i].load_from_disk(global_state::settings().dir_separator_utf8);
-            print_debug_msg("[ %d ] explorer_window::load_from_disk: %d", i, load_result);
 
             if (!load_result) {
                 expl.cwd = path_create("");
-                bool save_result = explorers[i].save_to_disk();
-                print_debug_msg("[%s] save_to_disk: %d", expl.name, save_result);
+                (void) explorers[i].save_to_disk();
             }
 
             auto [starting_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
@@ -212,9 +210,6 @@ try {
         swan_windows::id::settings,
         swan_windows::id::theme_editor,
         swan_windows::id::icon_library,
-        swan_windows::id::icon_font_browser_font_awesome,
-        swan_windows::id::icon_font_browser_codicon,
-        swan_windows::id::icon_font_browser_material_design,
         swan_windows::id::imgui_demo,
     };
 
@@ -225,14 +220,10 @@ try {
     {
         swan_windows::id last_focused_window_id;
 
-        if (!global_state::focused_window_load_from_disk(last_focused_window_id)) {
-            last_focused_window_id = swan_windows::id::explorer_0;
-        }
-        else {
-            assert(last_focused_window_id != swan_windows::id::nil_window);
-            auto last_focused_window_iter = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window_id);
-            std::swap(*last_focused_window_iter, window_render_order.back());
-        }
+        (void) global_state::focused_window_load_from_disk(last_focused_window_id);
+
+        auto last_focused_window_iter = std::find(window_render_order.begin(), window_render_order.end(), last_focused_window_id);
+        std::swap(*last_focused_window_iter, window_render_order.back());
     }
 
     static time_point_precise_t last_window_move_or_resize_time = get_time_precise();
@@ -275,6 +266,12 @@ try {
             if (one_of(GLFW_PRESS, { glfwGetKey(window, GLFW_KEY_ESCAPE) })) {
                 ImGui::SetWindowFocus(swan_windows::get_name(focused_now_id));
             }
+
+            // move explorer debug windows to back, they depend on render result of explorer windows to determine their visibility
+            std::partition(window_render_order.begin(), window_render_order.end(), [](swan_windows::id id) noexcept {
+                static_assert(global_constants::num_explorers == 4);
+                return !(id >= swan_windows::id::explorer_0_debug && id <= swan_windows::id::explorer_3_debug);
+            });
         }
 
         if (window_pos_or_size_needs_write && time_diff_ms(last_window_move_or_resize_time, get_time_precise()) > 250) {
@@ -303,99 +300,162 @@ try {
 
         auto &window_visib = global_state::settings().show;
 
+        bool expl_rendered[global_constants::num_explorers] = {};
+
         for (swan_windows::id window_id : window_render_order) {
             switch (window_id) {
                 case swan_windows::id::explorer_0: {
                     if (window_visib.explorer_0) {
-                        swan_windows::render_explorer(explorers[0], window_visib.explorer_0, finder, any_popups_open);
+                        expl_rendered[0] = swan_windows::render_explorer(explorers[0], window_visib.explorer_0, finder, any_popups_open);
+
+                        if (expl_rendered[0] && imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                            global_state::focused_window_set(swan_windows::id::explorer_0);
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::explorer_1: {
                     if (window_visib.explorer_1) {
-                        swan_windows::render_explorer(explorers[1], window_visib.explorer_1, finder, any_popups_open);
+                        expl_rendered[1] = swan_windows::render_explorer(explorers[1], window_visib.explorer_1, finder, any_popups_open);
+
+                        if (expl_rendered[1] && imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                            global_state::focused_window_set(swan_windows::id::explorer_1);
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::explorer_2: {
                     if (window_visib.explorer_2) {
-                        swan_windows::render_explorer(explorers[2], window_visib.explorer_2, finder, any_popups_open);
+                        expl_rendered[2] = swan_windows::render_explorer(explorers[2], window_visib.explorer_2, finder, any_popups_open);
+
+                        if (expl_rendered[2] && imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                            global_state::focused_window_set(swan_windows::id::explorer_2);
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::explorer_3: {
                     if (window_visib.explorer_3) {
-                        swan_windows::render_explorer(explorers[3], window_visib.explorer_3, finder, any_popups_open);
+                        expl_rendered[3] = swan_windows::render_explorer(explorers[3], window_visib.explorer_3, finder, any_popups_open);
+
+                        if (expl_rendered[3] && imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                            global_state::focused_window_set(swan_windows::id::explorer_3);
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::explorer_0_debug: {
-                    if (window_visib.explorer_0_debug) {
-                        swan_windows::render_explorer_debug(explorers[0], window_visib.explorer_0_debug, any_popups_open);
+                    if (window_visib.explorer_0_debug && expl_rendered[0]) {
+                        (void) swan_windows::render_explorer_debug(explorers[0], window_visib.explorer_0_debug, any_popups_open);
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::explorer_1_debug: {
-                    if (window_visib.explorer_1_debug) {
-                        swan_windows::render_explorer_debug(explorers[1], window_visib.explorer_1_debug, any_popups_open);
+                    if (window_visib.explorer_1_debug && expl_rendered[1]) {
+                        (void) swan_windows::render_explorer_debug(explorers[1], window_visib.explorer_1_debug, any_popups_open);
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::explorer_2_debug: {
-                    if (window_visib.explorer_2_debug) {
-                        swan_windows::render_explorer_debug(explorers[2], window_visib.explorer_2_debug, any_popups_open);
+                    if (window_visib.explorer_2_debug && expl_rendered[2]) {
+                        (void) swan_windows::render_explorer_debug(explorers[2], window_visib.explorer_2_debug, any_popups_open);
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::explorer_3_debug: {
-                    if (window_visib.explorer_3_debug) {
-                        swan_windows::render_explorer_debug(explorers[3], window_visib.explorer_3_debug, any_popups_open);
+                    if (window_visib.explorer_3_debug && expl_rendered[3]) {
+                        (void) swan_windows::render_explorer_debug(explorers[3], window_visib.explorer_3_debug, any_popups_open);
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::finder: {
                     if (window_visib.finder) {
-                        swan_windows::render_finder(finder, window_visib.finder, any_popups_open);
+                        if (swan_windows::render_finder(finder, window_visib.finder, any_popups_open)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::finder);
+                            }
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::pinned: {
                     if (window_visib.pinned) {
-                        swan_windows::render_pinned(explorers, window_visib.pinned, any_popups_open);
+                        if (swan_windows::render_pinned(explorers, window_visib.pinned, any_popups_open)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::pinned);
+                            }
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::file_operations: {
                     if (window_visib.file_operations) {
-                        swan_windows::render_file_operations(window_visib.file_operations, any_popups_open);
+                        if (swan_windows::render_file_operations(window_visib.file_operations, any_popups_open)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::file_operations);
+                            }
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::recent_files: {
                     if (window_visib.recent_files) {
-                        swan_windows::render_recent_files(window_visib.recent_files, any_popups_open);
+                        if (swan_windows::render_recent_files(window_visib.recent_files, any_popups_open)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::recent_files);
+                            }
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::analytics: {
                     if (window_visib.analytics) {
-                        swan_windows::render_analytics();
+                        if (swan_windows::render_analytics()) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::analytics);
+                            }
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::debug_log: {
                     if (window_visib.debug_log) {
                         swan_windows::render_debug_log(window_visib.debug_log, any_popups_open);
+                        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                            global_state::focused_window_set(swan_windows::id::debug_log);
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::settings: {
                     if (window_visib.settings) {
-                        bool changes_applied = swan_windows::render_settings(window_visib.settings, any_popups_open);
-                        if (changes_applied) {
-                            glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
-                            glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
-                            (void) global_state::settings().save_to_disk();
+                        bool changes_applied = false;
+
+                        if (swan_windows::render_settings(window_visib.settings, any_popups_open, changes_applied)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::settings);
+                            }
+                            imgui::End();
+
+                            if (changes_applied) {
+                                glfwSetWindowPos(window, global_state::settings().window_x, global_state::settings().window_y);
+                                glfwSetWindowSize(window, global_state::settings().window_w, global_state::settings().window_h);
+                                (void) global_state::settings().save_to_disk();
+                            }
                         }
                     }
                     break;
@@ -403,7 +463,7 @@ try {
                 case swan_windows::id::imgui_demo: {
                     if (window_visib.imgui_demo) {
                         imgui::ShowDemoWindow(&window_visib.imgui_demo);
-                        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+                        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
                             global_state::focused_window_set(swan_windows::id::imgui_demo);
                         }
                         imgui::End();
@@ -412,17 +472,35 @@ try {
                 }
                 case swan_windows::id::theme_editor: {
                     if (window_visib.theme_editor) {
-                        swan_windows::render_theme_editor(window_visib.theme_editor, our_default_imgui_style, any_popups_open);
+                        if (swan_windows::render_theme_editor(window_visib.theme_editor, our_default_imgui_style, any_popups_open)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::theme_editor);
+                            }
+                        }
+                        imgui::End();
                     }
                     break;
                 }
                 case swan_windows::id::icon_library: {
                     if (window_visib.icon_library) {
-                        swan_windows::render_icon_library(window_visib.icon_library, any_popups_open);
+                        if (swan_windows::render_icon_library(window_visib.icon_library, any_popups_open)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                global_state::focused_window_set(swan_windows::id::icon_library);
+                            }
+                        }
+                        imgui::End();
                     }
                     break;
                 }
             }
+        }
+
+        if (imgui::GetFrameCount() == 1) {
+            // After rendering all windows for the first time (GetFrameCount == 1),
+            // tell imgui which window will have initial focus based on what was loaded from [focused_window.txt].
+            // Notice that we check for imgui::GetFrameCount() > 1 before calling global_state::focused_window_set,
+            // this is because imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) returns true for all windows on frame 1.
+            imgui::SetWindowFocus(swan_windows::get_name(last_focused_window_id));
         }
 
         swan_popup_modals::render_single_rename();
@@ -442,7 +520,6 @@ try {
 
         // free memory if explorer payload was not accepted and the user dropped it
         if (!imgui::IsMouseDragging(ImGuiMouseButton_Left) && global_state::move_dirents_payload_set() == true) {
-        // if (imgui::IsMouseReleased(ImGuiMouseButton_Left) && !imgui::IsDragDropPayloadBeingAccepted()) {
             free_explorer_drag_drop_payload();
         }
     }

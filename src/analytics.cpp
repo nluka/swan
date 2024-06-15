@@ -2,13 +2,9 @@
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 
-void swan_windows::render_analytics() noexcept
+bool swan_windows::render_analytics() noexcept
 {
     if (imgui::Begin(swan_windows::get_name(swan_windows::id::analytics), &global_state::settings().show.analytics)) {
-        if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-            global_state::focused_window_set(swan_windows::id::analytics);
-        }
-
         auto &io = imgui::GetIO();
 
         imgui::Text("%s build", get_build_mode().str);
@@ -25,6 +21,9 @@ void swan_windows::render_analytics() noexcept
         imgui::Text("IsMouseReleased(left): %d", imgui::IsMouseReleased(ImGuiMouseButton_Left));
         imgui::Separator();
         imgui::Text("io.KeyCtrl: %d", io.KeyCtrl);
+
+        return true;
     }
-    imgui::End();
+
+    return false;
 }

@@ -1200,7 +1200,12 @@ void swan_popup_modals::render_bulk_rename() noexcept
                     }
                 }
             }
-            catch (...) {}
+            catch (std::exception const &except) {
+                print_debug_msg("FAILED catch(std::exception) %s", except.what());
+            }
+            catch (...) {
+                print_debug_msg("FAILED catch(...)");
+            }
 
             s_rename_state.store(bulk_rename_state::done);
         };

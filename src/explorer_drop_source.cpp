@@ -424,7 +424,12 @@ try {
 
     return DV_E_FORMATETC;
 }
+catch (std::exception const &except) {
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
+    return E_UNEXPECTED;
+}
 catch (...) {
+    print_debug_msg("FAILED catch(...).");
     return E_UNEXPECTED;
 }
 

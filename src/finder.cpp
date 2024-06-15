@@ -146,18 +146,13 @@ void search_proc(progressive_task<std::vector<finder_window::match>> &search_tas
     }
 }
 
-void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unused]] bool any_popups_open) noexcept
+bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unused]] bool any_popups_open) noexcept
 {
     if (!imgui::Begin(swan_windows::get_name(swan_windows::id::finder), &open)) {
-        imgui::End();
-        return;
+        return false;
     }
 
     // auto &io = imgui::GetIO();
-
-    if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-        global_state::focused_window_set(swan_windows::id::finder);
-    }
 
     std::optional<u64> remove_search_dir_idx = std::nullopt;
 
@@ -380,5 +375,5 @@ void swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
     }
     imgui::EndChild();
 
-    imgui::End();
+    return true;
 }
