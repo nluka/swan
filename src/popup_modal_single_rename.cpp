@@ -128,7 +128,30 @@ void swan_popup_modals::render_single_rename() noexcept
         }
         else {
             auto recent_files = global_state::recent_files_get();
-            {
+
+            if (PathIsDirectoryW(new_path_utf16.c_str())) {
+                std::scoped_lock recent_files_lock(*recent_files.mutex);
+
+                for (auto &rf : *recent_files.container) {
+                    u64 rf_path_len = path_length(rf.path);
+                    u64 old_path_utf8_len = path_length(old_path_utf8);
+
+                    char const *rf_path = rf.path.data();
+                    char const *old_path = old_path_utf8.data();
+                    char const *new_path = new_path_utf8.data();
+
+                    if (0 == StrCmpNIA(rf_path, old_path, (s32)std::min(rf_path_len, old_path_utf8_len))) {
+                        char const *rf_name = path_cfind_filename(rf_path);
+                        swan_path updated_rf_path = path_create(new_path);
+                        if (path_append(updated_rf_path, rf_name, dir_sep_utf8, true)) {
+                            rf.path = updated_rf_path;
+                            print_debug_msg("Match! (%zu) rf:[%s] o:[%s] n:[%s] u:[%s]",
+                                std::min(rf_path_len, old_path_utf8_len), rf_path, old_path, new_path, updated_rf_path.data());
+                        }
+                    }
+                }
+            }
+            else {
                 std::scoped_lock recent_files_lock(*recent_files.mutex);
 
                 for (auto &rf : *recent_files.container) {

@@ -3250,7 +3250,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     // print_debug_msg("[ %d ] GetOverlappedResult FAILED: %d %s", expl.id, GetLastError(), get_last_error_string().c_str());
                 } else {
                     if (global_state::settings().explorer_refresh_mode == swan_settings::explorer_refresh_mode_automatic) {
-                        print_debug_msg("[ %d ] ReadDirectoryChangesW signalled a change && refresh mode == automatic, refreshing...", expl.id);
+                        print_debug_msg("[ %d ] ReadDirectoryChangesW signalled && refresh mode == automatic, refreshing...", expl.id);
                         issue_read_dir_changes();
                         if (expl.read_dir_changes_refresh_request_time == time_point_precise_t()) {
                             // no refresh pending, submit request to refresh
