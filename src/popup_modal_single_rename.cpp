@@ -127,26 +127,53 @@ void swan_popup_modals::render_single_rename() noexcept
             }
         }
         else {
+            auto &pins = global_state::pinned_get();
+            bool pins_updated = false;
             auto recent_files = global_state::recent_files_get();
+            bool recent_files_updated = false;
 
             if (PathIsDirectoryW(new_path_utf16.c_str())) {
+                char const *old_path = old_path_utf8.data();
+                char const *new_path = new_path_utf8.data();
+                u64 old_path_len = path_length(old_path_utf8);
+                u64 new_path_len = path_length(new_path_utf8);
+
+                for (auto &p : pins) {
+                    u64 pin_path_len = path_length(p.path);
+                    swan_path prev_pin_path = p.path;
+                    char const *pin_path = p.path.data();
+
+                    if (pin_path_len >= old_path_len) {
+                        if (0 == StrCmpNIA(pin_path, old_path, old_path_len)) {
+                            if (pin_path_len > old_path_len) {
+                                // replace segment
+                                (void) strncpy(p.path.data(), new_path, new_path_len);
+                            } else {
+                                // replace whole thing
+                                swan_path updated_pin_path = path_create(new_path);
+                                p.path = updated_pin_path;
+                            }
+                            print_debug_msg("Match! (%zu) p:[%s] o:[%s] n:[%s] u:[%s]",
+                                old_path_len, prev_pin_path.data(), old_path, new_path, pin_path);
+                            pins_updated = true;
+                        }
+                    }
+                }
+
                 std::scoped_lock recent_files_lock(*recent_files.mutex);
 
                 for (auto &rf : *recent_files.container) {
                     u64 rf_path_len = path_length(rf.path);
-                    u64 old_path_utf8_len = path_length(old_path_utf8);
-
                     char const *rf_path = rf.path.data();
-                    char const *old_path = old_path_utf8.data();
-                    char const *new_path = new_path_utf8.data();
 
-                    if (0 == StrCmpNIA(rf_path, old_path, (s32)std::min(rf_path_len, old_path_utf8_len))) {
+                    if (0 == StrCmpNIA(rf_path, old_path, (s32)std::min(rf_path_len, old_path_len))) {
                         char const *rf_name = path_cfind_filename(rf_path);
                         swan_path updated_rf_path = path_create(new_path);
                         if (path_append(updated_rf_path, rf_name, dir_sep_utf8, true)) {
                             rf.path = updated_rf_path;
                             print_debug_msg("Match! (%zu) rf:[%s] o:[%s] n:[%s] u:[%s]",
-                                std::min(rf_path_len, old_path_utf8_len), rf_path, old_path, new_path, updated_rf_path.data());
+                                std::min(rf_path_len, old_path_len), rf_path, old_path, new_path, updated_rf_path.data());
+                            recent_files_updated = true;
                         }
                     }
                 }
@@ -157,12 +184,18 @@ void swan_popup_modals::render_single_rename() noexcept
                 for (auto &rf : *recent_files.container) {
                     if (path_loosely_same(rf.path, old_path_utf8)) {
                         rf.path = new_path_utf8;
+                        recent_files_updated = true;
                         break;
                     }
                 }
             }
 
-            (void) global_state::recent_files_save_to_disk();
+            if (pins_updated) {
+                (void) global_state::pinned_save_to_disk();
+            }
+            if (recent_files_updated) {
+                (void) global_state::recent_files_save_to_disk();
+            }
 
             g_on_rename_callback();
             cleanup_and_close_popup();

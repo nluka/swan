@@ -97,8 +97,7 @@ void swan_popup_modals::render_new_pin() noexcept
 
         global_state::pinned_add(s_color_input, s_label_input, path, '\\');
 
-        bool success = global_state::pinned_save_to_disk();
-        print_debug_msg("pinned_save_to_disk: %d", success);
+        (void) global_state::pinned_save_to_disk();
 
         cleanup_and_close_popup();
     }

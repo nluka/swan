@@ -85,7 +85,7 @@ bool swan_windows::render_pinned(
 
                     if (imgui::IsMouseReleased(ImGuiMouseButton_Left)) {
                         bool reorder_success = change_element_position(pins, from, to);
-                        print_debug_msg("change_element_position(pins, from:%zu, to:%zu): %d", from, to, reorder_success);
+                        print_debug_msg("%s change_element_position(pins, from:%zu, to:%zu)", from, to, reorder_success ? "SUCCESS" : "FAILED");
 
                         if (reorder_success) {
                             bool save_success = global_state::pinned_save_to_disk();
@@ -210,11 +210,11 @@ try {
             << pin.path.data() << '\n';
     }
 
-    print_debug_msg("SUCCESS global_state::pinned_save_to_disk");
+    print_debug_msg("SUCCESS saved %zu items", pins.size());
     return true;
 }
 catch (...) {
-    print_debug_msg("FAILED global_state::pinned_save_to_disk");
+    print_debug_msg("FAILED");
     return false;
 }
 
