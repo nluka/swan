@@ -1743,6 +1743,7 @@ bool swan_windows::render_explorer_debug(explorer_window &expl, bool &open, bool
         imgui::Text("select_cwd_entries_on_next_update.size(): %zu", expl.select_cwd_entries_on_next_update.size());
         imgui::Text("cwd_latest_selected_dirent_idx: %zu", expl.cwd_latest_selected_dirent_idx);
         imgui::Text("latest_save_to_disk_result: %d", expl.latest_save_to_disk_result);
+        imgui::Text("cwd_input_text_scroll_x: %.1f", expl.cwd_input_text_scroll_x);
 
         // bools
         imgui::Text("show_filter_window: %d", expl.show_filter_window);
@@ -3004,6 +3005,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
         .text_content = s_cwd_input.data(),
     };
 
+    ImGuiInputTextState *input_text_state = nullptr;
     {
         ImVec4 low_warning = warning_color(); low_warning.w /= 1.5;
         imgui::ScopedColor b(ImGuiCol_Border, low_warning, !path_is_empty(expl.cwd) && !cwd_exists_before_edit);
@@ -3016,7 +3018,11 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
             cwd_text_input_callback, (void *)&user_data);
 
         retval.is_hovered = imgui::IsItemHovered();
+
+        ImGuiID id = imgui::GetCurrentWindow()->GetID(label.data());
+        input_text_state = imgui::GetInputTextState(id);
     }
+    expl.cwd_input_text_scroll_x = input_text_state ? input_text_state->ScrollX : -1;
 
     if (user_data.edit_occurred) {
         bool path_functionally_diff = !path_loosely_same(expl.cwd, s_cwd_input);
@@ -3037,6 +3043,15 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
         }
 
         (void) expl.save_to_disk();
+    }
+
+    if (cwd_exists_after_edit) {
+        if (imgui::BeginDragDropTargetCustom({}, 0)) {
+            // TODO
+            // 1. Determine which segment is being hovered (consider expl.cwd_input_text_scroll_x)
+            // 2. Draw rectangle around segment
+            // 3. If mouse1 released, move selected to segment using move_files_into()
+        }
     }
 
     return retval;

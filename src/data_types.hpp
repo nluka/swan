@@ -411,6 +411,7 @@ struct explorer_window
     DWORD read_dir_changes_buffer_bytes_written = 0;
     s32 frame_count_when_cwd_entries_updated = -1;
     std::array<std::byte, 64*1024> read_dir_changes_buffer = {};
+    f32 cwd_input_text_scroll_x = -1;
 
     // 1 byte alignment members
 
