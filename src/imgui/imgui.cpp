@@ -1066,7 +1066,7 @@ static void             UpdateMouseWheel();
 static void             UpdateKeyRoutingTable(ImGuiKeyRoutingTable* rt);
 
 // Misc
-static void             UpdateSettings(char const *ini_file_path);
+static void             UpdateSettings(char const *user_ini_file_path);
 static bool             UpdateWindowManualResize(ImGuiWindow* window, const ImVec2& size_auto_fit, int* border_held, int resize_grip_count, ImU32 resize_grip_col[4], const ImRect& visibility_rect);
 static void             RenderWindowOuterBorders(ImGuiWindow* window);
 static void             RenderWindowDecorations(ImGuiWindow* window, const ImRect& title_bar_rect, bool title_bar_is_highlight, bool handle_borders_and_resize_grips, int resize_grip_count, const ImU32 resize_grip_col[4], float resize_grip_draw_size);
@@ -3559,13 +3559,13 @@ ImGuiContext* ImGui::CreateContext(ImFontAtlas* shared_font_atlas)
     return ctx;
 }
 
-void ImGui::DestroyContext(ImGuiContext* ctx)
+void ImGui::DestroyContext(ImGuiContext* ctx, char const *user_ini_file_path)
 {
     ImGuiContext* prev_ctx = GetCurrentContext();
     if (ctx == NULL) //-V1051
         ctx = prev_ctx;
     SetCurrentContext(ctx);
-    Shutdown();
+    Shutdown(user_ini_file_path);
     SetCurrentContext((prev_ctx != ctx) ? prev_ctx : NULL);
     IM_DELETE(ctx);
 }
@@ -3630,7 +3630,7 @@ void ImGui::Initialize()
 }
 
 // This function is merely here to free heap allocations.
-void ImGui::Shutdown()
+void ImGui::Shutdown(char const *user_ini_file_path)
 {
     // The fonts atlas can be used prior to calling NewFrame(), so we clear it even if g.Initialized is FALSE (which would happen if we never called NewFrame)
     ImGuiContext& g = *GImGui;
@@ -3647,8 +3647,12 @@ void ImGui::Shutdown()
         return;
 
     // Save settings (unless we haven't attempted to load them: CreateContext/DestroyContext without a call to NewFrame shouldn't save an empty file)
-    if (g.SettingsLoaded && g.IO.IniFilename != NULL)
-        SaveIniSettingsToDisk(g.IO.IniFilename);
+    if (g.SettingsLoaded) {
+        if (user_ini_file_path != NULL)
+            SaveIniSettingsToDisk(user_ini_file_path);
+        else if (g.IO.IniFilename != NULL)
+            SaveIniSettingsToDisk(g.IO.IniFilename); // g.IO.IniFilename
+    }
 
     // Destroy platform windows
     DestroyPlatformWindows();
@@ -4583,7 +4587,7 @@ void ImGui::UpdateHoveredWindowAndCaptureFlags()
     io.WantTextInput = (g.WantTextInputNextFrame != -1) ? (g.WantTextInputNextFrame != 0) : false;
 }
 
-void ImGui::NewFrame(char const *ini_file_path)
+void ImGui::NewFrame(char const *user_ini_file_path)
 {
     IM_ASSERT(GImGui != NULL && "No current context. Did you call ImGui::CreateContext() and ImGui::SetCurrentContext() ?");
     ImGuiContext& g = *GImGui;
@@ -4602,7 +4606,7 @@ void ImGui::NewFrame(char const *ini_file_path)
     g.ConfigFlagsCurrFrame = g.IO.ConfigFlags;
 
     // Load settings on first frame, save settings when modified (after a delay)
-    UpdateSettings(ini_file_path);
+    UpdateSettings(user_ini_file_path);
 
     g.Time += g.IO.DeltaTime;
     g.WithinFrameScope = true;
@@ -13469,7 +13473,7 @@ void ImGui::LogButtons()
 //-----------------------------------------------------------------------------
 
 // Called by NewFrame()
-void ImGui::UpdateSettings(char const *ini_file_path)
+void ImGui::UpdateSettings(char const *user_ini_file_path)
 {
     // Load settings on first frame (if not explicitly loaded manually before)
     ImGuiContext& g = *GImGui;
@@ -13478,7 +13482,7 @@ void ImGui::UpdateSettings(char const *ini_file_path)
         IM_ASSERT(g.SettingsWindows.empty());
         if (g.IO.IniFilename)
             // LoadIniSettingsFromDisk(g.IO.IniFilename);
-            LoadIniSettingsFromDisk(ini_file_path);
+            LoadIniSettingsFromDisk(user_ini_file_path);
         g.SettingsLoaded = true;
     }
 
@@ -13490,7 +13494,7 @@ void ImGui::UpdateSettings(char const *ini_file_path)
         {
             if (g.IO.IniFilename != NULL)
                 // SaveIniSettingsToDisk(g.IO.IniFilename);
-                SaveIniSettingsToDisk(ini_file_path);
+                SaveIniSettingsToDisk(user_ini_file_path);
             else
                 g.IO.WantSaveIniSettings = true;  // Let user know they can call SaveIniSettingsToMemory(). user will need to clear io.WantSaveIniSettings themselves.
             g.SettingsDirtyTimer = 0.0f;

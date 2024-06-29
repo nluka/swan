@@ -3045,6 +3045,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
         (void) expl.save_to_disk();
     }
 
+#if 0
     if (cwd_exists_after_edit) {
         if (imgui::BeginDragDropTargetCustom({}, 0)) {
             // TODO
@@ -3053,6 +3054,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
             // 3. If mouse1 released, move selected to segment using move_files_into()
         }
     }
+#endif
 
     return retval;
 }
@@ -3941,6 +3943,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                 else {
                                     print_debug_msg("[ %d ] double clicked file [%s]", expl.id, dirent.basic.path.data());
 
+                                    // TODO: async
                                     auto res = open_file(dirent.basic.path.data(), expl.cwd.data());
 
                                     if (res.success) {
@@ -4102,13 +4105,13 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                     std::optional<bool> mouse_inside_window = win32_is_mouse_inside_window(global_state::window_handle());
 
                     if (!mouse_inside_window.value_or(true)) {
-                        explorer_drop_source drop_obj = {};
+                        auto drop_obj = std::make_unique<explorer_drop_source>();
 
                         // make a copy, don't want race conditions or use after free bugs
-                        drop_obj.full_paths_delimited_by_newlines = payload_data->full_paths_delimited_by_newlines;
+                        drop_obj->full_paths_delimited_by_newlines = payload_data->full_paths_delimited_by_newlines;
                         DWORD effect;
 
-                        HRESULT result_drag = DoDragDrop(&drop_obj, &drop_obj, DROPEFFECT_LINK|DROPEFFECT_COPY, &effect);
+                        HRESULT result_drag = DoDragDrop(drop_obj.get(), drop_obj.get(), DROPEFFECT_LINK|DROPEFFECT_COPY, &effect);
 
                         switch (result_drag) {
                             case DRAGDROP_S_DROP: {
@@ -4291,6 +4294,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
             if ((path_ends_with(expl.context_menu_target->basic.path, ".exe") || path_ends_with(expl.context_menu_target->basic.path, ".bat"))
                 && imgui::Selectable("Run as administrator"))
             {
+                // TODO: async
                 auto res = open_file(expl.context_menu_target->basic.path.data(), expl.cwd.data(), true);
 
                 if (res.success) {
@@ -4347,6 +4351,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                     global_state::thread_pool().push_task([&expl]() noexcept {
                         task.active_token.store(true);
 
+                        // TODO: async
                         auto res = open_file_with(expl.context_menu_target->basic.path.data(), expl.cwd.data());
 
                         std::scoped_lock lock(task.result_mutex);

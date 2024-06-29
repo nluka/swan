@@ -94,16 +94,16 @@ try {
 
     print_debug_msg("SUCCESS barebones window created");
 
+    std::string const ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
+
     SCOPE_EXIT {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         // implot::DestroyContext();
-        imgui::DestroyContext();
+        imgui::DestroyContext(0, ini_file_path.c_str());
         glfwDestroyWindow(window);
         glfwTerminate();
     };
-
-    std::string const ini_file_path = (global_state::execution_path() / "data\\swan_imgui.ini").generic_string();
 
     print_debug_msg("global_state::execution_path = [%s]", global_state::execution_path().generic_string().c_str());
 

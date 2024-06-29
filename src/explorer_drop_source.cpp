@@ -105,15 +105,20 @@ std::pair<IID, char const *> const g_IIDs[] = {
     { IID_IApartmentShutdown, "IID_IApartmentShutdown" },
 };
 
+explorer_drop_source::~explorer_drop_source() noexcept
+{
+    print_debug_msg("explorer_drop_source :: ~explorer_drop_source");
+}
+
 ULONG explorer_drop_source::AddRef() noexcept
 {
-    print_debug_msg("explorer_drop_source::AddRef");
+    print_debug_msg("explorer_drop_source :: AddRef");
     return InterlockedIncrement(&this->ref_count);
 }
 
 ULONG explorer_drop_source::Release() noexcept
 {
-    print_debug_msg("explorer_drop_source::Release");
+    print_debug_msg("explorer_drop_source :: Release");
     ULONG count = InterlockedDecrement(&this->ref_count);
     if (count == 0) {
         delete this;
@@ -135,7 +140,7 @@ HRESULT explorer_drop_source::QueryInterface(REFIID riid, void** ppvObject) noex
             if (StringFromIID(riid, &iid_utf16) == S_OK) {
                 std::array<char, 128> iid_utf8;
                 assert(utf16_to_utf8(iid_utf16, iid_utf8.data(), iid_utf8.max_size()));
-                print_debug_msg("explorer_drop_source::QueryInterface(riid = %s)", iid_utf8.data());
+                print_debug_msg("explorer_drop_source :: QueryInterface(riid = %s)", iid_utf8.data());
             }
             break;
         }
@@ -158,7 +163,7 @@ HRESULT explorer_drop_source::QueryInterface(REFIID riid, void** ppvObject) noex
 
 HRESULT explorer_drop_source::QueryContinueDrag(BOOL escape_pressed, DWORD key_state) noexcept
 {
-    // print_debug_msg("explorer_drop_source::QueryContinueDrag");
+    // print_debug_msg("explorer_drop_source :: QueryContinueDrag");
 
     if (escape_pressed) {
         print_debug_msg("QueryContinueDrag: Cancel, user pressed escape");
@@ -180,7 +185,7 @@ HRESULT explorer_drop_source::QueryContinueDrag(BOOL escape_pressed, DWORD key_s
 
 HRESULT explorer_drop_source::GiveFeedback(DWORD effect) noexcept
 {
-    // print_debug_msg("explorer_drop_source::GiveFeedback");
+    // print_debug_msg("explorer_drop_source :: GiveFeedback");
 
     if (effect == DROPEFFECT_NONE) {
         // print_debug_msg("DROPEFFECT_NONE, IDropTarget::DragLeave");
@@ -206,21 +211,21 @@ public:
     EnumFormatEtcImpl(FORMATETC* formats, ULONG numFormats) noexcept
         : mRefCount(1), mIndex(0), mNumFormats(numFormats)
     {
-        print_debug_msg("EnumFormatEtcImpl::EnumFormatEtcImpl");
+        print_debug_msg("EnumFormatEtcImpl :: EnumFormatEtcImpl");
         mFormats = new FORMATETC[numFormats];
         memcpy(mFormats, formats, sizeof(FORMATETC) * numFormats);
     }
 
     ~EnumFormatEtcImpl() noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::~EnumFormatEtcImpl");
+        print_debug_msg("EnumFormatEtcImpl :: ~EnumFormatEtcImpl");
         delete[] mFormats;
     }
 
     // IUnknown methods
     STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject) noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::QueryInterface");
+        print_debug_msg("EnumFormatEtcImpl :: QueryInterface");
 
         if (ppvObject == nullptr)
             return E_INVALIDARG;
@@ -239,13 +244,13 @@ public:
 
     STDMETHODIMP_(ULONG) AddRef() noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::AddRef");
+        print_debug_msg("EnumFormatEtcImpl :: AddRef");
         return InterlockedIncrement(&mRefCount);
     }
 
     STDMETHODIMP_(ULONG) Release() noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::Release");
+        print_debug_msg("EnumFormatEtcImpl :: Release");
         ULONG newRefCount = InterlockedDecrement(&mRefCount);
         if (newRefCount == 0) {
             delete this;
@@ -255,7 +260,7 @@ public:
 
     STDMETHODIMP Next(ULONG celt, FORMATETC* rgelt, ULONG* pceltFetched) noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::Next");
+        print_debug_msg("EnumFormatEtcImpl :: Next");
 
         if (pceltFetched != nullptr)
             *pceltFetched = 0;
@@ -280,21 +285,21 @@ public:
 
     STDMETHODIMP Skip(ULONG celt) noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::Skip");
+        print_debug_msg("EnumFormatEtcImpl :: Skip");
         mIndex += celt;
         return (mIndex <= mNumFormats) ? S_OK : S_FALSE;
     }
 
     STDMETHODIMP Reset() noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::Reset");
+        print_debug_msg("EnumFormatEtcImpl :: Reset");
         mIndex = 0;
         return S_OK;
     }
 
     STDMETHODIMP Clone(IEnumFORMATETC** ppEnum) noexcept
     {
-        print_debug_msg("EnumFormatEtcImpl::Clone");
+        print_debug_msg("EnumFormatEtcImpl :: Clone");
 
         if (ppEnum == nullptr)
             return E_INVALIDARG;
@@ -436,14 +441,14 @@ catch (...) {
 /// Docs: https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-getdatahere
 HRESULT explorer_drop_source::GetDataHere(FORMATETC */*format_etc*/, STGMEDIUM */*medium*/) noexcept
 {
-    print_debug_msg("explorer_drop_source::GetDataHere");
+    print_debug_msg("explorer_drop_source :: GetDataHere");
     return E_NOTIMPL;
 }
 
 /// Docs: https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-setdata
 HRESULT explorer_drop_source::SetData(FORMATETC */*format_etc*/, STGMEDIUM */*medium*/, BOOL /*release*/) noexcept
 {
-    print_debug_msg("explorer_drop_source::SetData");
+    print_debug_msg("explorer_drop_source :: SetData");
     return E_NOTIMPL;
 }
 
@@ -451,7 +456,7 @@ HRESULT explorer_drop_source::SetData(FORMATETC */*format_etc*/, STGMEDIUM */*me
 /// Docs: https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-querygetdata
 HRESULT explorer_drop_source::QueryGetData(FORMATETC *format_etc) noexcept
 {
-    print_debug_msg("explorer_drop_source::QueryGetData");
+    print_debug_msg("explorer_drop_source :: QueryGetData");
 
     if (!supported_FORMATETC(format_etc)) {
         return DV_E_FORMATETC;
@@ -463,7 +468,7 @@ HRESULT explorer_drop_source::QueryGetData(FORMATETC *format_etc) noexcept
 /// Docs: https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-getcanonicalformatetc
 HRESULT explorer_drop_source::GetCanonicalFormatEtc(FORMATETC *format_etc_in, FORMATETC *format_etc_out) noexcept
 {
-    print_debug_msg("explorer_drop_source::GetCanonicalFormatEtc");
+    print_debug_msg("explorer_drop_source :: GetCanonicalFormatEtc");
 
     if (format_etc_in->cfFormat != CF_HDROP) {
         format_etc_out->cfFormat = CF_HDROP;
@@ -479,7 +484,7 @@ HRESULT explorer_drop_source::GetCanonicalFormatEtc(FORMATETC *format_etc_in, FO
 /// Docs: https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-enumformatetc
 HRESULT explorer_drop_source::EnumFormatEtc(DWORD direction, IEnumFORMATETC **enum_format_etc_out) noexcept
 {
-    print_debug_msg("explorer_drop_source::EnumFormatEtc");
+    print_debug_msg("explorer_drop_source :: EnumFormatEtc");
 
     if (enum_format_etc_out == nullptr) {
         print_debug_msg("ERROR: enum_format_etc_out == nullptr");
@@ -515,20 +520,20 @@ HRESULT explorer_drop_source::EnumFormatEtc(DWORD direction, IEnumFORMATETC **en
 // https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-dadvise
 HRESULT explorer_drop_source::DAdvise(FORMATETC */*format_etc*/, DWORD /*advf*/, IAdviseSink */*advise_sink*/, DWORD */*connection*/) noexcept
 {
-    print_debug_msg("explorer_drop_source::DAdvise -> OLE_E_ADVISENOTSUPPORTED");
+    print_debug_msg("OLE_E_ADVISENOTSUPPORTED");
     return OLE_E_ADVISENOTSUPPORTED;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-dunadvise
 HRESULT explorer_drop_source::DUnadvise(DWORD /*connection*/) noexcept
 {
-    print_debug_msg("explorer_drop_source::DUnadvise -> OLE_E_ADVISENOTSUPPORTED");
+    print_debug_msg("OLE_E_ADVISENOTSUPPORTED");
     return OLE_E_ADVISENOTSUPPORTED;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/api/objidl/nf-objidl-idataobject-enumdadvise
 HRESULT explorer_drop_source::EnumDAdvise(IEnumSTATDATA **/*enum_advise*/) noexcept
 {
-    print_debug_msg("explorer_drop_source::EnumDAdvise -> OLE_E_ADVISENOTSUPPORTED");
+    print_debug_msg("OLE_E_ADVISENOTSUPPORTED");
     return OLE_E_ADVISENOTSUPPORTED;
 }

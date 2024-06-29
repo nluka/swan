@@ -739,6 +739,8 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 if (show_undelete_option && imgui::Selectable("Restore")) {
                     if (s_num_restorables_selected_when_context_menu_opened == 0) {
                         if (context_target.obj_type == basic_dirent::kind::directory) {
+                            print_debug_msg("Restore directory [%s]", context_target.src_path.data());
+
                             swan_path restore_dir_utf8 = path_create(context_target.src_path.data(), path_extract_location(context_target.src_path.data()).length());
 
                             auto res = enqueue_undelete_directory(context_target.dst_path.data(), restore_dir_utf8.data(), context_target.src_path.data());
@@ -749,6 +751,8 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                             }
                         }
                         else {
+                            print_debug_msg("Restore file [%s]", context_target.src_path.data());
+
                             auto res = undelete_file(context_target.dst_path.data());
 
                             if (res.success()) {

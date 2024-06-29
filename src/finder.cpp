@@ -244,6 +244,9 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
                                  ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_path_chars());
 
         if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
+            finder.search_task.result.clear();
+            finder.num_entries_checked.store(0);
+
             swan_finder::g_thread_pool.push_task([&finder]() {
                 search_proc(std::ref(finder.search_task), finder.search_directories, std::ref(finder.num_entries_checked), finder.search_value);
             });

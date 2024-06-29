@@ -6,6 +6,7 @@ struct explorer_drop_source final
     : public IDropSource // https://learn.microsoft.com/en-us/windows/win32/api/oleidl/nn-oleidl-idropsource
     , public IDataObject // https://learn.microsoft.com/en-us/windows/win32/api/objidl/nn-objidl-idataobject
 {
+    ~explorer_drop_source() noexcept;
 
     ULONG AddRef() noexcept override;
 

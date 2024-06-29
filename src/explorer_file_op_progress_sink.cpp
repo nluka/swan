@@ -11,19 +11,19 @@ basic_dirent::kind derive_obj_type(DWORD attributes) noexcept
     }
 }
 
-HRESULT explorer_file_op_progress_sink::StartOperations() noexcept { print_debug_msg("explorer_file_op_progress_sink :: StartOperations"); return S_OK; }
-HRESULT explorer_file_op_progress_sink::PauseTimer()      noexcept { print_debug_msg("explorer_file_op_progress_sink :: PauseTimer");      return S_OK; }
-HRESULT explorer_file_op_progress_sink::ResetTimer()      noexcept { print_debug_msg("explorer_file_op_progress_sink :: ResetTimer");      return S_OK; }
-HRESULT explorer_file_op_progress_sink::ResumeTimer()     noexcept { print_debug_msg("explorer_file_op_progress_sink :: ResumeTimer");     return S_OK; }
+HRESULT explorer_file_op_progress_sink::StartOperations() noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: StartOperations"); */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::PauseTimer()      noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PauseTimer");      */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::ResetTimer()      noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: ResetTimer");      */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::ResumeTimer()     noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: ResumeTimer");     */ return S_OK; }
 
-HRESULT explorer_file_op_progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) noexcept { print_debug_msg("explorer_file_op_progress_sink :: PostNewItem");    return S_OK; }
-HRESULT explorer_file_op_progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *)              noexcept { print_debug_msg("explorer_file_op_progress_sink :: PostRenameItem"); return S_OK; }
+HRESULT explorer_file_op_progress_sink::PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PostNewItem");    */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *)              noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PostRenameItem"); */ return S_OK; }
 
-HRESULT explorer_file_op_progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept { print_debug_msg("explorer_file_op_progress_sink :: PreCopyItem");   return S_OK; }
-HRESULT explorer_file_op_progress_sink::PreDeleteItem(DWORD, IShellItem *)                      noexcept { print_debug_msg("explorer_file_op_progress_sink :: PreDeleteItem"); return S_OK; }
-HRESULT explorer_file_op_progress_sink::PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept { print_debug_msg("explorer_file_op_progress_sink :: PreMoveItem");   return S_OK; }
-HRESULT explorer_file_op_progress_sink::PreNewItem(DWORD, IShellItem *, LPCWSTR)                noexcept { print_debug_msg("explorer_file_op_progress_sink :: PreNewItem");    return S_OK; }
-HRESULT explorer_file_op_progress_sink::PreRenameItem(DWORD, IShellItem *, LPCWSTR)             noexcept { print_debug_msg("explorer_file_op_progress_sink :: PreRenameItem"); return S_OK; }
+HRESULT explorer_file_op_progress_sink::PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PreCopyItem");   */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::PreDeleteItem(DWORD, IShellItem *)                      noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PreDeleteItem"); */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PreMoveItem");   */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::PreNewItem(DWORD, IShellItem *, LPCWSTR)                noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PreNewItem");    */ return S_OK; }
+HRESULT explorer_file_op_progress_sink::PreRenameItem(DWORD, IShellItem *, LPCWSTR)             noexcept { /* print_debug_msg("explorer_file_op_progress_sink :: PreRenameItem"); */ return S_OK; }
 
 HRESULT explorer_file_op_progress_sink::PostMoveItem(
     [[maybe_unused]] DWORD flags,
@@ -71,7 +71,7 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
     }
     SCOPE_EXIT { if (free_dst_path_utf16) CoTaskMemFree(dst_path_utf16); };
 
-    print_debug_msg("PostMoveItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
+    print_debug_msg("src=[%s] dst=[%s]", src_path_utf8.data(), dst_path_utf8.data());
 
     swan_path new_name_utf8;
 
@@ -110,12 +110,14 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
 HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, HRESULT result, IShellItem *item_newly_created) noexcept
 {
     if (FAILED(result)) {
+        print_debug_msg("FAILED(HRESULT)");
         return S_OK;
     }
 
     // Extract deleted item path, UTF16
     wchar_t *deleted_item_path_utf16 = nullptr;
     if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &deleted_item_path_utf16))) {
+        print_debug_msg("FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, deleted_item_path_utf16)");
         return S_OK;
     }
     SCOPE_EXIT { CoTaskMemFree(deleted_item_path_utf16); };
@@ -133,6 +135,7 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
 
     if (item_newly_created != nullptr) {
         if (FAILED(item_newly_created->GetDisplayName(SIGDN_FILESYSPATH, &recycle_bin_hardlink_path_utf16))) {
+            print_debug_msg("FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, recycle_bin_hardlink_path_utf16)");
             return S_OK;
         }
         free_recycle_bin_hardlink_path_utf16 = true;
@@ -222,7 +225,7 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
             deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
     }
 
-    print_debug_msg("PostDeleteItem [%s] [%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
+    print_debug_msg("src=[%s] dst=[%s]", deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data());
 
     return S_OK;
 }
@@ -236,6 +239,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
     IShellItem *dst_item) noexcept
 {
     if (FAILED(result)) {
+        print_debug_msg("FAILED(HRESULT)");
         return S_OK;
     }
 
@@ -249,6 +253,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
     swan_path src_path_utf8;
 
     if (FAILED(src_item->GetDisplayName(SIGDN_FILESYSPATH, &src_path_utf16))) {
+        print_debug_msg("FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, src_path_utf16)");
         return S_OK;
     }
     SCOPE_EXIT { CoTaskMemFree(src_path_utf16); };
@@ -263,6 +268,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
 
     if (dst_item != nullptr) {
         if (FAILED(dst_item->GetDisplayName(SIGDN_FILESYSPATH, &dst_path_utf16))) {
+            print_debug_msg("FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, dst_path_utf16)");
             return S_OK;
         }
         dst_path_utf16_needs_free = true;
@@ -273,7 +279,7 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
     }
     SCOPE_EXIT { if (dst_path_utf16_needs_free) CoTaskMemFree(dst_path_utf16); };
 
-    print_debug_msg("PostCopyItem [%s] -> [%s]", src_path_utf8.data(), dst_path_utf8.data());
+    print_debug_msg("src=[%s] dst=[%s]", src_path_utf8.data(), dst_path_utf8.data());
 
     swan_path new_name_utf8;
 
@@ -311,14 +317,12 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
 
 HRESULT explorer_file_op_progress_sink::UpdateProgress(UINT work_total, UINT work_so_far) noexcept
 {
-    print_debug_msg("explorer_file_op_progress_sink :: UpdateProgress %zu/%zu", work_so_far, work_total);
+    print_debug_msg("%zu/%zu", work_so_far, work_total);
     return S_OK;
 }
 
 HRESULT explorer_file_op_progress_sink::FinishOperations(HRESULT) noexcept
 {
-    print_debug_msg("explorer_file_op_progress_sink :: FinishOperations");
-
     if (this->contains_delete_operations) {
         {
             auto new_buffer = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
@@ -348,18 +352,34 @@ HRESULT explorer_file_op_progress_sink::FinishOperations(HRESULT) noexcept
     return S_OK;
 }
 
-ULONG explorer_file_op_progress_sink::AddRef()  noexcept { return 1; }
-ULONG explorer_file_op_progress_sink::Release() noexcept { return 1; }
-
-HRESULT explorer_file_op_progress_sink::QueryInterface(const IID &riid, void **ppv) noexcept
+ULONG explorer_file_op_progress_sink::AddRef() noexcept
 {
-    print_debug_msg("explorer_file_op_progress_sink :: QueryInterface");
+    return InterlockedIncrement(&this->ref_count);
+}
+
+ULONG explorer_file_op_progress_sink::Release() noexcept
+{
+    ULONG count = InterlockedDecrement(&this->ref_count);
+    if (count == 0) {
+        delete this;
+    }
+    return count;
+}
+
+HRESULT explorer_file_op_progress_sink::QueryInterface(REFIID riid, void** ppv) noexcept
+{
+    if (!ppv) {
+        return E_POINTER;
+    }
 
     if (riid == IID_IUnknown || riid == IID_IFileOperationProgressSink) {
         *ppv = static_cast<IFileOperationProgressSink*>(this);
-        return S_OK;
+    } else {
+        *ppv = nullptr;
+        print_debug_msg("E_NOINTERFACE");
+        return E_NOINTERFACE;
     }
 
-    *ppv = nullptr;
-    return E_NOINTERFACE;
+    AddRef();
+    return S_OK;
 }

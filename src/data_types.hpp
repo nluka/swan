@@ -530,6 +530,10 @@ struct completed_file_operation
 
 struct explorer_file_op_progress_sink : public IFileOperationProgressSink
 {
+private:
+    volatile long ref_count = 1;
+
+public:
     std::set<std::string> connected_files_candidates;
     u32 group_id;
     s32 dst_expl_id;
