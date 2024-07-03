@@ -787,55 +787,15 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
             }
 
             if (!s_context_menu_initiated_on_group_col || context_target.group_id == 0) {
-                auto reveal = [](swan_path const &full_path, char const *entity_type) noexcept {
-                    explorer_window &expl = global_state::explorers()[0];
-
-                    swan_path reveal_name_utf8 = path_create(path_cfind_filename(full_path.data()));
-                    std::string_view path_no_name_utf8 = path_extract_location(full_path.data());
-
-                    expl.deselect_all_cwd_entries();
-                    {
-                        std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
-                        expl.select_cwd_entries_on_next_update.clear();
-                        expl.select_cwd_entries_on_next_update.push_back(reveal_name_utf8);
-                    }
-
-                    swan_path containing_dir_utf8 = path_create(path_no_name_utf8.data(), path_no_name_utf8.size());
-                    auto [containing_dir_exists, num_selected] = expl.update_cwd_entries(full_refresh, containing_dir_utf8.data());
-
-                    if (!containing_dir_exists) {
-                        std::string action = make_str("Reveal %s [%s] in Explorer 1.", entity_type, full_path.data());
-                        char const *error = "Containing directory not found. It was renamed, moved or deleted after the operation was logged.";
-                        swan_popup_modals::open_error(action.c_str(), error);
-                        (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
-                    }
-                    else if (num_selected == 0) {
-                        std::string action = make_str("Reveal %s [%s] in Explorer 1.", entity_type, full_path.data());
-                        char const *error = "File or directory to be revealed was not found. It was renamed, moved, or deleted after the operation was logged.";
-                        swan_popup_modals::open_error(action.c_str(), error);
-                        (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
-                    }
-                    else {
-                        expl.cwd = expl.latest_valid_cwd = containing_dir_utf8;
-                        expl.scroll_to_nth_selected_entry_next_frame = 0;
-                        (void) expl.save_to_disk();
-
-                        global_state::settings().show.explorer_0 = true;
-                        (void) global_state::settings().save_to_disk();
-
-                        imgui::SetWindowFocus(expl.name);
-                    }
-                };
-
                 if (s_num_selected_when_context_menu_opened <= 1) {
                     if (context_target.op_type == file_operation_type::del && context_target.undone()) {
                         if (imgui::Selectable("Find")) {
-                            reveal(context_target.src_path, "source");
+                            (void) find_in_swan_explorer_0(context_target.src_path.data());
                         }
                     }
                     else if (!path_is_empty(context_target.dst_path)) {
                         if (imgui::Selectable("Find")) {
-                            reveal(context_target.dst_path, "destination");
+                            (void) find_in_swan_explorer_0(context_target.dst_path.data());
                         }
                     }
                 }

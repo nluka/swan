@@ -3405,7 +3405,6 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 return e.selected && (counter++) == target;
             });
 
-
             if (scrolled_to_dirent != expl.cwd_entries.end()) {
                 scrolled_to_dirent->spotlight_frames_remaining = u32(imgui::GetIO().Framerate) / 3;
                 scrolled_to_dirent_offset_y = ImGui::GetTextLineHeightWithSpacing() * f32(std::distance(expl.cwd_entries.begin(), scrolled_to_dirent));
@@ -4729,5 +4728,50 @@ void free_explorer_drag_drop_payload() noexcept
             paths_data = nullptr;
             paths_len = 0;
         }
+    }
+}
+
+bool find_in_swan_explorer_0(char const *full_path) noexcept
+{
+    explorer_window &expl = global_state::explorers()[0];
+
+    swan_path reveal_name_utf8 = path_create(path_cfind_filename(full_path));
+    std::string_view path_no_name_utf8 = path_extract_location(full_path);
+
+    expl.deselect_all_cwd_entries();
+    {
+        std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
+        expl.select_cwd_entries_on_next_update.clear();
+        expl.select_cwd_entries_on_next_update.push_back(reveal_name_utf8);
+    }
+
+    swan_path containing_dir_utf8 = path_create(path_no_name_utf8.data(), path_no_name_utf8.size());
+    auto [containing_dir_exists, num_selected] = expl.update_cwd_entries(full_refresh, containing_dir_utf8.data());
+
+    if (!containing_dir_exists) {
+        std::string action = make_str("Find [%s] in Explorer %d.", full_path, expl.id+1);
+        char const *error = "Parent directory not found. It was renamed, moved or deleted after the operation was logged.";
+        swan_popup_modals::open_error(action.c_str(), error);
+        (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
+        return false;
+    }
+    else if (num_selected == 0) {
+        std::string action = make_str("Find [%s] in Explorer %d.", full_path, expl.id+1);
+        char const *error = "Target file/directory not found. It was renamed, moved, or deleted after the operation was logged.";
+        swan_popup_modals::open_error(action.c_str(), error);
+        (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore
+        return false;
+    }
+    else {
+        expl.cwd = expl.latest_valid_cwd = containing_dir_utf8;
+        expl.push_history_item(expl.cwd);
+        (void) expl.save_to_disk();
+
+        global_state::settings().show.explorer_0 = true;
+        (void) global_state::settings().save_to_disk();
+
+        expl.scroll_to_nth_selected_entry_next_frame = 0;
+        imgui::SetWindowFocus(expl.name);
+        return true;
     }
 }

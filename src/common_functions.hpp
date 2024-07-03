@@ -257,3 +257,5 @@ void free_explorer_drag_drop_payload() noexcept;
 void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
 
 ImVec4 compute_drive_usage_color(f32 fraction_used) noexcept;
+
+bool find_in_swan_explorer_0(char const *full_path) noexcept;

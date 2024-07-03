@@ -317,7 +317,7 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
         if (imgui::BeginTable("## finder matches table", matches_table_col_count, table_flags)) {
             imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, matches_table_col_number);
             imgui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_id);
-            imgui::TableSetupColumn("Name", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_name);
+            imgui::TableSetupColumn("Name", ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_NoHide, 0.0f, matches_table_col_name);
             imgui::TableSetupColumn("Location", ImGuiTableColumnFlags_DefaultSort, 0.0f, matches_table_col_parent);
             ImGui::TableSetupScrollFreeze(0, 1);
             imgui::TableHeadersRow();
@@ -354,7 +354,14 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
 
                     ImVec2 path_text_rect_min = imgui::GetCursorScreenPos();
                     char const *file_name = path_cfind_filename(m.basic.path.data());
-                    imgui::TextUnformatted(file_name);
+                    auto label = make_str_static<2048>("%s ## %zu", file_name, m.basic.id);
+
+                    if (imgui::Selectable(label.data(), false, ImGuiSelectableFlags_SpanAllColumns|ImGuiSelectableFlags_AllowDoubleClick)) {
+                        if (imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                            (void) find_in_swan_explorer_0(m.basic.path.data());
+                        }
+                    }
+
                     imgui::HighlightTextRegion(path_text_rect_min, file_name, m.highlight_start_idx, m.highlight_len,
                                                imgui::ReduceAlphaTo(imgui::Denormalize(warning_lite_color()), 75));
 

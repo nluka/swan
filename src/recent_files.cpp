@@ -365,9 +365,8 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         }
 
         if (imgui::BeginPopup("## recent_files context_menu")) {
-            auto &expl = global_state::explorers()[0];
             char *full_path = s_context_menu_target->path.data();
-            char *file_name = path_find_filename(full_path);
+            // char *file_name = path_find_filename(full_path);
             auto directory = path_extract_location(full_path);
             swan_path parent_directory = path_create(directory.data(), directory.size());
 
@@ -388,37 +387,7 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                             remove_idx = s_context_menu_target_idx;
                         }
                         else {
-                            expl.deselect_all_cwd_entries();
-                            {
-                                std::scoped_lock lock2(expl.select_cwd_entries_on_next_update_mutex);
-                                expl.select_cwd_entries_on_next_update.clear();
-                                expl.select_cwd_entries_on_next_update.push_back(path_create(file_name));
-                            }
-
-                            auto [file_directory_exists, _] = expl.update_cwd_entries(full_refresh, file_directory.data());
-
-                            if (!file_directory_exists) {
-                                std::string action = make_str("Open file location [%s].", full_path);
-                                std::string failure = make_str("Directory [%s] not found.", file_directory.data());
-                                swan_popup_modals::open_error(action.c_str(), failure.c_str());
-                                remove_idx = s_context_menu_target_idx;
-                            }
-                            else {
-                                expl.cwd = path_create(file_directory.data());
-
-                                if (!path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
-                                    expl.push_history_item(expl.cwd);
-                                }
-
-                                expl.latest_valid_cwd = expl.cwd;
-                                expl.scroll_to_nth_selected_entry_next_frame = 0;
-                                (void) expl.save_to_disk();
-
-                                global_state::settings().show.explorer_0 = true;
-                                (void) global_state::settings().save_to_disk();
-
-                                imgui::SetWindowFocus(expl.name);
-                            }
+                            (void) find_in_swan_explorer_0(full_path);
                         }
                     }
                 }
