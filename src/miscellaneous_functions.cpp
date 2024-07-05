@@ -88,128 +88,6 @@ char const *get_icon(basic_dirent::kind t) noexcept
     return ICON_CI_ERROR;
 }
 
-char const *get_icon_for_extension(char const *extension) noexcept
-{
-    if (extension == nullptr) {
-        return ICON_CI_FILE;
-    }
-    else {
-        std::pair<char const *, char const *> const extension_to_icon[] = {
-            { ICON_CI_FILE_MEDIA, "mp3" },
-            { ICON_CI_FILE_MEDIA, "wav" },
-            { ICON_CI_FILE_MEDIA, "opus" },
-            { ICON_CI_FILE_MEDIA, "ogg" },
-
-            { ICON_CI_FILE_ZIP, "zip" },
-            { ICON_CI_FILE_ZIP, "7z" },
-            { ICON_CI_FILE_ZIP, "rar" },
-            { ICON_CI_FILE_ZIP, "tar" },
-            { ICON_CI_FILE_ZIP, "gz" },
-            { ICON_CI_FILE_ZIP, "xz" },
-
-            { ICON_CI_FILE_CODE, "cpp" },
-            { ICON_CI_FILE_CODE, "c" },
-            { ICON_CI_FILE_CODE, "hpp" },
-            { ICON_CI_FILE_CODE, "h" },
-            { ICON_CI_FILE_CODE, "js" },
-            { ICON_CI_FILE_CODE, "ts" },
-            { ICON_CI_FILE_CODE, "py" },
-            { ICON_CI_FILE_CODE, "java" },
-            { ICON_CI_FILE_CODE, "cs"   },
-
-            { ICON_CI_FILE_PDF, "pdf" },
-            // { ICON_FA_FILE_CSV, "csv" },
-
-            // { ICON_FA_FILE_WORD, "doc" },
-            // { ICON_FA_FILE_WORD, "docx" },
-            // { ICON_FA_FILE_POWERPOINT, "pptx" },
-            // { ICON_FA_FILE_POWERPOINT, "ppt" },
-            // { ICON_FA_FILE_POWERPOINT, "pptx" },
-            // { ICON_FA_FILE_EXCEL, "xlsx" },
-            // { ICON_FA_FILE_EXCEL, "xls" },
-            // { ICON_FA_FILE_EXCEL, "xlsb" },
-
-            { ICON_CI_FILE_MEDIA, "mp4" },
-            { ICON_CI_FILE_MEDIA, "avi" },
-            { ICON_CI_FILE_MEDIA, "mov" },
-            { ICON_CI_FILE_MEDIA, "wmv" },
-            { ICON_CI_FILE_MEDIA, "mkv" },
-            { ICON_CI_FILE_MEDIA, "avchd" },
-
-            { ICON_CI_FILE_MEDIA, "jpeg" },
-            { ICON_CI_FILE_MEDIA, "jpg" },
-            { ICON_CI_FILE_MEDIA, "png" },
-            { ICON_CI_FILE_MEDIA, "raw" },
-            { ICON_CI_FILE_MEDIA, "ico" },
-            { ICON_CI_FILE_MEDIA, "tiff" },
-            { ICON_CI_FILE_MEDIA, "bmp" },
-            { ICON_CI_FILE_MEDIA, "pgm" },
-            { ICON_CI_FILE_MEDIA, "pnm" },
-            { ICON_CI_FILE_MEDIA, "gif" },
-
-            { ICON_CI_FILE_CODE, "txt" },
-            { ICON_CI_FILE_CODE, "md" },
-            { ICON_CI_FILE_CODE, "bat" },
-            { ICON_CI_FILE_CODE, "xml" },
-            { ICON_CI_FILE_CODE, "ini" },
-            { ICON_CI_FILE_CODE, "conf" },
-            { ICON_CI_FILE_CODE, "cfg" },
-            { ICON_CI_FILE_CODE, "config" },
-            { ICON_CI_FILE_CODE, "json" },
-            { ICON_CI_FILE_CODE, "gitignore" },
-            { ICON_CI_FILE_CODE, "natvis" },
-            { ICON_CI_FILE_CODE, "rc" },
-
-            { ICON_CI_FILE_BINARY, "exe" }, // (Executable)
-            { ICON_CI_FILE_BINARY, "obj" }, // (Object)
-            { ICON_CI_FILE_BINARY, "pch" }, // (Precompiled Header)
-            { ICON_CI_FILE_BINARY, "bin" }, // (Binary)
-            { ICON_CI_FILE_BINARY, "dll" }, // (Dynamic Link Library)
-            { ICON_CI_FILE_BINARY, "dat" }, // (Data)
-            { ICON_CI_FILE_BINARY, "app" }, // (Application)
-            { ICON_CI_FILE_BINARY, "jar" }, // (Java Archive)
-            { ICON_CI_FILE_BINARY, "so" }, // (Shared Object)
-            { ICON_CI_FILE_BINARY, "lib" }, // (Library)
-            { ICON_CI_FILE_BINARY, "sys" }, // (System)
-            { ICON_CI_FILE_BINARY, "class" }, // (Java Class)
-            { ICON_CI_FILE_BINARY, "dylib" }, // (Dynamic Library)
-            { ICON_CI_FILE_BINARY, "ko" }, // (Kernel Object)
-            { ICON_CI_FILE_BINARY, "a" }, // (Archive)
-            { ICON_CI_FILE_BINARY, "img" }, // (Disk Image)
-            { ICON_CI_FILE_BINARY, "iso" }, // (Disk Image)
-            { ICON_CI_FILE_BINARY, "rpm" }, // (RPM Package Manager)
-            { ICON_CI_FILE_BINARY, "deb" }, // (Debian Package)
-            { ICON_CI_FILE_BINARY, "dmg" }, // (Disk Image)
-            { ICON_CI_FILE_BINARY, "dmp" }, // (Dump)
-            { ICON_CI_FILE_BINARY, "o" }, // (Object)
-            { ICON_CI_FILE_BINARY, "gadget" }, // (Windows Gadget)
-            { ICON_CI_FILE_BINARY, "psd" }, // (Photoshop Document)
-            { ICON_CI_FILE_BINARY, "apk" }, // (Android Package)
-            { ICON_CI_FILE_BINARY, "cab" }, // (Cabinet File)
-            { ICON_CI_FILE_BINARY, "b" }, // (Binary)
-            { ICON_CI_FILE_BINARY, "coff" }, // (Common Object File Format)
-            { ICON_CI_FILE_BINARY, "mod" }, // (Module)
-            { ICON_CI_FILE_BINARY, "vxd" }, // (Virtual Device Driver)
-            { ICON_CI_FILE_BINARY, "bin" }, // (Binary Data)
-            { ICON_CI_FILE_BINARY, "sav" }, // (Saved Data)
-            { ICON_CI_FILE_BINARY, "sys" }, // (System File)
-            { ICON_CI_FILE_BINARY, "prx" }, // (Plugin)
-            { ICON_CI_FILE_BINARY, "fon" }, // (Font)
-            { ICON_CI_FILE_BINARY, "ttf" }, // (TrueType Font)
-            { ICON_CI_FILE_BINARY, "woff" }, // (Web Open Font Format)
-            { ICON_CI_FILE_BINARY, "res" }, // (Resource)
-        };
-
-        for (auto const &pair : extension_to_icon) {
-            if (StrCmpI(pair.second, extension) == 0) {
-                return pair.first;
-            }
-        }
-
-        return ICON_CI_FILE;
-    }
-}
-
 std::array<char, 64> get_type_text_for_extension(char const *extension) noexcept
 {
     if (extension == nullptr) {
@@ -747,7 +625,13 @@ generic_result open_file_with(char const *file_name, char const *file_directory)
     }
 }
 
-void render_path_with_stylish_separators(char const *path) noexcept
+std::variant<s64, basic_dirent::kind> appropriate_icon(s64 tex_id, basic_dirent::kind obj_type) noexcept
+{
+    if (global_state::settings().win32_file_icons) return tex_id;
+    else return obj_type;
+}
+
+void render_path_with_stylish_separators(char const *path, std::variant<s64, basic_dirent::kind> icon) noexcept
 {
     swan_path segmented_path = path_create(path);
     assert(!path_is_empty(segmented_path));
@@ -771,12 +655,32 @@ void render_path_with_stylish_separators(char const *path) noexcept
 
     for (u64 i = 0; i < s_segments.size() - 1; ++i) {
         char const *segment = s_segments[i];
+        imgui::ScopedColor bc(ImGuiCol_Border, imgui::ReduceAlphaTo(directory_color(), 0.5f));
         imgui::Button(segment);
         imgui::SameLine();
         imgui::TextDisabled(separator);
         imgui::SameLine();
     }
-    imgui::Button(s_segments.back());
+
+    if (std::holds_alternative<basic_dirent::kind>(icon)) {
+        auto type = std::get<basic_dirent::kind>(icon);
+        char const *icon_ = get_icon(type);
+        ImVec4 color = get_color(type);
+        imgui::AlignTextToFramePadding();
+        imgui::TextColored(color, icon_);
+    }
+    else if (std::holds_alternative<s64>(icon)) {
+        f32 icon_size = ImGui::GetFont()->FontSize;
+        imgui::SetCursorPosY(imgui::GetCursorPosY() + imgui::GetStyle().FramePadding.y);
+        ImGui::Image((ImTextureID)std::max(std::get<s64>(icon), s64(0)), ImVec2(icon_size, icon_size));
+    }
+    else {
+        assert(false);
+    }
+    imgui::SameLineSpaced(2);
+    imgui::AlignTextToFramePadding();
+    imgui::TextUnformatted(s_segments.back());
+    imgui::SameLineSpaced(1);
 }
 
 // static char const *g_help_indicator = "(?)";
@@ -813,4 +717,68 @@ ImVec4 compute_drive_usage_color(f32 fraction_used) noexcept
     }
 
     return ImVec4(red, green, blue, 1);
+}
+
+std::pair<s64, ImVec2> load_icon_texture(char const *full_path_utf8, wchar_t const *full_path_utf16_provided, char const *debug_label) noexcept
+{
+    assert((full_path_utf8 || full_path_utf16_provided) && "Provide at least one parameter!");
+
+    if (debug_label) print_debug_msg("load_icon_texture %s", debug_label);
+    else print_debug_msg("load_icon_texture");
+
+    wchar_t const *full_path_utf16;
+
+    wchar_t full_path_utf16_buf[MAX_PATH];
+    if (full_path_utf16_provided) {
+        full_path_utf16 = full_path_utf16_provided;
+    } else {
+        if (!utf8_to_utf16(full_path_utf8, full_path_utf16_buf, lengthof(full_path_utf16_buf))) {
+            return { -1, {} };
+        }
+        full_path_utf16 = full_path_utf16_buf;
+    }
+
+    SHFILEINFOW file_info = {};
+    if (!SHGetFileInfoW(full_path_utf16, 0, &file_info, sizeof(file_info), SHGFI_ICON|SHGFI_SMALLICON)) return { -1, {} };
+    if (file_info.hIcon == nullptr) return { -1, {} };
+    SCOPE_EXIT { if (!DestroyIcon(file_info.hIcon)) print_debug_msg("FAILED DestroyIcon"); };
+
+    ICONINFO icon_info = {};
+    if (!GetIconInfo(file_info.hIcon, &icon_info)) return { -1, {} };
+    if (icon_info.hbmColor == nullptr) return { -1, {} };
+    SCOPE_EXIT { if (!DeleteObject(icon_info.hbmColor)) print_debug_msg("FAILED DeleteObject(hbmColor)");
+                 if (!DeleteObject(icon_info.hbmMask)) print_debug_msg("FAILED DeleteObject(hbmMask)"); };
+
+    DIBSECTION ds;
+    if (!GetObjectA(icon_info.hbmColor, sizeof(ds), &ds)) return { -1, {} };
+
+    u64 num_bytes_pixels = ds.dsBm.bmWidth * ds.dsBm.bmHeight * (ds.dsBm.bmBitsPixel / 8);
+    if (num_bytes_pixels == 0) return { -1, {} };
+
+    auto pixel_data = std::make_unique<u8[]>(num_bytes_pixels);
+    if (!GetBitmapBits(icon_info.hbmColor, (LONG)num_bytes_pixels, pixel_data.get())) return { -1, {} };
+
+    char fmt = 0;
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ds.dsBm.bmWidth, ds.dsBm.bmHeight, 0, (fmt == 0) ? GL_BGRA : GL_RGBA, GL_UNSIGNED_BYTE, pixel_data.get());
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    return { tex, { f32(ds.dsBm.bmWidth), f32(ds.dsBm.bmHeight) } };
+}
+
+void delete_icon_texture(s64 &id, char const *debug_label) noexcept
+{
+    assert(id > 0 && "Don't call on non-existent texture!");
+    if (debug_label) print_debug_msg("delete_icon_texture %s", debug_label);
+    else print_debug_msg("delete_icon_texture");
+    GLuint gl_id = static_cast<GLuint>(id);
+    glDeleteTextures(1, &gl_id);
+    id = 0;
 }

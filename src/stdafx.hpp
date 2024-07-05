@@ -60,6 +60,9 @@
 
 #include <d3d11.h>
 
+#define GLEW_STATIC
+#include <glew.h>
+
 #define GL_SILENCE_DEPRECATION
 #include <glfw3.h> // Will drag system OpenGL headers
 

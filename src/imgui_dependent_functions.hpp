@@ -41,7 +41,9 @@ ImGuiStyle swan_default_imgui_style() noexcept;
 typedef wchar_t* filter_chars_callback_user_data_t;
 s32 filter_chars_callback(ImGuiInputTextCallbackData *data) noexcept;
 
-void render_path_with_stylish_separators(char const *path) noexcept;
+std::variant<s64, basic_dirent::kind> appropriate_icon(s64 tex_id, basic_dirent::kind obj_type) noexcept;
+
+void render_path_with_stylish_separators(char const *path, std::variant<s64, basic_dirent::kind> icon) noexcept;
 
 struct debug_log_record
 {

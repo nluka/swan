@@ -169,6 +169,8 @@ struct swan_settings
     ImVec4 file_color = default_file_color();
     ImVec4 symlink_color = default_symlink_color();
 
+    s32 num_max_file_operations = 10'000;
+
     s32 window_x = 10, window_y = 40; //! must be adjacent, y must come after x in memory
     s32 window_w = 1280, window_h = 720; //! must be adjacent, h must come after w in memory
     s32 size_unit_multiplier = 1024;
@@ -177,7 +179,7 @@ struct swan_settings
     char dir_separator_utf8 = '\\';
 
     bool show_debug_info = false;
-    bool file_extension_icons = true;
+    bool win32_file_icons = true;
     bool tables_alt_row_bg = true;
     bool table_borders_in_body = true;
 
@@ -257,6 +259,8 @@ struct explorer_window
         ptrdiff_t highlight_start_idx = 0;
         u64 highlight_len = 0;
         u32 spotlight_frames_remaining = 0;
+        s64 icon_GLtexID = 0; // -1 means load failed, 0 means no load attempted, > 0 means valid
+        ImVec2 icon_size = {};
 
     #define CACHE_FORMATTED_STRING_COLUMNS 1
     #if CACHE_FORMATTED_STRING_COLUMNS
@@ -509,6 +513,10 @@ struct file_operation_command_buf
 
 struct completed_file_operation
 {
+    s64 src_icon_GLtexID = 0;
+    s64 dst_icon_GLtexID = 0;
+    ImVec2 src_icon_size = {};
+    ImVec2 dst_icon_size = {};
     time_point_system_t completion_time = {};
     time_point_system_t undo_time = {};
     u32 group_id = {};
@@ -537,8 +545,10 @@ public:
     std::set<std::string> connected_files_candidates;
     u32 group_id;
     s32 dst_expl_id;
+    s32 num_max_file_operations;
     swan_path dst_expl_cwd_when_operation_started;
     bool contains_delete_operations;
+    char dir_sep_utf8;
 
     HRESULT PauseTimer() noexcept override;
     HRESULT ResetTimer() noexcept override;
@@ -600,7 +610,7 @@ struct explorer_drag_drop_payload
     u64 num_items;
     u64 full_paths_delimited_by_newlines_len;
     wchar_t *full_paths_delimited_by_newlines;
-    u64 obj_type_counts[(u64)basic_dirent::kind::count - 1 /* nil */];
+    u64 obj_type_counts[(u64)basic_dirent::kind::count];
 
     u64 get_num_heap_bytes_allocated() noexcept { assert(full_paths_delimited_by_newlines != nullptr);
                                                   return sizeof(wchar_t) * full_paths_delimited_by_newlines_len; }
@@ -626,6 +636,8 @@ struct recent_file
 
     boost::static_string<ACTION_MAX_LEN> action = {};
     time_point_system_t action_time = {};
+    s64 icon_GLtexID = 0;
+    ImVec2 icon_size = {};
     swan_path path = {};
     bool selected = false;
 };

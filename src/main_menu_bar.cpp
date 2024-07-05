@@ -89,7 +89,31 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
                 }
             }
 
-            setting_change |= imgui::MenuItem("File extension icons", nullptr, &global_state::settings().file_extension_icons);
+            if (imgui::MenuItem("Windows file icons", nullptr, &global_state::settings().win32_file_icons)) {
+                setting_change = true;
+
+                for (auto &expl : global_state::explorers()) {
+                    for (auto &dirent : expl.cwd_entries) {
+                        if (dirent.icon_GLtexID > 0) delete_icon_texture(dirent.icon_GLtexID, "explorer_window::dirent");
+                    }
+                }
+                {
+                    auto recent_files = global_state::recent_files_get();
+                    std::scoped_lock lock(*recent_files.mutex);
+                    for (auto &rf : *recent_files.container) {
+                        if (rf.icon_GLtexID > 0) delete_icon_texture(rf.icon_GLtexID, "recent_file");
+                    }
+                }
+                {
+                    auto completed_file_operations = global_state::completed_file_operations_get();
+                    std::scoped_lock lock(*completed_file_operations.mutex);
+                    for (auto &cfo : *completed_file_operations.container) {
+                        if (cfo.src_icon_GLtexID > 0) delete_icon_texture(cfo.src_icon_GLtexID, "completed_file_operation");
+                        if (cfo.dst_icon_GLtexID > 0) delete_icon_texture(cfo.dst_icon_GLtexID, "completed_file_operation");
+                    }
+                }
+            }
+
             setting_change |= imgui::MenuItem("Alternating table rows background", nullptr, &global_state::settings().tables_alt_row_bg);
             setting_change |= imgui::MenuItem("Borders in table body", nullptr, &global_state::settings().table_borders_in_body);
             setting_change |= imgui::MenuItem("Show debug info", nullptr, &global_state::settings().show_debug_info);

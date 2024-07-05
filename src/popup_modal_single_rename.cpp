@@ -144,7 +144,7 @@ void swan_popup_modals::render_single_rename() noexcept
                     char const *pin_path = p.path.data();
 
                     if (pin_path_len >= old_path_len) {
-                        if (0 == StrCmpNIA(pin_path, old_path, old_path_len)) {
+                        if (0 == StrCmpNIA(pin_path, old_path, (s32)old_path_len)) {
                             if (pin_path_len > old_path_len) {
                                 // replace segment
                                 (void) strncpy(p.path.data(), new_path, new_path_len);

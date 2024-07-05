@@ -145,8 +145,8 @@ namespace global_state
 
     struct recent_files
     {
-        circular_buffer<recent_file> *container;
-        std::mutex                   *mutex;
+        std::deque<recent_file> *container;
+        std::mutex              *mutex;
     };
     recent_files            recent_files_get() noexcept;
     u64                     recent_files_find_idx(char const *search_path) noexcept;
@@ -207,8 +207,6 @@ void apply_swan_style_overrides() noexcept;
 
 char const *get_icon(basic_dirent::kind t) noexcept;
 
-char const *get_icon_for_extension(char const *extension) noexcept;
-
 std::array<char, 64> get_type_text_for_extension(char const *extension) noexcept;
 
 drive_list_t query_drive_list() noexcept;
@@ -231,7 +229,9 @@ void perform_file_operations(
     std::mutex *init_done_mutex,
     std::condition_variable *init_done_cond,
     bool *init_done,
-    std::string *init_error) noexcept;
+    std::string *init_error,
+    char dir_sep_ut8,
+    s32 num_max_file_operations) noexcept;
 
 std::tuple<bool, std::string, u64> bulk_rename_parse_text_import(
     char const *text,
@@ -259,3 +259,21 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
 ImVec4 compute_drive_usage_color(f32 fraction_used) noexcept;
 
 bool find_in_swan_explorer_0(char const *full_path) noexcept;
+
+std::pair<s64, ImVec2> load_icon_texture(char const *full_path_utf8 = nullptr,
+                                         wchar_t const *full_path_utf16 = nullptr,
+                                         char const *debug_label = nullptr) noexcept;
+
+void delete_icon_texture(s64 &id, char const *debug_label = nullptr) noexcept;
+
+void erase(global_state::completed_file_operations &obj,
+           std::deque<completed_file_operation>::iterator first,
+           std::deque<completed_file_operation>::iterator last) noexcept;
+
+
+void pop_back(global_state::completed_file_operations &obj) noexcept;
+
+void erase(global_state::recent_files &obj,
+           std::deque<recent_file>::iterator first,
+           std::deque<recent_file>::iterator last,
+           bool delete_icon_texture = true) noexcept;

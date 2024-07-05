@@ -4,10 +4,23 @@
 #include "imgui_dependent_functions.hpp"
 #include "path.hpp"
 
-static circular_buffer<recent_file> g_recent_files = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
+static std::deque<recent_file> g_recent_files(global_constants::MAX_RECENT_FILES);
 static std::mutex g_recent_files_mutex = {};
 
 global_state::recent_files global_state::recent_files_get() noexcept { return { &g_recent_files, &g_recent_files_mutex }; }
+
+void erase(global_state::recent_files &obj,
+           std::deque<recent_file>::iterator first,
+           std::deque<recent_file>::iterator last,
+           bool perform_delete_icon_texture) noexcept
+{
+    if (perform_delete_icon_texture) {
+        for (auto iter = first; iter != last; ++iter) {
+            if (iter->icon_GLtexID > 0) delete_icon_texture(iter->icon_GLtexID, "recent_file");
+        }
+    }
+    obj.container->erase(first, last);
+}
 
 u64 global_state::recent_files_find_idx(char const *search_path) noexcept
 {
@@ -25,31 +38,43 @@ u64 global_state::recent_files_find_idx(char const *search_path) noexcept
 
 void global_state::recent_files_move_to_front(u64 recent_file_idx, char const *new_action) noexcept
 {
-    std::scoped_lock lock(g_recent_files_mutex);
+    auto recent_files = global_state::recent_files_get();
 
-    auto temp = g_recent_files[recent_file_idx];
+    std::scoped_lock lock(*recent_files.mutex);
+
+    auto temp = recent_files.container->operator[](recent_file_idx);
     temp.action_time = get_time_system();
     if (new_action) {
         temp.action.clear();
         temp.action = new_action;
     }
-
-    g_recent_files.erase(g_recent_files.begin() + recent_file_idx);
-    g_recent_files.push_front(temp);
+    auto delete_iter = g_recent_files.begin() + recent_file_idx;
+    erase(recent_files, delete_iter, delete_iter + 1, false);
+    recent_files.container->push_front(temp);
 }
 
 void global_state::recent_files_add(char const *action, char const *full_file_path) noexcept
 {
     swan_path path = path_create(full_file_path);
 
-    std::scoped_lock lock(g_recent_files_mutex);
-    g_recent_files.push_front({ action, get_time_system(), path });
+    auto recent_files = global_state::recent_files_get();
+
+    std::scoped_lock lock(*recent_files.mutex);
+
+    if (recent_files.container->size() >= global_constants::MAX_RECENT_FILES) {
+        erase(recent_files, recent_files.container->begin() + global_constants::MAX_RECENT_FILES, recent_files.container->end());
+    }
+    g_recent_files.emplace_front(action, get_time_system(), 0, ImVec2(), path, false);
 }
 
 void global_state::recent_files_remove(u64 recent_file_idx) noexcept
 {
-    std::scoped_lock lock(g_recent_files_mutex);
-    g_recent_files.erase(g_recent_files.begin() + recent_file_idx);
+    auto recent_files = global_state::recent_files_get();
+
+    std::scoped_lock lock(*recent_files.mutex);
+
+    auto elem_iter = recent_files.container->begin() + recent_file_idx;
+    erase(recent_files, elem_iter, elem_iter + 1);
 }
 
 bool global_state::recent_files_save_to_disk() noexcept
@@ -72,7 +97,7 @@ try {
             << file.path.data() << '\n';
     }
 
-    print_debug_msg("SUCCESS global_state::recent_files_save_to_disk");
+    print_debug_msg("SUCCESS");
     return true;
 }
 catch (std::exception const &except) {
@@ -113,8 +138,8 @@ try {
         iss >> stored_action_len;
         iss.ignore(1);
 
-        char buffer[recent_file::ACTION_MAX_LEN + 1] = {};
-        iss.read(buffer, std::min(stored_action_len, lengthof(buffer) - 1));
+        char stored_action[recent_file::ACTION_MAX_LEN + 1] = {};
+        iss.read(stored_action, std::min(stored_action_len, lengthof(stored_action) - 1));
         iss.ignore(1);
 
         time_point_system_t stored_time = extract_system_time_from_istream(iss);
@@ -127,10 +152,7 @@ try {
 
         path_force_separator(stored_path, dir_separator);
 
-        g_recent_files.push_back();
-        g_recent_files.back().action = buffer;
-        g_recent_files.back().action_time = stored_time;
-        g_recent_files.back().path = stored_path;
+        g_recent_files.emplace_back(stored_action, stored_time, 0, ImVec2(), stored_path, false);
 
         ++num_loaded_successfully;
 
@@ -145,7 +167,7 @@ catch (...) {
     return { false, 0 };
 }
 
-u64 deselect_all(circular_buffer<recent_file> &recent_files) noexcept
+u64 deselect_all(std::deque<recent_file> &recent_files) noexcept
 {
     u64 num_deselected = 0;
 
@@ -165,19 +187,52 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         return false;
     }
 
+    std::string dummy_buf = {};
+    bool search_text_edited;
     {
+        imgui::ScopedDisable d(true);
+        imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
+        search_text_edited = imgui::InputTextWithHint("## recent_files search", ICON_CI_SEARCH " TODO", &dummy_buf);
+    }
+
+    imgui::SameLineSpaced(1);
+
+    {
+        auto help = render_help_indicator(true);
+
+        if (help.hovered && imgui::BeginTooltip()) {
+            imgui::AlignTextToFramePadding();
+            imgui::TextUnformatted("[Recent Files] Help");
+            imgui::Separator();
+
+            imgui::TextUnformatted("- Double click a file to open");
+            imgui::TextUnformatted("- Right click a file for context menu");
+            imgui::TextUnformatted("- Hold Shift + Hover Source/Destination to see full path");
+
+            imgui::EndTooltip();
+        }
+    }
+
+    imgui::SameLineSpaced(0);
+
+    {
+        auto recent_files = global_state::recent_files_get();
+
         imgui::ScopedDisable d(g_recent_files.empty());
 
         if (imgui::Button(ICON_CI_CLEAR_ALL "## recent_files")) {
-            char const *confirmation_msg = "Are you sure you want to clear your recent files? This action cannot be undone.";
+            char const *confirmation_msg = "Are you sure you want to clear ALL recent files? This action cannot be undone.";
             imgui::OpenConfirmationModal(swan_id_confirm_recent_files_clear, confirmation_msg, &(global_state::settings().confirm_recent_files_clear));
         }
+        if (imgui::IsItemHovered()) imgui::SetTooltip("Clear %zu records", recent_files.container->size());
 
         auto status = imgui::GetConfirmationStatus(swan_id_confirm_recent_files_clear);
 
         if (status.value_or(false)) {
-            std::scoped_lock lock(g_recent_files_mutex);
-            g_recent_files.clear();
+            {
+                std::scoped_lock lock(*recent_files.mutex);
+                erase(recent_files, recent_files.container->begin(), recent_files.container->end());
+            }
             (void) global_state::recent_files_save_to_disk();
         }
     }
@@ -274,20 +329,24 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 imgui::Text("%s %s", file.action.c_str(), when.data());
             }
 
-            // ImVec2 file_name_TL;
-
             if (imgui::TableSetColumnIndex(recent_files_table_col_file_name)) {
-                {
-                    char const *icon = nullptr;
-                    if (global_state::settings().file_extension_icons) {
-                        temp_filename_extension_splitter splitter(file_name);
-                        icon = get_icon_for_extension(splitter.ext);
-                    } else {
-                        icon = get_icon(basic_dirent::kind::file);
-                    }
-                    imgui::TextColored(get_color(basic_dirent::kind::file), icon);
-                }
+                static ImVec2 s_last_known_icon_size = {};
 
+                if (global_state::settings().win32_file_icons) {
+                    if (file.icon_GLtexID == 0) {
+                        std::tie(file.icon_GLtexID, file.icon_size) = load_icon_texture(file.path.data(), 0, "recent_file");
+                        if (file.icon_GLtexID > 0) {
+                            s_last_known_icon_size = file.icon_size;
+                        }
+                    }
+                    auto const &icon_size = file.icon_GLtexID < 1 ? s_last_known_icon_size : file.icon_size;
+                    ImGui::Image((ImTextureID)std::max(file.icon_GLtexID, s64(0)), icon_size);
+                }
+                else { // fallback to generic icons
+                    char const *icon = get_icon(basic_dirent::kind::file);
+                    ImVec4 icon_color = get_color(basic_dirent::kind::file);
+                    imgui::TextColored(icon_color, icon);
+                }
                 imgui::SameLine();
 
                 auto label = make_str_static<1200>("%s##recent_file_%zu", file_name, i);
@@ -321,7 +380,7 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 right_clicked |= imgui::IsItemClicked(ImGuiMouseButton_Right);
             }
             if (double_clicked) {
-                auto res = open_file(file_name, file_directory.data());
+                auto res = open_file(file_name, file_directory.data()); // TODO async
 
                 if (res.success) {
                     move_to_front_idx = i;
@@ -341,6 +400,12 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 for (auto &rf : g_recent_files) {
                     rf.selected = rf.selected && keep_any_selected_state;
                     s_num_selected_when_context_menu_opened += u64(rf.selected);
+                }
+            }
+            if (imgui::TableGetHoveredColumn() == recent_files_table_col_file_name && imgui::IsItemHovered() && io.KeyShift) {
+                if (imgui::BeginTooltip()) {
+                    render_path_with_stylish_separators(full_path, appropriate_icon(file.icon_GLtexID, basic_dirent::kind::file));
+                    imgui::EndTooltip();
                 }
             }
 
@@ -516,10 +581,12 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
             auto status = imgui::GetConfirmationStatus(swan_id_confirm_recent_files_forget_selected);
 
             if (execute_forget_selection_immediately || status.value_or(false)) {
-                auto not_selected_end_iter = std::remove_if(g_recent_files.begin(), g_recent_files.end(),
-                                                            [](recent_file const &rf) noexcept { return rf.selected; });
+                auto recent_files = global_state::recent_files_get();
 
-                g_recent_files.erase(not_selected_end_iter, g_recent_files.end());
+                auto delete_iter = std::stable_partition(g_recent_files.begin(), g_recent_files.end(),
+                    [](recent_file const &rf) noexcept { return !rf.selected; });
+
+                erase(recent_files, delete_iter, g_recent_files.end());
 
                 (void) global_state::completed_file_operations_save_to_disk(&recent_files_lock);
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox

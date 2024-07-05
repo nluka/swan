@@ -11,6 +11,24 @@ global_state::completed_file_operations global_state::completed_file_operations_
     return { &g_completed_file_ops, &g_completed_file_ops_mutex };
 }
 
+void erase(global_state::completed_file_operations &obj,
+           std::deque<completed_file_operation>::iterator first,
+           std::deque<completed_file_operation>::iterator last) noexcept
+{
+    for (auto iter = first; iter != last; ++iter) {
+        if (iter->src_icon_GLtexID > 0) delete_icon_texture(iter->src_icon_GLtexID, "completed_file_operation");
+        if (iter->dst_icon_GLtexID > 0) delete_icon_texture(iter->dst_icon_GLtexID, "completed_file_operation");
+    }
+    obj.container->erase(first, last);
+}
+
+void pop_back(global_state::completed_file_operations &obj) noexcept
+{
+    if (obj.container->back().src_icon_GLtexID > 0) delete_icon_texture(obj.container->back().src_icon_GLtexID, "completed_file_operation");
+    if (obj.container->back().dst_icon_GLtexID > 0) delete_icon_texture(obj.container->back().dst_icon_GLtexID, "completed_file_operation");
+    obj.container->pop_back();
+}
+
 u32 global_state::completed_file_operations_calc_next_group_id() noexcept
 {
     u32 max_group_id = 0;
@@ -60,7 +78,7 @@ try {
         }
     }
 
-    print_debug_msg("SUCCESS global_state::completed_file_operations_save_to_disk");
+    print_debug_msg("SUCCESS");
     return true;
 }
 catch (std::exception const &except) {
@@ -152,39 +170,53 @@ catch (...) {
 }
 
 completed_file_operation::completed_file_operation() noexcept
-    : completion_time()
-    , src_path()
-    , dst_path()
-    , op_type()
-    , obj_type()
+    // : completion_time()
+    // , src_path()
+    // , dst_path()
+    // , op_type()
+    // , obj_type()
 {
 }
 
 completed_file_operation::completed_file_operation(time_point_system_t completion_time, time_point_system_t undo_time, file_operation_type op_type,
                                                    char const *src, char const *dst, basic_dirent::kind obj_type, u32 group_id) noexcept
-    : completion_time(completion_time)
+    : src_icon_GLtexID(0)
+    , dst_icon_GLtexID(0)
+    , src_icon_size()
+    , dst_icon_size()
+    , completion_time(completion_time)
     , undo_time(undo_time)
     , group_id(group_id)
     , src_path(path_create(src))
     , dst_path(path_create(dst))
     , op_type(op_type)
     , obj_type(obj_type)
+    , selected(false)
 {
 }
 
 completed_file_operation::completed_file_operation(completed_file_operation const &other) noexcept
-    : completion_time(other.completion_time)
+    : src_icon_GLtexID(other.src_icon_GLtexID)
+    , dst_icon_GLtexID(other.dst_icon_GLtexID)
+    , src_icon_size(other.src_icon_size)
+    , dst_icon_size(other.dst_icon_size)
+    , completion_time(other.completion_time)
     , undo_time(other.undo_time)
     , group_id(other.group_id)
     , src_path(other.src_path)
     , dst_path(other.dst_path)
     , op_type(other.op_type)
     , obj_type(other.obj_type)
+    , selected(other.selected)
 {
 }
 
 completed_file_operation &completed_file_operation::operator=(completed_file_operation const &other) noexcept // for boost::circular_buffer
 {
+    this->src_icon_GLtexID = other.src_icon_GLtexID;
+    this->dst_icon_GLtexID = other.dst_icon_GLtexID;
+    this->src_icon_size = other.src_icon_size;
+    this->dst_icon_size = other.dst_icon_size;
     this->completion_time = other.completion_time;
     this->undo_time = other.undo_time;
     this->group_id = other.group_id;
@@ -192,6 +224,7 @@ completed_file_operation &completed_file_operation::operator=(completed_file_ope
     this->dst_path = other.dst_path;
     this->op_type = other.op_type;
     this->obj_type = other.obj_type;
+    this->selected = other.selected;
 
     return *this;
 }
@@ -459,6 +492,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
     }
 
     auto &io = imgui::GetIO();
+    auto const &style = imgui::GetStyle();
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
     auto completed_file_operations = global_state::completed_file_operations_get();
     bool settings_change = false;
@@ -483,6 +517,31 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         }
     }
 
+    std::string dummy_buf = {};
+    bool search_text_edited;
+    {
+        imgui::ScopedDisable d(true);
+        imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
+        search_text_edited = imgui::InputTextWithHint("## recent_files search", ICON_CI_SEARCH " TODO", &dummy_buf);
+    }
+
+    imgui::SameLineSpaced(1);
+    {
+        auto help = render_help_indicator(true);
+
+        if (help.hovered && imgui::BeginTooltip()) {
+            imgui::AlignTextToFramePadding();
+            imgui::TextUnformatted("[File Operations] Help");
+            imgui::Separator();
+
+            imgui::TextUnformatted("- Right click a record to open context menu");
+            imgui::TextUnformatted("- Hold Shift + Hover Source/Destination to see full path");
+
+            imgui::EndTooltip();
+        }
+    }
+
+    imgui::SameLineSpaced(0);
     {
         imgui::ScopedDisable d(completed_file_operations.container->empty());
 
@@ -500,17 +559,23 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 /* confirmation_enabled = */ &(global_state::settings().confirm_completed_file_operations_forget_all)
             );
         }
+        if (imgui::IsItemHovered()) imgui::SetTooltip("Clear %zu records", completed_file_operations.container->size());
     }
-    imgui::SameLineSpaced(0);
-    imgui::AlignTextToFramePadding();
-    imgui::Text("%zu completed operations", completed_file_operations.container->size());
 
     auto &settings = global_state::settings();
 
-    imgui::SameLineSpaced(2);
-    settings_change |= imgui::Checkbox("Full source path", &settings.file_operations_src_path_full);
     imgui::SameLineSpaced(1);
-    settings_change |= imgui::Checkbox("Full destination path", &settings.file_operations_dst_path_full);
+    {
+        imgui::ScopedItemWidth iw(imgui::CalcTextSize("2147483647").x + style.FramePadding.x*2);
+        settings_change |= imgui::InputInt("Max records", &settings.num_max_file_operations, 0);
+        settings.num_max_file_operations = std::clamp(settings.num_max_file_operations, 0, INT32_MAX);
+        // TODO get user confirmation to delete records beyond max after value reduction
+    }
+    imgui::SameLineSpaced(1);
+
+    settings_change |= imgui::Checkbox("Full src path", &settings.file_operations_src_path_full);
+    imgui::SameLineSpaced(1);
+    settings_change |= imgui::Checkbox("Full dst path", &settings.file_operations_dst_path_full);
 
     imgui::Separator();
 
@@ -534,7 +599,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
     ;
 
-    if (imgui::BeginTable("completed_file_operations_get", file_ops_table_col_count, table_flags)) {
+    if (imgui::BeginTable("completed_file_operations table", file_ops_table_col_count, table_flags)) {
         static std::optional< std::deque<completed_file_operation>::iterator > s_context_menu_target_iter = std::nullopt;
                               std::deque<completed_file_operation>::iterator   remove_single_iter         = completed_file_operations.container->end();
 
@@ -545,6 +610,8 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         static u64 s_num_restorables_selected_when_context_menu_opened = 0;
         static u64 s_num_restorables_in_group_when_context_menu_opened = 0;
         static u64 s_latest_selected_row_idx = u64(-1);
+
+        static ImVec2 s_last_known_icon_size = {};
 
         imgui::TableSetupColumn("Group", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_group);
         imgui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoSort, 0.0f, file_ops_table_col_op_type);
@@ -612,6 +679,24 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_src_path)) {
                 char const *src_path = settings.file_operations_src_path_full ? file_op.src_path.data() : path_find_filename(file_op.src_path.data());
+
+                if (global_state::settings().win32_file_icons) {
+                    if (file_op.src_icon_GLtexID == 0) {
+                        std::tie(file_op.src_icon_GLtexID, file_op.src_icon_size) = load_icon_texture(file_op.src_path.data(), 0, "completed_file_operation");
+                        if (file_op.src_icon_GLtexID > 0) {
+                            s_last_known_icon_size = file_op.src_icon_size;
+                        }
+                    }
+                    auto const &icon_size = file_op.src_icon_GLtexID < 1 ? s_last_known_icon_size : file_op.src_icon_size;
+                    ImGui::Image((ImTextureID)std::max(file_op.src_icon_GLtexID, s64(0)), icon_size);
+                }
+                else { // fallback to generic icons
+                    char const *icon = get_icon(file_op.obj_type);
+                    ImVec4 icon_color = get_color(file_op.obj_type);
+                    imgui::TextColored(icon_color, icon);
+                }
+                imgui::SameLine();
+
                 auto label = make_str_static<1200>("%s##%zu", src_path, i);
 
                 if (imgui::Selectable(label.data(), file_op.selected, ImGuiSelectableFlags_SpanAllColumns)) {
@@ -645,7 +730,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     s_context_menu_target_rect = imgui::GetItemRect();
                     s_context_menu_target_iter = elem_iter;
 
-                    imgui::OpenPopup("## completed_file_operations_get context_menu");
+                    imgui::OpenPopup("## completed_file_operations context_menu");
 
                     bool keep_any_selected_state = file_op.selected;
 
@@ -659,12 +744,48 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     }
                 }
             }
-            if (imgui::TableGetHoveredColumn() == file_ops_table_col_src_path && imgui::IsItemHovered()) {
-                bool show_full = settings.file_operations_src_path_full;
-                bool show_full_and_truncated = show_full && imgui::IsColumnTextVisuallyTruncated(file_ops_table_col_src_path, file_op.src_path.data());
-                if (!show_full || show_full_and_truncated) {
+            if (imgui::TableGetHoveredColumn() == file_ops_table_col_src_path && imgui::IsItemHovered() && io.KeyShift) {
+                if (imgui::BeginTooltip()) {
+                    render_path_with_stylish_separators(file_op.src_path.data(), appropriate_icon(file_op.src_icon_GLtexID, file_op.obj_type));
+                    imgui::EndTooltip();
+                }
+            }
+
+            if (imgui::TableSetColumnIndex(file_ops_table_col_dst_path)) {
+                if (global_state::settings().win32_file_icons) {
+                    bool is_restored = file_op.undone() && file_op.op_type == file_operation_type::del;
+                    if (is_restored) {
+                        if (file_op.dst_icon_GLtexID > 0) {
+                            delete_icon_texture(file_op.dst_icon_GLtexID);
+                            file_op.dst_icon_GLtexID = -1;
+                        }
+                    }
+                    if (file_op.dst_icon_GLtexID == 0 && !is_restored) {
+                        // TODO investigate weirdness where restored record has a valid dst_path and returns valid icon (I expect -1).
+                        // For now we detect manually and force it to -1
+                        std::tie(file_op.dst_icon_GLtexID, file_op.dst_icon_size) = load_icon_texture(file_op.dst_path.data(), 0, "completed_file_operation");
+                        if (file_op.dst_icon_GLtexID > 0) {
+                            s_last_known_icon_size = file_op.dst_icon_size;
+                        }
+                    }
+                    auto const &icon_size = file_op.dst_icon_GLtexID < 1 ? s_last_known_icon_size : file_op.dst_icon_size;
+                    ImGui::Image((ImTextureID)std::max(file_op.dst_icon_GLtexID, s64(0)), icon_size);
+                }
+                else { // fallback to generic icons
+                    char const *icon = get_icon(file_op.obj_type);
+                    ImVec4 icon_color = get_color(file_op.obj_type);
+                    imgui::TextColored(icon_color, icon);
+                }
+                imgui::SameLine();
+
+                char const *dst_path = settings.file_operations_dst_path_full ? file_op.dst_path.data() : path_find_filename(file_op.dst_path.data());
+                imgui::TextUnformatted(dst_path);
+            }
+            {
+                ImRect cell_rect = imgui::TableGetCellBgRect(imgui::GetCurrentTable(), file_ops_table_col_dst_path);
+                if (imgui::IsMouseHoveringRect(cell_rect) && io.KeyShift) {
                     if (imgui::BeginTooltip()) {
-                        render_path_with_stylish_separators(file_op.src_path.data());
+                        render_path_with_stylish_separators(file_op.dst_path.data(), appropriate_icon(file_op.dst_icon_GLtexID, file_op.obj_type));
                         imgui::EndTooltip();
                     }
                 }
@@ -686,24 +807,9 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     imgui::Text("%zu", file_op.group_id);
                 }
             }
-
-            if (imgui::TableSetColumnIndex(file_ops_table_col_dst_path)) {
-                char const *dst_path = settings.file_operations_dst_path_full ? file_op.dst_path.data() : path_find_filename(file_op.dst_path.data());
-                imgui::TextUnformatted(dst_path);
-            }
-            if (imgui::TableGetHoveredColumn() == file_ops_table_col_dst_path && imgui::IsItemHovered()) {
-                bool show_full = settings.file_operations_dst_path_full;
-                bool show_full_and_truncated = show_full && imgui::IsColumnTextVisuallyTruncated(file_ops_table_col_dst_path, file_op.dst_path.data());
-                if (!show_full || show_full_and_truncated) {
-                    if (imgui::BeginTooltip()) {
-                        render_path_with_stylish_separators(file_op.dst_path.data());
-                        imgui::EndTooltip();
-                    }
-                }
-            }
         }
 
-        if (imgui::IsPopupOpen("## completed_file_operations_get context_menu")) {
+        if (imgui::IsPopupOpen("## completed_file_operations context_menu")) {
             if (s_num_selected_when_context_menu_opened <= 1) {
                 assert(s_context_menu_target_rect.has_value());
                 ImVec2 min = s_context_menu_target_rect.value().Min;
@@ -712,17 +818,13 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 ImGui::GetWindowDrawList()->AddRect(min, max, imgui::ImVec4_to_ImU32(imgui::GetStyleColorVec4(ImGuiCol_NavHighlight), true));
             }
         }
-        // else {
-        //     s_context_menu_target_iter = std::nullopt;
-        //     s_context_menu_target_rect = std::nullopt;
-        // }
 
         bool execute_forget_immediately = false;
         bool execute_forget_group_immediately = false;
 
         static bool s_forget_just_one = false;
 
-        if (imgui::BeginPopup("## completed_file_operations_get context_menu")) {
+        if (imgui::BeginPopup("## completed_file_operations context_menu")) {
             assert(s_context_menu_target_iter.has_value());
             assert(s_context_menu_target_iter.value() != completed_file_operations.container->end());
             completed_file_operation &context_target = *s_context_menu_target_iter.value();
@@ -737,7 +839,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 bool show_undelete_option = context_target_can_be_undeleted && s_num_selected_when_context_menu_opened <= 1; // && s_num_restorables_selected_when_context_menu_opened <= 1;
 
                 if (show_undelete_option && imgui::Selectable("Restore")) {
-                    if (s_num_restorables_selected_when_context_menu_opened == 0) {
+                    if (s_num_restorables_selected_when_context_menu_opened <= 1) {
                         if (context_target.obj_type == basic_dirent::kind::directory) {
                             print_debug_msg("Restore directory [%s]", context_target.src_path.data());
 
@@ -781,6 +883,10 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                                     (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                                 }
                             }
+                        }
+                        std::tie(context_target.src_icon_GLtexID, context_target.src_icon_size) = load_icon_texture(context_target.src_path.data(), 0, "completed_file_operation");
+                        if (context_target.src_icon_GLtexID > 0) {
+                            s_last_known_icon_size = context_target.src_icon_size;
                         }
                     }
                 }
@@ -912,23 +1018,20 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
 
             if (execute_forget_immediately || status.value_or(false)) {
                 if (s_forget_just_one) {
-                    completed_file_operations.container->erase(s_context_menu_target_iter.value());
+                    auto erase_iter = s_context_menu_target_iter.value();
+                    erase(completed_file_operations, erase_iter, erase_iter + 1);
                 }
                 else {
                     auto begin_iter = completed_file_operations.container->begin();
                     auto end_iter   = completed_file_operations.container->end();
 
-                    auto not_selected_end_iter = std::remove_if(begin_iter, end_iter, [](completed_file_operation const &cfo) noexcept { return cfo.selected; });
+                    auto selected_partition_iter = std::stable_partition(std::execution::par_unseq, begin_iter, end_iter,
+                        [](completed_file_operation const &elem) noexcept { return !elem.selected; });
 
-                    completed_file_operations.container->erase(not_selected_end_iter, end_iter);
-
-                    // perplexingly, the unremoved elements (who were not selected prior) become selected after .erase(),
-                    // hence this seemingly unnecessary operation. I suspect it has something to do with imgui::Selectable,
-                    // but I don't have the time or will to go figure out the root case so I'm just going to fix it here.
-                    // let the runtime parallelize it too, in hopes that for large containers it will be faster.
-                    std::for_each(std::execution::par_unseq, begin_iter, end_iter, [](completed_file_operation &cfo) noexcept { cfo.selected = false; });
+                    for (auto iter = selected_partition_iter; iter != end_iter; ++iter) {
+                        erase(completed_file_operations, iter, iter + 1);
+                    }
                 }
-
                 (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
             }
@@ -948,7 +1051,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 auto remove_group_begin_iter = std::find_if    (begin_iter,              end_iter, predicate_same_group);
                 auto remove_group_end_iter   = std::find_if_not(remove_group_begin_iter, end_iter, predicate_same_group);
 
-                completed_file_operations.container->erase(remove_group_begin_iter, remove_group_end_iter);
+                erase(completed_file_operations, remove_group_begin_iter, remove_group_end_iter);
 
                 (void) global_state::completed_file_operations_save_to_disk(&completed_file_ops_lock);
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
@@ -1009,7 +1112,9 @@ void perform_file_operations(
     std::mutex *init_done_mutex,
     std::condition_variable *init_done_cond,
     bool *init_done,
-    std::string *init_error) noexcept
+    std::string *init_error,
+    char dir_sep_utf8,
+    s32 num_max_file_operations) noexcept
 {
     assert(!destination_directory_utf16.empty());
 
@@ -1084,6 +1189,8 @@ void perform_file_operations(
     explorer_file_op_progress_sink prog_sink = {};
     prog_sink.dst_expl_id = dst_expl_id;
     prog_sink.dst_expl_cwd_when_operation_started = global_state::explorers()[dst_expl_id].cwd;
+    prog_sink.dir_sep_utf8 = dir_sep_utf8;
+    prog_sink.num_max_file_operations = num_max_file_operations;
 
     // attach items (IShellItem) for deletion to IFileOperation
     {

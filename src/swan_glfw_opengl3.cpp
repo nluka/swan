@@ -81,6 +81,10 @@ try {
     }
     global_state::window_handle() = glfwGetWin32Window(window);
 
+    if (glewInit() != GLEW_OK) {
+        return 1;
+    }
+
     // reset log file
     {
         auto log_file_path = global_state::execution_path() / "debug_log.md";

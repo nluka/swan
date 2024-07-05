@@ -77,7 +77,8 @@ try {
             << color.w << '\n';
     };
 
-    ofs << "window_x " << this->window_x << '\n';
+    ofs << "num_max_file_operations " << this->num_max_file_operations << '\n';
+
     ofs << "window_x " << this->window_x << '\n';
     ofs << "window_y " << this->window_y << '\n';
     ofs << "window_w " << this->window_w << '\n';
@@ -91,7 +92,7 @@ try {
     write_bool("unix_directory_separator", this->dir_separator_utf8 == '/');
 
     write_bool("show_debug_info", this->show_debug_info);
-    write_bool("file_extension_icons", this->file_extension_icons);
+    write_bool("win32_file_icons", this->win32_file_icons);
     write_bool("tables_alt_row_bg", this->tables_alt_row_bg);
     write_bool("table_borders_in_body", this->table_borders_in_body);
 
@@ -1004,6 +1005,9 @@ try {
             }
         }
         else {
+            if (property == "num_max_file_operations") {
+                ss >> this->num_max_file_operations;
+            }
             if (property == "window_x") {
                 ss >> this->window_x;
             }
@@ -1047,8 +1051,8 @@ try {
             else if (property == "explorer_clear_filter_on_cwd_change") {
                 this->explorer_clear_filter_on_cwd_change = extract_bool();
             }
-            else if (property == "file_extension_icons") {
-                this->file_extension_icons = extract_bool();
+            else if (property == "win32_file_icons") {
+                this->win32_file_icons = extract_bool();
             }
 
             else if (property == "file_operations_src_path_full") {

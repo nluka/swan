@@ -89,8 +89,8 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
         dst_expl.select_cwd_entries_on_next_update.push_back(new_name_utf8);
     }
 
-    path_force_separator(src_path_utf8, global_state::settings().dir_separator_utf8);
-    path_force_separator(dst_path_utf8, global_state::settings().dir_separator_utf8);
+    path_force_separator(src_path_utf8, this->dir_sep_utf8);
+    path_force_separator(dst_path_utf8, this->dir_sep_utf8);
 
     {
         auto completed_file_operations = global_state::completed_file_operations_get();
@@ -99,6 +99,9 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
         auto completion_time = get_time_system();
 
         std::scoped_lock lock(*completed_file_operations.mutex);
+
+        while (completed_file_operations.container->size() >= this->num_max_file_operations && !completed_file_operations.container->empty())
+            pop_back(completed_file_operations);
 
         completed_file_operations.container->emplace_front(completion_time, time_point_system_t(), file_operation_type::move,
                                                            src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
@@ -221,6 +224,9 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
 
         std::scoped_lock lock(*completed_file_operations.mutex);
 
+        while (completed_file_operations.container->size() >= this->num_max_file_operations && !completed_file_operations.container->empty())
+            pop_back(completed_file_operations);
+
         completed_file_operations.container->emplace_front(completion_time, time_point_system_t(), file_operation_type::del,
             deleted_item_path_utf8.data(), recycle_bin_item_path_utf8.data(), obj_type, this->group_id);
     }
@@ -308,6 +314,9 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
 
         std::scoped_lock lock(*completed_file_operations.mutex);
 
+        while (completed_file_operations.container->size() >= this->num_max_file_operations && !completed_file_operations.container->empty())
+            pop_back(completed_file_operations);
+
         completed_file_operations.container->emplace_front(completion_time, time_point_system_t(), file_operation_type::copy,
                                                            src_path_utf8.data(), dst_path_utf8.data(), obj_type, this->group_id);
     }
@@ -325,23 +334,17 @@ HRESULT explorer_file_op_progress_sink::FinishOperations(HRESULT) noexcept
 {
     if (this->contains_delete_operations) {
         {
-            auto new_buffer = circular_buffer<recent_file>(global_constants::MAX_RECENT_FILES);
-
             auto recent_files = global_state::recent_files_get();
 
             std::scoped_lock lock(*recent_files.mutex);
 
-            for (auto const &recent_file : *recent_files.container) {
-                wchar_t recent_file_path_utf16[MAX_PATH];
+            auto deleted_files_iter = std::stable_partition(recent_files.container->begin(), recent_files.container->end(), [](recent_file const &rf) noexcept {
+                wchar_t rf_path_utf16[MAX_PATH];
+                if (!utf8_to_utf16(rf.path.data(), rf_path_utf16, lengthof(rf_path_utf16))) return true;
+                return (bool) PathFileExistsW(rf_path_utf16);
+            });
 
-                if (utf8_to_utf16(recent_file.path.data(), recent_file_path_utf16, lengthof(recent_file_path_utf16))) {
-                    if (PathFileExistsW(recent_file_path_utf16)) { // TODO: move out of lock scope
-                        new_buffer.push_back(recent_file);
-                    }
-                }
-            }
-
-            *recent_files.container = new_buffer;
+            erase(recent_files, deleted_files_iter, recent_files.container->end());
         }
 
         global_state::recent_files_save_to_disk();

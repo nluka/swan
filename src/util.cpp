@@ -107,38 +107,6 @@ time_point_precise_t get_time_precise() noexcept
     return std::chrono::high_resolution_clock::now();
 }
 
-std::array<char, 64> time_diff_str(time_point_precise_t start, time_point_precise_t end) noexcept
-{
-    std::array<char, 64> out = {};
-
-    s64 ms_diff = time_diff_ms(start, end);
-    s64 one_minute = 60'000;
-    s64 one_hour = one_minute * 60;
-    s64 one_day = one_hour * 24;
-
-    bool in_future = ms_diff < 0;
-    char const *tense = in_future ? "in future" : "ago";
-    ms_diff = abs(ms_diff);
-
-    if (ms_diff < one_minute) {
-        snprintf(out.data(), out.size(), "just now%s", in_future ? tense : "");
-    }
-    else if (ms_diff < one_hour) {
-        u64 minutes = u64(ms_diff / one_minute);
-        snprintf(out.data(), out.size(), "%zu min%s %s", minutes, minutes == 1 ? "" : "s", tense);
-    }
-    else if (ms_diff < one_day) {
-        u64 hours = u64(ms_diff / one_hour);
-        snprintf(out.data(), out.size(), "%zu hour%s %s", hours, hours == 1 ? "" : "s", tense);
-    }
-    else {
-        u64 days = u64(ms_diff / one_day);
-        snprintf(out.data(), out.size(), "%zu day%s %s", days, days == 1 ? "" : "s", tense);
-    }
-
-    return out;
-}
-
 time_point_system_t get_time_system() noexcept
 {
     return std::chrono::system_clock::now();
@@ -160,35 +128,57 @@ s64 time_diff_us(time_point_system_t start, time_point_system_t end) noexcept
     return diff_us.count();
 }
 
-std::array<char, 64> time_diff_str(time_point_system_t start, time_point_system_t end) noexcept
+void time_diff_str_impl(std::array<char, 64> &out, s64 ms_diff) noexcept
 {
-    std::array<char, 64> out = {};
-
-    s64 ms_diff = time_diff_ms(start, end);
-    s64 one_minute = 60'000;
-    s64 one_hour = one_minute * 60;
-    s64 one_day = one_hour * 24;
+    s64 const one_second = 1'000;
+    s64 const one_minute = one_second * 60;
+    s64 const one_hour = one_minute * 60;
+    s64 const one_day = one_hour * 24;
 
     bool in_future = ms_diff < 0;
     char const *tense = in_future ? "in future" : "ago";
     ms_diff = abs(ms_diff);
 
     if (ms_diff < one_minute) {
-        snprintf(out.data(), out.size(), "just now%s", in_future ? tense : "");
+    #if 1
+        u64 seconds = u64(ms_diff / one_second);
+        snprintf(out.data(), out.size(), "%zus %s", seconds, tense);
+    #else
+        if (in_future) {
+            u64 seconds = u64(ms_diff / one_second);
+            snprintf(out.data(), out.size(), "%zus in future", seconds);
+        } else {
+            snprintf(out.data(), out.size(), "now");
+        }
+    #endif
     }
     else if (ms_diff < one_hour) {
         u64 minutes = u64(ms_diff / one_minute);
-        snprintf(out.data(), out.size(), "%zu min%s %s", minutes, minutes == 1 ? "" : "s", tense);
+        snprintf(out.data(), out.size(), "%zum %s", minutes, tense);
     }
     else if (ms_diff < one_day) {
         u64 hours = u64(ms_diff / one_hour);
-        snprintf(out.data(), out.size(), "%zu hour%s %s", hours, hours == 1 ? "" : "s", tense);
+        snprintf(out.data(), out.size(), "%zuh %s", hours, tense);
     }
     else {
         u64 days = u64(ms_diff / one_day);
-        snprintf(out.data(), out.size(), "%zu day%s %s", days, days == 1 ? "" : "s", tense);
+        snprintf(out.data(), out.size(), "%zud %s", days, tense);
     }
+}
 
+std::array<char, 64> time_diff_str(time_point_precise_t start, time_point_precise_t end) noexcept
+{
+    std::array<char, 64> out = {};
+    s64 ms_diff = time_diff_ms(start, end);
+    time_diff_str_impl(out, ms_diff);
+    return out;
+}
+
+std::array<char, 64> time_diff_str(time_point_system_t start, time_point_system_t end) noexcept
+{
+    std::array<char, 64> out = {};
+    s64 ms_diff = time_diff_ms(start, end);
+    time_diff_str_impl(out, ms_diff);
     return out;
 }
 

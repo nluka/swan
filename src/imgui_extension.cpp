@@ -148,8 +148,9 @@ void imgui::RenderConfirmationModal() noexcept
     if (imgui::BeginPopupModal("Confirm ## RenderConfirmationModal", 0, ImGuiWindowFlags_NoResize)) {
         auto cleanup_and_close_popup = []() noexcept {
             if (g_on_yes_callback != nullptr) {
-                g_on_yes_callback();
-
+                if (g_response == true) {
+                    g_on_yes_callback();
+                }
                 g_on_yes_callback = nullptr;
                 g_active_id = -1;
                 g_content = "";
@@ -174,9 +175,6 @@ void imgui::RenderConfirmationModal() noexcept
 
         if (imgui::Button("Yes")) {
             g_response = true;
-            if (g_on_yes_callback != nullptr) {
-                g_on_yes_callback();
-            }
             cleanup_and_close_popup();
         }
 

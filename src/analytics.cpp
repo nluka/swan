@@ -13,13 +13,15 @@ bool swan_windows::render_analytics() noexcept
         imgui::SameLineSpaced(2);
         imgui::Text("%.3f ms/frame", 1000.0f / io.Framerate);
 
-        imgui::Spacing();
+        imgui::Separator();
 
         imgui::Text("IsMouseClicked(left): %d", imgui::IsMouseClicked(ImGuiMouseButton_Left));
         imgui::Text("IsMouseDown(left): %d", imgui::IsMouseDown(ImGuiMouseButton_Left));
         imgui::Text("IsMouseDragging(left): %d", imgui::IsMouseDragging(ImGuiMouseButton_Left));
         imgui::Text("IsMouseReleased(left): %d", imgui::IsMouseReleased(ImGuiMouseButton_Left));
+
         imgui::Separator();
+
         imgui::Text("io.KeyCtrl: %d", io.KeyCtrl);
 
         return true;

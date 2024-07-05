@@ -4,24 +4,20 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 option(CMAKE_BUILD_TYPE "Build type, Debug or Release")
-option(GLFW3_INCLUDE_PATH "Path to directory containing <glfw3.h> file")
-option(GLFW3_LIB_PATH "Path to directory containing <glfw3.lib> file")
-option(BOOST_PATH "Path to Boost 1.80.0 directory")
-option(BOOST_LIB_PATH "Path to directory containing built Boost 1.80.0 .lib files")
+option(GLFW3_PATH "Path to directory containing <glfw3.h> and <glfw3.lib> files")
+option(GLEW_PATH "Path to directory containing <glew.h> and <glew32s.lib> files")
+option(BOOST_PATH "Path to standard Boost 1.80.0 directory")
 
-if(NOT GLFW3_INCLUDE_PATH)
-    message(FATAL_ERROR "Please provide path to directory containing <glfw3.h> file with -DGLFW3_INCLUDE_PATH=/path/to/dir")
+if(NOT GLFW3_PATH)
+    message(FATAL_ERROR "Please provide path to directory containing <glfw3.h> and <glfw3.lib> files with -DGLFW3_PATH=/path/to/dir")
 endif()
-if(NOT GLFW3_LIB_PATH)
-    message(FATAL_ERROR "Please provide path to directory containing <glfw3.lib> file with -DGLFW3_LIB_PATH=/path/to/dir")
+if(NOT GLEW_PATH)
+    message(FATAL_ERROR "Please provide path to directory containing <glew.h> and <glew.lib> files with -DGLEW_PATH=/path/to/dir")
 endif()
 if(NOT BOOST_PATH)
     message(FATAL_ERROR "Please provide path to Boost 1.80.0 directory with -DBOOST_PATH=/path/to/dir")
 endif()
-if(NOT BOOST_LIB_PATH)
-    message(FATAL_ERROR "Please provide path to directory containing built Boost 1.80.0 <.lib> files -DBOOST_LIB_PATH=/path/to/dir")
-endif()
-if(NOT BOOST_LIB_PATH)
+if(NOT CMAKE_BUILD_TYPE)
     message(FATAL_ERROR "Please specify build type as Debug or Release")
 endif()
 
@@ -113,17 +109,19 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     )
     target_include_directories(swan_debug PRIVATE
         ${BOOST_PATH}
-        ${GLFW3_INCLUDE_PATH}
+        ${GLFW3_PATH}
+        ${GLEW_PATH}
     )
     target_link_directories(swan_debug PRIVATE
-        ${BOOST_LIB_PATH}
-        ${GLFW3_LIB_PATH}
+        ${BOOST_LIB_PATH}/stage/lib
+        ${GLEW_PATH}
     )
     target_link_libraries(swan_debug PRIVATE
         imgui
         stb_image
         "opengl32.lib"
         "glfw3.lib"
+        "glew32s.lib"
         "D3D11.lib"
         "gdi32.lib"
         "shell32.lib"
@@ -168,6 +166,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         stb_image
         "opengl32.lib"
         "glfw3.lib"
+        "glew32s.lib"
         "gdi32.lib"
         "shell32.lib"
         "kernel32.lib"
