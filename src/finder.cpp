@@ -152,7 +152,8 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
         return false;
     }
 
-    // auto &io = imgui::GetIO();
+    [[maybe_unused]] auto &style = imgui::GetStyle();
+    [[maybe_unused]] auto const &io = imgui::GetIO();
 
     std::optional<u64> remove_search_dir_idx = std::nullopt;
 
@@ -162,7 +163,7 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
         {
             imgui::ScopedDisable d(finder.search_directories.size() == 1);
 
-            auto label = make_str_static<64>(ICON_FA_MINUS "## finder search_dir %zu", i);
+            auto label = make_str_static<64>(ICON_CI_CHROME_CLOSE "## finder search_dir %zu", i);
 
             if (imgui::Button(label.data())) {
                 remove_search_dir_idx = i;
@@ -200,6 +201,19 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
             bool path_changed = imgui::InputTextWithHint(label.data(), hint.data(), search_directory.path_utf8.data(), search_directory.path_utf8.max_size(),
                                                          ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_path_chars());
 
+            if (imgui::BeginDragDropTarget()) {
+                auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name());
+
+                if (payload_wrapper != nullptr) {
+                    assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
+                    auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
+                    auto const &pin = global_state::pinned_get()[payload_data->pin_idx];
+                    search_directory.path_utf8 = pin.path;
+                    path_changed = true;
+                }
+                imgui::EndDragDropTarget();
+            }
+
             if (path_changed) {
                 wchar_t path_utf16[MAX_PATH];
                 if (utf8_to_utf16(search_directory.path_utf8.data(), path_utf16, lengthof(path_utf16))) {
@@ -213,18 +227,59 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
         finder.search_directories.erase(finder.search_directories.begin() + remove_search_dir_idx.value());
     }
 
-    if (imgui::Button(ICON_FA_PLUS "## finder search_dir")) {
+    if (imgui::Button(ICON_CI_PLUS "## finder search_dir")) {
         finder.search_directories.push_back({ false, path_create("") });
     }
+    if (imgui::BeginDragDropTarget()) {
+        auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name());
 
-    imgui::SameLine();
+        if (payload_wrapper != nullptr) {
+            assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
+            auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
+            auto const &pin = global_state::pinned_get()[payload_data->pin_idx];
 
-    imgui::Text(ICON_CI_BLANK);
+            bool found = false;
+            wchar_t path_utf16[MAX_PATH];
+            if (utf8_to_utf16(pin.path.data(), path_utf16, lengthof(path_utf16))) {
+                found = PathIsDirectoryW(path_utf16);
+            }
+            finder.search_directories.push_back({ found, pin.path });
+        }
+        imgui::EndDragDropTarget();
+    }
 
     imgui::SameLine();
 
     bool search_active = finder.search_task.active_token.load();
     [[maybe_unused]] bool search_cancelled = finder.search_task.cancellation_token.load();
+
+    {
+        imgui::ScopedStyle<f32> fp(style.FramePadding.x, 0);
+        imgui::ScopedStyle<f32> bs(style.FrameBorderSize, 0);
+
+        if (search_active) {
+            if (imgui::Button(ICON_CI_SEARCH_STOP "## finder")) {
+                finder.search_task.cancellation_token.store(true);
+            }
+        } else {
+            bool search_value_empty = cstr_empty(finder.search_value.data());
+            bool any_search_dirs_not_found = std::any_of(finder.search_directories.begin(), finder.search_directories.end(),
+                [](finder_window::search_directory const &sd) { return !sd.found; });
+
+            imgui::ScopedDisable d(search_value_empty || any_search_dirs_not_found);
+
+            if (imgui::Button(ICON_CI_SEARCH "## finder")) {
+                finder.search_task.result.clear();
+                finder.num_entries_checked.store(0);
+
+                swan_finder::g_thread_pool.push_task([&finder]() {
+                    search_proc(std::ref(finder.search_task), finder.search_directories, std::ref(finder.num_entries_checked), finder.search_value);
+                });
+            }
+        }
+    }
+
+    imgui::SameLine();
 
     {
         auto width = std::max(
@@ -244,29 +299,6 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
                                  ImGuiInputTextFlags_CallbackCharFilter, filter_chars_callback, (void *)windows_illegal_path_chars());
 
         if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_Enter)) {
-            finder.search_task.result.clear();
-            finder.num_entries_checked.store(0);
-
-            swan_finder::g_thread_pool.push_task([&finder]() {
-                search_proc(std::ref(finder.search_task), finder.search_directories, std::ref(finder.num_entries_checked), finder.search_value);
-            });
-        }
-    }
-
-    imgui::SameLine();
-
-    if (search_active) {
-        if (imgui::Button(ICON_FA_STOP "## finder")) {
-            finder.search_task.cancellation_token.store(true);
-        }
-    } else {
-        bool search_value_empty = cstr_empty(finder.search_value.data());
-        bool any_search_dirs_not_found = std::any_of(finder.search_directories.begin(), finder.search_directories.end(),
-                                                     [](finder_window::search_directory const &sd) { return !sd.found; });
-
-        imgui::ScopedDisable d(search_value_empty || any_search_dirs_not_found);
-
-        if (imgui::Button(ICON_FA_SEARCH "## finder")) {
             finder.search_task.result.clear();
             finder.num_entries_checked.store(0);
 
