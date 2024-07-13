@@ -3598,18 +3598,20 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
             auto const &pin = global_state::pinned_get()[payload_data->pin_idx];
 
-            swan_path initial_cwd = expl.cwd;
-            expl.cwd = path_create("");
+            if (!path_loosely_same(pin.path.data(), expl.cwd)) {
+                swan_path initial_cwd = expl.cwd;
+                expl.cwd = path_create("");
 
-            auto result = try_descend_to_directory(expl, pin.path.data());
+                auto result = try_descend_to_directory(expl, pin.path.data());
 
-            if (!result.success) {
-                std::string action = make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1);
-                char const *failed = result.err_msg.c_str();
-                swan_popup_modals::open_error(action.c_str(), failed);
+                if (!result.success) {
+                    std::string action = make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1);
+                    char const *failed = result.err_msg.c_str();
+                    swan_popup_modals::open_error(action.c_str(), failed);
 
-                expl.cwd = initial_cwd;
-                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
+                    expl.cwd = initial_cwd;
+                    (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
+                }
             }
         }
 

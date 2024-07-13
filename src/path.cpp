@@ -269,19 +269,29 @@ swan_path path_reconstruct_canonically(char const *path_utf8) noexcept
 {
     swan_path retval;
 
-    try {
-        std::filesystem::path fs_path(path_utf8);
-        std::filesystem::path canonical_path = std::filesystem::canonical(fs_path);
-        std::string canonical_string = canonical_path.string();
-        retval = path_create(canonical_string.c_str());
-    }
-    catch (std::exception const &) {
-        // print_debug_msg("FAILED catch(std::exception) %s", except.what());
+    // The std::filesystem::canonical function resolves the path to its absolute, symlink-free form.
+    // When you pass "C:" (or any valid drive letter), it resolves it based on the current directory on the drive
+    //  at the time of the call.
+
+    u64 path_utf8_len = strlen(path_utf8);
+    if (path_utf8_len == 2 && isalpha(path_utf8[0]) && path_utf8[1] == ':') {
         retval = path_create(path_utf8);
     }
-    catch (...) {
-        // print_debug_msg("FAILED catch(...)");
-        retval = path_create(path_utf8);
+    else {
+        try {
+            std::filesystem::path fs_path(path_utf8);
+            std::filesystem::path canonical_path = std::filesystem::canonical(fs_path);
+            std::string canonical_string = canonical_path.string();
+            retval = path_create(canonical_string.c_str());
+        }
+        catch (std::exception const &) {
+            // print_debug_msg("FAILED catch(std::exception) %s", except.what());
+            retval = path_create(path_utf8);
+        }
+        catch (...) {
+            // print_debug_msg("FAILED catch(...)");
+            retval = path_create(path_utf8);
+        }
     }
 
     return retval;

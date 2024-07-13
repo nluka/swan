@@ -207,7 +207,7 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
 
             imgui::TextUnformatted("- Double click a file to open");
             imgui::TextUnformatted("- Right click a file for context menu");
-            imgui::TextUnformatted("- Hold Shift + Hover Source/Destination to see full path");
+            imgui::TextUnformatted("- Hold Shift + Hover File Name to see full path");
 
             imgui::EndTooltip();
         }
