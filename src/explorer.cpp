@@ -4595,6 +4595,25 @@ render_footer_result render_footer(explorer_window &expl, cwd_count_info const &
         if (!path_is_empty(expl.cwd)) {
             if (!cwd_exists_after_edit) {
                 imgui::TextColored(warning_color(), "Directory not found");
+                imgui::SameLine();
+                if (imgui::Button("Create")) {
+                    char const *full_path_utf8 = expl.cwd.data();
+                    try {
+                        std::filesystem::path fs_path = full_path_utf8;
+                        std::filesystem::create_directories(fs_path);
+                        expl.update_cwd_entries(full_refresh, expl.cwd.data());
+                    }
+                    catch (std::exception const &except) {
+                        std::string action = make_str("std::filesystem::create_directories [%s].", full_path_utf8);
+                        char const *failed = except.what();
+                        swan_popup_modals::open_error(action.c_str(), failed);
+                    }
+                    catch (...) {
+                        std::string action = make_str("std::filesystem::create_directories [%s].", full_path_utf8);
+                        char const *failed = "Caught unexpected exception -> catch(...)";
+                        swan_popup_modals::open_error(action.c_str(), failed);
+                    }
+                }
             }
             else if (expl.cwd_entries.empty()) {
                 imgui::TextColored(warning_color(), "Empty directory");
