@@ -54,9 +54,8 @@
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx11.h"
 #include "imgui/imgui_stdlib.h"
-#include "imgui/font_awesome.h"
-#include "imgui/material_design.h"
-#include "imgui/codicons.h"
+#include "imgui/font_FontAwesome5.h"
+#include "imgui/font_codicon.h"
 
 #include <d3d11.h>
 

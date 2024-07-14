@@ -270,3 +270,76 @@ bool imgui::IsMouseCursorOutsideMainViewport() noexcept
 
     return retval;
 }
+
+#if 0
+// block execution until all necessary files are found in their expected locations, relative to execution path.
+// if any are not found, the user is notified and given the ability to "Retry" the search for essential files.
+find_essential_files(window, ini_file_path.c_str());
+print_debug_msg("SUCCESS essential files found");
+#endif
+
+static void         find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept;
+
+static
+void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept
+{
+    struct essential_file
+    {
+        std::string full_path = {};
+        char const *type = nullptr;
+        char const *path_relative_to_executable = nullptr;
+        bool found = false;
+        // TODO: maybe check for validity via hash?
+    };
+
+    essential_file essential[] = {
+        { .full_path={}, .type="directory", .path_relative_to_executable="data",                          .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\codicon.ttf",            .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\fa-solid-900.ttf",       .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\RobotoMono-Regular.ttf", .found=false },
+        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\CascadiaMonoPL.ttf",     .found=false },
+    };
+
+    bool retry = true; // start true to do initial scan
+    bool all_essential_files_located = false;
+
+    while (true) {
+        if (retry) {
+            retry = false;
+            for (u64 i = 0; i < lengthof(essential); ++i) {
+                auto &file = essential[i];
+                std::filesystem::path full_path = global_state::execution_path() / file.path_relative_to_executable;
+                if (cstr_eq(file.type, "directory")) {
+                    file.found = std::filesystem::is_directory(full_path);
+                } else {
+                    file.found = std::filesystem::is_regular_file(full_path);
+                }
+                file.full_path = full_path.generic_string();
+            }
+            all_essential_files_located = std::all_of(essential, essential + lengthof(essential),
+                                                      [](essential_file const &f) noexcept { return f.found; });
+        }
+
+        if (all_essential_files_located) {
+            break;
+        }
+
+        BeginFrame_GLFW_OpenGL3(ini_file_path);
+
+        if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
+            imgui::TextColored(error_color(), "Application is unable to continue, essential file(s) not found:");
+            imgui::Spacing();
+            for (u64 i = 0; i < lengthof(essential); ++i) {
+                auto &file = essential[i];
+                if (!file.found) {
+                    imgui::Text("%s: [%s]", file.type, file.full_path.c_str());
+                }
+            }
+            imgui::Spacing();
+            retry = imgui::Button("Retry");
+        }
+        imgui::End();
+
+        EndFrame_GLFW_OpenGL3(window);
+    }
+}

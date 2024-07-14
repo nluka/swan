@@ -6,6 +6,12 @@
 #include "imgui_dependent_functions.hpp"
 #include "util.hpp"
 
+#include "binary/CascadiaMonoPL_ttf.h"
+#include "binary/FontAwesome5_Solid_900_ttf.h"
+#include "binary/RobotoMono_Regular_ttf.h"
+#include "binary/codicon_ttf.h"
+#include "binary/swan_png.h"
+
 struct failed_assertion
 {
     ntest::assertion ntest;
@@ -19,8 +25,7 @@ static std::optional<bool>              g_test_suite_ran_without_crashes = std::
 static LONG WINAPI  custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcept;
 static GLFWwindow * create_barebones_window() noexcept;
 static void         glfw_error_callback(s32 error, char const *description) noexcept;
-static void         find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept;
-static void         load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept;
+static void         load_custom_fonts(GLFWwindow *window, char const *ini_file_path) noexcept;
 static void         set_window_icon(GLFWwindow *window) noexcept;
 static void         render_ntest_output_window(swan_path const &output_directory_path) noexcept;
 static void         run_tests_integrated(swan_path const &ntest_output_directory_path) noexcept;
@@ -111,14 +116,10 @@ try {
 
     print_debug_msg("global_state::execution_path = [%s]", global_state::execution_path().generic_string().c_str());
 
-    // block execution until all necessary files are found in their expected locations, relative to execution path.
-    // if any are not found, the user is notified and given the ability to "Retry" the search for essential files.
-    find_essential_files(window, ini_file_path.c_str());
-    print_debug_msg("SUCCESS essential files found");
-
-    // block execution until all non-default fonts are loaded successfully.
+    // block execution until all custom fonts are loaded successfully.
+    // a custom font is one not built into Dear ImGui.
     // the user is notified of any font load failures and given the ability to "Retry" which will attempt to reload the fonts.
-    load_non_default_fonts(window, ini_file_path.c_str());
+    load_custom_fonts(window, ini_file_path.c_str());
     print_debug_msg("SUCCESS non-default fonts loaded");
 
     // block until COM is successfully initialized. the user is notified if an error occurs,
@@ -618,18 +619,13 @@ void set_window_icon(GLFWwindow *window) noexcept
     std::filesystem::path icon_file_path = global_state::execution_path() / "swan.png";
     std::string icon_file_path_str = icon_file_path.generic_string();
 
-    s32 icon_width, icon_height, icon_channels;
-    u8 *icon_pixels = stbi_load(icon_file_path_str.c_str(), &icon_width, &icon_height, &icon_channels, STBI_rgb_alpha);
+    s32 icon_channels;
+    icon.pixels = stbi_load_from_memory(swan_png, (s32)lengthof(swan_png), &icon.width, &icon.height, &icon_channels, STBI_rgb_alpha);
+    SCOPE_EXIT { stbi_image_free(icon.pixels); };
 
-    SCOPE_EXIT { stbi_image_free(icon_pixels); };
-
-    if (icon_pixels) {
-        icon.pixels = icon_pixels;
-        icon.width = icon_width;
-        icon.height = icon_height;
+    if (icon.pixels) {
         glfwSetWindowIcon(window, 1, &icon);
-    }
-    else {
+    } else {
         print_debug_msg("FAILED to set window icon [%s]", icon_file_path_str.c_str());
     }
 }
@@ -678,71 +674,11 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcep
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-static
-void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcept
-{
-    struct essential_file
-    {
-        std::string full_path = {};
-        char const *type = nullptr;
-        char const *path_relative_to_executable = nullptr;
-        bool found = false;
-        // TODO: maybe check for validity via hash?
-    };
+#if 0
 
-    essential_file essential[] = {
-        { .full_path={}, .type="directory", .path_relative_to_executable="data",                          .found=false },
-        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\codicon.ttf",            .found=false },
-        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\fa-solid-900.ttf",       .found=false },
-        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\RobotoMono-Regular.ttf", .found=false },
-        { .full_path={}, .type="file",      .path_relative_to_executable="fonts\\CascadiaMonoPL.ttf",     .found=false },
-    };
+#endif
 
-    bool retry = true; // start true to do initial scan
-    bool all_essential_files_located = false;
-
-    while (true) {
-        if (retry) {
-            retry = false;
-            for (u64 i = 0; i < lengthof(essential); ++i) {
-                auto &file = essential[i];
-                std::filesystem::path full_path = global_state::execution_path() / file.path_relative_to_executable;
-                if (cstr_eq(file.type, "directory")) {
-                    file.found = std::filesystem::is_directory(full_path);
-                } else {
-                    file.found = std::filesystem::is_regular_file(full_path);
-                }
-                file.full_path = full_path.generic_string();
-            }
-            all_essential_files_located = std::all_of(essential, essential + lengthof(essential),
-                                                      [](essential_file const &f) noexcept { return f.found; });
-        }
-
-        if (all_essential_files_located) {
-            break;
-        }
-
-        BeginFrame_GLFW_OpenGL3(ini_file_path);
-
-        if (imgui::Begin("Startup Error", nullptr, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysAutoResize)) {
-            imgui::TextColored(error_color(), "Application is unable to continue, essential file(s) not found:");
-            imgui::Spacing();
-            for (u64 i = 0; i < lengthof(essential); ++i) {
-                auto &file = essential[i];
-                if (!file.found) {
-                    imgui::Text("%s: [%s]", file.type, file.full_path.c_str());
-                }
-            }
-            imgui::Spacing();
-            retry = imgui::Button("Retry");
-        }
-        imgui::End();
-
-        EndFrame_GLFW_OpenGL3(window);
-    }
-}
-
-void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexcept
+void load_custom_fonts(GLFWwindow *window, char const *ini_file_path) noexcept
 {
     auto font_loaded = [](ImFont const *font) noexcept { return font && !font->IsLoaded(); };
 
@@ -754,59 +690,45 @@ void load_non_default_fonts(GLFWwindow *window, char const *ini_file_path) noexc
             retry = false;
             failed_fonts = {};
 
-            auto attempt_load_font = [&](char const *path, f32 size, bool merge, bool path_rel_to_exec = true, ImWchar const *ranges = nullptr)
+            auto attempt_load_font = [&](char const *font_name, unsigned char const *ttf_data_static, u64 ttf_data_len,
+                                         f32 size_pixels, bool merge, ImWchar const *ranges = nullptr) noexcept
             {
-                std::filesystem::path font_file_path;
-                if (path_rel_to_exec) {
-                    font_file_path = global_state::execution_path() / path;
-                } else {
-                    font_file_path = path;
-                }
-
                 ImFontConfig cfg = {};
                 cfg.MergeMode = merge;
 
-                auto font = imgui::GetIO().Fonts->AddFontFromFileTTF(font_file_path.string().c_str(), size, &cfg, ranges);
+                // create a malloc'd copy, because ImGui will call free on the TTF data pointer in imgui::DestroyContext
+                auto ttf_data_alloc = (unsigned char *) malloc(ttf_data_len);
+                memcpy(ttf_data_alloc, ttf_data_static, ttf_data_len);
 
-                if (!font_loaded(font)) {
-                    failed_fonts.push_back(font_file_path);
-                }
+                auto font = imgui::GetIO().Fonts->AddFontFromMemoryTTF(ttf_data_alloc, (s32)ttf_data_len, size_pixels, &cfg, ranges);
+                if (!font_loaded(font)) failed_fonts.push_back(font_name);
             };
 
-            attempt_load_font("fonts/RobotoMono-Regular.ttf", 17.0f, false);
-            // attempt_load_font("C:/Windows/Fonts/consola.ttf", 17.0f, false, false);
-            // attempt_load_font("C:/Windows/Fonts/arialuni.ttf", 20.0f, false, false);
-            attempt_load_font("fonts/CascadiaMonoPL.ttf", 16.0f, true, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());
-
-            auto attempt_load_icon_font = [&](char const *path, f32 size, f32 offset_x, f32 offset_y, ImWchar const *s_glyph_ranges)
+            auto attempt_load_icon_font = [&](char const *font_name, unsigned char const *ttf_data_static, u64 ttf_data_len,
+                                              f32 size, ImVec2 offset, ImWchar const *s_glyph_ranges) noexcept
             {
-                std::filesystem::path font_file_path = global_state::execution_path() / path;
+                ImFontConfig icons_config = {};
+                icons_config.MergeMode = icons_config.PixelSnapH = true;
+                icons_config.GlyphOffset = offset;
+                icons_config.GlyphMinAdvanceX = icons_config.GlyphMaxAdvanceX = size;
 
-                ImFontConfig icons_config;
-                icons_config.MergeMode = true;
-                icons_config.PixelSnapH = true;
-                icons_config.GlyphOffset.x = offset_x;
-                icons_config.GlyphOffset.y = offset_y;
-                icons_config.GlyphMinAdvanceX = size;
-                icons_config.GlyphMaxAdvanceX = size;
+                // create a malloc'd copy, because ImGui will call free on the TTF data pointer in imgui::DestroyContext
+                auto ttf_data_alloc = (unsigned char *) malloc(ttf_data_len);
+                memcpy(ttf_data_alloc, ttf_data_static, ttf_data_len);
 
-                auto font = imgui::GetIO().Fonts->AddFontFromFileTTF(font_file_path.generic_string().c_str(), size, &icons_config, s_glyph_ranges);
-
-                if (!font_loaded(font)) {
-                    failed_fonts.push_back(font_file_path);
-                }
+                auto font = imgui::GetIO().Fonts->AddFontFromMemoryTTF(ttf_data_alloc, (s32)ttf_data_len, size, &icons_config, s_glyph_ranges);
+                if (!font_loaded(font)) failed_fonts.push_back(font_name);
             };
 
-            // font awesome
+            attempt_load_font("RobotoMono_Regular", RobotoMono_Regular_ttf, lengthof(RobotoMono_Regular_ttf), 17.0f, false);
+            attempt_load_font("CascadiaMonoPL", CascadiaMonoPL_ttf, lengthof(CascadiaMonoPL_ttf), 16.0f, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
-                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_FAS, 16, 0.25f, 0, s_glyph_ranges);
+                attempt_load_icon_font("FontAwesome5_Solid_900", FontAwesome5_Solid_900_ttf, lengthof(FontAwesome5_Solid_900_ttf), 16, ImVec2(0.25f, 0), s_glyph_ranges);
             }
-
-            // codicons
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
-                attempt_load_icon_font("fonts\\" FONT_ICON_FILE_NAME_CI, 18, 0, 3, s_glyph_ranges);
+                attempt_load_icon_font("codicon", codicon_ttf, lengthof(codicon_ttf), 18, ImVec2(0, 3), s_glyph_ranges);
             }
         }
 
