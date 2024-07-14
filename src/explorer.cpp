@@ -2518,7 +2518,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
             swan_popup_modals::open_new_pin(expl.cwd, false);
         }
         bool result = global_state::pinned_save_to_disk();
-        print_debug_msg("pinned_save_to_disk: %d", result);
+        // print_debug_msg("pinned_save_to_disk: %d", result);
     }
     if (imgui::IsItemHovered()) {
         imgui::SetTooltip("%s current working directory", already_pinned ? "Unpin" : "Pin");
@@ -2528,7 +2528,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
 static
 bool render_history_browser_button() noexcept
 {
-    if (imgui::Button(ICON_CI_HISTORY "##expl.wd_history")) {
+    if (imgui::Button(ICON_CI_HISTORY "## expl.wd_history")) {
         return true;
     }
     if (imgui::IsItemHovered()) {
@@ -2628,6 +2628,16 @@ void render_more_controls_button(explorer_window &expl, bool cwd_exists_before_e
         imgui::SameLine();
 
         render_button_pin_cwd(expl, cwd_exists_before_edit);
+
+        imgui::SameLine();
+
+        if (imgui::Button(ICON_CI_FILE_ADD)) swan_popup_modals::open_new_file(expl.cwd.data(), expl.id);
+        if (imgui::IsItemHovered()) imgui::SetTooltip("New file in cwd");
+
+        imgui::SameLine();
+
+        if (imgui::Button(ICON_CI_NEW_FOLDER)) swan_popup_modals::open_new_directory(expl.cwd.data(), expl.id);
+        if (imgui::IsItemHovered()) imgui::SetTooltip("New directory in cwd");
 
         if (cwd_exists_before_edit) {
             imgui::SameLine();
@@ -2933,6 +2943,33 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
 #endif
 
     return retval;
+}
+
+static
+void render_menu_new_object(explorer_window const &expl, char const *label = "New") noexcept
+{
+    if (imgui::BeginMenu(label)) {
+        {
+            imgui::ScopedTextColor tc(file_color());
+            if (imgui::Selectable(ICON_CI_FILE_ADD " File")) swan_popup_modals::open_new_file(expl.cwd.data(), expl.id);
+        }
+        {
+            imgui::ScopedTextColor tc(directory_color());
+            if (imgui::Selectable(ICON_CI_NEW_FOLDER " Directory")) swan_popup_modals::open_new_directory(expl.cwd.data(), expl.id);
+        }
+        imgui::SeparatorText("TODO");
+        {
+            imgui::ScopedDisable d(true);
+            imgui::ScopedTextColor tc(symlink_color());
+            if (imgui::Selectable(ICON_CI_NEW_FOLDER " File Symlink")) (void)d;
+        }
+        {
+            imgui::ScopedDisable d(true);
+            imgui::ScopedTextColor tc(symlink_color());
+            if (imgui::Selectable(ICON_CI_NEW_FILE " Directory Symlink")) (void)d;
+        }
+        imgui::EndMenu();
+    }
 }
 
 bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_window &finder, bool any_popups_open) noexcept
@@ -3491,13 +3528,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             auto result = g_file_op_payload.execute(expl);
             // TODO: why is result unused?
         }
-
-        if (imgui::Selectable("New file")) {
-            swan_popup_modals::open_new_file(expl.cwd.data(), expl.id);
-        }
-        if (imgui::Selectable("New directory")) {
-            swan_popup_modals::open_new_directory(expl.cwd.data(), expl.id);
-        }
+        render_menu_new_object(expl);
     };
 
     if (!drives_table_rendered) {
@@ -4413,6 +4444,13 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
             }
 
             imgui::Separator();
+
+            if (!g_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
+                auto result = g_file_op_payload.execute(expl);
+                // TODO: why is result unused?
+            }
+
+            render_menu_new_object(expl, "New (in cwd)");
 
             if (imgui::BeginMenu("Copy metadata")) {
                 if (imgui::Selectable("Name")) {
