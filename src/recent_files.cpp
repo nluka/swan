@@ -77,7 +77,7 @@ void global_state::recent_files_remove(u64 recent_file_idx) noexcept
     erase(recent_files, elem_iter, elem_iter + 1);
 }
 
-bool global_state::recent_files_save_to_disk() noexcept
+bool global_state::recent_files_save_to_disk(std::scoped_lock<std::mutex> *supplied_lock) noexcept
 try {
     std::filesystem::path full_path = global_state::execution_path() / "data\\recent_files.txt";
 
@@ -87,7 +87,7 @@ try {
         return false;
     }
 
-    std::scoped_lock lock(g_recent_files_mutex);
+    auto lock = supplied_lock ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(g_recent_files_mutex);
 
     for (auto const &file : g_recent_files) {
         iss << file.action.size() << ' '
@@ -229,11 +229,9 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         auto status = imgui::GetConfirmationStatus(swan_id_confirm_recent_files_clear);
 
         if (status.value_or(false)) {
-            {
-                std::scoped_lock lock(*recent_files.mutex);
-                erase(recent_files, recent_files.container->begin(), recent_files.container->end());
-            }
-            (void) global_state::recent_files_save_to_disk();
+            std::scoped_lock lock(*recent_files.mutex);
+            erase(recent_files, recent_files.container->begin(), recent_files.container->end());
+            (void) global_state::recent_files_save_to_disk(&lock);
         }
     }
 
@@ -349,7 +347,7 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
                 }
                 imgui::SameLine();
 
-                auto label = make_str_static<1200>("%s##recent_file_%zu", file_name, i);
+                auto label = make_str_static<1200>("%s ## recent_file_%zu", file_name, i);
                 if (imgui::Selectable(label.data(), file.selected, ImGuiSelectableFlags_SpanAllColumns|ImGuiSelectableFlags_AllowDoubleClick)) {
                     bool selection_state_before_activate = file.selected;
 
@@ -588,7 +586,7 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
 
                 erase(recent_files, delete_iter, g_recent_files.end());
 
-                (void) global_state::completed_file_operations_save_to_disk(&recent_files_lock);
+                (void) global_state::recent_files_save_to_disk(&recent_files_lock);
                 (void) global_state::settings().save_to_disk(); // persist potential change to confirmation checkbox
             }
         }
@@ -598,11 +596,11 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
 
     if (remove_idx != u64(-1)) {
         (void) global_state::recent_files_remove(remove_idx);
-        (void) global_state::recent_files_save_to_disk();
+        (void) global_state::recent_files_save_to_disk(nullptr);
     }
     if (move_to_front_idx != u64(-1)) {
         global_state::recent_files_move_to_front(move_to_front_idx, "Opened");
-        (void) global_state::recent_files_save_to_disk();
+        (void) global_state::recent_files_save_to_disk(nullptr);
     }
 
     return true;

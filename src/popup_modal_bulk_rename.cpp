@@ -89,7 +89,7 @@ void update_recent_files(std::vector<bulk_rename_transform> &transforms, swan_pa
         }
     }
 
-    (void) global_state::recent_files_save_to_disk();
+    (void) global_state::recent_files_save_to_disk(nullptr);
 }
 
 enum class modal_state : s32 {

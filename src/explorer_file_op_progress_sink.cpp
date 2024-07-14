@@ -333,21 +333,19 @@ HRESULT explorer_file_op_progress_sink::UpdateProgress(UINT work_total, UINT wor
 HRESULT explorer_file_op_progress_sink::FinishOperations(HRESULT) noexcept
 {
     if (this->contains_delete_operations) {
-        {
-            auto recent_files = global_state::recent_files_get();
+        auto recent_files = global_state::recent_files_get();
 
-            std::scoped_lock lock(*recent_files.mutex);
+        std::scoped_lock lock(*recent_files.mutex);
 
-            auto deleted_files_iter = std::stable_partition(recent_files.container->begin(), recent_files.container->end(), [](recent_file const &rf) noexcept {
-                wchar_t rf_path_utf16[MAX_PATH];
-                if (!utf8_to_utf16(rf.path.data(), rf_path_utf16, lengthof(rf_path_utf16))) return true;
-                return (bool) PathFileExistsW(rf_path_utf16);
-            });
+        auto deleted_files_iter = std::stable_partition(recent_files.container->begin(), recent_files.container->end(), [](recent_file const &rf) noexcept {
+            wchar_t rf_path_utf16[MAX_PATH];
+            if (!utf8_to_utf16(rf.path.data(), rf_path_utf16, lengthof(rf_path_utf16))) return true;
+            return (bool) PathFileExistsW(rf_path_utf16);
+        });
 
-            erase(recent_files, deleted_files_iter, recent_files.container->end());
-        }
+        erase(recent_files, deleted_files_iter, recent_files.container->end());
 
-        global_state::recent_files_save_to_disk();
+        global_state::recent_files_save_to_disk(&lock);
     }
 
     (void) global_state::completed_file_operations_save_to_disk(nullptr);

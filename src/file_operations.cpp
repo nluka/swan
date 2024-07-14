@@ -62,7 +62,7 @@ try {
     auto completed_file_operations = global_state::completed_file_operations_get();
 
     {
-        auto lock = supplied_lock != nullptr ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(*completed_file_operations.mutex);
+        auto lock = supplied_lock ? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(*completed_file_operations.mutex);
 
         for (auto const &file_op : *completed_file_operations.container) {
             out

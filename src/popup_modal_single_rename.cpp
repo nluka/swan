@@ -188,13 +188,14 @@ void swan_popup_modals::render_single_rename() noexcept
                         break;
                     }
                 }
+
+                if (recent_files_updated) {
+                    (void) global_state::recent_files_save_to_disk(&recent_files_lock);
+                }
             }
 
             if (pins_updated) {
                 (void) global_state::pinned_save_to_disk();
-            }
-            if (recent_files_updated) {
-                (void) global_state::recent_files_save_to_disk();
             }
 
             g_on_rename_callback();

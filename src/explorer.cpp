@@ -3858,7 +3858,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                             else { // already in recent
                                                 global_state::recent_files_move_to_front(recent_file_idx, "Opened");
                                             }
-                                            (void) global_state::recent_files_save_to_disk();
+                                            (void) global_state::recent_files_save_to_disk(nullptr);
                                         }
                                     } else {
                                         std::string action = make_str("Open symlink [%s].", dirent.basic.path.data());
@@ -3882,7 +3882,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                         else { // already in recent
                                             global_state::recent_files_move_to_front(recent_file_idx, "Opened");
                                         }
-                                        (void) global_state::recent_files_save_to_disk();
+                                        (void) global_state::recent_files_save_to_disk(nullptr);
                                     } else {
                                         std::string action = make_str("Open file [%s].", dirent.basic.path.data());
                                         char const *failed = res.error_or_utf8_path.c_str();
@@ -4235,7 +4235,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                     else { // already in recent
                         global_state::recent_files_move_to_front(recent_file_idx, "Opened");
                     }
-                    (void) global_state::recent_files_save_to_disk();
+                    (void) global_state::recent_files_save_to_disk(nullptr);
                 } else {
                     std::string action = make_str("Open file as administrator [%s].", expl.context_menu_target->basic.path.data());
                     char const *failed = res.error_or_utf8_path.c_str();

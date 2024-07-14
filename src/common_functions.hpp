@@ -153,7 +153,7 @@ namespace global_state
     void                    recent_files_move_to_front(u64 recent_file_idx, char const *new_action = nullptr) noexcept;
     void                    recent_files_add(char const *action, char const *full_file_path) noexcept;
     void                    recent_files_remove(u64 recent_file_idx) noexcept;
-    bool                    recent_files_save_to_disk() noexcept;
+    bool                    recent_files_save_to_disk(std::scoped_lock<std::mutex> *supplied_lock) noexcept;
     std::pair<bool, u64>    recent_files_load_from_disk(char dir_separator) noexcept;
 
     struct completed_file_operations
