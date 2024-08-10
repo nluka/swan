@@ -56,6 +56,7 @@
 #include "imgui/imgui_stdlib.h"
 #include "imgui/font_FontAwesome5.h"
 #include "imgui/font_codicon.h"
+#include "imgui/font_lucide.h"
 
 #include <d3d11.h>
 

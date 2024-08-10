@@ -11,8 +11,9 @@
 
 namespace global_constants
 {
-    std::vector<icon_font_glyph> const &icon_font_glyphs_font_awesome() noexcept;
+    std::vector<icon_font_glyph> const &icon_font_glyphs_FontAwesome5() noexcept;
     std::vector<icon_font_glyph> const &icon_font_glyphs_codicon() noexcept;
+    std::vector<icon_font_glyph> const &icon_font_glyphs_lucide() noexcept;
 
     constexpr u64 num_explorers = 4;
     constexpr u64 MAX_RECENT_FILES = 100;

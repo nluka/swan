@@ -1991,15 +1991,13 @@ ImRect render_file_op_payload_hint() noexcept
 }
 
 static
-void render_back_to_prev_valid_cwd_button(explorer_window &expl) noexcept
+void render_button_history_right(explorer_window &expl) noexcept
 {
     auto io = imgui::GetIO();
 
     imgui::ScopedDisable disabled(expl.wd_history_pos == 0);
 
-    if (imgui::Button(ICON_CI_CHEVRON_LEFT "## back")) {
-        print_debug_msg("[ %d ] back arrow button triggered", expl.id);
-
+    if (imgui::Button(ICON_LC_ARROW_RIGHT "## expl.wd_history")) {
         if (io.KeyShift || io.KeyCtrl) {
             expl.wd_history_pos = 0;
         } else {
@@ -2016,21 +2014,19 @@ void render_back_to_prev_valid_cwd_button(explorer_window &expl) noexcept
     }
 
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Back");
+        imgui::SetTooltip("Forward");
     }
 }
 
 static
-void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
+void render_button_history_left(explorer_window &expl) noexcept
 {
     u64 wd_history_last_idx = expl.wd_history.empty() ? 0 : expl.wd_history.size() - 1;
     auto io = imgui::GetIO();
 
     imgui::ScopedDisable disabled(expl.wd_history_pos == wd_history_last_idx);
 
-    if (imgui::Button(ICON_CI_CHEVRON_RIGHT "## forward")) {
-        print_debug_msg("[ %d ] forward arrow button triggered", expl.id);
-
+    if (imgui::Button(ICON_LC_ARROW_LEFT "## expl.wd_history")) {
         if (io.KeyShift || io.KeyCtrl) {
             expl.wd_history_pos = wd_history_last_idx;
         } else {
@@ -2046,7 +2042,7 @@ void render_forward_to_next_valid_cwd_button(explorer_window &expl) noexcept
     }
 
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Forward");
+        imgui::SetTooltip("Back");
     }
 }
 
@@ -2528,7 +2524,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
 static
 bool render_history_browser_button() noexcept
 {
-    if (imgui::Button(ICON_CI_HISTORY "## expl.wd_history")) {
+    if (imgui::Button(ICON_LC_HISTORY "## expl.wd_history")) {
         return true;
     }
     if (imgui::IsItemHovered()) {
@@ -2659,7 +2655,7 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
 {
     imgui::ScopedDisable disabled(!cwd_exists_before_edit);
 
-    if (imgui::Button(ICON_CI_ARROW_UP "## up")) { // ICON_FA_ARROW_UP
+    if (imgui::Button(ICON_LC_MOVE_UP "## up")) { // ICON_FA_ARROW_UP
         print_debug_msg("[ %d ] (..) button triggered", expl.id);
 
         auto result = try_ascend_directory(expl);
@@ -3253,15 +3249,15 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         imgui::SameLine(0, style.ItemSpacing.x / 2);
 
-        render_back_to_prev_valid_cwd_button(expl);
-
-        imgui::SameLine(0, style.ItemSpacing.x / 2);
-
-        render_forward_to_next_valid_cwd_button(expl);
-
-        imgui::SameLine(0, style.ItemSpacing.x / 2);
-
         render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
+
+        imgui::SameLine(0, style.ItemSpacing.x / 2);
+
+        render_button_history_left(expl);
+
+        imgui::SameLine(0, style.ItemSpacing.x / 2);
+
+        render_button_history_right(expl);
 
         imgui::SameLine();
 

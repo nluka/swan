@@ -53,14 +53,16 @@ bool swan_windows::render_icon_library(bool &open, [[maybe_unused]] bool any_pop
         return false;
     }
 
-    static bool s_show_codicons = true;
-    static bool s_show_font_awesome = true;
+    static bool s_show_lucide = true;
+    static bool s_show_codicon = true;
+    static bool s_show_FontAwesome5 = true;
 
     enum class library_id : s8
     {
         nil = -1,
+        lucide,
         codicons,
-        font_awesome_5,
+        FontAwesome5,
         count
     };
 
@@ -72,8 +74,9 @@ bool swan_windows::render_icon_library(bool &open, [[maybe_unused]] bool any_pop
         bool *show = nullptr;
     };
     static icon_library s_icon_libraries[(u64)library_id::count] = {
-        { "Codicons", "ICON_CI_", global_constants::icon_font_glyphs_codicon(), &s_show_codicons },
-        { "Font Awesome 5", "ICON_FA_", global_constants::icon_font_glyphs_font_awesome(), &s_show_font_awesome },
+        { "Lucide", "ICON_LC_", global_constants::icon_font_glyphs_lucide(), &s_show_lucide },
+        { "Codicons", "ICON_CI_", global_constants::icon_font_glyphs_codicon(), &s_show_codicon },
+        { "Font Awesome 5", "ICON_FA_", global_constants::icon_font_glyphs_FontAwesome5(), &s_show_FontAwesome5 },
     };
 
     struct icon_match
@@ -113,9 +116,9 @@ bool swan_windows::render_icon_library(bool &open, [[maybe_unused]] bool any_pop
 
     static bool s_prioritize_sub_word_matching = true;
 
-    imgui::Checkbox("Codicons", &s_show_codicons);
+    imgui::Checkbox("Codicons", &s_show_codicon);
     imgui::SameLineSpaced(1);
-    imgui::Checkbox("Font Awesome 5", &s_show_font_awesome);
+    imgui::Checkbox("Font Awesome 5", &s_show_FontAwesome5);
 
     imgui::SameLineSpaced(3);
 

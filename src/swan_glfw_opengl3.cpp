@@ -10,6 +10,7 @@
 #include "binary/FontAwesome5_Solid_900_ttf.h"
 #include "binary/RobotoMono_Regular_ttf.h"
 #include "binary/codicon_ttf.h"
+#include "binary/lucide_ttf.h"
 #include "binary/swan_png.h"
 
 struct failed_assertion
@@ -729,6 +730,10 @@ void load_custom_fonts(GLFWwindow *window, char const *ini_file_path) noexcept
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
                 attempt_load_icon_font("codicon", codicon_ttf, lengthof(codicon_ttf), 18, ImVec2(0, 3), s_glyph_ranges);
+            }
+            {
+                static ImWchar const s_glyph_ranges[] = { ICON_MIN_LC, ICON_MAX_16_LC, 0 };
+                attempt_load_icon_font("lucide", lucide_ttf, lengthof(lucide_ttf), 18, ImVec2(0, 3), s_glyph_ranges);
             }
         }
 
