@@ -501,6 +501,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
     auto const &style = imgui::GetStyle();
     bool window_hovered = imgui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
     auto completed_file_operations = global_state::completed_file_operations_get();
+    auto &settings = global_state::settings();
     bool settings_change = false;
 
     // handle keybind actions
@@ -525,6 +526,8 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
 
     std::string dummy_buf = {};
     bool search_text_edited;
+
+    imgui::TableNextColumn();
     {
         imgui::ScopedDisable d(true);
         imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
@@ -567,8 +570,6 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         }
         if (imgui::IsItemHovered()) imgui::SetTooltip("Clear %zu records", completed_file_operations.container->size());
     }
-
-    auto &settings = global_state::settings();
 
     imgui::SameLineSpaced(1);
     {
@@ -650,13 +651,13 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                 ImVec4 icon_color = get_color(file_op.obj_type);
 
                 char const *desc = nullptr;
-                if      (file_op.op_type == file_operation_type::move) desc = "Move";
-                else if (file_op.op_type == file_operation_type::copy) desc = "Copy";
-                else if (file_op.op_type == file_operation_type::del ) desc = "Delete";
+                if      (file_op.op_type == file_operation_type::move) desc = "Mov";
+                else if (file_op.op_type == file_operation_type::copy) desc = "Cpy";
+                else if (file_op.op_type == file_operation_type::del ) desc = "Del";
 
-                imgui::TextColored(icon_color, icon);
-                imgui::SameLine();
                 imgui::TextUnformatted(desc);
+                imgui::SameLine();
+                imgui::TextColored(icon_color, icon);
             }
 
             if (imgui::TableSetColumnIndex(file_ops_table_col_completion_time)) {
@@ -694,7 +695,17 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                         }
                     }
                     auto const &icon_size = file_op.src_icon_GLtexID < 1 ? s_last_known_icon_size : file_op.src_icon_size;
-                    ImGui::Image((ImTextureID)std::max(file_op.src_icon_GLtexID, s64(0)), icon_size);
+
+                    if (file_op.op_type == file_operation_type::move) {
+                        imgui::Image((ImTextureID)(file_op.src_icon_GLtexID > 0 ? file_op.src_icon_GLtexID : file_op.dst_icon_GLtexID), icon_size, ImVec2(0,0), ImVec2(1,1), ImVec4(1,1,1,.3f));
+                    } else if (file_op.op_type == file_operation_type::del) {
+                        imgui::Image((ImTextureID)(file_op.src_icon_GLtexID > 0 ? file_op.src_icon_GLtexID : file_op.dst_icon_GLtexID), icon_size, ImVec2(0,0), ImVec2(1,1), ImVec4(1,1,1,.5f));
+                        auto icon_rect = imgui::GetItemRect();
+                        imgui::GetWindowDrawList()->AddLine(icon_rect.GetTL(), icon_rect.GetBR(), imgui::ImVec4_to_ImU32(error_color(), true), 1);
+                    } else {
+                        // file_operation_type::copy
+                        imgui::Image((ImTextureID)(file_op.src_icon_GLtexID > 0 ? file_op.src_icon_GLtexID : file_op.dst_icon_GLtexID), icon_size);
+                    }
                 }
                 else { // fallback to generic icons
                     char const *icon = get_icon(file_op.obj_type);
@@ -774,15 +785,18 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                             s_last_known_icon_size = file_op.dst_icon_size;
                         }
                     }
-                    auto const &icon_size = file_op.dst_icon_GLtexID < 1 ? s_last_known_icon_size : file_op.dst_icon_size;
-                    ImGui::Image((ImTextureID)std::max(file_op.dst_icon_GLtexID, s64(0)), icon_size);
+                    if (!path_is_empty(file_op.dst_path)) {
+                        auto const &icon_size = file_op.dst_icon_GLtexID < 1 ? s_last_known_icon_size : file_op.dst_icon_size;
+                        ImGui::Image((ImTextureID)std::max(file_op.dst_icon_GLtexID, s64(0)), icon_size);
+                        imgui::SameLine();
+                    }
                 }
                 else { // fallback to generic icons
                     char const *icon = get_icon(file_op.obj_type);
                     ImVec4 icon_color = get_color(file_op.obj_type);
                     imgui::TextColored(icon_color, icon);
+                    imgui::SameLine();
                 }
-                imgui::SameLine();
 
                 char const *dst_path = settings.file_operations_dst_path_full ? file_op.dst_path.data() : path_find_filename(file_op.dst_path.data());
                 imgui::TextUnformatted(dst_path);
@@ -790,7 +804,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
             {
                 ImRect cell_rect = imgui::TableGetCellBgRect(imgui::GetCurrentTable(), file_ops_table_col_dst_path);
                 if (imgui::IsMouseHoveringRect(cell_rect) && io.KeyShift) {
-                    if (imgui::BeginTooltip()) {
+                    if (imgui::BeginTooltip() && !path_is_empty(file_op.dst_path)) {
                         render_path_with_stylish_separators(file_op.dst_path.data(), appropriate_icon(file_op.dst_icon_GLtexID, file_op.obj_type));
                         imgui::EndTooltip();
                     }
