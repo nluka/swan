@@ -150,8 +150,22 @@ try {
 
         (void) global_state::settings().load_from_disk();
         (void) global_state::pinned_load_from_disk(global_state::settings().dir_separator_utf8);
-        (void) global_state::recent_files_load_from_disk(global_state::settings().dir_separator_utf8);
-        (void) global_state::completed_file_operations_load_from_disk(global_state::settings().dir_separator_utf8);
+        {
+            auto result = global_state::recent_files_load_from_disk(global_state::settings().dir_separator_utf8);
+            if (!result.first) {
+                auto recent_files = global_state::recent_files_get();
+                std::scoped_lock recent_files_lock(*recent_files.mutex);
+                recent_files.container->clear();
+            }
+        }
+        {
+            auto result = global_state::completed_file_operations_load_from_disk(global_state::settings().dir_separator_utf8);
+            if (!result.first) {
+                auto completed_file_operations = global_state::completed_file_operations_get();
+                std::scoped_lock recent_files_lock(*completed_file_operations.mutex);
+                completed_file_operations.container->clear();
+            }
+        }
 
         if (global_state::settings().startup_with_window_maximized) {
             glfwMaximizeWindow(window);
@@ -502,7 +516,7 @@ try {
         }
 
         if (imgui::GetFrameCount() == 1) {
-            // After rendering all windows for the first time (GetFrameCount == 1),
+            // After rendering all windows for the first time (FrameCount == 1),
             // tell imgui which window will have initial focus based on what was loaded from [focused_window.txt].
             // Notice that we check for imgui::GetFrameCount() > 1 before calling global_state::focused_window_set,
             // this is because imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) returns true for all windows on frame 1.

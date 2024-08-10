@@ -625,9 +625,9 @@ struct pinned_path
 {
     static u64 const LABEL_MAX_LEN = 64;
 
-    ImVec4 color;
-    boost::static_string<LABEL_MAX_LEN> label;
-    swan_path path;
+    ImVec4 color = {};
+    boost::static_string<LABEL_MAX_LEN> label = {};
+    swan_path path = {};
 };
 
 struct recent_file

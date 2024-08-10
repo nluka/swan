@@ -233,7 +233,7 @@ bool swan_windows::render_icon_library(bool &open, [[maybe_unused]] bool any_pop
                 ImVec2 button_TL = imgui::GetItemRectMin();
                 ImVec2 button_BR = imgui::GetItemRectMax();
                 ImRect button_rect(button_TL, button_BR);
-                imgui::GetWindowDrawList()->AddCircleFilled(button_rect.GetTR(), 2, IM_COL32(0, 255, 0, 255));
+                imgui::GetWindowDrawList()->AddCircleFilled(button_rect.GetTR(), 2, imgui::ImVec4_to_ImU32(success_color(), true));
             }
 
             if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {

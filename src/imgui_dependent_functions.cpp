@@ -349,7 +349,7 @@ std::string serialize_ImGuiStyle(ImGuiStyle const &style, u64 reserve_size, seri
 
 ImGuiStyle swan_default_imgui_style() noexcept
 {
-    ImGuiStyle style;
+    ImGuiStyle style = {};
 
     style.Alpha = 1.000f;
     style.DisabledAlpha = 0.600f;

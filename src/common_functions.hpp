@@ -273,7 +273,6 @@ void erase(global_state::completed_file_operations &obj,
            std::deque<completed_file_operation>::iterator first,
            std::deque<completed_file_operation>::iterator last) noexcept;
 
-
 void pop_back(global_state::completed_file_operations &obj) noexcept;
 
 void erase(global_state::recent_files &obj,

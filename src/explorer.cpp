@@ -2858,6 +2858,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
             if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
                 expl.cwd = path_reconstruct_canonically(expl.cwd.data());
                 expl.push_history_item(expl.cwd);
+                expl.advance_history(expl.cwd);
                 expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
             }
@@ -3157,7 +3158,6 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     // print_debug_msg("[ %d ] GetOverlappedResult FAILED: %d %s", expl.id, GetLastError(), get_last_error_string().c_str());
                 } else {
                     if (global_state::settings().explorer_refresh_mode == swan_settings::explorer_refresh_mode_automatic) {
-                        print_debug_msg("[ %d ] ReadDirectoryChangesW signalled, requesting refresh...", expl.id);
                         issue_read_dir_changes();
                         if (expl.read_dir_changes_refresh_request_time == time_point_precise_t()) {
                             // no refresh pending, submit request to refresh

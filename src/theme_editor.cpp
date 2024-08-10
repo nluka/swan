@@ -38,6 +38,7 @@ bool swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
             imgui::TextUnformatted("ImGuiColorEditFlags_");
 
             imgui::Separator();
+            imgui::Spacing();
 
             if (imgui::BeginChild("## theme_editor ImGuiColorEditFlags_")) {
                 static bool s_None = bool(ImGuiColorEditFlags_DefaultOptions_ & ImGuiColorEditFlags_None);
@@ -384,7 +385,13 @@ bool swan_windows::render_theme_editor(bool &open, ImGuiStyle const &fallback_st
                     /* on_yes_callback  = */
                     [&]() noexcept {
                         auto &style = imgui::GetStyle();
-                        (void) std::memcpy(&style.Colors, &fallback_style, sizeof(style.Colors));
+
+                        ImVec4 colors[ImGuiCol_COUNT];
+                        (void) memcpy(colors, style.Colors, sizeof(style.Colors));
+
+                        (void) std::memcpy(&style, &fallback_style, sizeof(style));
+                        (void) std::memcpy(&style.Colors, &colors, sizeof(style.Colors));
+
                         (void) global_state::settings().save_to_disk();
                     },
                     /* confirmation_enabled = */ &(global_state::settings().confirm_theme_editor_style_reset)

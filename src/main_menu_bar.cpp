@@ -279,11 +279,11 @@ void render_main_menu_bar(GLFWwindow *window, std::array<explorer_window, global
 
             if (actual_framerate < (.5f * ideal_framerate)) {
                 imgui::SameLineSpaced(2);
-                imgui::TextColored(error_color(), "%df FPS", s32(io.Framerate));
+                imgui::TextColored(error_color(), "%d FPS", s32(io.Framerate));
             }
             else if (actual_framerate < (.8f * ideal_framerate)) {
                 imgui::SameLineSpaced(2);
-                imgui::TextColored(warning_color(), "%df FPS", s32(io.Framerate));
+                imgui::TextColored(warning_color(), "%d FPS", s32(io.Framerate));
             }
         }
 
