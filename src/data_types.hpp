@@ -322,7 +322,7 @@ struct explorer_window
         std::string_view parent_dir,
         std::source_location sloc = std::source_location::current()) noexcept;
 
-    void push_history_item(swan_path const &new_latest_entry, std::source_location sloc = std::source_location::current()) noexcept;
+    void advance_history(swan_path const &new_latest_entry) noexcept;
 
     // 104 byte alignment members
 
@@ -342,12 +342,11 @@ struct explorer_window
     struct history_item
     {
         time_point_system_t time_departed;
-        std::string called_from;
         swan_path path;
     };
 
-    // history for working directories, persisted in file
-    circular_buffer<history_item> wd_history = circular_buffer<history_item>(MAX_WD_HISTORY_SIZE);
+    // History of working directories, most recent dirs get pushed to front
+    std::deque<history_item> wd_history = {}; // persisted in file
 
     // 32 byte alignment members
 

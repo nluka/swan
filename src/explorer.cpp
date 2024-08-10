@@ -1427,51 +1427,47 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
         return false;
     }
 
+    this->wd_history_pos = std::clamp(this->wd_history_pos, u64(0), this->wd_history.size() - 1);
+
     print_debug_msg("SUCCESS parsed %zu lines, skipped %zu", num_lines_parsed, num_lines_skipped);
     return true;
 }
 
-void explorer_window::push_history_item(swan_path const &new_latest_entry, std::source_location sloc) noexcept
+void explorer_window::advance_history(swan_path const &new_latest_entry) noexcept
 {
     char dir_sep_utf8 = global_state::settings().dir_separator_utf8;
+
+    if (this->wd_history_pos > 0) {
+        assert(!this->wd_history.empty());
+        // we are not at head of history, new entry will become head
+        this->wd_history.erase(this->wd_history.begin(), this->wd_history.begin() + this->wd_history_pos);
+        this->wd_history_pos = 0;
+    }
 
     swan_path new_latest_entry_clean = new_latest_entry;
     path_force_separator(new_latest_entry_clean, dir_sep_utf8);
     while (path_pop_back_if(new_latest_entry_clean, dir_sep_utf8));
     new_latest_entry_clean = path_reconstruct_canonically(new_latest_entry_clean.data());
 
-    bool history_empty = this->wd_history.empty();
-
-    if (!history_empty && path_loosely_same(new_latest_entry_clean, this->wd_history.back().path.data())) {
+    if (!this->wd_history.empty() && path_loosely_same(new_latest_entry_clean, this->wd_history.back().path.data())) {
         return; // avoid pushing adjacent duplicates
     }
 
-    if (!history_empty) {
-        u64 num_trailing_history_items_to_del = wd_history_pos >= explorer_window::MAX_WD_HISTORY_SIZE // overflown
-                                                ? 1
-                                                : this->wd_history.size() - this->wd_history_pos - 1u;
+    u64 size_pre_insert = this->wd_history.size();
+    u64 pos_pre_insert = this->wd_history_pos;
 
-        assert(num_trailing_history_items_to_del != u64(-1));
+    this->wd_history.emplace_front(get_time_system(), new_latest_entry_clean);
 
-        for (u64 i = 0; i < num_trailing_history_items_to_del; ++i) {
-            this->wd_history.pop_back();
-        }
-
-        if (this->wd_history.size() == explorer_window::MAX_WD_HISTORY_SIZE) {
-            this->wd_history.pop_front();
-        }
+    while (this->wd_history.size() > MAX_WD_HISTORY_SIZE) {
+        this->wd_history.pop_back();
     }
 
-    if (history_empty) {
+    if (size_pre_insert == 0) {
+        // we now have 1 elem, point to it
         this->wd_history_pos = 0;
-    } else if (wd_history_pos < explorer_window::MAX_WD_HISTORY_SIZE) {
-        this->wd_history_pos += 1;
+    } else if (pos_pre_insert > 0) {
+        this->wd_history_pos -= 1;
     }
-
-    this->wd_history.push_back({});
-    this->wd_history.back().path = new_latest_entry_clean;
-    this->wd_history.back().time_departed = get_time_system();
-    this->wd_history.back().called_from = make_str_static<256>("%s  %s:%ld", sloc.function_name(), sloc.file_name(), sloc.line()).data();
 }
 
 struct ascend_result
@@ -1498,7 +1494,7 @@ ascend_result try_ascend_directory(explorer_window &expl) noexcept
 
     if (parent_dir_exists) {
         if (!path_is_empty(expl.cwd)) {
-            expl.push_history_item(res.parent_dir);
+            expl.advance_history(res.parent_dir);
         }
         expl.filter_error.clear();
         expl.cwd_latest_selected_dirent_idx = explorer_window::NO_SELECTION;
@@ -1562,7 +1558,7 @@ descend_result try_descend_to_directory(explorer_window &expl, char const *targe
         return res;
     }
 
-    expl.push_history_item(new_cwd_canoncial_utf8);
+    expl.advance_history(new_cwd_canoncial_utf8);
     expl.cwd = new_cwd_canoncial_utf8;
     expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
     (void) expl.update_cwd_entries(filter, new_cwd_canoncial_utf8.data());
@@ -2007,7 +2003,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
             expl.wd_history_pos = 0;
 
             if (cwd_exists) {
-                expl.push_history_item(expl.cwd);
+                expl.advance_history(expl.cwd);
             }
 
             expl.save_to_disk();
@@ -2026,37 +2022,36 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
             ImGuiTableFlags_BordersInnerV|
             ImGuiTableFlags_Resizable
         ;
+        if (imgui::BeginTable("history_table", 4, table_flags)) {
+            for (u64 i = 0; i < expl.wd_history.size(); ++i) {
+                explorer_window::history_item const &hist_item = expl.wd_history[i];
 
-    #if DEBUG_MODE
-        s32 num_columns = 5;
-    #else
-        s32 num_columns = 4;
-    #endif
+                if (path_is_empty(hist_item.path)) continue;
 
-        if (imgui::BeginTable("history_table", num_columns, table_flags)) {
-            u64 i = expl.wd_history.size() - 1;
-            u64 i_inverse = 0;
-
-            for (auto iter = expl.wd_history.rbegin(); iter != expl.wd_history.rend(); ++iter, --i, ++i_inverse) {
                 imgui::TableNextRow();
-                explorer_window::history_item const &hist_item = *iter;
 
                 imgui::TableNextColumn();
                 if (i == expl.wd_history_pos) {
-                    imgui::TextColored(success_color(), ICON_FA_LONG_ARROW_ALT_RIGHT);
+                    imgui::TextDisabled(ICON_LC_MOVE_RIGHT);
                 }
 
                 imgui::TableNextColumn();
-                imgui::Text("%3zu ", i_inverse + 1);
+                imgui::Text("%3zu ", i + 1);
 
                 imgui::TableNextColumn();
                 {
                     auto label = make_str_static<1200>("%s ## %zu", hist_item.path.data(), i);
                     bool pressed;
                     {
-                        imgui::ScopedTextColor tc(directory_color());
+                        char const *icon = get_icon(basic_dirent::kind::directory);
+                        auto line = make_str_static<2048>("%s %s", icon, hist_item.path.data());
+                        {
+                            imgui::ScopedTextColor tc(directory_color());
+                            imgui::Text("%s ", icon);
+                        }
+                        imgui::SameLine(0, 0);
                         pressed = imgui::Selectable(label.data(), false, ImGuiSelectableFlags_SpanAllColumns);
-                        imgui::RenderTooltipWhenColumnTextTruncated(2, hist_item.path.data());
+                        imgui::RenderTooltipWhenColumnTextTruncated(2, line.data(), 0, hist_item.path.data());
                     }
 
                     if (pressed) {
@@ -2075,11 +2070,6 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists, [[mayb
                     auto when = time_diff_str(hist_item.time_departed, get_time_system());
                     imgui::TextUnformatted(when.data());
                 }
-
-            #if DEBUG_MODE
-                imgui::TableNextColumn();
-                imgui::TextUnformatted(hist_item.called_from.c_str());
-            #endif
             }
 
             imgui::EndTable();
@@ -2133,7 +2123,7 @@ void render_pins_popup(explorer_window &expl) noexcept
                         auto [pin_is_valid_dir, _] = expl.update_cwd_entries(query_filesystem, pin.path.data());
                         if (pin_is_valid_dir) {
                             expl.cwd = pin.path;
-                            expl.push_history_item(pin.path);
+                            expl.advance_history(pin.path);
                             expl.set_latest_valid_cwd(pin.path); // this may mutate filter
                             (void) expl.update_cwd_entries(filter, pin.path.data());
                             (void) expl.save_to_disk();
@@ -2193,7 +2183,6 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
     s32 table_flags =
         ImGuiTableFlags_SizingStretchSame|
         ImGuiTableFlags_BordersV|
-        ImGuiTableFlags_BordersInnerV|
         ImGuiTableFlags_Reorderable|
         ImGuiTableFlags_Resizable|
         ImGuiTableFlags_ScrollY|
@@ -2226,7 +2215,7 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
                     char root[] = { drive.letter, ':', dir_sep_utf8, '\0' };
                     expl.cwd = expl.latest_valid_cwd = path_create(root);
                     expl.set_latest_valid_cwd(expl.cwd);
-                    expl.push_history_item(expl.cwd);
+                    expl.advance_history(expl.cwd);
                     auto [drive_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
                     if (drive_exists) {
                         (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -2507,7 +2496,7 @@ void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char) noexcept
         else {
             backup_ch = expl.cwd[len];
             expl.cwd[len] = '\0';
-            expl.push_history_item(expl.cwd);
+            expl.advance_history(expl.cwd);
         }
 
         auto [exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
@@ -2857,7 +2846,6 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
 
             if (cwd_exists_after_edit && !path_is_empty(expl.cwd)) {
                 expl.cwd = path_reconstruct_canonically(expl.cwd.data());
-                expl.push_history_item(expl.cwd);
                 expl.advance_history(expl.cwd);
                 expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -3810,7 +3798,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                             path_force_separator(expl.cwd, dir_sep_utf8);
 
                                             expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
-                                            expl.push_history_item(expl.cwd);
+                                            expl.advance_history(expl.cwd);
                                             (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
                                             (void) expl.save_to_disk();
                                         }
@@ -4230,7 +4218,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
                         expl.select_cwd_entries_on_next_update.push_back(select_name_utf8);
                     }
 
-                    expl.push_history_item(expl.cwd);
+                    expl.advance_history(expl.cwd);
                     (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
                     (void) expl.save_to_disk();
 
@@ -4680,7 +4668,7 @@ bool find_in_swan_explorer_0(char const *full_path) noexcept
     }
     else {
         expl.cwd = expl.latest_valid_cwd = containing_dir_utf8;
-        expl.push_history_item(expl.cwd);
+        expl.advance_history(expl.cwd);
         (void) expl.save_to_disk();
 
         global_state::settings().show.explorer_0 = true;

@@ -178,7 +178,7 @@ void find_cwd_completion_suggestions(directory_completion_suggestions &completio
                     auto [cwd_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
                     cwd_exists_after_edit = cwd_exists;
                     if (path_is_empty(expl.latest_valid_cwd) || !path_loosely_same(expl.cwd, expl.latest_valid_cwd)) {
-                        expl.push_history_item(expl.cwd);
+                        expl.advance_history(expl.cwd);
                     }
                     expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
                     (void) expl.update_cwd_entries(filter, expl.cwd.data());
