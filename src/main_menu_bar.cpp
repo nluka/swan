@@ -1,8 +1,103 @@
 #include "common_functions.hpp"
+#include "imgui_dependent_functions.hpp"
 #include "imgui_extension.hpp"
 
-void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept
+GLFWmonitor *get_window_monitor(GLFWwindow *window) {
+    int wx, wy, ww, wh;
+    glfwGetWindowPos(window, &wx, &wy);
+    glfwGetWindowSize(window, &ww, &wh);
+
+    int monitorCount;
+    GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
+
+    GLFWmonitor *bestMonitor = NULL;
+    int bestOverlap = 0;
+
+    for (int i = 0; i < monitorCount; i++) {
+        int mx, my;
+        glfwGetMonitorWorkarea(monitors[i], &mx, &my, NULL, NULL);
+
+        int overlap = (wx + ww - mx) * (wy + wh - my);
+        if (overlap > bestOverlap) {
+            bestOverlap = overlap;
+            bestMonitor = monitors[i];
+        }
+    }
+
+    return bestMonitor;
+}
+
+static
+ImRect render_file_op_payload_hint() noexcept
 {
+    {
+        imgui::ScopedTextColor tc(warning_lite_color());
+        auto label = make_str_static<64>("%s %zu", ICON_LC_CLIPBOARD, global_state::file_op_cmd_buf().items.size());
+
+        if (imgui::Selectable(label.data(), false, 0, imgui::CalcTextSize(label.data()))) {
+            imgui::OpenPopup("File Operation Payload");
+        }
+    }
+    ImRect retval_selectable_rect = imgui::GetItemRect();
+
+    if (imgui::IsItemHovered() && imgui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        global_state::file_op_cmd_buf().clear();
+    }
+
+    if (imgui::IsItemHovered()) {
+        imgui::SetTooltip("File operations ready to paste.\n"
+                          "\n"
+                          "[L click]   view operations\n"
+                          "[R click]  clear operations\n");
+    }
+
+    if (imgui::BeginPopup("File Operation Payload")) {
+        // imgui::Text("%zu operation%s ready to paste.", global_state::file_op_cmd_buf().items.size(), pluralized(global_state::file_op_cmd_buf().items.size(), "", "s"));
+
+        // imgui::Spacing();
+        // imgui::Separator();
+
+        if (imgui::BeginTable("file_operation_command_buf", 2)) {
+            ImGuiListClipper clipper;
+            {
+                u64 num_dirents_to_render = global_state::file_op_cmd_buf().items.size();
+                assert(num_dirents_to_render <= (u64)INT32_MAX);
+                clipper.Begin(s32(num_dirents_to_render));
+            }
+
+            while (clipper.Step())
+            for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+                auto const &item = global_state::file_op_cmd_buf().items[i];
+
+                imgui::TableNextColumn();
+                // imgui::TextUnformatted(item.operation_desc);
+                imgui::AlignTextToFramePadding();
+                if (cstr_eq(item.operation_desc, "Cut")) imgui::TextUnformatted(ICON_LC_SCISSORS);
+                else if (cstr_eq(item.operation_desc, "Copy")) imgui::TextUnformatted(ICON_LC_COPY_PLUS);
+                else if (cstr_eq(item.operation_desc, "Delete")) imgui::TextUnformatted(ICON_LC_TRASH);
+
+                imgui::TableNextColumn();
+                render_path_with_stylish_separators(item.path.data(), item.type);
+                // imgui::SameLine();
+                // imgui::TextColored(get_color(item.type), get_icon(item.type));
+
+                // imgui::TableNextColumn();
+                // imgui::TextUnformatted(item.path.data());
+            }
+
+            imgui::EndTable();
+        }
+
+        imgui::EndPopup();
+    }
+
+    return retval_selectable_rect;
+}
+
+void render_main_menu_bar(GLFWwindow *window, std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept
+{
+    imgui::ScopedStyle<f32> fpy(imgui::GetStyle().FramePadding.y, imgui::GetStyle().FramePadding.y * 2);
+
     if (imgui::BeginMainMenuBar()) {
         bool setting_change = false;
         static_assert((false | false) == false);
@@ -165,6 +260,31 @@ void render_main_menu_bar(std::array<explorer_window, global_constants::num_expl
             }
 
             imgui::EndMenu();
+        }
+
+        if (!global_state::file_op_cmd_buf().items.empty()) {
+            imgui::ScopedStyle<f32> fpy2(imgui::GetStyle().FramePadding.y, fpy.m_original_value * .5f);
+            imgui::SameLineSpaced(1);
+            (void) render_file_op_payload_hint();
+        }
+
+        auto const &io = imgui::GetIO();
+
+        if (imgui::GetTime() > 1.0) {
+            assert(window != nullptr);
+
+            auto monitor = get_window_monitor(window);
+            s32 ideal_framerate = glfwGetVideoMode(monitor)->refreshRate;
+            s32 actual_framerate = u32(io.Framerate);
+
+            if (actual_framerate < (.5f * ideal_framerate)) {
+                imgui::SameLineSpaced(2);
+                imgui::TextColored(error_color(), "%df FPS", s32(io.Framerate));
+            }
+            else if (actual_framerate < (.8f * ideal_framerate)) {
+                imgui::SameLineSpaced(2);
+                imgui::TextColored(warning_color(), "%df FPS", s32(io.Framerate));
+            }
         }
 
         if (setting_change) {

@@ -5,10 +5,16 @@
 
 static std::mutex g_completed_file_ops_mutex = {};
 static std::deque<completed_file_operation> g_completed_file_ops(1000);
+static file_operation_command_buf g_file_op_payload = {};
 
 global_state::completed_file_operations global_state::completed_file_operations_get() noexcept
 {
     return { &g_completed_file_ops, &g_completed_file_ops_mutex };
+}
+
+file_operation_command_buf &global_state::file_op_cmd_buf() noexcept
+{
+    return g_file_op_payload;
 }
 
 void erase(global_state::completed_file_operations &obj,

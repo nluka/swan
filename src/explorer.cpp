@@ -9,7 +9,6 @@
 static IShellLinkW *g_shell_link = nullptr;
 static IPersistFile *g_persist_file_interface = nullptr;
 static std::array<explorer_window, global_constants::num_explorers> g_explorers = {};
-static file_operation_command_buf g_file_op_payload = {};
 
 std::array<explorer_window, global_constants::num_explorers> &global_state::explorers() noexcept { return g_explorers; }
 
@@ -297,7 +296,7 @@ generic_result add_selected_entries_to_file_op_payload(explorer_window &expl, ch
         swan_path src = expl.cwd;
 
         if (path_append(src, dirent.basic.path.data(), global_state::settings().dir_separator_utf8, true)) {
-            g_file_op_payload.items.push_back({ operation_desc, operation_type, dirent.basic.type, src });
+            global_state::file_op_cmd_buf().items.push_back({ operation_desc, operation_type, dirent.basic.type, src });
         } else {
             err << "Current working directory path + [" << src.data() << "] exceeds max allowed path length.\n";
         }
@@ -1931,66 +1930,6 @@ ImRect render_num_cwd_items_selected(explorer_window &expl, cwd_count_info const
 }
 
 static
-ImRect render_file_op_payload_hint() noexcept
-{
-    {
-        imgui::ScopedTextColor tc(warning_lite_color());
-        auto label = make_str_static<64>("%s %zu", ICON_CI_COPY, g_file_op_payload.items.size());
-
-        if (imgui::Selectable(label.data(), false, 0, imgui::CalcTextSize(label.data()))) {
-            imgui::OpenPopup("File Operation Payload");
-        }
-    }
-    ImRect retval_selectable_rect = imgui::GetItemRect();
-
-    if (imgui::IsItemHovered() && imgui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        g_file_op_payload.clear();
-    }
-
-    if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("File operations ready to paste.\n"
-                          "\n"
-                          "[L click]   view operations\n"
-                          "[R click]  clear operations\n");
-    }
-
-    if (imgui::BeginPopup("File Operation Payload")) {
-        imgui::Text("%zu operation%s ready to paste.", g_file_op_payload.items.size(), pluralized(g_file_op_payload.items.size(), "", "s"));
-
-        imgui::Spacing();
-        imgui::Separator();
-
-        if (imgui::BeginTable("file_operation_command_buf", 2)) {
-            ImGuiListClipper clipper;
-            {
-                u64 num_dirents_to_render = g_file_op_payload.items.size();
-                assert(num_dirents_to_render <= (u64)INT32_MAX);
-                clipper.Begin(s32(num_dirents_to_render));
-            }
-
-            while (clipper.Step())
-            for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-                auto const &item = g_file_op_payload.items[i];
-
-                imgui::TableNextColumn();
-                imgui::TextUnformatted(item.operation_desc);
-
-                imgui::TableNextColumn();
-                imgui::TextColored(get_color(item.type), get_icon(item.type));
-                imgui::SameLine();
-                imgui::TextUnformatted(item.path.data());
-            }
-
-            imgui::EndTable();
-        }
-
-        imgui::EndPopup();
-    }
-
-    return retval_selectable_rect;
-}
-
-static
 void render_button_history_right(explorer_window &expl) noexcept
 {
     auto io = imgui::GetIO();
@@ -3502,17 +3441,17 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             expl.select_all_visible_cwd_entries();
         }
         else if (imgui::IsKeyPressed(ImGuiKey_X) && io.KeyCtrl && window_hovered && !expl.filter_text_input_focused) {
-            g_file_op_payload.clear();
+            global_state::file_op_cmd_buf().clear();
             auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
             handle_file_op_failure("cut", result);
         }
         else if (imgui::IsKeyPressed(ImGuiKey_C) && io.KeyCtrl && window_hovered) {
-            g_file_op_payload.clear();
+            global_state::file_op_cmd_buf().clear();
             auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
             handle_file_op_failure("copy", result);
         }
-        else if (imgui::IsKeyPressed(ImGuiKey_V) && io.KeyCtrl && window_hovered && !g_file_op_payload.items.empty()) {
-            g_file_op_payload.execute(expl);
+        else if (imgui::IsKeyPressed(ImGuiKey_V) && io.KeyCtrl && window_hovered && !global_state::file_op_cmd_buf().items.empty()) {
+            global_state::file_op_cmd_buf().execute(expl);
         }
         else if (imgui::IsKeyPressed(ImGuiKey_I) && io.KeyCtrl) {
             expl.invert_selection_on_visible_cwd_entries();
@@ -3520,8 +3459,8 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
 
     auto render_footer_context_menu = [&expl]() noexcept {
-        if (!g_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
-            auto result = g_file_op_payload.execute(expl);
+        if (!global_state::file_op_cmd_buf().items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
+            auto result = global_state::file_op_cmd_buf().execute(expl);
             // TODO: why is result unused?
         }
         render_menu_new_object(expl);
@@ -3535,7 +3474,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         expl.footer_selection_info_rect = selection_info_rect;
         expl.footer_clipboard_rect = clipboard_rect;
 
-        if (!path_is_empty(expl.cwd) && cwd_exists_after_edit && !g_file_op_payload.items.empty()) {
+        if (!path_is_empty(expl.cwd) && cwd_exists_after_edit && !global_state::file_op_cmd_buf().items.empty()) {
             imgui::OpenPopupOnItemClick("## explorer_window footer context_menu", ImGuiPopupFlags_MouseButtonRight);
 
             if (imgui::BeginPopup("## explorer_window footer context_menu")) {
@@ -3650,7 +3589,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
 void file_operation_command_buf::clear() noexcept
 {
-    g_file_op_payload.items.clear();
+    global_state::file_op_cmd_buf().items.clear();
 
     auto &all_explorers = global_state::explorers();
     for (auto &expl : all_explorers) {
@@ -4360,7 +4299,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
             if (imgui::Selectable("Cut" "## single")) {
                 if (!io.KeyShift) {
-                    g_file_op_payload.clear();
+                    global_state::file_op_cmd_buf().clear();
                 }
                 expl.deselect_all_cwd_entries();
                 expl.context_menu_target->selected = true;
@@ -4369,7 +4308,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
             }
             if (imgui::Selectable("Copy" "## single")) {
                 if (!io.KeyShift) {
-                    g_file_op_payload.clear();
+                    global_state::file_op_cmd_buf().clear();
                 }
 
                 expl.deselect_all_cwd_entries();
@@ -4441,8 +4380,8 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
             imgui::Separator();
 
-            if (!g_file_op_payload.items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
-                auto result = g_file_op_payload.execute(expl);
+            if (!global_state::file_op_cmd_buf().items.empty() && !path_is_empty(expl.cwd) && imgui::Selectable("Paste")) {
+                auto result = global_state::file_op_cmd_buf().execute(expl);
                 // TODO: why is result unused?
             }
 
@@ -4485,14 +4424,14 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
             if (imgui::Selectable("Cut" "## multi")) {
                 if (!io.KeyShift) {
-                    g_file_op_payload.clear();
+                    global_state::file_op_cmd_buf().clear();
                 }
                 auto result = add_selected_entries_to_file_op_payload(expl, "Cut", file_operation_type::move);
                 handle_failure("Cut", result);
             }
             if (imgui::Selectable("Copy" "## multi")) {
                 if (!io.KeyShift) {
-                    g_file_op_payload.clear();
+                    global_state::file_op_cmd_buf().clear();
                 }
                 auto result = add_selected_entries_to_file_op_payload(expl, "Copy", file_operation_type::copy);
                 handle_failure("Copy", result);
@@ -4670,11 +4609,6 @@ render_footer_result render_footer(explorer_window &expl, cwd_count_info const &
             if (cnt.selected_dirents > 0) {
                 imgui::SameLineSpaced(2);
                 retval.selection_info_rect = render_num_cwd_items_selected(expl, cnt);
-            }
-
-            if (!g_file_op_payload.items.empty()) {
-                imgui::SameLineSpaced(2);
-                retval.clipboard_rect = render_file_op_payload_hint();
             }
         }
     }

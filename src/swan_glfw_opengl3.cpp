@@ -302,7 +302,7 @@ try {
 
         imgui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode);
 
-        render_main_menu_bar(explorers);
+        render_main_menu_bar(window, explorers);
 
         auto &window_visib = global_state::settings().show;
 

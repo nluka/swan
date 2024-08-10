@@ -188,6 +188,8 @@ namespace global_state
     s32 &                   debug_log_size_limit_megabytes() noexcept;
     s32 &                   page_size() noexcept;
 
+    file_operation_command_buf &file_op_cmd_buf() noexcept;
+
     std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
 
 } // namespace global_state
@@ -255,7 +257,7 @@ ImVec2 help_indicator_size() noexcept;
 
 void free_explorer_drag_drop_payload() noexcept;
 
-void render_main_menu_bar(std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
+void render_main_menu_bar(GLFWwindow *window, std::array<explorer_window, global_constants::num_explorers> &explorers) noexcept;
 
 ImVec4 compute_drive_usage_color(f32 fraction_used) noexcept;
 
