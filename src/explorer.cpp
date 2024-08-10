@@ -2143,13 +2143,17 @@ void render_pins_popup(explorer_window &expl) noexcept
 static
 void render_filter_reset_button(explorer_window &expl) noexcept
 {
-    if (imgui::Button(ICON_CI_REDO "## clear_filter")) {
-        expl.reset_filter();
-        (void) expl.update_cwd_entries(filter, expl.cwd.data());
-        (void) expl.save_to_disk();
-    }
+    {
+        imgui::ScopedDisable d(true);
+
+        if (imgui::Button(ICON_LC_FILTER_X "## clear_filter")) {
+            expl.reset_filter();
+            (void) expl.update_cwd_entries(filter, expl.cwd.data());
+            (void) expl.save_to_disk();
+        }
+        }
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Reset filter settings");
+        imgui::SetTooltip("Restore default filter");
     }
 }
 
@@ -2299,7 +2303,7 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
         bool &show              = std::get<1>(button_def);
         char const *type_str    = std::get<2>(button_def);
 
-        imgui::SameLine(0, imgui::GetStyle().ItemSpacing.x / 2);
+        imgui::SameLine(0, 0);
 
         {
             imgui::ScopedColor ct(ImGuiCol_Text, show ? get_color(type) : ImVec4(0.3f, 0.3f, 0.3f, 1));
@@ -2372,7 +2376,7 @@ static
 void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
 {
     {
-        imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, expl.filter_case_sensitive ? 1 : 0.4f);
+        imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, expl.filter_case_sensitive ? 1 : imgui::GetStyle().DisabledAlpha);
 
         if (imgui::Button(ICON_CI_CASE_SENSITIVE)) { // ICON_FA_CROSSHAIRS
             flip_bool(expl.filter_case_sensitive);
@@ -2381,7 +2385,7 @@ void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
         }
     }
     if (imgui::IsItemHovered()) {
-        imgui::SetTooltip("Case sensitive filter %s\n", expl.filter_case_sensitive ? "ON" : "OFF");
+        imgui::SetTooltip("Case sensitive: %s\n", expl.filter_case_sensitive ? "ON" : "OFF");
     }
 }
 
@@ -2982,10 +2986,9 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                         auto result = delete_selected_entries(expl, global_state::settings());
 
                         if (!result.success) {
-                            u64 num_failed = std::count(result.error_or_utf8_path.begin(), result.error_or_utf8_path.end(), '\n');
-                            std::string action = make_str("Delete %zu items.", num_failed);
+                            char const *action = "Delete items.";
                             char const *failed = result.error_or_utf8_path.c_str();
-                            swan_popup_modals::open_error(action.c_str(), failed);
+                            swan_popup_modals::open_error(action, failed);
                         }
                         (void) global_state::settings().save_to_disk();
                     },
@@ -3172,32 +3175,22 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
     // header controls
     {
-        render_more_controls_button(expl, cwd_exists_before_edit, dir_sep_utf8);
+        // render_more_controls_button(expl, cwd_exists_before_edit, dir_sep_utf8);
 
-        imgui::SameLine(0, style.ItemSpacing.x / 2);
+        render_button_history_left(expl);
+
+        imgui::SameLine(0, 0);
+
+        render_button_history_right(expl);
+
+        imgui::SameLine(0, 0);
 
         render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
 
         imgui::SameLine(0, style.ItemSpacing.x / 2);
 
-        render_button_history_left(expl);
-
-        imgui::SameLine(0, style.ItemSpacing.x / 2);
-
-        render_button_history_right(expl);
-
-        imgui::SameLine();
-
-        // render_history_browser_button();
-
-        // imgui::SameLine();
-
-        f32 avail_width_subtract_amt = help_indicator_size().x + imgui::GetStyle().ItemSpacing.x; // for help icon
-        render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, avail_width_subtract_amt, cwd_exists_before_edit);
-
-        imgui::SameLine();
-
-        render_help_icon(expl);
+        // f32 avail_width_subtract_amt = help_indicator_size().x + imgui::GetStyle().ItemSpacing.x; // for help icon
+        render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, 0, cwd_exists_before_edit);
     }
 
     cwd_count_info cnt = {};
@@ -3255,8 +3248,6 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             imgui::PopTextWrapPos();
         }
     }
-
-    imgui::Separator();
 
     ImVec2 cwd_entries_table_size = {};
     ImVec2 cwd_entries_table_min = {};

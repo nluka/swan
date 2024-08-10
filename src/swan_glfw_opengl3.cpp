@@ -735,7 +735,7 @@ void load_custom_fonts(GLFWwindow *window, char const *ini_file_path) noexcept
                 if (!font_loaded(font)) failed_fonts.push_back(font_name);
             };
 
-            attempt_load_font("RobotoMono_Regular", RobotoMono_Regular_ttf, lengthof(RobotoMono_Regular_ttf), 17.0f, false);
+            attempt_load_font("RobotoMono_Regular", RobotoMono_Regular_ttf, lengthof(RobotoMono_Regular_ttf), 16.0f, false);
             attempt_load_font("CascadiaMonoPL", CascadiaMonoPL_ttf, lengthof(CascadiaMonoPL_ttf), 16.0f, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
@@ -743,11 +743,11 @@ void load_custom_fonts(GLFWwindow *window, char const *ini_file_path) noexcept
             }
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_CI, ICON_MAX_16_CI, 0 };
-                attempt_load_icon_font("codicon", codicon_ttf, lengthof(codicon_ttf), 18, ImVec2(0, 3), s_glyph_ranges);
+                attempt_load_icon_font("codicon", codicon_ttf, lengthof(codicon_ttf), 16, ImVec2(0, 3), s_glyph_ranges);
             }
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_LC, ICON_MAX_16_LC, 0 };
-                attempt_load_icon_font("lucide", lucide_ttf, lengthof(lucide_ttf), 18, ImVec2(0, 3), s_glyph_ranges);
+                attempt_load_icon_font("lucide", lucide_ttf, lengthof(lucide_ttf), 16, ImVec2(0, 3), s_glyph_ranges);
             }
         }
 

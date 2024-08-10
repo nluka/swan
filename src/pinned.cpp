@@ -58,7 +58,8 @@ bool swan_windows::render_pinned(
                 imgui::OpenPopup("## pinned context_menu");
             }
             if (imgui::BeginDragDropSource()) {
-                imgui::TextColored(pin.color, pin.label.c_str());
+                // imgui::TextColored(pin.color, pin.label.c_str());
+                imgui::TextUnformatted(pin.label.c_str());
                 pin_drag_drop_payload payload = { i };
                 imgui::SetDragDropPayload(typeid(pin_drag_drop_payload).name(), &payload, sizeof(payload), ImGuiCond_Once);
                 imgui::EndDragDropSource();

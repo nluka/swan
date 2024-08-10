@@ -235,8 +235,6 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         }
     }
 
-    imgui::Separator();
-
     static recent_file *s_context_menu_target = nullptr;
     static u64 s_context_menu_target_idx = u64(-1);
     static std::optional<ImRect> s_context_menu_target_rect = std::nullopt;

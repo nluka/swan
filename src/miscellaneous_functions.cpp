@@ -61,8 +61,8 @@ char const *basic_dirent::kind_short_cstr() const noexcept
     switch (this->type) {
         case basic_dirent::kind::directory:            return "dir";
         case basic_dirent::kind::file:                 return "file";
-        case basic_dirent::kind::symlink_to_directory: return ICON_CI_ARROW_SMALL_RIGHT "dir";
-        case basic_dirent::kind::symlink_to_file:      return ICON_CI_ARROW_SMALL_RIGHT "file";
+        case basic_dirent::kind::symlink_to_directory: return ICON_CI_ARROW_SMALL_RIGHT "d";
+        case basic_dirent::kind::symlink_to_file:      return ICON_CI_ARROW_SMALL_RIGHT "f";
         case basic_dirent::kind::symlink_ambiguous:    return ICON_CI_ARROW_SMALL_RIGHT "?";
         case basic_dirent::kind::invalid_symlink:      return ICON_CI_ARROW_SMALL_RIGHT ICON_CI_ISSUE_DRAFT;
         default:                                       return "";
@@ -77,12 +77,12 @@ char const *basic_dirent::kind_icon() const noexcept
 char const *get_icon(basic_dirent::kind t) noexcept
 {
     switch (t) {
-        case basic_dirent::kind::directory:            return ICON_CI_FOLDER;
-        case basic_dirent::kind::file:                 return ICON_CI_FILE;
-        case basic_dirent::kind::symlink_to_directory: return ICON_CI_FILE_SYMLINK_DIRECTORY;
-        case basic_dirent::kind::symlink_to_file:      return ICON_CI_FILE_SYMLINK_FILE;
-        case basic_dirent::kind::symlink_ambiguous:    return ICON_CI_LINK_EXTERNAL;
-        case basic_dirent::kind::invalid_symlink:      return ICON_CI_ERROR;
+        case basic_dirent::kind::directory:            return ICON_LC_FOLDER;
+        case basic_dirent::kind::file:                 return ICON_LC_FILE;
+        case basic_dirent::kind::symlink_to_directory: return ICON_LC_FOLDER_SYMLINK;
+        case basic_dirent::kind::symlink_to_file:      return ICON_LC_FILE_SYMLINK;
+        case basic_dirent::kind::symlink_ambiguous:    return ICON_LC_LINK_2;
+        case basic_dirent::kind::invalid_symlink:      return ICON_LC_FILE_X_2;
         default:                                       assert(false && "has no icon"); break;
     }
     return ICON_CI_ERROR;
@@ -655,7 +655,7 @@ void render_path_with_stylish_separators(char const *path, std::variant<s64, bas
 
     for (u64 i = 0; i < s_segments.size() - 1; ++i) {
         char const *segment = s_segments[i];
-        imgui::ScopedColor bc(ImGuiCol_Border, imgui::ReduceAlphaTo(directory_color(), 0.5f));
+        imgui::ScopedColor bc(ImGuiCol_Border, imgui::ReduceAlphaTo(imgui::GetStyleColorVec4(ImGuiCol_Text), 0.5f));
         imgui::Button(segment);
         imgui::SameLine();
         imgui::TextDisabled(separator);

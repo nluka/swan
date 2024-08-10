@@ -155,46 +155,11 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
     [[maybe_unused]] auto &style = imgui::GetStyle();
     [[maybe_unused]] auto const &io = imgui::GetIO();
 
-    std::optional<u64> remove_search_dir_idx = std::nullopt;
-
-    for (u64 i = 0; i < finder.search_directories.size(); ++i) {
+    for (u64 i = 0; i < 1; ++i) {
         auto &search_directory = finder.search_directories[i];
-
-        {
-            imgui::ScopedDisable d(finder.search_directories.size() == 1);
-
-            auto label = make_str_static<64>(ICON_CI_CHROME_CLOSE "## finder search_dir %zu", i);
-
-            if (imgui::Button(label.data())) {
-                remove_search_dir_idx = i;
-            }
-            imgui::SameLine();
-        }
-
-        if (path_is_empty(search_directory.path_utf8)) {
-            imgui::TextColored(warning_color(), ICON_CI_ALERT);
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Empty input");
-            }
-        }
-        else if (search_directory.found) {
-            imgui::TextColored(success_color(), ICON_CI_CHECK);
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Directory found");
-            }
-        }
-        else {
-            imgui::TextColored(error_color(), ICON_CI_X);
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip("Directory not found");
-            }
-        }
-
-        imgui::SameLine();
-
         {
             auto label = make_str_static<64>("## finder search_dir %zu", i);
-            auto hint = make_str_static<64>("Search directory %zu", i);
+            auto hint = make_str_static<64>("Where to search...");
 
             imgui::ScopedAvailWidth w = {};
 
@@ -223,42 +188,12 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
         }
     }
 
-    if (remove_search_dir_idx.has_value()) {
-        finder.search_directories.erase(finder.search_directories.begin() + remove_search_dir_idx.value());
-    }
-
-    if (imgui::Button(ICON_CI_PLUS "## finder search_dir")) {
-        finder.search_directories.push_back({ false, path_create("") });
-    }
-    if (imgui::BeginDragDropTarget()) {
-        auto payload_wrapper = imgui::AcceptDragDropPayload(typeid(pin_drag_drop_payload).name());
-
-        if (payload_wrapper != nullptr) {
-            assert(payload_wrapper->DataSize == sizeof(pin_drag_drop_payload));
-            auto payload_data = (pin_drag_drop_payload *)payload_wrapper->Data;
-            auto const &pin = global_state::pinned_get()[payload_data->pin_idx];
-
-            bool found = false;
-            wchar_t path_utf16[MAX_PATH];
-            if (utf8_to_utf16(pin.path.data(), path_utf16, lengthof(path_utf16))) {
-                found = PathIsDirectoryW(path_utf16);
-            }
-            finder.search_directories.push_back({ found, pin.path });
-        }
-        imgui::EndDragDropTarget();
-    }
-
-    imgui::SameLine();
-
     bool search_active = finder.search_task.active_token.load();
     [[maybe_unused]] bool search_cancelled = finder.search_task.cancellation_token.load();
 
     {
-        imgui::ScopedStyle<f32> fp(style.FramePadding.x, 0);
-        imgui::ScopedStyle<f32> bs(style.FrameBorderSize, 0);
-
         if (search_active) {
-            if (imgui::Button(ICON_CI_SEARCH_STOP "## finder")) {
+            if (imgui::Button(ICON_LC_SEARCH_X "## finder")) {
                 finder.search_task.cancellation_token.store(true);
             }
         } else {
@@ -268,7 +203,7 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
 
             imgui::ScopedDisable d(search_value_empty || any_search_dirs_not_found);
 
-            if (imgui::Button(ICON_CI_SEARCH "## finder")) {
+            if (imgui::Button(ICON_LC_SEARCH "## finder")) {
                 finder.search_task.result.clear();
                 finder.num_entries_checked.store(0);
 
@@ -311,6 +246,22 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
     imgui::SameLine();
 
     {
+        imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, false ? 1 : imgui::GetStyle().DisabledAlpha);
+
+        if (imgui::Button(ICON_CI_CASE_SENSITIVE)) {
+            // TODO
+            // flip_bool(expl.filter_case_sensitive);
+            // (void) expl.update_cwd_entries(filter, expl.cwd.data());
+            // (void) expl.save_to_disk();
+        }
+    }
+    if (imgui::IsItemHovered()) {
+        // imgui::SetTooltip("Case sensitive: %s\n", expl.filter_case_sensitive ? "ON" : "OFF");
+    }
+
+    imgui::SameLineSpaced(1);
+
+    {
         u64 num_entries_checked = finder.num_entries_checked.load();
         if (num_entries_checked > 0) {
             u64 num_matches = 0;
@@ -323,8 +274,6 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
     }
 
     imgui::Spacing(1);
-
-    // imgui::Text("Status: %s", progressive_task_status_cstr(finder.search_task.status()));
 
     enum matches_table_col : s32 {
         matches_table_col_number,
