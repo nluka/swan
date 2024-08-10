@@ -531,7 +531,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
     {
         imgui::ScopedDisable d(true);
         imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
-        search_text_edited = imgui::InputTextWithHint("## recent_files search", ICON_CI_SEARCH " TODO", &dummy_buf);
+        search_text_edited = imgui::InputTextWithHint("## completed_file_operations search", ICON_CI_SEARCH " TODO", &dummy_buf);
     }
 
     imgui::SameLineSpaced(1);

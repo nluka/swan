@@ -2445,8 +2445,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
         else {
             swan_popup_modals::open_new_pin(expl.cwd, false);
         }
-        bool result = global_state::pinned_save_to_disk();
-        // print_debug_msg("pinned_save_to_disk: %d", result);
+        (void) global_state::pinned_save_to_disk();
     }
     if (imgui::IsItemHovered()) {
         imgui::SetTooltip("%s current working directory", already_pinned ? "Unpin" : "Pin");
@@ -2634,7 +2633,6 @@ void render_help_icon(explorer_window &expl) noexcept
     }
 
     imgui::SetNextWindowSizeConstraints(ImVec2(200, 200), ImVec2(imgui::GetMainViewport()->Size.x, 800));
-    // imgui::SetNextWindowSize()
 
     if (imgui::BeginPopup("## explorer help")) {
         static std::string s_search_input = {};
@@ -3693,7 +3691,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                         }
                     }
                     auto const &icon_size = dirent.icon_GLtexID < 1 ? s_last_known_icon_size : dirent.icon_size;
-                    ImGui::Image((ImTextureID)std::max(dirent.icon_GLtexID, s64(0)), icon_size);
+                    ImGui::Image((ImTextureID)std::max(dirent.icon_GLtexID, s64(0)), icon_size, ImVec2(0,0), ImVec2(1,1), ImVec4(1,1,1, dirent.cut ? .3f : 1.f));
                 }
                 else { // fallback to generic icons
                     char const *icon = dirent.basic.kind_icon();
@@ -3812,7 +3810,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                                     }
                                 }
                                 else {
-                                    print_debug_msg("[ %d ] double clicked file [%s]", expl.id, dirent.basic.path.data());
+                                    // print_debug_msg("[ %d ] double clicked file [%s]", expl.id, dirent.basic.path.data());
 
                                     // TODO: async
                                     auto res = open_file(dirent.basic.path.data(), expl.cwd.data());
