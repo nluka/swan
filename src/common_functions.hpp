@@ -279,3 +279,5 @@ void erase(global_state::recent_files &obj,
            std::deque<recent_file>::iterator first,
            std::deque<recent_file>::iterator last,
            bool delete_icon_texture = true) noexcept;
+
+void open_file_properties(char const *full_path_utf8) noexcept;

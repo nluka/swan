@@ -782,3 +782,25 @@ void delete_icon_texture(s64 &id, char const *debug_label) noexcept
     glDeleteTextures(1, &gl_id);
     id = 0;
 }
+
+void open_file_properties(char const *full_path_utf8) noexcept
+{
+    wchar_t full_path_utf16[MAX_PATH];
+
+    if (!utf8_to_utf16(full_path_utf8, full_path_utf16, sizeof(full_path_utf16))) {
+        return;
+    }
+
+    SHELLEXECUTEINFOW shExecInfo = {0};
+    shExecInfo.cbSize = sizeof(shExecInfo);
+    shExecInfo.fMask = SEE_MASK_INVOKEIDLIST;
+    shExecInfo.hwnd = NULL;
+    shExecInfo.lpVerb = L"properties";
+    shExecInfo.lpFile = full_path_utf16;
+    shExecInfo.lpParameters = L"";
+    shExecInfo.lpDirectory = NULL;
+    shExecInfo.nShow = SW_SHOW;
+    shExecInfo.hInstApp = NULL;
+
+    ShellExecuteExW(&shExecInfo);
+}

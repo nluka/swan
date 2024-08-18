@@ -4364,6 +4364,17 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
             render_menu_new_object(expl, "New (in cwd)");
 
+            if (imgui::Selectable("Properties")) {
+                swan_path full_path = path_create(expl.cwd.data());
+                if (!path_append(full_path, expl.context_menu_target->basic.path.data(), settings.dir_separator_utf8, true)) {
+                    std::string action = make_str("Open properties of [%s].", expl.context_menu_target->basic.path.data());
+                    char const *failed = "Max path length exceeded when appending name to current working directory path.";
+                    swan_popup_modals::open_error(action.c_str(), failed);
+                } else {
+                    imgui::SetClipboardText(full_path.data());
+                }
+                global_state::thread_pool().push_task([full_path]() { open_file_properties(full_path.data()); });
+
             if (imgui::BeginMenu("Copy metadata")) {
                 if (imgui::Selectable("Name")) {
                     imgui::SetClipboardText(expl.context_menu_target->basic.path.data());
