@@ -804,3 +804,69 @@ void open_file_properties(char const *full_path_utf8) noexcept
 
     ShellExecuteExW(&shExecInfo);
 }
+
+bool window_render_order_save_to_disk(std::array<swan_windows::id, (u64)swan_windows::id::count - 1> data) noexcept
+try {
+    std::filesystem::path full_path = global_state::execution_path() / "data\\window_render_order.txt";
+    std::ofstream iss(full_path);
+    if (!iss) return false;
+
+    for (auto const &id : data) {
+        iss << (s32)id << ' ' << swan_windows::get_name(id) << '\n'; // include name for debugging
+    }
+    print_debug_msg("SUCCESS");
+    return true;
+}
+catch (std::exception const &except) {
+    print_debug_msg("FAILED catch(std::exception) %s", except.what());
+    return false;
+}
+catch (...) {
+    print_debug_msg("FAILED catch(...)");
+    return false;
+}
+
+std::array<swan_windows::id, (u64)swan_windows::id::count - 1> window_render_order_load_from_disk() noexcept
+{
+    std::array<swan_windows::id, (u64)swan_windows::id::count - 1> retval = {
+        swan_windows::id::explorer_0,
+        swan_windows::id::explorer_1,
+        swan_windows::id::explorer_2,
+        swan_windows::id::explorer_3,
+        swan_windows::id::explorer_0_debug,
+        swan_windows::id::explorer_1_debug,
+        swan_windows::id::explorer_2_debug,
+        swan_windows::id::explorer_3_debug,
+        swan_windows::id::finder,
+        swan_windows::id::pinned,
+        swan_windows::id::file_operations,
+        swan_windows::id::recent_files,
+        swan_windows::id::analytics,
+        swan_windows::id::debug_log,
+        swan_windows::id::settings,
+        swan_windows::id::theme_editor,
+        swan_windows::id::icon_library,
+        swan_windows::id::imgui_demo,
+    };
+    try {
+        std::filesystem::path full_path = global_state::execution_path() / "data\\window_render_order.txt";
+        std::ifstream in(full_path);
+        std::string line = {};
+        line.reserve(global_state::page_size() - 1);
+
+        for (u64 i = 0; std::getline(in, line); ++i) {
+            std::istringstream iss(line);
+            s32 stored_val = 0;
+            iss >> stored_val;
+            retval[i] = (swan_windows::id)stored_val;
+        }
+        print_debug_msg("SUCCESS window_render_order_load_from_disk");
+    }
+    catch (std::exception const &except) {
+        print_debug_msg("FAILED window_render_order_load_from_disk: %s", except.what());
+    }
+    catch (...) {
+        print_debug_msg("FAILED window_render_order_load_from_disk: catch(...)");
+    }
+    return retval;
+}

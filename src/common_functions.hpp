@@ -92,7 +92,7 @@ namespace swan_windows
 
     bool render_theme_editor(bool &open, ImGuiStyle const &fallback_style, bool any_popups_open) noexcept;
 
-    bool render_analytics() noexcept;
+    bool render_analytics(std::array<swan_windows::id, (u64)swan_windows::id::count - 1> const &window_render_order) noexcept;
 
 } // namespace render_window
 
@@ -175,10 +175,6 @@ namespace global_state
     void                        pinned_remove(u64 pin_idx) noexcept;
     void                        pinned_update_directory_separators(char new_dir_separator) noexcept;
     void                        pinned_swap(u64 pin1_idx, u64 pin2_idx) noexcept;
-
-    swan_windows::id   focused_window_get() noexcept;
-    bool               focused_window_set(swan_windows::id window_id) noexcept;
-    bool               focused_window_load_from_disk(swan_windows::id &window_id) noexcept;
 
     HWND &                  window_handle() noexcept;
     std::filesystem::path & execution_path() noexcept;
@@ -281,3 +277,7 @@ void erase(global_state::recent_files &obj,
            bool delete_icon_texture = true) noexcept;
 
 void open_file_properties(char const *full_path_utf8) noexcept;
+
+bool window_render_order_save_to_disk(std::array<swan_windows::id, (u64)swan_windows::id::count - 1> data) noexcept;
+
+std::array<swan_windows::id, (u64)swan_windows::id::count - 1> window_render_order_load_from_disk() noexcept;

@@ -2,7 +2,7 @@
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 
-bool swan_windows::render_analytics() noexcept
+bool swan_windows::render_analytics(std::array<swan_windows::id, (u64)swan_windows::id::count - 1> const &window_render_order) noexcept
 {
     if (imgui::Begin(swan_windows::get_name(swan_windows::id::analytics), &global_state::settings().show.analytics)) {
         auto &io = imgui::GetIO();
@@ -20,9 +20,16 @@ bool swan_windows::render_analytics() noexcept
         imgui::Text("IsMouseDragging(left): %d", imgui::IsMouseDragging(ImGuiMouseButton_Left));
         imgui::Text("IsMouseReleased(left): %d", imgui::IsMouseReleased(ImGuiMouseButton_Left));
 
+        // imgui::Separator();
+        // imgui::Text("io.KeyCtrl: %d", io.KeyCtrl);
+
         imgui::Separator();
 
-        imgui::Text("io.KeyCtrl: %d", io.KeyCtrl);
+        imgui::TextUnformatted("window_render_order:");
+        for (u64 i = 0; i < window_render_order.size(); ++i) {
+            auto const &id = window_render_order[i];
+            imgui::Text("[%02zu] %s", i, get_name(id));
+        }
 
         return true;
     }

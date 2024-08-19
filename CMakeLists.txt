@@ -67,7 +67,6 @@ set(SWAN_SOURCES
     "src/explorer.cpp"
     "src/file_operations.cpp"
     "src/finder.cpp"
-    "src/focused_window.cpp"
     "src/icon_glyphs.cpp"
     "src/icon_library.cpp"
     "src/imgui_dependent_functions.cpp"

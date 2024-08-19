@@ -21,7 +21,6 @@
 #include "explorer_file_op_progress_sink.cpp"
 #include "file_operations.cpp"
 #include "finder.cpp"
-#include "focused_window.cpp"
 #include "icon_glyphs.cpp"
 #include "icon_library.cpp"
 #include "imgui_dependent_functions.cpp"
