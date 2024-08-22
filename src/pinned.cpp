@@ -22,37 +22,105 @@ bool change_element_position(std::vector<Ty> &vec, u64 elem_idx, u64 new_elem_id
     }
 }
 
-bool swan_windows::render_pinned(
-    [[maybe_unused]] std::array<explorer_window,
-    global_constants::num_explorers> &explorers,
-    bool &open,
-    [[maybe_unused]] bool any_popups_open) noexcept
+std::pair<pinned_path *, bool> swan_windows::render_pinned(pinned_path *s_context_target, bool is_popup_modal) noexcept
 {
-    if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &open)) {
-        std::vector<pinned_path> &pins = global_state::pinned_get();
+    std::vector<pinned_path> &pins = global_state::pinned_get();
 
-        static pinned_path *s_context_target = nullptr;
-        u64 const npos = u64(-1);
-        u64 pin_to_delete_idx = npos;
+    static std::vector<pinned_path>::iterator s_hidden_begin_iter = pins.end();
+    u64 num_elems_hidden = std::distance(s_hidden_begin_iter, pins.end());
 
+    static std::string s_search_buf = {};
+    bool search_text_edited;
+
+    static s64 s_focus_idx = -1;
+    bool set_focus = false;
+
+    // when window is first appearing
+    if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
+        imgui::SetKeyboardFocusHere(0); // set initial focus on search input
+        s_hidden_begin_iter = pins.end(); // show all elems
+        s_search_buf.clear();
+        s_focus_idx = -1;
+    }
+
+    if (imgui::IsKeyPressed(ImGuiKey_Tab)) {
+        s64 min = 0, max = pins.size() - num_elems_hidden - 1;
+        if (imgui::GetIO().KeyShift) dec_or_wrap(s_focus_idx, min, max);
+        else inc_or_wrap(s_focus_idx, min, max);
+        set_focus = true;
+    }
+
+    if (imgui::GetIO().KeyCtrl && imgui::IsKeyPressed(ImGuiKey_F)) {
+        imgui::ActivateItemByID(imgui::GetID("## pins search"));
+        s_focus_idx = -1;
+    }
+    {
+        imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
+        search_text_edited = imgui::InputTextWithHint("## pins search", ICON_CI_SEARCH, &s_search_buf);
+    }
+    if (search_text_edited) {
+        s_focus_idx = -1;
+        s_hidden_begin_iter = s_search_buf.empty() ? pins.end() : std::partition(pins.begin(), pins.end(), [](pinned_path const &elem) {
+            return strstr(elem.label.c_str(), s_search_buf.c_str());
+        });
+    }
+
+    if (is_popup_modal) {
+        imgui::SameLineSpaced(1);
+        if (imgui::Button(ICON_LC_SQUARE_X)) {
+            return { nullptr, true };
+        }
+        imgui::SameLine();
+        imgui::TextDisabled("or [Escape] to exit");
+    }
+
+    u64 const npos = u64(-1);
+    u64 pin_to_delete_idx = npos;
+
+    s32 table_flags =
+        ImGuiTableFlags_SizingStretchProp|
+        ImGuiTableFlags_Resizable|
+        ImGuiTableFlags_BordersV|
+        // ImGuiTableFlags_Reorderable|
+        ImGuiTableFlags_ScrollY|
+        (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
+        (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
+    ;
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
+
+    if (imgui::BeginTable("pins", 2, table_flags)) {
         ImGuiListClipper clipper;
-        assert(pins.size() <= (u64)INT32_MAX);
-        clipper.Begin(s32(pins.size()));
-
+        {
+            u64 num_elems_to_render = pins.size() - num_elems_hidden;
+            assert(num_elems_to_render <= (u64)INT32_MAX);
+            clipper.Begin(s32(num_elems_to_render));
+        }
         while (clipper.Step())
         for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
             auto &pin = pins[i];
 
-            imgui::TextDisabled(ICON_CI_PIN);
-            imgui::SameLine();
+            imgui::TableNextColumn();
+            imgui::TextDisabled(ICON_LC_PIN);
+            imgui::SameLineSpaced(1);
             {
-                imgui::ScopedTextColor tc(pin.color);
+                // imgui::ScopedTextColor tc(pin.color);
                 auto label = make_str_static<pinned_path::LABEL_MAX_LEN + 32>("%s ## %zu", pin.label.c_str(), i);
-                imgui::Selectable(label.data(), false);
+                if (imgui::Selectable(label.data(), false)) {
+                    if (!imgui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                        imgui::EndTable();
+                        return { &pin, false };
+                    }
+                }
             }
-            if (imgui::IsItemHovered({}, 1.f)) {
-                imgui::SetTooltip(pin.path.data());
+            if (set_focus && !imgui::IsItemFocused() && s_focus_idx == s64(i)) {
+                imgui::FocusItem();
             }
+            // if (imgui::IsItemHovered() && imgui::GetIO().KeyCtrl) {
+            //     if (imgui::BeginTooltip()) {
+            //         render_path_with_stylish_separators(pin.path.data(), basic_dirent::kind::directory);
+            //         imgui::EndTooltip();
+            //     }
+            // }
             if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
                 s_context_target = &pin;
                 imgui::OpenPopup("## pinned context_menu");
@@ -89,48 +157,49 @@ bool swan_windows::render_pinned(
                         print_debug_msg("%s change_element_position(pins, from:%zu, to:%zu)", reorder_success ? "SUCCESS" : "FAILED", from, to);
 
                         if (reorder_success) {
-                            bool save_success = global_state::pinned_save_to_disk();
-                            print_debug_msg("global_state::pinned_save_to_disk: %d", save_success);
+                            (void) global_state::pinned_save_to_disk();
                         }
                     }
                 }
 
                 imgui::EndDragDropTarget();
             }
+
+            imgui::TableNextColumn();
+            imgui::TextUnformatted(pin.path.data());
         }
-
-        if (imgui::BeginPopup("## pinned context_menu")) {
-            if (imgui::Selectable("Edit")) {
-                swan_popup_modals::open_edit_pin(s_context_target);
-            }
-            if (imgui::Selectable("Delete")) {
-                imgui::OpenConfirmationModal(swan_id_confirm_delete_pin, []() noexcept {
-                    imgui::TextUnformatted("Are you sure you want to delete the following pin?");
-                    imgui::TextColored(s_context_target->color, s_context_target->label.c_str());
-                    imgui::TextUnformatted("This action cannot be undone.");
-                });
-            }
-            imgui::TextDisabled("(drag to reorder)");
-
-            imgui::EndPopup();
-        }
-
-        auto status = imgui::GetConfirmationStatus(swan_id_confirm_delete_pin);
-
-        if (status.value_or(false)) {
-            pin_to_delete_idx = std::distance(&*pins.begin(), s_context_target);
-        }
-
-        if (pin_to_delete_idx != npos) {
-            pins.erase(pins.begin() + pin_to_delete_idx);
-            bool success = global_state::pinned_save_to_disk();
-            print_debug_msg("delete pins[%zu], global_state::pinned_save_to_disk: %d", pin_to_delete_idx, success);
-        }
-
-        return true;
+        imgui::EndTable();
     }
 
-    return false;
+    if (imgui::BeginPopup("## pinned context_menu")) {
+        if (imgui::Selectable("Edit")) {
+            swan_popup_modals::open_edit_pin(s_context_target);
+        }
+        if (imgui::Selectable("Delete")) {
+            imgui::OpenConfirmationModal(swan_id_confirm_delete_pin, [s_context_target]() noexcept {
+                imgui::TextUnformatted("Are you sure you want to delete the following pin?");
+                imgui::TextColored(s_context_target->color, s_context_target->label.c_str());
+                imgui::TextUnformatted("This action cannot be undone.");
+            });
+        }
+        imgui::TextDisabled("(drag to reorder)");
+
+        imgui::EndPopup();
+    }
+
+    auto status = imgui::GetConfirmationStatus(swan_id_confirm_delete_pin);
+
+    if (status.value_or(false)) {
+        pin_to_delete_idx = std::distance(&*pins.begin(), s_context_target);
+    }
+
+    if (pin_to_delete_idx != npos) {
+        pins.erase(pins.begin() + pin_to_delete_idx);
+        bool success = global_state::pinned_save_to_disk();
+        print_debug_msg("delete pins[%zu], global_state::pinned_save_to_disk: %d", pin_to_delete_idx, success);
+    }
+
+    return { nullptr, false };
 }
 
 std::vector<pinned_path> &global_state::pinned_get() noexcept

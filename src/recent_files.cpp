@@ -162,8 +162,12 @@ try {
     print_debug_msg("SUCCESS global_state::recent_files_load_from_disk, loaded %zu files", num_loaded_successfully);
     return { true, num_loaded_successfully };
 }
+catch (std::exception const &except) {
+    print_debug_msg("FAILED global_state::recent_files_load_from_disk: %s", except.what());
+    return { false, 0 };
+}
 catch (...) {
-    print_debug_msg("FAILED global_state::recent_files_load_from_disk");
+    print_debug_msg("FAILED global_state::recent_files_load_from_disk: catch(...)");
     return { false, 0 };
 }
 
@@ -192,6 +196,8 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
     {
         imgui::ScopedDisable d(true);
         imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
+
         search_text_edited = imgui::InputTextWithHint("## recent_files search", ICON_CI_SEARCH " TODO", &dummy_buf);
     }
 
@@ -219,6 +225,7 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         auto recent_files = global_state::recent_files_get();
 
         imgui::ScopedDisable d(g_recent_files.empty());
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
         if (imgui::Button(ICON_CI_CLEAR_ALL "## recent_files")) {
             char const *confirmation_msg = "Are you sure you want to clear ALL recent files? This action cannot be undone.";
@@ -286,6 +293,7 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
         (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
         (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
     ;
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
     std::optional<ImRect> file_name_rect = std::nullopt;
 

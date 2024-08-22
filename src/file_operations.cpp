@@ -530,6 +530,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
     imgui::TableNextColumn();
     {
         imgui::ScopedDisable d(true);
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
         imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
         search_text_edited = imgui::InputTextWithHint("## completed_file_operations search", ICON_CI_SEARCH " TODO", &dummy_buf);
     }
@@ -553,6 +554,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
     imgui::SameLineSpaced(0);
     {
         imgui::ScopedDisable d(completed_file_operations.container->empty());
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
         if (imgui::Button(ICON_CI_CLEAR_ALL "## file_operations")) {
             imgui::OpenConfirmationModalWithCallback(
@@ -574,15 +576,18 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
     imgui::SameLineSpaced(1);
     {
         imgui::ScopedItemWidth iw(imgui::CalcTextSize("2147483647").x + style.FramePadding.x*2);
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
         settings_change |= imgui::InputInt("Max records", &settings.num_max_file_operations, 0);
         settings.num_max_file_operations = std::clamp(settings.num_max_file_operations, 0, INT32_MAX);
         // TODO get user confirmation to delete records beyond max after value reduction
     }
     imgui::SameLineSpaced(1);
-
-    settings_change |= imgui::Checkbox("Full src path", &settings.file_operations_src_path_full);
-    imgui::SameLineSpaced(1);
-    settings_change |= imgui::Checkbox("Full dst path", &settings.file_operations_dst_path_full);
+    {
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
+        settings_change |= imgui::Checkbox("Full src path", &settings.file_operations_src_path_full);
+        imgui::SameLineSpaced(1);
+        settings_change |= imgui::Checkbox("Full dst path", &settings.file_operations_dst_path_full);
+    }
 
     enum file_ops_table_col : s32
     {
@@ -603,6 +608,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
         (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
         (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
     ;
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
     if (imgui::BeginTable("completed_file_operations table", file_ops_table_col_count, table_flags)) {
         static std::optional< std::deque<completed_file_operation>::iterator > s_context_menu_target_iter = std::nullopt;

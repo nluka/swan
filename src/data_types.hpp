@@ -139,7 +139,7 @@ struct drive_info
     char letter;
 };
 
-typedef static_vector<drive_info, 26> drive_list_t;
+typedef static_vector<drive_info, 26> drive_info_array_t;
 
 struct recycle_bin_info
 {
@@ -275,6 +275,15 @@ struct explorer_window
         bool context_menu_active = false;
     };
 
+    struct drive
+    {
+        s64 icon_GLtexID = 0; // -1 means load failed, 0 means no load attempted, > 0 means valid
+        ImVec2 icon_size = {};
+        drive_info info;
+    };
+
+    u64 a = sizeof(drive);
+
     enum filter_mode : u64
     {
         contains = 0,
@@ -360,6 +369,8 @@ struct explorer_window
     std::vector<dirent> cwd_entries = {};                           // all direct children of the cwd
     std::vector<swan_path> select_cwd_entries_on_next_update = {};  // entries to select on the next update of cwd_entries
 
+    std::array<drive, ('Z' - 'A' + 1)> drives = {};
+
     // 16 byte alignment members
 
     std::optional<ImRect> footer_rect = std::nullopt;
@@ -378,6 +389,7 @@ struct explorer_window
     HANDLE read_dir_changes_handle = INVALID_HANDLE_VALUE;
     time_point_precise_t read_dir_changes_refresh_request_time = {};
     time_point_precise_t last_filesystem_query_time = {};
+    time_point_precise_t last_drives_refresh_time = {};
     dirent *context_menu_target = nullptr;
 
     static u64 const NUM_TIMING_SAMPLES = 10;

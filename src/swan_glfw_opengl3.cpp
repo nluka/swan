@@ -390,7 +390,9 @@ try {
                 }
                 case swan_windows::id::pinned: {
                     if (window_visib.pinned) {
-                        if (swan_windows::render_pinned(explorers, window_visib.pinned, any_popups_open)) {
+                        if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &window_visib.pinned)) {
+                            static pinned_path *s_context_target = nullptr;
+                            swan_windows::render_pinned(s_context_target, false);
                             if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
                                 window_render_order_move_to_back(swan_windows::id::pinned);
                             }
@@ -502,6 +504,7 @@ try {
             window_render_order_save_to_disk(window_render_order_2);
             window_render_order = window_render_order_2;
         }
+
         if (imgui::GetFrameCount() == 1) {
             // After rendering all windows for the first time (FrameCount == 1),
             // tell imgui which window will have initial focus based on what was loaded from [focused_window.txt].
@@ -727,7 +730,7 @@ void load_custom_fonts(GLFWwindow *window, char const *ini_file_path) noexcept
             };
 
             attempt_load_font("RobotoMono_Regular", RobotoMono_Regular_ttf, lengthof(RobotoMono_Regular_ttf), 16.0f, false);
-            attempt_load_font("CascadiaMonoPL", CascadiaMonoPL_ttf, lengthof(CascadiaMonoPL_ttf), 16.0f, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());
+            attempt_load_font("CascadiaMonoPL", CascadiaMonoPL_ttf, lengthof(CascadiaMonoPL_ttf), 14.0f, true, imgui::GetIO().Fonts->GetGlyphRangesCyrillic());
             {
                 static ImWchar const s_glyph_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
                 attempt_load_icon_font("FontAwesome5_Solid_900", FontAwesome5_Solid_900_ttf, lengthof(FontAwesome5_Solid_900_ttf), 16, ImVec2(0.25f, 0), s_glyph_ranges);

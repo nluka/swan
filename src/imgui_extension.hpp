@@ -9,6 +9,8 @@
 
 namespace ImGui
 {
+    void ClearNavFocus(bool clear_window = false) noexcept;
+
     ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;
 
     ImU32 ImVec4_to_ImU32(ImVec4 vec, bool attempt_denormalization = false) noexcept;

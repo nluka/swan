@@ -343,3 +343,76 @@ void find_essential_files(GLFWwindow *window, char const *ini_file_path) noexcep
         EndFrame_GLFW_OpenGL3(window);
     }
 }
+
+static
+void render_cwd_clicknav(explorer_window &expl, bool cwd_exists, char) noexcept
+{
+    if (!cwd_exists || path_is_empty(expl.cwd)) {
+        return;
+    }
+
+    static std::vector<char const *> s_slices = {};
+    s_slices.clear();
+
+    swan_path sliced_path = expl.cwd;
+    {
+        char const *slice = strtok(sliced_path.data(), "\\/");
+        while (slice != nullptr) {
+            s_slices.push_back(slice);
+            slice = strtok(nullptr, "\\/");
+        }
+    }
+
+    auto cd_to_slice = [&](char const *slice) noexcept {
+        char const *slice_end = slice;
+        while (*slice_end != '\0') {
+            ++slice_end;
+        }
+
+        u64 len = slice_end - sliced_path.data();
+
+        char backup_ch = '\0';
+
+        if (len == path_length(expl.cwd)) {
+            print_debug_msg("[ %d ] cd_to_slice: slice == cwd, not updating cwd|history", expl.id);
+        }
+        else {
+            backup_ch = expl.cwd[len];
+            expl.cwd[len] = '\0';
+            expl.advance_history(expl.cwd);
+        }
+
+        auto [exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
+        if (exists) {
+            expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+            (void) expl.update_cwd_entries(filter, expl.cwd.data());
+            (void) expl.save_to_disk();
+        }
+        else {
+            // restore state
+            (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+            if (backup_ch) {
+                expl.cwd[len] = backup_ch;
+            }
+        }
+
+        imgui::CloseCurrentPopup();
+    };
+
+    char const *separator = ICON_CI_TRIANGLE_RIGHT;
+    imgui::ScopedStyle<f32> s(imgui::GetStyle().ItemSpacing.x, 2);
+
+    for (u64 i = 0; i < s_slices.size() - 1; ++i) {
+        char const *slice = s_slices[i];
+        auto label = make_str_static<1200>("%s" "## clicknav %zu", slice, i);
+
+        if (imgui::Button(label.data())) {
+            cd_to_slice(slice);
+        }
+
+        imgui::SameLine();
+        imgui::TextDisabled(separator);
+        imgui::SameLine();
+    }
+    imgui::Button(s_slices.back());
+}

@@ -179,6 +179,18 @@
         return val;
     }
 
+    /// Decrements `val`, or wraps it back to `max` if increment would subceed `min`.
+    template <typename Ty>
+    Ty &dec_or_wrap(Ty &val, Ty const &min, Ty const &max) noexcept
+    {
+        if (val == min) {
+            val = max; // wrap around
+        } else {
+            --val;
+        }
+        return val;
+    }
+
     template <typename Ty>
     void bit_set(Ty &val, u64 bit_pos) noexcept
     {

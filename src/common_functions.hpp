@@ -70,7 +70,7 @@ namespace swan_windows
         }
     }
 
-    //? all render_* functions return the result of imgui::Begin(*)
+    //? render_* with return type bool call and return result of imgui::Begin
 
     bool render_explorer(explorer_window &, bool &open, finder_window &, bool any_popups_open) noexcept;
 
@@ -78,7 +78,7 @@ namespace swan_windows
 
     bool render_finder(finder_window &, bool &open, bool any_popups_open) noexcept;
 
-    bool render_pinned(std::array<explorer_window, 4> &, bool &open, bool any_popups_open) noexcept;
+    std::pair<pinned_path *, bool> render_pinned(pinned_path *s_context_target, bool is_popup_modal) noexcept;
 
     bool render_debug_log(bool &open, bool any_popups_open) noexcept;
 
@@ -208,7 +208,7 @@ char const *get_icon(basic_dirent::kind t) noexcept;
 
 std::array<char, 64> get_type_text_for_extension(char const *extension) noexcept;
 
-drive_list_t query_drive_list() noexcept;
+drive_info_array_t query_available_drives_info() noexcept;
 
 recycle_bin_info query_recycle_bin() noexcept;
 

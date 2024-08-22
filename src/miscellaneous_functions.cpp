@@ -459,9 +459,9 @@ winapi_error get_last_winapi_error() noexcept
     return { error_code, error_message };
 }
 
-drive_list_t query_drive_list() noexcept
+drive_info_array_t query_available_drives_info() noexcept
 {
-    drive_list_t drive_list;
+    drive_info_array_t drive_list;
 
     s32 drives_mask = GetLogicalDrives();
 
@@ -655,12 +655,13 @@ void render_path_with_stylish_separators(char const *path, std::variant<s64, bas
 
     for (u64 i = 0; i < s_segments.size() - 1; ++i) {
         char const *segment = s_segments[i];
-        imgui::ScopedColor bc(ImGuiCol_Border, imgui::ReduceAlphaTo(imgui::GetStyleColorVec4(ImGuiCol_Text), 0.5f));
-        imgui::Button(segment);
+        // imgui::ScopedColor bc(ImGuiCol_Border, imgui::ReduceAlphaTo(imgui::GetStyleColorVec4(ImGuiCol_Text), 0.5f));
+        imgui::SmallButton(segment);
         imgui::SameLine();
         imgui::TextDisabled(separator);
         imgui::SameLine();
     }
+    imgui::SameLineSpaced(3);
 
     if (std::holds_alternative<basic_dirent::kind>(icon)) {
         auto type = std::get<basic_dirent::kind>(icon);
@@ -684,7 +685,7 @@ void render_path_with_stylish_separators(char const *path, std::variant<s64, bas
 }
 
 // static char const *g_help_indicator = "(?)";
-static char const *g_help_indicator = ICON_FA_INFO_CIRCLE;
+static char const *g_help_indicator = ICON_LC_BADGE_HELP;
 
 help_indicator render_help_indicator(bool align_text_to_frame_padding) noexcept
 {

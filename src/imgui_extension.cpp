@@ -195,7 +195,7 @@ void imgui::RenderConfirmationModal() noexcept
 
         if (g_confirmation_enabled != nullptr) {
             imgui::SameLineSpaced(2);
-            imgui::Checkbox("Ask for this operation", g_confirmation_enabled);
+            imgui::Checkbox("Confirm these operations", g_confirmation_enabled);
         }
 
         if (imgui::IsWindowFocused() && imgui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -489,4 +489,15 @@ std::pair<u64, u64> imgui::SelectRange(u64 prev_select_idx, u64 curr_select_idx)
     }
 
     return { first_idx, last_idx };
+}
+
+void imgui::ClearNavFocus(bool clear_window) noexcept
+{
+    ImGuiContext& g = *ImGui::GetCurrentContext();
+
+    g.NavId = 0;                       // Clear the current focused item
+    g.NavFocusScopeId = 0;             // Clear the current focus scope
+    g.NavLayer = ImGuiNavLayer_Main;   // Reset to the main navigation layer
+
+    g.NavWindow = clear_window ? NULL : g.NavWindow;
 }
