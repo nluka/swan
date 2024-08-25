@@ -154,6 +154,7 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
 
     [[maybe_unused]] auto &style = imgui::GetStyle();
     [[maybe_unused]] auto const &io = imgui::GetIO();
+    ImVec2 base_window_pos = imgui::GetCursorScreenPos();
 
     for (u64 i = 0; i < 1; ++i) {
         auto &search_directory = finder.search_directories[i];
@@ -177,6 +178,38 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
                     path_changed = true;
                 }
                 imgui::EndDragDropTarget();
+            }
+
+            if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_O)) {
+                imgui::OpenPopup("Pins");
+            }
+            if (imgui::IsPopupOpen("Pins")) {
+                ImVec2 avail = imgui::GetContentRegionAvail();
+                avail.y -= imgui::GetStyle().WindowPadding.y*10;
+                imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Always);
+                imgui::SetNextWindowSize(imgui::GetWindowContentRegionMax(), ImGuiCond_Always);
+            }
+            if (imgui::BeginPopupModal("Pins", nullptr, ImGuiWindowFlags_NoResize)) {
+                static pinned_path *s_context_target = nullptr;
+                auto [open_target, close_btn] = render_pinned(s_context_target, true);
+
+                if (imgui::IsKeyPressed(ImGuiKey_Escape) || close_btn || open_target) {
+                    imgui::CloseCurrentPopup();
+                    imgui::ClearNavFocus();
+                }
+
+                if (open_target) {
+                    if (!directory_exists(open_target->path.data())) {
+                        std::string action = make_str("Open pin [%s].", open_target->label.c_str());
+                        std::string failed = make_str("Pin path [%s] does not exit.", open_target->path.data());
+                        swan_popup_modals::open_error(action.c_str(), failed.c_str());
+                    }
+                    else {
+                        search_directory.path_utf8 = open_target->path;
+                        finder.focus_search_value_input = true;
+                    }
+                }
+                imgui::EndPopup();
             }
 
             if (path_changed) {
@@ -259,11 +292,10 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
         // imgui::SetTooltip("Case sensitive: %s\n", expl.filter_case_sensitive ? "ON" : "OFF");
     }
 
-    imgui::SameLineSpaced(1);
-
     {
         u64 num_entries_checked = finder.num_entries_checked.load();
         if (num_entries_checked > 0) {
+            imgui::SameLineSpaced(1);
             u64 num_matches = 0;
             {
                 std::scoped_lock lock(finder.search_task.result_mutex);
@@ -272,8 +304,6 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
             imgui::Text("%zu of %zu (%.2lf %%) entries matched", num_matches, num_entries_checked, (f64(num_matches) / f64(num_entries_checked) * 100.0));
         }
     }
-
-    imgui::Spacing(1);
 
     enum matches_table_col : s32 {
         matches_table_col_number,

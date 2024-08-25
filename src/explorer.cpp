@@ -2929,7 +2929,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     }
 
-    {
+    if (imgui::IsPopupOpen("Pins")) {
         ImVec2 avail = imgui::GetContentRegionAvail();
         avail.y -= imgui::GetStyle().WindowPadding.y*10;
         imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Always);
