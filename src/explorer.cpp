@@ -167,8 +167,15 @@ void render_count_summary(u64 cnt_dir, u64 cnt_file, u64 cnt_symlink) noexcept
     }
 }
 
+struct
+render_table_rows_for_cwd_entries_result
+{
+    std::optional<ImRect> context_menu_target_row_rect = std::nullopt;
+    std::optional<swan_path> descend_target = std::nullopt;
+    bool do_ascend = false;
+};
 static
-std::optional<ImRect> render_table_rows_for_cwd_entries(
+render_table_rows_for_cwd_entries_result render_table_rows_for_cwd_entries(
     explorer_window &expl,
     cwd_count_info const &cnt,
     u64 size_unit_multiplier,
@@ -882,7 +889,12 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
 
             for (auto &e : this->cwd_entries) {
                 if (e.icon_GLtexID > 0) {
-                    delete_icon_texture(e.icon_GLtexID, "explorer_window::dirent");
+                    // if we delete the icon texture immediately, ImGui will render a black square for the image
+                    // because the frame is drawn much later.
+                    // !delete_icon_texture(e.icon_GLtexID, "explorer_window::dirent");
+
+                    // Instead, delete the texture after the frame (that we are currently rendering) is actually drawn by the GPU.
+                    global_state::delete_icon_textures_queue().push_back(e.icon_GLtexID);
                 }
             }
             this->cwd_entries.clear();
@@ -2827,6 +2839,10 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
     static explorer_window::dirent const *s_dirent_to_be_renamed = nullptr;
 
+    std::optional<swan_path> descend_target = std::nullopt;
+    std::optional<swan_path> open_target = std::nullopt;
+    bool do_ascend = false;
+
     auto label_child = make_str_static<64>("%s ## main_child", expl.name);
     if (imgui::BeginChild(label_child.data(), {}, false)) {
 
@@ -3355,7 +3371,10 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             }
 
             // opens "Context" popup if a rendered dirent is right clicked
-            auto context_menu_target_row_rect = render_table_rows_for_cwd_entries(expl, cnt, size_unit_multiplier, any_popups_open, dir_sep_utf8, dir_sep_utf16);
+            auto [context_menu_target_row_rect, descend_target_, do_ascend_] = render_table_rows_for_cwd_entries(expl, cnt, size_unit_multiplier, any_popups_open, dir_sep_utf8, dir_sep_utf16);
+
+            if (descend_target_.has_value()) descend_target = descend_target_;
+            do_ascend = do_ascend_;
 
             auto result = render_dirent_context_menu(expl, cnt, global_state::settings());
             open_bulk_rename_popup   |= result.open_bulk_rename_popup;
@@ -3492,23 +3511,55 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             auto const &pin = global_state::pinned_get()[payload_data->pin_idx];
 
             if (!path_loosely_same(pin.path.data(), expl.cwd)) {
-                swan_path initial_cwd = expl.cwd;
-                expl.cwd = path_create("");
-
-                auto result = try_descend_to_directory(expl, pin.path.data());
-
-                if (!result.success) {
-                    std::string action = make_str("Open pin [%s] in Explorer %d.", pin.path.data(), expl.id+1);
-                    char const *failed = result.err_msg.c_str();
-                    swan_popup_modals::open_error(action.c_str(), failed);
-
-                    expl.cwd = initial_cwd;
-                    (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
-                }
+                open_target = pin.path;
             }
         }
 
         imgui::EndDragDropTarget();
+    }
+
+    if (open_target.has_value()) {
+        swan_path initial_cwd = expl.cwd;
+        expl.cwd = path_create("");
+
+        auto result = try_descend_to_directory(expl, descend_target.value().data());
+
+        if (!result.success) {
+            std::string action = make_str("Open [%s] in Explorer %d.", descend_target.value().data(), expl.id+1);
+            char const *failed = result.err_msg.c_str();
+            swan_popup_modals::open_error(action.c_str(), failed);
+
+            expl.cwd = initial_cwd;
+            (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
+        }
+    }
+    if (descend_target.has_value()) {
+        swan_path initial_cwd = expl.cwd;
+
+        auto result = try_descend_to_directory(expl, descend_target.value().data());
+
+        if (!result.success) {
+            std::string action = make_str("Descend into [%s] in Explorer %d.", descend_target.value().data(), expl.id+1);
+            char const *failed = result.err_msg.c_str();
+            swan_popup_modals::open_error(action.c_str(), failed);
+
+            expl.cwd = initial_cwd;
+            (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
+        }
+    }
+    else if (do_ascend) {
+        swan_path initial_cwd = expl.cwd;
+
+        auto result = try_ascend_directory(expl);
+
+        if (!result.success) {
+            std::string action = make_str("Ascend to [%s].", result.parent_dir.data());
+            char const *failed = "Directory not found.";
+            swan_popup_modals::open_error(action.c_str(), failed);
+
+            expl.cwd = initial_cwd;
+            (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_ascend_directory
+        }
     }
 
     return true;
@@ -3587,7 +3638,7 @@ generic_result file_operation_command_buf::execute(explorer_window &expl) noexce
 }
 
 static
-std::optional<ImRect> render_table_rows_for_cwd_entries(
+render_table_rows_for_cwd_entries_result render_table_rows_for_cwd_entries(
     explorer_window &expl,
     cwd_count_info const &cnt,
     u64 size_unit_multiplier,
@@ -3595,7 +3646,7 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
     char dir_sep_utf8,
     wchar_t dir_sep_utf16) noexcept
 {
-    std::optional<ImRect> context_menu_target_row_rect = std::nullopt;
+    render_table_rows_for_cwd_entries_result retval = {};
 
     auto io = imgui::GetIO();
 
@@ -3697,31 +3748,10 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
                             if (imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !io.KeyCtrl && path_equals_exactly(current_click_path, s_last_click_path)) {
                                 if (dirent.basic.is_directory()) {
                                     if (dirent.basic.is_path_dotdot()) {
-                                        auto result = try_ascend_directory(expl);
-
-                                        if (!result.success) {
-                                            std::string action = make_str("Ascend to directory [%s].", result.parent_dir.data());
-                                            char const *failed = "Directory not found.";
-                                            swan_popup_modals::open_error(action.c_str(), failed);
-
-                                            (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_ascend_directory
-                                        }
-
-                                        return context_menu_target_row_rect;
+                                        retval.do_ascend = true;
                                     }
                                     else {
-                                        char const *target = dirent.basic.path.data();
-                                        auto result = try_descend_to_directory(expl, target);
-
-                                        if (!result.success) {
-                                            std::string action = make_str("Descend to directory [%s].", target);
-                                            char const *failed = result.err_msg.c_str();
-                                            swan_popup_modals::open_error(action.c_str(), failed);
-
-                                            (void) expl.update_cwd_entries(full_refresh, expl.cwd.data()); // restore entries cleared by try_descend_to_directory
-                                        }
-
-                                        return context_menu_target_row_rect;
+                                        retval.descend_target = current_click_path;
                                     }
                                 }
                                 else if (dirent.basic.is_symlink()) {
@@ -4091,14 +4121,14 @@ std::optional<ImRect> render_table_rows_for_cwd_entries(
             }
 
             if (dirent.context_menu_active) {
-                context_menu_target_row_rect.emplace(selectable_rect.Min, selectable_rect.Max);
+                retval.context_menu_target_row_rect.emplace(selectable_rect.Min, selectable_rect.Max);
             }
 
             dirent.spotlight_frames_remaining -= (dirent.spotlight_frames_remaining > 0);
         }
     }
 
-    return context_menu_target_row_rect;
+    return retval;
 }
 
 static

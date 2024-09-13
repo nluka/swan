@@ -186,6 +186,8 @@ namespace global_state
 
     file_operation_command_buf &file_op_cmd_buf() noexcept;
 
+    std::vector<s64> &delete_icon_textures_queue() noexcept;
+
     std::array<explorer_window, global_constants::num_explorers> &explorers() noexcept;
 
 } // namespace global_state

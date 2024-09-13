@@ -8,7 +8,7 @@ namespace swan
     static bool                     g_move_dirents_payload_is_set = false;
     static std::filesystem::path    g_execution_path = {};
     static HWND                     g_hwnd = {};
-
+    static std::vector<s64>         g_delete_icon_textures_queue = {};
 };
 
 s32 &global_state::page_size() noexcept { return swan::g_page_size; }
@@ -20,3 +20,5 @@ bool &global_state::move_dirents_payload_set() noexcept { return swan::g_move_di
 std::filesystem::path &global_state::execution_path() noexcept { return swan::g_execution_path; }
 
 HWND &global_state::window_handle() noexcept { return swan::g_hwnd; }
+
+std::vector<s64> &global_state::delete_icon_textures_queue() noexcept { return swan::g_delete_icon_textures_queue; };

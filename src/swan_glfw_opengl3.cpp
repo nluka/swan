@@ -264,6 +264,11 @@ try {
         SCOPE_EXIT {
             EndFrame_GLFW_OpenGL3(window);
 
+            for (auto &id : global_state::delete_icon_textures_queue()) {
+                delete_icon_texture(id);
+            }
+            global_state::delete_icon_textures_queue().clear();
+
             bool window_visibilities_changed = memcmp(&global_state::settings().show, &visib_at_frame_start, sizeof(visib_at_frame_start)) != 0;
             if (window_visibilities_changed) {
                 global_state::settings().save_to_disk();
