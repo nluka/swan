@@ -653,10 +653,36 @@ std::optional<bool> win32_is_mouse_inside_window(HWND hwnd) noexcept
 
     bool result = cp.x >= wr.left && cp.x <= wr.right && cp.y >= wr.top && cp.y <= wr.bottom;
 
+    if (result) {
+        // Get the window handle at the cursor position
+        HWND hwnd_under_cursor = WindowFromPoint(cp);
+
+        // If the window under the cursor is not the target window, the cursor is covered
+        if (hwnd_under_cursor != hwnd) {
+            // Check if the window is a child window of hwnd
+            HWND parent = hwnd;
+            while (parent != NULL) {
+                if (hwnd_under_cursor == parent) {
+                    return false; // Covered by a child window
+                }
+                parent = GetParent(parent);
+            }
+            // If the window is not a child and it covers the target window
+            return false;
+        }
+    }
+
 // #if DEBUG_MODE
 //     print_debug_msg("%s " ICON_FA_MOUSE_POINTER " (%d, %d) " ICON_CI_SCREEN_FULL " (%d, %d), (%d, %d)",
 //         (result ? ICON_CI_PASS_FILLED : ICON_CI_CIRCLE_LARGE_FILLED), cp.x, cp.y, wr.left, wr.top, wr.right, wr.bottom);
 // #endif
 
     return result;
+}
+
+bool path_drive_like(char const *path, u64 len) noexcept
+{
+    if (len == 0) len = strlen(path);
+    return (len == 2 && IsCharAlphaA(path[0]) && path[1] == ':')
+        || (len == 3 && IsCharAlphaA(path[0]) && path[1] == ':' && strchr("\\/", path[2]));
 }

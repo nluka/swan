@@ -866,6 +866,7 @@ explorer_window::update_cwd_entries_result explorer_window::update_cwd_entries(
     print_debug_msg("[ %d ] expl.update_cwd_entries(%d) called from [%s:%d]", this->id, actions, path_cfind_filename(sloc.file_name()), sloc.line());
 
     this->scroll_to_nth_selected_entry_next_frame = u64(-1);
+    this->tabbing_focus_idx = -1;
 
     update_cwd_entries_timers timers = {};
     SCOPE_EXIT { this->update_cwd_entries_timing_samples.push_back(timers); };
@@ -1871,12 +1872,14 @@ ImRect render_num_cwd_items_filtered(explorer_window &expl, cwd_count_info const
 
     if (imgui::IsItemHovered({}, 1) && imgui::BeginTooltip()) {
         render_count_summary(cnt.filtered_directories, cnt.filtered_files, cnt.filtered_symlinks);
+    #if 0
         imgui::Spacing();
         if (expl.show_filter_window) {
             imgui::TextUnformatted("Click to unhide");
         } else {
             imgui::TextUnformatted("Click to open filter");
         }
+    #endif
         imgui::EndTooltip();
     }
 
@@ -2301,7 +2304,7 @@ bool render_filter_text_input(explorer_window &expl, bool window_hovered, bool c
     }
     bool retval_is_focused = imgui::IsItemFocused();
 
-    if (imgui::IsKeyPressed(ImGuiKey_Tab)) {
+    if (retval_is_focused && imgui::IsKeyPressed(ImGuiKey_Tab)) {
         if (expl.tabbing_focus_idx == -1) {
             expl.tabbing_focus_idx = 0;
         }
@@ -2514,11 +2517,7 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
         auto result = try_ascend_directory(expl);
 
         if (!result.success) {
-            auto cwd_len = path_length(expl.cwd);
-
-            bool cwd_is_drive = ( cwd_len == 2 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':'                               )
-                             || ( cwd_len == 3 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':' && strchr("\\/", expl.cwd[2]) );
-
+            bool cwd_is_drive = path_drive_like(expl.cwd.data(), path_length(expl.cwd));
             if (cwd_is_drive) {
                 path_clear(expl.cwd);
             } else {
@@ -2918,11 +2917,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             auto result = try_ascend_directory(expl);
 
             if (!result.success) {
-                auto cwd_len = path_length(expl.cwd);
-
-                bool cwd_is_drive = ( cwd_len == 2 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':'                               )
-                                || ( cwd_len == 3 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':' && strchr("\\/", expl.cwd[2]) );
-
+                bool cwd_is_drive = path_drive_like(expl.cwd.data(), path_length(expl.cwd));
                 if (cwd_is_drive) {
                     path_clear(expl.cwd);
                 } else {
@@ -2988,26 +2983,26 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
     if (imgui::BeginPopupModal("Pins", nullptr, ImGuiWindowFlags_NoResize)) {
         static pinned_path *s_context_target = nullptr;
-        auto [open_target, close_btn] = render_pinned(s_context_target, true);
+        auto [open_target_, close_btn] = render_pinned(s_context_target, true);
 
-        if (imgui::IsKeyPressed(ImGuiKey_Escape) || close_btn || open_target) {
+        if (imgui::IsKeyPressed(ImGuiKey_Escape) || close_btn || open_target_) {
             imgui::CloseCurrentPopup();
             imgui::ClearNavFocus();
         }
 
-        if (open_target) {
-            if (!directory_exists(open_target->path.data())) {
-                std::string action = make_str("Open pin [%s].", open_target->label.c_str());
-                std::string failed = make_str("Pin path [%s] does not exit.", open_target->path.data());
+        if (open_target_) {
+            if (!directory_exists(open_target_->path.data())) {
+                std::string action = make_str("Open pin [%s].", open_target_->label.c_str());
+                std::string failed = make_str("Pin path [%s] does not exit.", open_target_->path.data());
                 swan_popup_modals::open_error(action.c_str(), failed.c_str());
             }
             else {
-                auto [pin_is_valid_dir, _] = expl.update_cwd_entries(query_filesystem, open_target->path.data());
+                auto [pin_is_valid_dir, _] = expl.update_cwd_entries(query_filesystem, open_target_->path.data());
                 if (pin_is_valid_dir) {
-                    expl.cwd = open_target->path;
-                    expl.advance_history(open_target->path);
-                    expl.set_latest_valid_cwd(open_target->path); // this may mutate filter
-                    (void) expl.update_cwd_entries(filter, open_target->path.data());
+                    expl.cwd = open_target_->path;
+                    expl.advance_history(open_target_->path);
+                    expl.set_latest_valid_cwd(open_target_->path); // this may mutate filter
+                    (void) expl.update_cwd_entries(filter, open_target_->path.data());
                     (void) expl.save_to_disk();
                 } else {
                     (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
@@ -3307,9 +3302,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     }
 
-
-
-    if (!expl.filter_text_input_focused) {
+    if (!expl.filter_text_input_focused && !any_popups_open) {
         if (imgui::IsKeyPressed(ImGuiKey_Tab)) {
             if (expl.tabbing_focus_idx == -1) {
                 expl.tabbing_focus_idx = 0;
@@ -3401,8 +3394,8 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             };
             f32 fixed_widths_sum = std::accumulate(widths, widths + lengthof(widths), 0.f);
             widths[explorer_window::cwd_entries_table_col_path] = 1.0f - fixed_widths_sum;
-            f32 widths_sum = std::accumulate(widths, widths + lengthof(widths), 0.f);
-            f32 epsilon = 0.00001;
+            [[maybe_unused]] f32 widths_sum = std::accumulate(widths, widths + lengthof(widths), 0.f);
+            [[maybe_unused]] f32 epsilon = 0.00001f;
             assert(fabs(1.0 - widths_sum) < epsilon); // a.k.a widths_sum == 1.0f
 
             imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_number], explorer_window::cwd_entries_table_col_number);
@@ -3483,6 +3476,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         if (imgui::IsKeyPressed(ImGuiKey_Escape)) {
             expl.deselect_all_cwd_entries();
+            expl.tabbing_focus_idx = -1;
         }
         else if (imgui::IsKeyPressed(ImGuiKey_A) && io.KeyCtrl) {
             expl.select_all_visible_cwd_entries();
@@ -4016,16 +4010,18 @@ render_table_rows_for_cwd_entries_result render_table_rows_for_cwd_entries(
                     auto payload_data = reinterpret_cast<explorer_drag_drop_payload *>(payload_wrapper->Data);
 
                     u64 digits = count_digits(payload_data->num_items);
-                    imgui::Text("%*zu %s", digits, payload_data->num_items, ICON_CI_FILES);
-                    imgui::SameLine();
-                    for (u64 j = 0, n = 1; j < (u64)basic_dirent::kind::count; ++j) {
+                    bool homogeneous_obj_type = std::count_if(payload_data->obj_type_counts, payload_data->obj_type_counts + u64(basic_dirent::kind::count), [](u64 val) { return val != 0; }) == 1;
+
+                    for (u64 j = 0; j < (u64)basic_dirent::kind::count; ++j) {
                         u64 obj_type_cnt = payload_data->obj_type_counts[j];
                         if (obj_type_cnt > 0) {
                             basic_dirent::kind obj_type = basic_dirent::kind(j);
-                            if (n > 1 && n % 2 != 0) imgui::SameLine();
                             imgui::TextColored(get_color(obj_type), "%*zu %s", digits, obj_type_cnt, get_icon(obj_type));
-                            n += 1;
                         }
+                    }
+                    if (!homogeneous_obj_type) {
+                        imgui::Separator();
+                        imgui::Text("%*zu", digits, payload_data->num_items);
                     }
 
                     std::optional<bool> mouse_inside_window = win32_is_mouse_inside_window(global_state::window_handle());

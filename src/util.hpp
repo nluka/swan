@@ -106,6 +106,7 @@
     wchar_t const *     path_cfind_filename  (wchar_t const *path) noexcept;
     char const *        path_cfind_file_ext  (char    const *path) noexcept;
     std::string_view    path_extract_location(char    const *path) noexcept;
+    bool                path_drive_like      (char    const *path, u64 len = 0) noexcept; // len optional
 
     /// @brief Object to split a file path into 2 pieces: name and extension.
     /// It does so by finding the appropriate [.] character and replacing it with NUL on construction.
