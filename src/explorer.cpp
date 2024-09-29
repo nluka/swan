@@ -3388,15 +3388,32 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             s32 const col_flags_sortable_prefer_asc = ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortAscending;
             s32 const col_flags_sortable_prefer_desc = ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortDescending;
 
-            imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, explorer_window::cwd_entries_table_col_number);
-            imgui::TableSetupColumn("ID", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_id);
-            imgui::TableSetupColumn("Name", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_NoHide, 0.0f, explorer_window::cwd_entries_table_col_path);
-            imgui::TableSetupColumn("Object", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_object);
-            imgui::TableSetupColumn("Type", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_type);
-            imgui::TableSetupColumn("Size", col_flags_sortable_prefer_desc, 0.0f, explorer_window::cwd_entries_table_col_size_formatted);
-            imgui::TableSetupColumn("Bytes", col_flags_sortable_prefer_desc, 0.0f, explorer_window::cwd_entries_table_col_size_bytes);
-            imgui::TableSetupColumn("Created", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_creation_time);
-            imgui::TableSetupColumn("Modified", col_flags_sortable_prefer_asc, 0.0f, explorer_window::cwd_entries_table_col_last_write_time);
+            f32 widths[explorer_window::cwd_entries_table_col_count] = {
+                0.05f, // cwd_entries_table_col_number
+                0.05f, // cwd_entries_table_col_id
+                0.f, // cwd_entries_table_col_path (calculated as remainder)
+                0.05f, // cwd_entries_table_col_object
+                0.15f, // cwd_entries_table_col_type
+                0.05f, // cwd_entries_table_col_size_formatted
+                0.05f, // cwd_entries_table_col_size_bytes
+                0.075f, // cwd_entries_table_col_creation_time
+                0.075f, // cwd_entries_table_col_last_write_time
+            };
+            f32 fixed_widths_sum = std::accumulate(widths, widths + lengthof(widths), 0.f);
+            widths[explorer_window::cwd_entries_table_col_path] = 1.0f - fixed_widths_sum;
+            f32 widths_sum = std::accumulate(widths, widths + lengthof(widths), 0.f);
+            f32 epsilon = 0.00001;
+            assert(fabs(1.0 - widths_sum) < epsilon); // a.k.a widths_sum == 1.0f
+
+            imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_number], explorer_window::cwd_entries_table_col_number);
+            imgui::TableSetupColumn("ID", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_id], explorer_window::cwd_entries_table_col_id);
+            imgui::TableSetupColumn("Name", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_WidthStretch|ImGuiTableColumnFlags_NoHide, widths[explorer_window::cwd_entries_table_col_path], explorer_window::cwd_entries_table_col_path);
+            imgui::TableSetupColumn("Object", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_object], explorer_window::cwd_entries_table_col_object);
+            imgui::TableSetupColumn("Type", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_type], explorer_window::cwd_entries_table_col_type);
+            imgui::TableSetupColumn("Size", col_flags_sortable_prefer_desc|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_size_formatted], explorer_window::cwd_entries_table_col_size_formatted);
+            imgui::TableSetupColumn("Bytes", col_flags_sortable_prefer_desc|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_size_bytes], explorer_window::cwd_entries_table_col_size_bytes);
+            imgui::TableSetupColumn("Created", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_creation_time], explorer_window::cwd_entries_table_col_creation_time);
+            imgui::TableSetupColumn("Modified", col_flags_sortable_prefer_asc|ImGuiTableColumnFlags_WidthStretch, widths[explorer_window::cwd_entries_table_col_last_write_time], explorer_window::cwd_entries_table_col_last_write_time);
             ImGui::TableSetupScrollFreeze(0, 1);
             imgui::TableHeadersRow();
 
