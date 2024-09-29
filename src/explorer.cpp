@@ -1806,7 +1806,7 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
         imgui::Text("%zu (of %zu) items", cnt_visible, cnt.child_dirents);
     }
 
-    if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
+    if (imgui::IsItemHovered({}, 1) && imgui::BeginTooltip()) {
         if (cnt.child_dirents == 0) {
             imgui::TextUnformatted("No items in this directory");
         }
@@ -1869,7 +1869,7 @@ ImRect render_num_cwd_items_filtered(explorer_window &expl, cwd_count_info const
         }
     }
 
-    if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
+    if (imgui::IsItemHovered({}, 1) && imgui::BeginTooltip()) {
         render_count_summary(cnt.filtered_directories, cnt.filtered_files, cnt.filtered_symlinks);
         imgui::Spacing();
         if (expl.show_filter_window) {
@@ -1899,7 +1899,7 @@ ImRect render_num_cwd_items_selected([[maybe_unused]] explorer_window &expl, cwd
 
     retval_text_rect = imgui::GetItemRect();
 
-    if (imgui::IsItemHovered() && imgui::BeginTooltip()) {
+    if (imgui::IsItemHovered({}, 1) && imgui::BeginTooltip()) {
         render_count_summary(cnt.selected_directories, cnt.selected_files, cnt.selected_symlinks);
         // imgui::Spacing();
         imgui::TextUnformatted("Click to cycle selections");
@@ -1952,7 +1952,7 @@ void render_button_history_right(explorer_window &expl) noexcept
         }
     }
 
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Forward");
     }
 }
@@ -1981,7 +1981,7 @@ void render_button_history_left(explorer_window &expl) noexcept
         }
     }
 
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Back");
     }
 }
@@ -2042,7 +2042,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists) noexce
             cleanup_and_close_popup();
         }
     }
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Clear history");
     }
 
@@ -2143,7 +2143,7 @@ void render_filter_reset_button(explorer_window &expl) noexcept
             (void) expl.save_to_disk();
         }
     }
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Restore default filter");
     }
 }
@@ -2329,7 +2329,7 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
             imgui::Button(get_icon(type));
         }
 
-        if (imgui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        if (imgui::IsItemHovered({}, 1)) {
             imgui::SetTooltip("[      L click] Toggle %s\n"
                               "[Ctrl  L click] Solo %s\n"
                               "[Shift L click] Unmute all", type_str, type_str);
@@ -2379,7 +2379,7 @@ void render_filter_mode_toggle(explorer_window &expl) noexcept
         (void) expl.save_to_disk();
     }
 
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         char const *mode = nullptr;
         switch (expl.filter_mode) {
             case explorer_window::filter_mode::contains: mode = "CONTAINS"; break;
@@ -2403,7 +2403,7 @@ void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
             (void) expl.save_to_disk();
         }
     }
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Case sensitive: %s\n", expl.filter_case_sensitive ? "ON" : "OFF");
     }
 }
@@ -2416,7 +2416,7 @@ void render_filter_polarity_button(explorer_window &expl) noexcept
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
         (void) expl.save_to_disk();
     }
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Polarity: %s matches\n", expl.filter_polarity ? "SHOW" : "HIDE");
     }
 }
@@ -2467,7 +2467,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists_before_edit) n
         }
         (void) global_state::pinned_save_to_disk();
     }
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("%s current working directory", already_pinned ? "Unpin" : "Pin");
     }
 }
@@ -2480,7 +2480,7 @@ bool render_history_browser_button() noexcept
     if (imgui::Button(ICON_LC_HISTORY "## expl.wd_history")) {
         return true;
     }
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Open history");
     }
     return false;
@@ -2513,7 +2513,7 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
         }
     }
 
-    if (imgui::IsItemHovered()) {
+    if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Up to parent directory");
     }
 }
@@ -3141,7 +3141,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         {
             imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
             if (imgui::Button(ICON_LC_BOOK_OPEN_TEXT)) imgui::OpenPopup("Pins");
-            if (imgui::IsItemHovered()) imgui::SetTooltip("Open pins");
+            if (imgui::IsItemHovered({}, 1)) imgui::SetTooltip("Open pins");
         }
         imgui::SameLine(0, 0);
 
@@ -3152,21 +3152,21 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             imgui::ScopedDisable d(path_is_empty(expl.cwd));
             imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
             if (imgui::Button(ICON_CI_FILE_ADD)) swan_popup_modals::open_new_file(expl.cwd.data(), expl.id);
-            if (imgui::IsItemHovered()) imgui::SetTooltip("New file in cwd");
+            if (imgui::IsItemHovered({}, 1)) imgui::SetTooltip("New file in cwd");
         }
         imgui::SameLine(0, 0);
         {
             imgui::ScopedDisable d(path_is_empty(expl.cwd));
             imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
             if (imgui::Button(ICON_CI_NEW_FOLDER)) swan_popup_modals::open_new_directory(expl.cwd.data(), expl.id);
-            if (imgui::IsItemHovered()) imgui::SetTooltip("New directory in cwd");
+            if (imgui::IsItemHovered({}, 1)) imgui::SetTooltip("New directory in cwd");
         }
         imgui::SameLine(0, 0);
         {
             imgui::ScopedDisable d(path_is_empty(expl.cwd));
             imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
             if (imgui::Button(ICON_CI_SYMBOL_NULL)) expl.invert_selection_on_visible_cwd_entries();
-            if (imgui::IsItemHovered()) imgui::SetTooltip("Invert selection");
+            if (imgui::IsItemHovered({}, 1)) imgui::SetTooltip("Invert selection");
         }
         imgui::SameLine(0, 0);
         {
@@ -3176,7 +3176,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 auto result = global_state::file_op_cmd_buf().execute(expl);
                 // TODO: why is result unused?
             }
-            if (imgui::IsItemHovered()) imgui::SetTooltip("Paste");
+            if (imgui::IsItemHovered({}, 1)) imgui::SetTooltip("Paste");
         }
         imgui::SameLineSpaced(1);
         render_help_icon(expl);
