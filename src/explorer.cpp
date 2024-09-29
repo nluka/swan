@@ -2493,7 +2493,7 @@ void render_up_to_cwd_parent_button(explorer_window &expl, bool cwd_exists_befor
     imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
     if (imgui::Button(ICON_LC_MOVE_UP "## up")) { // ICON_FA_ARROW_UP
-        print_debug_msg("[ %d ] (..) button triggered", expl.id);
+        // print_debug_msg("[ %d ] (..) button triggered", expl.id);
 
         auto result = try_ascend_directory(expl);
 
@@ -2897,6 +2897,24 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         else if (window_focused_or_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_H)) {
             imgui::OpenPopup("History");
         }
+        else if (window_focused_or_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_U)) {
+            auto result = try_ascend_directory(expl);
+
+            if (!result.success) {
+                auto cwd_len = path_length(expl.cwd);
+
+                bool cwd_is_drive = ( cwd_len == 2 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':'                               )
+                                || ( cwd_len == 3 && IsCharAlphaA(expl.cwd[0]) && expl.cwd[1] == ':' && strchr("\\/", expl.cwd[2]) );
+
+                if (cwd_is_drive) {
+                    path_clear(expl.cwd);
+                } else {
+                    std::string action = make_str("Ascend to directory [%s]", result.parent_dir.data());
+                    char const *failed = "Directory not found.";
+                    swan_popup_modals::open_error(action.c_str(), failed);
+                }
+            }
+        }
         else if (window_focused_or_hovered && io.KeyCtrl && imgui::IsKeyDown(ImGuiKey_N) && imgui::IsKeyPressed(ImGuiKey_F)) {
             swan_popup_modals::open_new_file(expl.cwd.data(), expl.id);
         }
@@ -3128,11 +3146,49 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         render_up_to_cwd_parent_button(expl, cwd_exists_before_edit);
 
-        imgui::SameLine(0, style.ItemSpacing.x / 2);
+        // imgui::SameLine(0, style.ItemSpacing.x / 2);
+        imgui::SameLine();
 
         render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, 0, cwd_exists_before_edit);
 
         // line break
+
+        if (/* expl.show_filter_window && */ !path_is_empty(expl.cwd)) {
+            render_filter_polarity_button(expl);
+            imgui::SameLine(0, 0);
+            render_filter_mode_toggle(expl);
+            imgui::SameLine(0, 0);
+            render_filter_case_sensitivity_button(expl);
+
+            // imgui::SameLine(0, style.ItemSpacing.x / 2);
+            imgui::SameLine();
+
+            expl.filter_text_input_focused = render_filter_text_input(expl, window_hovered, io.KeyCtrl, cnt);
+
+            imgui::SameLine();
+            render_filter_reset_button(expl);
+
+            imgui::SameLineSpaced(1);
+
+            render_filter_type_toggler_buttons(expl);
+
+            if (expl.filter_error != "") {
+                imgui::SameLineSpaced(1);
+                imgui::PushTextWrapPos(imgui::GetColumnWidth());
+                imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
+                imgui::PopTextWrapPos();
+            }
+            else if (cwd_exists_after_edit && cnt.child_dirents > 0 && cnt.filtered_dirents == cnt.child_dirents) {
+                imgui::SameLineSpaced(1);
+                imgui::TextColored(warning_color(), "All items filtered");
+            }
+            else if (cnt.filtered_dirents > 0) {
+                imgui::SameLineSpaced(1);
+                (void) render_num_cwd_items_filtered(expl, cnt);
+            }
+        }
+
+        imgui::SameLineSpaced(1);
 
         bool open_history_browser = render_history_browser_button();
         if (open_history_browser) imgui::OpenPopup("History");
@@ -3234,40 +3290,19 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     }
 
-    if (expl.show_filter_window && !path_is_empty(expl.cwd)) {
-        render_filter_reset_button(expl);
-        imgui::SameLine();
 
-        expl.filter_text_input_focused = render_filter_text_input(expl, window_hovered, io.KeyCtrl, cnt);
 
-        imgui::SameLine();
-
-        render_filter_case_sensitivity_button(expl);
-        imgui::SameLine(0, 0);
-        render_filter_mode_toggle(expl);
-        imgui::SameLine(0, 0);
-        render_filter_polarity_button(expl);
-
-        imgui::SameLineSpaced(1);
-
-        render_filter_type_toggler_buttons(expl);
-
-        if (expl.filter_error != "") {
-            imgui::SameLineSpaced(1);
-            imgui::PushTextWrapPos(imgui::GetColumnWidth());
-            imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
-            imgui::PopTextWrapPos();
+    if (!expl.filter_text_input_focused) {
+        if (imgui::IsKeyPressed(ImGuiKey_Tab)) {
+            if (expl.tab_focus_idx == -1) {
+                expl.tab_focus_idx = 0;
+            } else {
+                s64 min = 0, max = expl.cwd_entries.size() - 1;
+                if (imgui::GetIO().KeyShift) dec_or_wrap(expl.tab_focus_idx, min, max);
+                else inc_or_wrap(expl.tab_focus_idx, min, max);
+            }
+            expl.set_focus = true;
         }
-        else if (cwd_exists_after_edit && cnt.child_dirents > 0 && cnt.filtered_dirents == cnt.child_dirents) {
-            imgui::SameLineSpaced(1);
-            imgui::TextColored(warning_color(), "All items filtered");
-        }
-        else if (cnt.filtered_dirents > 0) {
-            imgui::SameLineSpaced(1);
-            (void) render_num_cwd_items_filtered(expl, cnt);
-        }
-
-        imgui::Spacing();
     }
 
     bool drives_table_rendered = false;
@@ -3329,7 +3364,8 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         ;
         imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
-        bool show_cwd_entries_table = !expl.cwd_entries.empty() && cnt.filtered_dirents < expl.cwd_entries.size();
+        // bool show_cwd_entries_table = !expl.cwd_entries.empty() && cnt.filtered_dirents < expl.cwd_entries.size();
+        bool show_cwd_entries_table = true;
 
         if (show_cwd_entries_table && imgui::BeginTable("## explorer_window cwd_entries", explorer_window::cwd_entries_table_col_count, table_flags)) {
             s32 const col_flags_sortable_prefer_asc = ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortAscending;
