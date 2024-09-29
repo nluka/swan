@@ -391,6 +391,7 @@ struct explorer_window
     time_point_precise_t last_filesystem_query_time = {};
     time_point_precise_t last_drives_refresh_time = {};
     dirent *context_menu_target = nullptr;
+    s64 tabbing_focus_idx = -1;
 
     static u64 const NUM_TIMING_SAMPLES = 10;
 
@@ -455,6 +456,7 @@ struct explorer_window
     bool footer_selection_info_hovered = false;
     bool footer_clipboard_hovered = false;
     bool highlight_footer = false;
+    bool tabbing_set_focus = false;
 
     update_cwd_entries_actions update_request_from_outside = nil; /* how code from outside the Begin()/End() of the explorer window
                                                                      signals to the explorer to call update_cwd_entries */

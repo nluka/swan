@@ -2136,6 +2136,7 @@ void render_filter_reset_button(explorer_window &expl) noexcept
             && expl.filter_show_symlink_files
         ;
         imgui::ScopedDisable d(starting_filter);
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
         if (imgui::Button(ICON_LC_SEARCH_X "## clear_filter")) {
             expl.reset_filter();
@@ -2201,6 +2202,7 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)|
         (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)
     ;
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
     if (imgui::BeginTable("## explorer_window drives_table", drive_table_col_id_count, table_flags)) {
         imgui::TableSetupColumn("#", ImGuiTableColumnFlags_NoSort, 0.0f, drive_table_col_id_number);
@@ -2299,8 +2301,16 @@ bool render_filter_text_input(explorer_window &expl, bool window_hovered, bool c
     }
     bool retval_is_focused = imgui::IsItemFocused();
 
+    if (imgui::IsKeyPressed(ImGuiKey_Tab)) {
+        if (expl.tabbing_focus_idx == -1) {
+            expl.tabbing_focus_idx = 0;
+        }
+        expl.tabbing_set_focus = true;
+    }
+
     if (window_hovered && ctrl_key_down && imgui::IsKeyPressed(ImGuiKey_F)) {
         imgui::ActivateItemByID(imgui::GetID("## explorer_window filter"));
+        expl.tabbing_focus_idx = -1;
     }
 
     return retval_is_focused;
@@ -2326,6 +2336,7 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
 
         {
             imgui::ScopedColor ct(ImGuiCol_Text, show ? get_color(type) : ImVec4(0.3f, 0.3f, 0.3f, 1));
+            imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
             imgui::Button(get_icon(type));
         }
 
@@ -2373,6 +2384,8 @@ void render_filter_mode_toggle(explorer_window &expl) noexcept
 
     auto label = make_str_static<64>("%s""## %zu", s_current_mode, expl.filter_mode);
 
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
+
     if (imgui::Button(label.data())) {
         inc_or_wrap<u64>((u64 &)expl.filter_mode, 0, u64(explorer_window::filter_mode::count) - 1);
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -2396,6 +2409,7 @@ void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
 {
     {
         imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, expl.filter_case_sensitive ? 1 : imgui::GetStyle().DisabledAlpha);
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
         if (imgui::Button(ICON_CI_CASE_SENSITIVE)) { // ICON_FA_CROSSHAIRS
             flip_bool(expl.filter_case_sensitive);
@@ -2411,6 +2425,8 @@ void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
 static
 void render_filter_polarity_button(explorer_window &expl) noexcept
 {
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
+
     if (imgui::Button(expl.filter_polarity ? (ICON_CI_EYE "## filter_polarity") : (ICON_CI_EYE_CLOSED "## filter_polarity"))) {
         flip_bool(expl.filter_polarity);
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
@@ -2555,6 +2571,7 @@ void render_help_icon(explorer_window &expl) noexcept
             (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
             (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
         ;
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
         if (imgui::BeginTable("## explorer_window help_icon_table", 3, table_flags)) {
             struct keybind_cell
@@ -3294,14 +3311,14 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
     if (!expl.filter_text_input_focused) {
         if (imgui::IsKeyPressed(ImGuiKey_Tab)) {
-            if (expl.tab_focus_idx == -1) {
-                expl.tab_focus_idx = 0;
+            if (expl.tabbing_focus_idx == -1) {
+                expl.tabbing_focus_idx = 0;
             } else {
                 s64 min = 0, max = expl.cwd_entries.size() - 1;
-                if (imgui::GetIO().KeyShift) dec_or_wrap(expl.tab_focus_idx, min, max);
-                else inc_or_wrap(expl.tab_focus_idx, min, max);
+                if (imgui::GetIO().KeyShift) dec_or_wrap(expl.tabbing_focus_idx, min, max);
+                else inc_or_wrap(expl.tabbing_focus_idx, min, max);
             }
-            expl.set_focus = true;
+            expl.tabbing_set_focus = true;
         }
     }
 
@@ -3781,7 +3798,7 @@ render_table_rows_for_cwd_entries_result render_table_rows_for_cwd_entries(
                             static swan_path s_last_click_path = {};
                             swan_path const &current_click_path = dirent.basic.path;
 
-                            if (imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !io.KeyCtrl && path_equals_exactly(current_click_path, s_last_click_path)) {
+                            if (imgui::IsItemActivated() || imgui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !io.KeyCtrl && path_equals_exactly(current_click_path, s_last_click_path)) {
                                 if (dirent.basic.is_directory()) {
                                     if (dirent.basic.is_path_dotdot()) {
                                         retval.do_ascend = true;
@@ -3861,6 +3878,11 @@ render_table_rows_for_cwd_entries_result render_table_rows_for_cwd_entries(
                     } // imgui::Selectable
 
                     selectable_rect = imgui::GetItemRect();
+
+                    if (expl.tabbing_set_focus && expl.tabbing_focus_idx == s64(i) && !imgui::IsItemFocused()) {
+                        expl.tabbing_set_focus = false;
+                        imgui::FocusItem();
+                    }
 
                     // {
                     //     f32 offset_for_icon_and_space = imgui::CalcTextSize(icon).x + imgui::CalcTextSize(" ").x;
