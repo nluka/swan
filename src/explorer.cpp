@@ -3307,7 +3307,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             if (expl.tabbing_focus_idx == -1) {
                 expl.tabbing_focus_idx = 0;
             } else {
-                s64 min = 0, max = expl.cwd_entries.size() - 1;
+                s64 min = 0, max = std::distance(expl.cwd_entries.begin(), expl.first_filtered_cwd_dirent_iter) - 1;
                 if (imgui::GetIO().KeyShift) dec_or_wrap(expl.tabbing_focus_idx, min, max);
                 else inc_or_wrap(expl.tabbing_focus_idx, min, max);
             }
@@ -3418,19 +3418,17 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                 expl.column_sort_specs = expl.copy_column_sort_specs(table_sort_specs);
             }
 
-            std::vector<explorer_window::dirent>::iterator first_filtered_cwd_dirent;
-
             if (table_sort_specs != nullptr && table_sort_specs->SpecsDirty) {
                 table_sort_specs->SpecsDirty = false;
-                first_filtered_cwd_dirent = sort_cwd_entries(expl);
+                expl.first_filtered_cwd_dirent_iter = sort_cwd_entries(expl);
             } else {
                 f64 find_first_filtered_cwd_dirent_us = 0;
                 SCOPE_EXIT { expl.find_first_filtered_cwd_dirent_timing_samples.push_back(find_first_filtered_cwd_dirent_us); };
                 scoped_timer<timer_unit::MICROSECONDS> timer(&find_first_filtered_cwd_dirent_us);
 
                 // no point in binary search here, cost of linear traversal is tiny even for huge collection
-                first_filtered_cwd_dirent = std::find_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
-                                                            [](explorer_window::dirent const &ent) noexcept { return ent.filtered; });
+                expl.first_filtered_cwd_dirent_iter = std::find_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
+                    [](explorer_window::dirent const &ent) noexcept { return ent.filtered; });
             }
 
             // opens "Context" popup if a rendered dirent is right clicked

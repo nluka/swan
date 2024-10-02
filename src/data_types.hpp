@@ -392,6 +392,7 @@ struct explorer_window
     time_point_precise_t last_drives_refresh_time = {};
     dirent *context_menu_target = nullptr;
     s64 tabbing_focus_idx = -1;
+    std::vector<dirent>::iterator first_filtered_cwd_dirent_iter;
 
     static u64 const NUM_TIMING_SAMPLES = 10;
 
