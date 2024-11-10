@@ -232,9 +232,9 @@ void explorer_window::invert_selection_on_visible_cwd_entries() noexcept
     }
 }
 
-void explorer_window::set_latest_valid_cwd(swan_path const &new_latest_valid_cwd) noexcept
+void explorer_window::set_latest_valid_cwd(swan_path const &new_latest_valid_cwd, bool prevent_filter_clear) noexcept
 {
-    if (global_state::settings().explorer_clear_filter_on_cwd_change) {
+    if (!prevent_filter_clear && global_state::settings().explorer_clear_filter_on_cwd_change) {
         this->reset_filter();
         this->show_filter_window = false;
     }
@@ -1244,12 +1244,14 @@ bool explorer_window::load_from_disk(char dir_separator) noexcept
     auto key_numerical_pattern = make_str_static<128>("^%s %s$", key_pattern, uint_or_float_pattern);
     auto key_ImVec4_pattern = make_str_static<128>("^%s %s %s %s %s$", key_pattern, uint_or_float_pattern, uint_or_float_pattern, uint_or_float_pattern, uint_or_float_pattern);
     auto key_path_pattern = make_str_static<128>("^%s %s [a-z]:[\\\\/].*$", key_pattern, uint_pattern);
+    auto filter_pattern = make_str_static<128>("^filter %s .*$", key_pattern, uint_pattern);
     auto wd_history_elem_pattern = make_str_static<128>("^wd_history_elem %s [a-z]:[\\\\/].* %s$", uint_pattern, key_pattern);
 
     std::vector<std::regex> valid_line_regexs = {};
     valid_line_regexs.emplace_back(key_numerical_pattern.data(), std::regex_constants::icase);
     valid_line_regexs.emplace_back(key_ImVec4_pattern.data(), std::regex_constants::icase);
     valid_line_regexs.emplace_back(key_path_pattern.data(), std::regex_constants::icase);
+    valid_line_regexs.emplace_back(filter_pattern.data(), std::regex_constants::icase);
     valid_line_regexs.emplace_back(wd_history_elem_pattern.data(), std::regex_constants::icase);
 
     std::stringstream ss;
@@ -1857,7 +1859,7 @@ void render_num_cwd_items(cwd_count_info const &cnt) noexcept
 static
 ImRect render_num_cwd_items_filtered(explorer_window &expl, cwd_count_info const &cnt) noexcept
 {
-    imgui::Text("%zu items hidden", cnt.filtered_dirents);
+    imgui::Text("%zu hidden", cnt.filtered_dirents);
     ImRect retval_text_rect = imgui::GetItemRect();;
 
     if (imgui::IsItemClicked()) {
@@ -1895,9 +1897,9 @@ ImRect render_num_cwd_items_selected([[maybe_unused]] explorer_window &expl, cwd
 
     if (cnt.selected_directories == 0) {
         auto formatted_size = format_file_size(cnt.selected_files_size, global_state::settings().size_unit_multiplier);
-        imgui::Text("%zu item%s selected  %s", cnt.selected_dirents, pluralized(cnt.selected_dirents, "", "s"), formatted_size.data());
+        imgui::Text("%zu selected  %s", cnt.selected_dirents, formatted_size.data());
     } else {
-        imgui::Text("%zu item%s selected", cnt.selected_dirents, pluralized(cnt.selected_dirents, "", "s"));
+        imgui::Text("%zu selected", cnt.selected_dirents);
     }
 
     retval_text_rect = imgui::GetItemRect();
@@ -2008,7 +2010,7 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists) noexce
 
     // when window is appearing
     if (imgui::IsWindowAppearing() && !imgui::IsAnyItemActive() && !imgui::IsMouseClicked(0)) {
-        imgui::SetKeyboardFocusHere(0); // set initial focus on search input
+        imgui::SetKeyboardFocusHere(); // set initial focus on search input
         s_focus_idx = -1;
         s_search_buf.clear();
     }
@@ -2293,9 +2295,16 @@ bool render_filter_text_input(explorer_window &expl, bool window_hovered, bool c
         imgui::CalcTextSize("1").x * 20.75f
     );
 
-    ImVec4 low_warning = warning_color(); low_warning.w /= 1.5;
-    bool valid_non_empty_cwd = !path_is_empty(expl.cwd) && cnt.child_dirents > 0;
-    imgui::ScopedColor b(ImGuiCol_Border, low_warning, valid_non_empty_cwd && cnt.filtered_dirents == cnt.child_dirents);
+    ImVec4 border_color = imgui::GetStyleColorVec4(ImGuiCol_Border);
+    if (bool valid_non_empty_cwd = !path_is_empty(expl.cwd) && cnt.child_dirents > 0) {
+        if (!expl.filter_error.empty()) border_color = error_color();
+        else if (cnt.filtered_dirents == cnt.child_dirents) {
+            ImVec4 low_warning = warning_color(); low_warning.w /= 1.5;
+            border_color = low_warning;
+        }
+    }
+
+    imgui::ScopedColor b(ImGuiCol_Border, border_color);
     imgui::ScopedItemWidth iw(width);
 
     if (imgui::InputTextWithHint("## explorer_window filter", ICON_LC_SEARCH, expl.filter_text.data(), expl.filter_text.size())) {
@@ -2753,6 +2762,11 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
         retval.is_hovered = imgui::IsItemHovered();
 
         ImGuiID id = imgui::GetCurrentWindow()->GetID(label.data());
+
+        if (imgui::GetIO().KeyCtrl && imgui::IsKeyPressed(ImGuiKey_D)) {
+            imgui::ActivateItemByID(id);
+            expl.tabbing_focus_idx = -1;
+        }
         input_text_state = imgui::GetInputTextState(id);
     }
     expl.cwd_input_text_scroll_x = input_text_state ? input_text_state->ScrollX : -1;
@@ -3058,7 +3072,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                     expl.read_dir_changes_target = expl.cwd;
 
                     if (success) {
-                        print_debug_msg("[ %d ] SUCCESS ReadDirectoryChangesW [%s]", expl.id, expl.cwd.data());
+                        // print_debug_msg("[ %d ] SUCCESS ReadDirectoryChangesW [%s]", expl.id, expl.cwd.data());
                     } else {
                         print_debug_msg("[ %d ] FAILED ReadDirectoryChangesW: %s", expl.id, get_last_winapi_error().formatted_message.c_str());
                     }
@@ -3183,21 +3197,6 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             imgui::SameLineSpaced(1);
 
             render_filter_type_toggler_buttons(expl);
-
-            if (expl.filter_error != "") {
-                imgui::SameLineSpaced(1);
-                imgui::PushTextWrapPos(imgui::GetColumnWidth());
-                imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
-                imgui::PopTextWrapPos();
-            }
-            else if (cwd_exists_after_edit && cnt.child_dirents > 0 && cnt.filtered_dirents == cnt.child_dirents) {
-                imgui::SameLineSpaced(1);
-                imgui::TextColored(warning_color(), "All items filtered");
-            }
-            else if (cnt.filtered_dirents > 0) {
-                imgui::SameLineSpaced(1);
-                (void) render_num_cwd_items_filtered(expl, cnt);
-            }
         }
 
         imgui::SameLineSpaced(1);
@@ -3250,17 +3249,6 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         render_help_icon(expl);
         imgui::SameLineSpaced(2);
 
-        if (expl.refresh_message != "") {
-            imgui::TextColored(warning_color(), "%s", expl.refresh_message.c_str());
-            if (imgui::IsItemHovered()) {
-                imgui::SetTooltip(expl.refresh_message_tooltip.c_str());
-            }
-            if (imgui::IsItemClicked(ImGuiMouseButton_Left)) {
-                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
-            }
-            imgui::SameLineSpaced(1);
-        }
-
         if (!path_is_empty(expl.cwd)) {
             if (!cwd_exists_after_edit) {
                 imgui::TextColored(warning_color(), "Directory not found");
@@ -3298,6 +3286,32 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             if (cnt.selected_dirents > 0) {
                 imgui::SameLineSpaced(2);
                 (void) render_num_cwd_items_selected(expl, cnt);
+            }
+
+            if (expl.filter_error != "") {
+                imgui::SameLineSpaced(2);
+                // imgui::PushTextWrapPos(imgui::GetColumnWidth());
+                imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
+                // imgui::PopTextWrapPos();
+            }
+            else if (cwd_exists_after_edit && cnt.child_dirents > 0 && cnt.filtered_dirents == cnt.child_dirents) {
+                imgui::SameLineSpaced(2);
+                imgui::TextColored(warning_color(), "All items filtered");
+            }
+            else if (cnt.filtered_dirents > 0) {
+                imgui::SameLineSpaced(2);
+                (void) render_num_cwd_items_filtered(expl, cnt);
+            }
+
+            if (expl.refresh_message != "") {
+                imgui::SameLineSpaced(2);
+                imgui::TextColored(warning_color(), "%s", expl.refresh_message.c_str());
+                if (imgui::IsItemHovered()) {
+                    imgui::SetTooltip(expl.refresh_message_tooltip.c_str());
+                }
+                if (imgui::IsItemClicked(ImGuiMouseButton_Left)) {
+                    (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+                }
             }
         }
     }
@@ -3500,7 +3514,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     bool any_clickable_footer_components_hovered = false;
 
     if (expl.footer_rect.has_value()) {
-        expl.footer_hovered = imgui::IsMouseHoveringRect(expl.footer_rect.value().Min, expl.footer_rect.value().Max);
+        expl.footer_hovered = imgui::IsMouseHoveringRect(expl.footer_rect.value());
 
         expl.footer_selection_info_hovered = expl.footer_selection_info_rect.has_value() ? imgui::IsMouseHoveringRect(expl.footer_selection_info_rect.value()) : false;
         expl.footer_filter_info_hovered    = expl.footer_filter_info_rect.has_value()    ? imgui::IsMouseHoveringRect(expl.footer_filter_info_rect.value())    : false;

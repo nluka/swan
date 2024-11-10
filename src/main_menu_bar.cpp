@@ -111,7 +111,7 @@ void render_main_menu_bar(GLFWwindow *window, std::array<explorer_window, global
             setting_change |= imgui::MenuItem(explorers[3].name, nullptr, &global_state::settings().show.explorer_3);
 
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::finder), nullptr, &global_state::settings().show.finder);
-            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::pinned), nullptr, &global_state::settings().show.pinned);
+            // setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::pinned), nullptr, &global_state::settings().show.pinned);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::file_operations), nullptr, &global_state::settings().show.file_operations);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::recent_files), nullptr, &global_state::settings().show.recent_files);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::analytics), nullptr, &global_state::settings().show.analytics);

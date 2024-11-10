@@ -3,6 +3,8 @@
 #include "imgui_dependent_functions.hpp"
 #include "scoped_timer.hpp"
 
+#include "imgui/imspinner.h"
+
 static constexpr u64 num_obj_types = (u64)basic_dirent::kind::count;
 static constexpr u64 num_status_types = (u64)bulk_rename_transform::status::count;
 
@@ -105,7 +107,8 @@ bool render_execute_all_button(bool disabled_condition, bool cross_out_condition
     bool pressed;
     {
         imgui::ScopedDisable d(disabled_condition);
-        pressed = imgui::Button(ICON_CI_DEBUG_CONTINUE "## bulk_rename");
+        imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
+        pressed = imgui::Button(ICON_LC_PLAY " Execute" "## bulk_rename");
     }
 
     if (cross_out_condition) {
@@ -135,7 +138,7 @@ bool render_revert_all_button(bool disabled_condition, bool cross_out_condition)
     bool pressed;
     {
         imgui::ScopedDisable d(disabled_condition);
-        pressed = imgui::Button(ICON_CI_DEBUG_REVERSE_CONTINUE "## bulk_rename");
+        pressed = imgui::Button(ICON_LC_UNDO " Revert" "## bulk_rename");
     }
 
     if (cross_out_condition) {
@@ -165,8 +168,9 @@ static
 bool render_stop_button(bool transact_active) noexcept
 {
     imgui::ScopedDisable d(!transact_active);
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
-    bool pressed = imgui::Button(ICON_CI_STOP_CIRCLE "## bulk_rename");
+    bool pressed = imgui::Button(ICON_LC_PAUSE " Stop" "## bulk_rename");
 
     if (imgui::IsItemHovered({}, .5f)) {
         imgui::SetTooltip("Stop rename operations");
@@ -179,8 +183,9 @@ static
 bool render_exit_button(bool transact_active) noexcept
 {
     imgui::ScopedDisable d(transact_active);
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
-    bool pressed = imgui::Button(ICON_CI_CHROME_CLOSE "## bulk_rename");
+    bool pressed = imgui::Button(ICON_LC_X " Exit" "## bulk_rename");
 
     if (imgui::IsItemHovered({}, .5f)) {
         imgui::SetTooltip("Exit");
@@ -193,8 +198,9 @@ static
 bool render_reset_all_button(bool transact_active) noexcept
 {
     imgui::ScopedDisable d(transact_active);
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
-    bool pressed = imgui::Button(ICON_CI_REFRESH "## bulk rename");
+    bool pressed = imgui::Button(ICON_CI_REFRESH " Reset" "## bulk rename");
 
     if (imgui::IsItemHovered({}, .5f)) {
         imgui::SetTooltip("Reset all [After] values");
@@ -204,21 +210,23 @@ bool render_reset_all_button(bool transact_active) noexcept
 }
 
 static
-bool render_export_button(bool transact_active,
-                          std::vector<bulk_rename_transform>::iterator first_transform,
-                          std::vector<bulk_rename_transform>::iterator last_transform,
-                          u64 transforms_size_digits) noexcept
+std::pair<bool, u64> render_export_button(bool transact_active,
+                                          std::vector<bulk_rename_transform>::iterator first_transform,
+                                          std::vector<bulk_rename_transform>::iterator last_transform,
+                                          u64 transforms_size_digits) noexcept
 {
     bool exported = false;
+    u64 num_lines = 0;
 
     imgui::ScopedDisable d(transact_active);
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
-    if (imgui::Button(ICON_CI_ARROW_CIRCLE_UP "## bulk rename")) {
+    if (imgui::Button(ICON_LC_CLIPBOARD " Export" "## bulk rename")) {
         u64 num = 0;
         std::string content = {};
 
         for (auto iter = first_transform; iter != last_transform; ++iter) {
-            auto line = make_str_static<1200>("[%0*zu] %s\n", transforms_size_digits, num++, iter->after.data());
+            auto line = make_str_static<1200>("[%0*zu] %s\n", transforms_size_digits, num_lines++, iter->after.data());
             content.append(line.data());
         }
         if (content.ends_with('\n')) {
@@ -232,11 +240,11 @@ bool render_export_button(bool transact_active,
         imgui::SetTooltip("Export text to clipboard");
     }
 
-    return exported;
+    return { exported, num_lines };
 }
 
 static
-bool render_import_button(bool transact_active, bool export_triggered_at_least_once, std::vector<bulk_rename_transform> &transforms) noexcept
+std::pair<bool, u64> render_import_button(bool transact_active, bool export_triggered_at_least_once, std::vector<bulk_rename_transform> &transforms) noexcept
 {
     bool imported = false;
     static std::vector<std::string> s_errors = {};
@@ -244,8 +252,9 @@ bool render_import_button(bool transact_active, bool export_triggered_at_least_o
     static u64 s_clipboard_num_lines = 0;
 
     imgui::ScopedDisable d(!export_triggered_at_least_once || transact_active);
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
-    if (imgui::Button(ICON_CI_ARROW_CIRCLE_DOWN "## bulk rename")) {
+    if (imgui::Button(ICON_LC_CLIPBOARD " Import" "## bulk rename")) {
         char const *clipboard = imgui::GetClipboardText();
         std::vector<swan_path> transforms_after = {};
         auto [success, text_sanitized, num_lines] = bulk_rename_parse_text_import(clipboard, transforms_after, transforms.size() - 1, s_errors);
@@ -279,7 +288,7 @@ bool render_import_button(bool transact_active, bool export_triggered_at_least_o
         imgui::EndPopup();
     }
 
-    return imported;
+    return { imported, s_clipboard_num_lines };
 }
 
 static
@@ -296,14 +305,16 @@ bool render_transaction_progress_indicator(transaction_counters const &counters)
     f64 ratio_done = f64(num_completed + num_failed) / f64(num_total);
     f64 percent_done = ratio_done * 100.f;
 
-    if (num_total < 10'000) {
-        imgui::Text("%4.0lf %%", percent_done);
-    } else {
-        imgui::Text("%5.1lf %%", percent_done);
-    }
+    imgui::ProgressBar(ratio_done, ImVec2(100, 0));
+
     if (num_failed > 0) {
         imgui::SameLineSpaced(1);
-        imgui::TextColored(error_color(), "%zu failed", num_failed);
+        imgui::TextColored(error_color(), ICON_LC_MESSAGE_SQUARE_WARNING " %zu", num_failed);
+    }
+    if (num_completed + num_failed < num_total) {
+        static int pnt = 0;
+        imgui::SameLineSpaced(1);
+        ImSpinner::SpinnerBlocks("Spinner", 15.f/2.f, 5, imgui::GetStyleColorVec4(ImGuiCol_Text), imgui::GetStyleColorVec4(ImGuiCol_TextDisabled), 15);
     }
 
     return true;
@@ -608,14 +619,16 @@ render_table_result render_table(
         ImGuiTableFlags_SizingStretchProp|
         ImGuiTableFlags_Reorderable|
         ImGuiTableFlags_BordersOuterV|
+        ImGuiTableFlags_ScrollY|
         (global_state::settings().tables_alt_row_bg ? ImGuiTableFlags_RowBg : 0)|
         (global_state::settings().table_borders_in_body ? 0 : ImGuiTableFlags_NoBordersInBody)
     ;
+    imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
     ImVec2 avail = imgui::GetContentRegionAvail();
-    ImVec2 size = ImVec2(avail.x, avail.y - imgui::CalcTextSize("X").y - imgui::GetStyle().ItemSpacing.y);
+    ImVec2 size = ImVec2(avail.x, avail.y - imgui::CalcTextSize("X").y - imgui::GetStyle().ItemSpacing.y*2 - imgui::GetStyle().FramePadding.y*2);
 
-    if (imgui::BeginChild("bulk_rename child", size)) {
+    // if (imgui::BeginChild("bulk_rename child", size)) {
         if (imgui::BeginTable("bulk_rename table", bulk_rename_table_col_id_count, table_flags, size)) {
             ImGuiTableColumnFlags fixed_col_flags = ImGuiTableColumnFlags_NoResize|ImGuiTableColumnFlags_WidthFixed;
 
@@ -624,7 +637,7 @@ render_table_result render_table(
             imgui::TableSetupColumn(ICON_CI_SYMBOL_OBJECT, fixed_col_flags, 0.0f, bulk_rename_table_col_id_obj_type);
             imgui::TableSetupColumn("Before", 0, 0.0f, bulk_rename_table_col_id_before);
             imgui::TableSetupColumn("After", ImGuiTableColumnFlags_NoHide, 0.0f, bulk_rename_table_col_id_after);
-            imgui::TableSetupScrollFreeze(0, 1);
+            imgui::TableSetupScrollFreeze(0, 2);
             imgui::TableHeadersRow();
 
             imgui::TableNextRow();
@@ -853,9 +866,8 @@ render_table_result render_table(
 
             imgui::EndTable();
         }
-
-        imgui::EndChild();
-    }
+    // }
+    // imgui::EndChild();
 
     return retval;
 }
@@ -977,21 +989,21 @@ void swan_popup_modals::render_bulk_rename() noexcept
         u64 num_total = 0;
         for (auto &transform : g_transforms) {
             if (consider_selected_only && !transform.selected) continue;
-            bool work_to_do = !path_equals_exactly(transform.before, transform.after);
+            bool work_to_do = !path_equals_exactly(transform.before, transform.after) && transform.stat.load() != bulk_rename_transform::status::execute_success;
             if (work_to_do) {
                 transform.stat.store(bulk_rename_transform::status::ready);
                 num_total += 1;
             }
         }
         if (num_total == 0) {
-            s_informational_msg = "> No work to do";
+            s_informational_msg = ICON_LC_MESSAGE_SQUARE_MORE " No work to do";
         } else {
             s_transaction_counters.num_completed.store(0);
             s_transaction_counters.num_failed.store(0);
             s_transaction_counters.num_total.store(num_total);
 
             global_state::thread_pool().push_task(execute_task, std::ref(g_transforms), g_cwd, false);
-            s_informational_msg = make_str("> Transaction[%s]", ICON_CI_ARROW_RIGHT);
+            s_informational_msg = make_str("Transaction");
         }
     };
 
@@ -1054,7 +1066,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
             num_total += u64(transform.stat.load() == bulk_rename_transform::status::execute_success);
         }
         if (num_total == 0) {
-            s_informational_msg = "> No work to do";
+            s_informational_msg = ICON_LC_MESSAGE_SQUARE_MORE " No work to do";
         } else {
             s_transaction_counters.num_completed.store(0);
             s_transaction_counters.num_failed.store(0);
@@ -1062,7 +1074,7 @@ void swan_popup_modals::render_bulk_rename() noexcept
 
             bool reset_names = imgui::GetIO().KeyCtrl;
             global_state::thread_pool().push_task(revert_task, std::ref(g_transforms), g_cwd, reset_names, false);
-            s_informational_msg = make_str("> Transaction[%s]", ICON_CI_ARROW_LEFT);
+            s_informational_msg = make_str("Transaction");
         }
     };
 
@@ -1070,27 +1082,6 @@ void swan_popup_modals::render_bulk_rename() noexcept
     bool transact_started = s_transaction_task.started.load();
     bool transact_active = s_transaction_task.active_token.load();
     // bool transact_cancelled = s_transaction_task.cancellation_token.load();
-
-    bool revert_all_button_pressed;
-    {
-        bool disabled_condition = g_transforms.empty() || !transact_started || transact_active;
-        bool cross_out_condition = false;
-        revert_all_button_pressed = render_revert_all_button(disabled_condition, cross_out_condition);
-    }
-    if (revert_all_button_pressed) {
-        launch_revert_task_if_work_available(false);
-    }
-
-    imgui::SameLine();
-
-    bool stop_button_pressed = render_stop_button(transact_active);
-    if (stop_button_pressed) {
-        s_transaction_task.cancellation_token.store(true);
-        assert(s_informational_msg.starts_with("> Transaction["));
-        s_informational_msg += " aborted";
-    }
-
-    imgui::SameLine();
 
     bool exec_all_button_pressed;
     {
@@ -1102,7 +1093,51 @@ void swan_popup_modals::render_bulk_rename() noexcept
         launch_execute_task_if_work_available(false);
     }
 
-    imgui::SameLine();
+    imgui::SameLineSpaced(1);
+
+    bool stop_button_pressed = render_stop_button(transact_active);
+    if (stop_button_pressed) {
+        s_transaction_task.cancellation_token.store(true);
+        assert(s_informational_msg.starts_with("Transaction"));
+        s_informational_msg += " (aborted) ";
+    }
+
+    imgui::SameLineSpaced(1);
+
+    bool revert_all_button_pressed;
+    {
+        bool disabled_condition = g_transforms.empty() || !transact_started || transact_active;
+        bool cross_out_condition = false;
+        revert_all_button_pressed = render_revert_all_button(disabled_condition, cross_out_condition);
+    }
+    if (revert_all_button_pressed) {
+        launch_revert_task_if_work_available(false);
+    }
+
+    imgui::SameLineSpaced(1);
+
+    auto [exported, num_lines_exported] = render_export_button(transact_active, g_transforms.begin(), s_filtered_transforms_partition_iter, transforms_size_digits);
+    if (exported) {
+        s_exported = true;
+        s_informational_msg = make_str(ICON_LC_MESSAGE_SQUARE_MORE " Exported %zu lines", num_lines_exported);
+    }
+
+    imgui::SameLineSpaced(1);
+
+    auto [imported, num_lines_imported] = render_import_button(transact_active, s_exported, g_transforms);
+    if (imported) {
+        s_informational_msg = make_str(ICON_LC_MESSAGE_SQUARE_MORE " Imported %zu lines", num_lines_imported);
+    }
+
+    imgui::SameLineSpaced(1);
+
+    bool reset_all_button_pressed = render_reset_all_button(transact_active);
+    if (reset_all_button_pressed) {
+        reset();
+        s_informational_msg = ICON_LC_MESSAGE_SQUARE_MORE " Reset";
+    }
+
+    imgui::SameLineSpaced(1);
 
     bool exit_button_pressed = render_exit_button(transact_active);
     if (exit_button_pressed) {
@@ -1113,42 +1148,6 @@ void swan_popup_modals::render_bulk_rename() noexcept
             g_on_rename_callback();
         }
         cleanup_and_close_popup();
-    }
-
-    imgui::SameLineSpaced(2);
-
-    if (render_export_button(transact_active, g_transforms.begin(), s_filtered_transforms_partition_iter, transforms_size_digits)) {
-        s_exported = true;
-        s_informational_msg = "> Exported";
-    }
-
-    imgui::SameLine();
-
-    bool imported = render_import_button(transact_active, s_exported, g_transforms);
-    if (imported) {
-        s_informational_msg = "> Imported";
-    }
-
-    imgui::SameLine();
-
-    bool reset_all_button_pressed = render_reset_all_button(transact_active);
-    if (reset_all_button_pressed) {
-        reset();
-        s_informational_msg = "> Reset";
-    }
-
-    if (!s_informational_msg.empty()) {
-        imgui::SameLineSpaced(2);
-        imgui::TextUnformatted(s_informational_msg.c_str());
-
-        if (transact_started && s_informational_msg.starts_with("> Transaction[")) {
-            imgui::SameLine();
-            if (!render_transaction_progress_indicator(s_transaction_counters)) {
-                imgui::NewLine();
-            }
-        }
-    } else {
-        assert(s_transaction_task.active_token.load() == false);
     }
 
     auto table = render_table(
@@ -1198,25 +1197,36 @@ void swan_popup_modals::render_bulk_rename() noexcept
     }
 #endif
 
-    u64 num_rows_filtered = std::distance(s_filtered_transforms_partition_iter, g_transforms.end());
-    if (num_rows_filtered > 0) {
-        imgui::Text("%zu items filtered", num_rows_filtered);
-#if 0
-        imgui::SameLine();
+    // footer
+    {
+        imgui::Spacing();
+        imgui::AlignTextToFramePadding();
+
+        u64 num_rows_filtered = std::distance(s_filtered_transforms_partition_iter, g_transforms.end());
+        if (num_rows_filtered > 0) {
+            imgui::Text(ICON_LC_FILTER " %zu", num_rows_filtered);
+            if (imgui::IsItemHovered({}, 1)) {
+                imgui::SetTooltip("%zu rows hidden according to filters", num_rows_filtered);
+            }
+            imgui::SameLineSpaced(2);
+        }
+
+        if (!s_informational_msg.empty()) {
+            imgui::TextUnformatted(s_informational_msg.c_str());
+
+            if (transact_started && s_informational_msg.starts_with("Transaction")) {
+                imgui::SameLine();
+                if (!render_transaction_progress_indicator(s_transaction_counters)) {
+                    imgui::NewLine();
+                }
+            }
+        } else {
+            assert(s_transaction_task.active_token.load() == false);
+        }
     }
-    imgui::Text("Transaction (s:%d a:%d c:%d)", transact_started, transact_active, transact_cancelled);
-    imgui::SameLine();
-    imgui::TextColored(success_color(), "%zu", s_transaction_counters.num_completed.load());
-    imgui::SameLine();
-    imgui::TextColored(error_color(), "%zu", s_transaction_counters.num_failed.load());
-    imgui::SameLine();
-    imgui::Text("%zu", s_transaction_counters.num_total.load());
-#else
-    }
-#endif
 
     if (imported || reset_all_button_pressed || table.any_after_text_edited) {
-        print_debug_msg("change made (%d %d %d) updating s_last_edit_time", imported, reset_all_button_pressed, table.any_after_text_edited);
+        print_debug_msg("Change made (%d %d %d), updating s_last_edit_time", imported, reset_all_button_pressed, table.any_after_text_edited);
         s_last_edit_time = get_time_precise();
     }
 

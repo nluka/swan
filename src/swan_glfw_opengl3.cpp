@@ -202,7 +202,7 @@ try {
 
             auto [starting_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
             if (starting_dir_exists) {
-                expl.set_latest_valid_cwd(expl.cwd); // this may mutate filter
+                expl.set_latest_valid_cwd(expl.cwd, true); // prevent filter reset after load_from_disk
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
             }
         }
@@ -393,19 +393,19 @@ try {
                     }
                     break;
                 }
-                case swan_windows::id::pinned: {
-                    if (window_visib.pinned) {
-                        if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &window_visib.pinned)) {
-                            static pinned_path *s_context_target = nullptr;
-                            swan_windows::render_pinned(s_context_target, false);
-                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
-                                window_render_order_move_to_back(swan_windows::id::pinned);
-                            }
-                        }
-                        imgui::End();
-                    }
-                    break;
-                }
+                // case swan_windows::id::pinned: {
+                //     if (window_visib.pinned) {
+                //         if (imgui::Begin(swan_windows::get_name(swan_windows::id::pinned), &window_visib.pinned)) {
+                //             static pinned_path *s_context_target = nullptr;
+                //             swan_windows::render_pinned(s_context_target, false);
+                //             if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                //                 window_render_order_move_to_back(swan_windows::id::pinned);
+                //             }
+                //         }
+                //         imgui::End();
+                //     }
+                //     break;
+                // }
                 case swan_windows::id::file_operations: {
                     if (window_visib.file_operations) {
                         if (swan_windows::render_file_operations(window_visib.file_operations, any_popups_open)) {

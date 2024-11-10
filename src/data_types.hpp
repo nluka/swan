@@ -169,7 +169,7 @@ struct swan_settings
     ImVec4 file_color = default_file_color();
     ImVec4 symlink_color = default_symlink_color();
 
-    s32 num_max_file_operations = 10'000;
+    s32 num_max_file_operations = 100'000;
 
     s32 window_x = 10, window_y = 40; //! must be adjacent, y must come after x in memory
     s32 window_w = 1280, window_h = 720; //! must be adjacent, h must come after w in memory
@@ -207,7 +207,7 @@ struct swan_settings
 
     struct window_visibility
     {
-        bool explorer_0 = true;
+        bool explorer_0 = false;
         bool explorer_1 = false;
         bool explorer_2 = false;
         bool explorer_3 = false;
@@ -225,9 +225,6 @@ struct swan_settings
         bool imgui_demo = false;
         bool theme_editor = false;
         bool icon_library = false;
-        bool fa_icons = false;
-        bool ci_icons = false;
-        bool md_icons = false;
     };
 
     window_visibility show;
@@ -315,7 +312,7 @@ struct explorer_window
     void select_all_visible_cwd_entries(bool select_dotdot_dir = false) noexcept;
     u64 deselect_all_cwd_entries() noexcept;
     void invert_selection_on_visible_cwd_entries() noexcept;
-    void set_latest_valid_cwd(swan_path const &new_latest_valid_cwd) noexcept;
+    void set_latest_valid_cwd(swan_path const &new_latest_valid_cwd, bool prevent_filter_clear = false) noexcept;
     void uncut() noexcept;
     void reset_filter() noexcept;
     cwd_entries_column_sort_specs_t copy_column_sort_specs(ImGuiTableSortSpecs const *sort_specs) noexcept;

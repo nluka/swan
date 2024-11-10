@@ -136,9 +136,6 @@ try {
     write_bool("show.imgui_demo", this->show.imgui_demo);
     write_bool("show.theme_editor", this->show.theme_editor);
     write_bool("show.icon_library", this->show.icon_library);
-    write_bool("show.fa_icons", this->show.fa_icons);
-    write_bool("show.ci_icons", this->show.ci_icons);
-    write_bool("show.md_icons", this->show.md_icons);
 
     write_ImVec4("color.success", this->success_color);
     write_ImVec4("color.warning", this->warning_color);
@@ -404,14 +401,6 @@ try {
             else if (remainder == "icon_library") {
                 this->show.icon_library = extract_bool();
             }
-            else if (remainder == "fa_icons") {
-                this->show.fa_icons = extract_bool();
-            }
-            else if (remainder == "ci_icons") {
-                this->show.ci_icons = extract_bool();
-            }
-            else if (remainder == "md_icons") {
-                this->show.md_icons = extract_bool();
             }
             else {
                 print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);
@@ -1008,7 +997,7 @@ try {
             if (property == "num_max_file_operations") {
                 ss >> this->num_max_file_operations;
             }
-            if (property == "window_x") {
+            else if (property == "window_x") {
                 ss >> this->window_x;
             }
             else if (property == "window_y") {

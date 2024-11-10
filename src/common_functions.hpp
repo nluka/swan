@@ -62,7 +62,7 @@ namespace swan_windows
             case id::recent_files: return " Recent Files ";
             case id::analytics: return " Analytics ";
             case id::debug_log: return " Debug Log ";
-            case id::settings: return " Settings ";
+            case id::settings: return " Advanced Settings ";
             case id::theme_editor: return " Theme Editor ";
             case id::icon_library: return " Icon Library ";
             case id::imgui_demo: return " ImGui Demo ";
