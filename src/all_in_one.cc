@@ -25,6 +25,7 @@
 #include "icon_library.cpp"
 #include "imgui_dependent_functions.cpp"
 #include "imgui_extension.cpp"
+#include "imspinner_demo.cpp"
 #include "main_menu_bar.cpp"
 #include "miscellaneous_functions.cpp"
 #include "miscellaneous_globals.cpp"

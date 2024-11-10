@@ -500,6 +500,17 @@ try {
                     }
                     break;
                 }
+                case swan_windows::id::imspinner_demo: {
+                    if (window_visib.imspinner_demo) {
+                        if (swan_windows::render_imspinner_demo(window_visib.imspinner_demo, any_popups_open)) {
+                            if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
+                                window_render_order_move_to_back(swan_windows::id::icon_library);
+                            }
+                        }
+                        imgui::End();
+                    }
+                    break;
+                }
                 default: break;
             }
         }

@@ -71,6 +71,7 @@ set(SWAN_SOURCES
     "src/icon_library.cpp"
     "src/imgui_dependent_functions.cpp"
     "src/imgui_extension.cpp"
+    "src/imspinner_demo.cpp"
     "src/main_menu_bar.cpp"
     "src/miscellaneous_functions.cpp"
     "src/miscellaneous_globals.cpp"

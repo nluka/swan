@@ -401,6 +401,8 @@ try {
             else if (remainder == "icon_library") {
                 this->show.icon_library = extract_bool();
             }
+            else if (remainder == "imspinner_demo") {
+                this->show.imspinner_demo = extract_bool();
             }
             else {
                 print_debug_msg("Unknown property [%s] at line %zu, skipping...", property.c_str(), line_num);

@@ -42,6 +42,7 @@ namespace swan_windows
         theme_editor,
         icon_library,
         imgui_demo,
+        imspinner_demo,
         count
     };
 
@@ -66,6 +67,7 @@ namespace swan_windows
             case id::theme_editor: return " Theme Editor ";
             case id::icon_library: return " Icon Library ";
             case id::imgui_demo: return " ImGui Demo ";
+            case id::imspinner_demo: return " ImSpinner Demo ";
             default: assert(false && "Window has no name"); return nullptr;
         }
     }
@@ -94,7 +96,9 @@ namespace swan_windows
 
     bool render_analytics(std::array<swan_windows::id, (u64)swan_windows::id::count - 1> const &window_render_order) noexcept;
 
-} // namespace render_window
+    bool render_imspinner_demo(bool &open, bool any_popups_open) noexcept;
+
+}
 
 namespace swan_popup_modals
 {

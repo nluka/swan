@@ -126,6 +126,7 @@ void render_main_menu_bar(GLFWwindow *window, std::array<explorer_window, global
 
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::debug_log), nullptr, &global_state::settings().show.debug_log);
             setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::imgui_demo), nullptr, &global_state::settings().show.imgui_demo);
+            setting_change |= imgui::MenuItem(swan_windows::get_name(swan_windows::id::imspinner_demo), nullptr, &global_state::settings().show.imspinner_demo);
 
             imgui::EndMenu();
         }

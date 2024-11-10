@@ -225,6 +225,7 @@ struct swan_settings
         bool imgui_demo = false;
         bool theme_editor = false;
         bool icon_library = false;
+        bool imspinner_demo = false;
     };
 
     window_visibility show;

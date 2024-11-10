@@ -848,6 +848,7 @@ std::array<swan_windows::id, (u64)swan_windows::id::count - 1> window_render_ord
         swan_windows::id::theme_editor,
         swan_windows::id::icon_library,
         swan_windows::id::imgui_demo,
+        swan_windows::id::imspinner_demo,
     };
     try {
         std::filesystem::path full_path = global_state::execution_path() / "data\\window_render_order.txt";
