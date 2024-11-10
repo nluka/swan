@@ -608,10 +608,9 @@ render_table_result render_table(
 {
     render_table_result retval = {};
 
-    // auto &io = imgui::GetIO();
+    [[maybe_unused]] auto &io = imgui::GetIO();
 
     static u64 s_latest_selected_row_idx = u64(-1);
-    // static bulk_rename_transform *s_deselect_on_context_menu_close = nullptr;
 
     ImGuiTableFlags table_flags =
         ImGuiTableFlags_Hideable|
@@ -628,246 +627,183 @@ render_table_result render_table(
     ImVec2 avail = imgui::GetContentRegionAvail();
     ImVec2 size = ImVec2(avail.x, avail.y - imgui::CalcTextSize("X").y - imgui::GetStyle().ItemSpacing.y*2 - imgui::GetStyle().FramePadding.y*2);
 
-    // if (imgui::BeginChild("bulk_rename child", size)) {
-        if (imgui::BeginTable("bulk_rename table", bulk_rename_table_col_id_count, table_flags, size)) {
-            ImGuiTableColumnFlags fixed_col_flags = ImGuiTableColumnFlags_NoResize|ImGuiTableColumnFlags_WidthFixed;
+    if (imgui::BeginTable("bulk_rename table", bulk_rename_table_col_id_count, table_flags, size)) {
+        ImGuiTableColumnFlags fixed_col_flags = ImGuiTableColumnFlags_NoResize|ImGuiTableColumnFlags_WidthFixed;
 
-            imgui::TableSetupColumn(ICON_CI_ARRAY, fixed_col_flags, 0.0f, bulk_rename_table_col_id_index);
-            imgui::TableSetupColumn(ICON_CI_INFO, fixed_col_flags, 0.0f, bulk_rename_table_col_id_status);
-            imgui::TableSetupColumn(ICON_CI_SYMBOL_OBJECT, fixed_col_flags, 0.0f, bulk_rename_table_col_id_obj_type);
-            imgui::TableSetupColumn("Before", 0, 0.0f, bulk_rename_table_col_id_before);
-            imgui::TableSetupColumn("After", ImGuiTableColumnFlags_NoHide, 0.0f, bulk_rename_table_col_id_after);
-            imgui::TableSetupScrollFreeze(0, 2);
-            imgui::TableHeadersRow();
+        imgui::TableSetupColumn(ICON_CI_ARRAY, fixed_col_flags, 0.0f, bulk_rename_table_col_id_index);
+        imgui::TableSetupColumn(ICON_CI_INFO, fixed_col_flags, 0.0f, bulk_rename_table_col_id_status);
+        imgui::TableSetupColumn(ICON_CI_SYMBOL_OBJECT, fixed_col_flags, 0.0f, bulk_rename_table_col_id_obj_type);
+        imgui::TableSetupColumn("Before", 0, 0.0f, bulk_rename_table_col_id_before);
+        imgui::TableSetupColumn("After", ImGuiTableColumnFlags_NoHide, 0.0f, bulk_rename_table_col_id_after);
+        imgui::TableSetupScrollFreeze(0, 2);
+        imgui::TableHeadersRow();
+
+        imgui::TableNextRow();
+        retval.filters = render_filters_row(
+            filter_before_input,
+            filter_after_input,
+            obj_type_filters,
+            status_filters,
+            obj_types_present,
+            transforms_size_digits
+        );
+
+        ImGuiListClipper clipper;
+        {
+            u64 num_filtered = std::distance(filtered_transforms_partition_iter, transforms.end());
+            u64 num_shown = transforms.size() - num_filtered;
+            clipper.Begin((s32)num_shown);
+        }
+
+        while (clipper.Step())
+        for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+            auto &transform = transforms[i];
+            auto status = transform.stat.load();
 
             imgui::TableNextRow();
-            retval.filters = render_filters_row(
-                filter_before_input,
-                filter_after_input,
-                obj_type_filters,
-                status_filters,
-                obj_types_present,
-                transforms_size_digits
-            );
 
-            ImGuiListClipper clipper;
-            {
-                u64 num_filtered = std::distance(filtered_transforms_partition_iter, transforms.end());
-                u64 num_shown = transforms.size() - num_filtered;
-                clipper.Begin((s32)num_shown);
+            if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_index)) {
+                imgui::Text("%0*zu", transforms_size_digits, i);
             }
 
-            while (clipper.Step())
-            for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-                auto &transform = transforms[i];
-                auto status = transform.stat.load();
+            if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_obj_type)) {
+                ImVec4 color = get_color(transform.obj_type);
+                char const *icon = get_icon(transform.obj_type);
 
-                imgui::TableNextRow();
+                imgui::TextColored(color, icon);
 
-                if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_index)) {
-                    imgui::Text("%0*zu", transforms_size_digits, i);
+                if (imgui::IsItemHovered({}, .5f)) {
+                    imgui::ScopedTextColor tc(color);
+                    imgui::SetTooltip(basic_dirent::kind_description(transform.obj_type));
+                }
+            }
 
-                #if 0
-                    imgui::ScopedItemFlag tab(ImGuiItemFlags_NoTabStop);
-                    auto label = make_str_static<32>("%0*zu", transforms_size_digits, i);
+            if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_before)) {
+                {
+                    imgui::ScopedDisable d(true);
+                    imgui::TextUnformatted(transform.before.data());
+                }
+                imgui::RenderTooltipWhenColumnTextTruncated(bulk_rename_table_col_id_before, transform.before.data());
+            }
 
-                    if (imgui::Selectable(label.data(), transform.selected)) {
-                        bool selection_state_before_activate = transform.selected;
+            if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_after)) {
+                imgui::ScopedStyle<ImVec2> fp(imgui::GetStyle().FramePadding, {});
+                imgui::ScopedColor bgc(ImGuiCol_FrameBg, imgui::GetStyleColorVec4(ImGuiCol_ChildBg));
+                imgui::ScopedColor bc(ImGuiCol_Border, imgui::GetStyleColorVec4(ImGuiCol_ChildBg));
+                imgui::ScopedAvailWidth w = {};
 
-                        u64 num_deselected = 0;
-                        if (!io.KeyCtrl && !io.KeyShift) {
-                            // entry was selected but Ctrl was not held, so deselect everything
-                            num_deselected = deselect_all(transforms);
-                        }
-
-                        if (num_deselected > 1) {
-                            transform.selected = true;
-                        } else {
-                            transform.selected = !selection_state_before_activate;
-                        }
-
-                        if (io.KeyShift) {
-                            auto [first_idx, last_idx] = imgui::SelectRange(s_latest_selected_row_idx, i);
-                            s_latest_selected_row_idx = last_idx;
-                            for (u64 j = first_idx; j <= last_idx; ++j) {
-                                transforms[j].selected = true;
-                            }
-                        } else {
-                            s_latest_selected_row_idx = i;
-                        }
-                    }
-
-                    if (imgui::IsItemClicked(ImGuiMouseButton_Right)) {
-                        if (!transform.selected) { // ! REF1
-                            // right clicked an unselected element, deselect any other elements
-                            for (auto &elem : transforms) {
-                                elem.selected = false;
-                            }
-                            transform.selected = true; // select the right clicked element when context menu opens
-                            s_deselect_on_context_menu_close = &transform; // deselect the right clicked element when context menu closes
-                        }
-                        imgui::OpenPopup("## bulk_rename context_menu");
-                    }
-                #endif
+                ImGuiInputTextFlags read_only = 0;
+                if (transact_active || status == bulk_rename_transform::status::execute_success) {
+                    read_only = ImGuiInputTextFlags_ReadOnly;
                 }
 
-                if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_obj_type)) {
-                    ImVec4 color = get_color(transform.obj_type);
-                    char const *icon = get_icon(transform.obj_type);
+                auto label = make_str_static<32>("## after %zu", i);
+                bool after_edited = imgui::InputText(
+                    label.data(),
+                    transform.after.data(),
+                    transform.after.max_size(),
+                    ImGuiInputTextFlags_CallbackCharFilter|read_only,
+                    filter_chars_callback,
+                    (void *)windows_illegal_path_chars()
+                );
 
-                    imgui::TextColored(color, icon);
+                retval.any_after_text_edited |= after_edited;
+                transform.input_focused = imgui::IsItemFocused();
 
-                    if (imgui::IsItemHovered({}, .5f)) {
-                        imgui::ScopedTextColor tc(color);
-                        imgui::SetTooltip(basic_dirent::kind_description(transform.obj_type));
-                    }
-                }
-
-                if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_before)) {
-                    {
-                        imgui::ScopedDisable d(true);
-                        imgui::TextUnformatted(transform.before.data());
-                    }
-                    imgui::RenderTooltipWhenColumnTextTruncated(bulk_rename_table_col_id_before, transform.before.data());
-                }
-
-                if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_after)) {
-                    imgui::ScopedStyle<ImVec2> fp(imgui::GetStyle().FramePadding, {});
-                    imgui::ScopedColor bgc(ImGuiCol_FrameBg, imgui::GetStyleColorVec4(ImGuiCol_ChildBg));
-                    imgui::ScopedColor bc(ImGuiCol_Border, imgui::GetStyleColorVec4(ImGuiCol_ChildBg));
-                    imgui::ScopedAvailWidth w = {};
-
-                    ImGuiInputTextFlags read_only = 0;
-                    if (transact_active || status == bulk_rename_transform::status::execute_success) {
-                        read_only = ImGuiInputTextFlags_ReadOnly;
-                    }
-
-                    auto label = make_str_static<32>("## after %zu", i);
-                    bool after_edited = imgui::InputText(
-                        label.data(),
-                        transform.after.data(),
-                        transform.after.max_size(),
-                        ImGuiInputTextFlags_CallbackCharFilter|read_only,
-                        filter_chars_callback,
-                        (void *)windows_illegal_path_chars()
-                    );
-
-                    retval.any_after_text_edited |= after_edited;
-                    transform.input_focused = imgui::IsItemFocused();
-
-                    if (after_edited) {
-                        using status_t = bulk_rename_transform::status;
-
-                        if (cstr_empty(transform.after.data())) {
-                            transform.stat.store(status_t::error_name_empty);
-                        }
-                        else if (path_equals_exactly(transform.before, transform.after)) {
-                            transform.stat.store(status_t::name_unchanged);
-                        }
-                        else {
-                            transform.stat.store(status_t::name_unchanged);
-                        }
-
-                        if (cstr_empty(transform.after.data())) {
-                            retval.any_inputs_blank = true;
-                        } else {
-                            retval.any_inputs_blank = std::any_of(transforms.begin(), transforms.end(), [](bulk_rename_transform const &op) noexcept {
-                                return cstr_empty(op.after.data());
-                            });
-                        }
-                    }
-                }
-
-                // instead of updating all transforms when an edit occurs, we track when each transform was last updated,
-                // performing any outstanding updates when rendering the transform. this is very efficient because of ImGuiListClipper
-                // which will not render out of view rows. this way the cost of updating is spread over many frames in the case when the user
-                // is scrolling the list, or not paid at all if the user never brings the row into view.
-                if (transform.last_updated_time < last_edit_time) {
-                    transform.last_updated_time = get_time_precise();
-
+                if (after_edited) {
                     using status_t = bulk_rename_transform::status;
 
-                    auto old_status = status;
-                    bool transform_executed = one_of(old_status, { status_t::execute_success, status_t::execute_failed, status_t::revert_success, status_t::revert_failed });
-
-                    if (!transform_executed) {
-                        auto new_status = status_t::ready;
-
-                        if (cstr_empty(transform.after.data())) {
-                            new_status = status_t::error_name_empty;
-                        }
-                        else if (path_equals_exactly(transform.before, transform.after.data())) {
-                            new_status = status_t::name_unchanged;
-                        }
-
-                        transform.stat.store(new_status);
-                        status = new_status;
+                    if (cstr_empty(transform.after.data())) {
+                        transform.stat.store(status_t::error_name_empty);
                     }
-                }
+                    else if (path_equals_exactly(transform.before, transform.after)) {
+                        transform.stat.store(status_t::name_unchanged);
+                    }
+                    else {
+                        transform.stat.store(status_t::name_unchanged);
+                    }
 
-                if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_status)) {
-                    ImVec4 status_color = get_color(status);
-                    char const *status_icon = nullptr;
-                    char const *status_tooltip = nullptr;
-
-                    switch (status) {
-                        case bulk_rename_transform::status::execute_success:
-                            status_icon = ICON_CI_CIRCLE_LARGE_FILLED; // ICON_CI_PASS
-                            status_tooltip = "Executed successfully";
-                            break;
-                        case bulk_rename_transform::status::revert_success:
-                            status_icon = ICON_CI_ARROW_CIRCLE_LEFT; // ICON_CI_PASS
-                            status_tooltip = "Reverted successfully";
-                            break;
-                        case bulk_rename_transform::status::execute_failed:
-                        case bulk_rename_transform::status::revert_failed:
-                            status_icon = ICON_CI_ERROR;
-                            status_tooltip = transform.error.c_str();
-                            break;
-                        case bulk_rename_transform::status::error_name_empty:
-                            status_icon = ICON_CI_CIRCLE_SLASH;
-                            status_tooltip = "Name empty";
-                            break;
-                        case bulk_rename_transform::status::name_unchanged:
-                            status_icon = ICON_CI_CIRCLE_LARGE_FILLED; // ICON_CI_CIRCLE_LARGE_OUTLINE
-                            status_tooltip = "Same name as before";
-                            break;
-                        case bulk_rename_transform::status::ready:
-                            status_icon = ICON_CI_CIRCLE_LARGE_FILLED; // ICON_CI_COLOR_MODE
-                            status_tooltip = "Ready to execute";
-                            break;
-                    };
-
-                    imgui::TextColored(status_color, status_icon);
-
-                    if (imgui::IsItemHovered({}, .5f)) {
-                        imgui::ScopedTextColor tc(status_color);
-                        imgui::SetTooltip(status_tooltip);
+                    if (cstr_empty(transform.after.data())) {
+                        retval.any_inputs_blank = true;
+                    } else {
+                        retval.any_inputs_blank = std::any_of(transforms.begin(), transforms.end(), [](bulk_rename_transform const &op) noexcept {
+                            return cstr_empty(op.after.data());
+                        });
                     }
                 }
             }
 
-        #if 0
-            if (imgui::BeginPopup("## bulk_rename context_menu")) {
-                if (imgui::Selectable("Execute")) {
-                    retval.execute_selected = true;
+            // instead of updating all transforms when an edit occurs, we track when each transform was last updated,
+            // performing any outstanding updates when rendering the transform. this is very efficient because of ImGuiListClipper
+            // which will not render out of view rows. this way the cost of updating is spread over many frames in the case when the user
+            // is scrolling the list, or not paid at all if the user never brings the row into view.
+            if (transform.last_updated_time < last_edit_time) {
+                transform.last_updated_time = get_time_precise();
+
+                using status_t = bulk_rename_transform::status;
+
+                auto old_status = status;
+                bool transform_executed = one_of(old_status, { status_t::execute_success, status_t::execute_failed, status_t::revert_success, status_t::revert_failed });
+
+                if (!transform_executed) {
+                    auto new_status = status_t::ready;
+
+                    if (cstr_empty(transform.after.data())) {
+                        new_status = status_t::error_name_empty;
+                    }
+                    else if (path_equals_exactly(transform.before, transform.after.data())) {
+                        new_status = status_t::name_unchanged;
+                    }
+
+                    transform.stat.store(new_status);
+                    status = new_status;
                 }
-                if (imgui::Selectable("Undo")) {
-                    retval.undo_selected = true;
-                }
-                imgui::EndPopup();
             }
 
-            if (s_deselect_on_context_menu_close && !imgui::IsPopupOpen("## bulk_rename context_menu")) {
-                s_deselect_on_context_menu_close->selected = false;
-                s_deselect_on_context_menu_close = nullptr;
-            }
-        #endif
+            if (imgui::TableSetColumnIndex(bulk_rename_table_col_id_status)) {
+                ImVec4 status_color = get_color(status);
+                char const *status_icon = nullptr;
+                char const *status_tooltip = nullptr;
 
-            imgui::EndTable();
+                switch (status) {
+                    case bulk_rename_transform::status::execute_success:
+                        status_icon = ICON_CI_CIRCLE_LARGE_FILLED; // ICON_CI_PASS
+                        status_tooltip = "Executed successfully";
+                        break;
+                    case bulk_rename_transform::status::revert_success:
+                        status_icon = ICON_CI_ARROW_CIRCLE_LEFT; // ICON_CI_PASS
+                        status_tooltip = "Reverted successfully";
+                        break;
+                    case bulk_rename_transform::status::execute_failed:
+                    case bulk_rename_transform::status::revert_failed:
+                        status_icon = ICON_CI_ERROR;
+                        status_tooltip = transform.error.c_str();
+                        break;
+                    case bulk_rename_transform::status::error_name_empty:
+                        status_icon = ICON_CI_CIRCLE_SLASH;
+                        status_tooltip = "Name empty";
+                        break;
+                    case bulk_rename_transform::status::name_unchanged:
+                        status_icon = ICON_CI_CIRCLE_LARGE_FILLED; // ICON_CI_CIRCLE_LARGE_OUTLINE
+                        status_tooltip = "Same name as before";
+                        break;
+                    case bulk_rename_transform::status::ready:
+                        status_icon = ICON_CI_CIRCLE_LARGE_FILLED; // ICON_CI_COLOR_MODE
+                        status_tooltip = "Ready to execute";
+                        break;
+                };
+
+                imgui::TextColored(status_color, status_icon);
+
+                if (imgui::IsItemHovered({}, .5f)) {
+                    imgui::ScopedTextColor tc(status_color);
+                    imgui::SetTooltip(status_tooltip);
+                }
+            }
         }
-    // }
-    // imgui::EndChild();
+
+        imgui::EndTable();
+    }
 
     return retval;
 }
@@ -1183,19 +1119,6 @@ void swan_popup_modals::render_bulk_rename() noexcept
             return !filtered;
         });
     }
-
-#if 0
-    if (table.execute_selected) {
-        // ! this is no good because bulk_rename_transform::selected is not threadsafe.
-        // ! furthermore, render_table will sometimes deselect the target element before we get here - see REF1.
-        launch_execute_task_if_work_available(true);
-    }
-    if (table.undo_selected) {
-        // ! this is no good because bulk_rename_transform::selected is not threadsafe.
-        // ! furthermore, render_table will sometimes deselect the target element before we get here - see REF1.
-        launch_revert_task_if_work_available(true);
-    }
-#endif
 
     // footer
     {
