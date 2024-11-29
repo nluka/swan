@@ -429,7 +429,8 @@ generic_result delete_selected_entries(explorer_window &expl, swan_settings cons
             }
 
             bool compound_operation = i > 1;
-            prog_sink.group_id = compound_operation ? global_state::completed_file_operations_calc_next_group_id() : 0;
+            prog_sink.group_id = global_state::completed_file_operations_calc_next_group_id();
+            // prog_sink.group_id = compound_operation ? global_state::completed_file_operations_calc_next_group_id() : 0;
         }
 
         DWORD cookie = {};
@@ -2127,8 +2128,10 @@ bool render_history_browser_popup(explorer_window &expl, bool cwd_exists) noexce
 }
 
 static
-void render_filter_reset_button(explorer_window &expl) noexcept
+bool render_filter_reset_button(explorer_window &expl) noexcept
 {
+    bool retval_cwd_entries_affected = false;
+
     {
         bool starting_filter = cstr_empty(expl.filter_text.data())
             && !expl.filter_case_sensitive
@@ -2147,11 +2150,14 @@ void render_filter_reset_button(explorer_window &expl) noexcept
             expl.reset_filter();
             (void) expl.update_cwd_entries(filter, expl.cwd.data());
             (void) expl.save_to_disk();
+            retval_cwd_entries_affected = true;
         }
     }
     if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Restore default filter");
     }
+
+    return retval_cwd_entries_affected;
 }
 
 static
@@ -2162,26 +2168,25 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         time_point_precise_t now = get_time_precise();
         s64 diff_ms = time_diff_ms(expl.last_drives_refresh_time, now);
         if (diff_ms >= 1000) {
-            for (auto &drive : expl.drives) drive.info.letter = 0; // nullify drives
-
             expl.last_drives_refresh_time = get_time_precise();
             auto drives_info = query_available_drives_info();
 
+            for (auto &d : expl.drives) {
+                if (d.icon_GLtexID > 0) delete_icon_texture(d.icon_GLtexID, "drive_entry");
+            }
+            expl.drives.clear();
+
             // only repopulate drives found by `query_available_drives_info`, nullified ones won't get rendered
             for (auto const &di : drives_info) {
+                if (di.letter == 0) continue;
+
                 assert(di.letter >= 'A' && di.letter <= 'Z');
                 char root[] = { di.letter, ':', dir_sep_utf8, '\0' };
-                auto &expl_drive = expl.drives[di.letter - 'A'];
 
-                if (expl_drive.icon_GLtexID == 0) {
-                    std::tie(expl_drive.icon_GLtexID, expl_drive.icon_size) = load_icon_texture(root, nullptr, "explorer_window::drive");
-                }
-                else if (!cstr_eq(di.filesystem_name_utf8, expl_drive.info.filesystem_name_utf8) || (di.total_bytes != expl_drive.info.total_bytes)) {
-                    // drive probably changed, refresh icon
-                    if (expl_drive.icon_GLtexID > 0) delete_icon_texture(expl_drive.icon_GLtexID, "explorer_window::drive");
-                    std::tie(expl_drive.icon_GLtexID, expl_drive.icon_size) = load_icon_texture(root, nullptr, "explorer_window::drive");
-                }
-                expl_drive.info = di;
+                drive_entry d;
+                d.info = di;
+                std::tie(d.icon_GLtexID, d.icon_size) = load_icon_texture(root, nullptr, "drive_entry");
+                expl.drives.push_back(d);
             }
         }
     }
@@ -2220,15 +2225,16 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
         ImGui::TableSetupScrollFreeze(0, 1);
         imgui::TableHeadersRow();
 
-        u64 n = 0;
-
-        for (auto &drive : expl.drives) {
-            if (drive.info.letter == 0) continue;
+        // for (auto &drive : expl.drives) {
+            // if (drive.info.letter == 0) continue;
+        for (u64 i = 0; i < expl.drives.size(); ++i) {
+            auto &drive = expl.drives[i];
+            assert(drive.info.letter != 0);
 
             imgui::TableNextRow();
 
             if (imgui::TableSetColumnIndex(drive_table_col_id_number)) {
-                imgui::Text("%zu", ++n);
+                imgui::Text("%zu", i+1);
             }
 
             if (imgui::TableSetColumnIndex(drive_table_col_id_letter)) {
@@ -2253,6 +2259,11 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
                     } else {
                         // TODO: handle error
                     }
+                }
+
+                if (expl.tabbing_set_focus && expl.tabbing_focus_idx == s64(i) && !imgui::IsItemFocused()) {
+                    expl.tabbing_set_focus = false;
+                    imgui::FocusItem();
                 }
             }
 
@@ -2287,9 +2298,16 @@ void render_drives_table(explorer_window &expl, char dir_sep_utf8, u64 size_unit
     }
 }
 
-static
-bool render_filter_text_input(explorer_window &expl, bool window_hovered, bool ctrl_key_down, cwd_count_info const &cnt) noexcept
+struct render_filter_text_input_result
 {
+    bool focused;
+    bool edited;
+};
+static
+render_filter_text_input_result render_filter_text_input(explorer_window &expl, bool window_hovered, bool ctrl_key_down, cwd_count_info const &cnt) noexcept
+{
+    render_filter_text_input_result retval = {};
+
     auto width = std::max(
         imgui::CalcTextSize(expl.filter_text.data()).x + (imgui::GetStyle().FramePadding.x * 2) + 10.f,
         imgui::CalcTextSize("1").x * 20.75f
@@ -2311,9 +2329,9 @@ bool render_filter_text_input(explorer_window &expl, bool window_hovered, bool c
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
         (void) expl.save_to_disk();
     }
-    bool retval_is_focused = imgui::IsItemFocused();
+    retval.focused = imgui::IsItemFocused();
 
-    if (retval_is_focused && imgui::IsKeyPressed(ImGuiKey_Tab)) {
+    if (retval.focused && imgui::IsKeyPressed(ImGuiKey_Tab)) {
         if (expl.tabbing_focus_idx == -1) {
             expl.tabbing_focus_idx = 0;
         }
@@ -2325,12 +2343,14 @@ bool render_filter_text_input(explorer_window &expl, bool window_hovered, bool c
         expl.tabbing_focus_idx = -1;
     }
 
-    return retval_is_focused;
+    return retval;
 }
 
 static
-void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
+bool render_filter_type_toggler_buttons(explorer_window &expl) noexcept
 {
+    bool retval_cwd_entries_affected = false;
+
     std::tuple<basic_dirent::kind, bool &, char const *> button_defs[] = {
         { basic_dirent::kind::directory,             expl.filter_show_directories,          "directories"         },
         { basic_dirent::kind::symlink_to_directory,  expl.filter_show_symlink_directories,  "directory shortcuts" },
@@ -2376,13 +2396,17 @@ void render_filter_type_toggler_buttons(explorer_window &expl) noexcept
             }
             (void) expl.update_cwd_entries(filter, expl.cwd.data());
             (void) expl.save_to_disk();
+            retval_cwd_entries_affected = true;
         }
     }
+    return retval_cwd_entries_affected;
 }
 
 static
-void render_filter_mode_toggle(explorer_window &expl) noexcept
+bool render_filter_mode_toggle(explorer_window &expl) noexcept
 {
+    bool retval_cwd_entries_affected = false;
+
     static char const *s_filter_modes[] = {
          ICON_CI_WHOLE_WORD, // ICON_FA_FONT,
          ICON_CI_REGEX, // ICON_FA_ASTERISK,
@@ -2402,6 +2426,7 @@ void render_filter_mode_toggle(explorer_window &expl) noexcept
         inc_or_wrap<u64>((u64 &)expl.filter_mode, 0, u64(explorer_window::filter_mode::count) - 1);
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
         (void) expl.save_to_disk();
+        retval_cwd_entries_affected = true;
     }
 
     if (imgui::IsItemHovered({}, 1)) {
@@ -2414,11 +2439,14 @@ void render_filter_mode_toggle(explorer_window &expl) noexcept
         }
         imgui::SetTooltip("Mode: %s\n", mode);
     }
+
+    return retval_cwd_entries_affected;
 }
 
 static
-void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
+bool render_filter_case_sensitivity_button(explorer_window &expl) noexcept
 {
+    bool retval_cwd_entries_affected = false;
     {
         imgui::ScopedStyle<f32> s(imgui::GetStyle().Alpha, expl.filter_case_sensitive ? 1 : imgui::GetStyle().DisabledAlpha);
         imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
@@ -2427,26 +2455,33 @@ void render_filter_case_sensitivity_button(explorer_window &expl) noexcept
             flip_bool(expl.filter_case_sensitive);
             (void) expl.update_cwd_entries(filter, expl.cwd.data());
             (void) expl.save_to_disk();
+            retval_cwd_entries_affected = true;
         }
     }
     if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Case sensitive: %s\n", expl.filter_case_sensitive ? "ON" : "OFF");
     }
+    return retval_cwd_entries_affected;
 }
 
 static
-void render_filter_polarity_button(explorer_window &expl) noexcept
+bool render_filter_polarity_button(explorer_window &expl) noexcept
 {
+    bool retval_cwd_entries_affected = false;
+
     imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
     if (imgui::Button(expl.filter_polarity ? (ICON_CI_EYE "## filter_polarity") : (ICON_CI_EYE_CLOSED "## filter_polarity"))) {
         flip_bool(expl.filter_polarity);
         (void) expl.update_cwd_entries(filter, expl.cwd.data());
         (void) expl.save_to_disk();
+        retval_cwd_entries_affected = true;
     }
     if (imgui::IsItemHovered({}, 1)) {
         imgui::SetTooltip("Polarity: %s matches\n", expl.filter_polarity ? "SHOW" : "HIDE");
     }
+
+    return retval_cwd_entries_affected;
 }
 
 static
@@ -2723,6 +2758,7 @@ void render_help_icon(explorer_window &expl) noexcept
 struct render_cwd_text_input_result
 {
     bool is_hovered;
+    bool edit_occurred;
 };
 static
 render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
@@ -2755,7 +2791,7 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
 
         auto label = make_str_static<64>("## cwd expl_%d", expl.id);
 
-        is_input_text_enter_pressed = imgui::InputText(label.data(), s_cwd_input.data(), s_cwd_input.size(),
+        is_input_text_enter_pressed = imgui::InputTextWithHint(label.data(), "Current working directory", s_cwd_input.data(), s_cwd_input.size(),
             ImGuiInputTextFlags_CallbackCharFilter|ImGuiInputTextFlags_CallbackEdit|ImGuiInputTextFlags_EnterReturnsTrue,
             cwd_text_input_callback, (void *)&user_data);
 
@@ -2770,6 +2806,8 @@ render_cwd_text_input_result render_cwd_text_input(explorer_window &expl,
         input_text_state = imgui::GetInputTextState(id);
     }
     expl.cwd_input_text_scroll_x = input_text_state ? input_text_state->ScrollX : -1;
+
+    retval.edit_occurred = user_data.edit_occurred;
 
     if (user_data.edit_occurred) {
         bool path_functionally_diff = !path_loosely_same(expl.cwd, s_cwd_input);
@@ -3129,8 +3167,11 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
     }
     // refresh logic end
 
-    cwd_count_info cnt = {};
-    {
+    auto do_counting = [](explorer_window const &expl) noexcept -> cwd_count_info {
+        // print_debug_msg("[ %d ] do_counting [%s]", expl.id, expl.cwd.data());
+
+        cwd_count_info cnt = {};
+
         for (auto &dirent : expl.cwd_entries) {
             static_assert(u64(false) == 0);
             static_assert(u64(true)  == 1);
@@ -3158,7 +3199,12 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         cnt.filtered_dirents = cnt.filtered_directories + cnt.filtered_symlinks + cnt.filtered_files;
         cnt.selected_dirents = cnt.selected_directories + cnt.selected_symlinks + cnt.selected_files;
-    }
+
+        return cnt;
+    };
+
+    cwd_count_info cnt = {};
+    bool recount = false;
 
     // header controls
     {
@@ -3175,29 +3221,38 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         // imgui::SameLine(0, style.ItemSpacing.x / 2);
         imgui::SameLine();
 
-        render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, 0, cwd_exists_before_edit);
+        auto [_, cwd_edited] = render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, 0, cwd_exists_before_edit);
 
         // line break
 
-        if (/* expl.show_filter_window && */ !path_is_empty(expl.cwd)) {
-            render_filter_polarity_button(expl);
+        cnt = do_counting(expl);
+
+        imgui::ScopedDisable d2(path_is_empty(expl.cwd));
+
+        // if (/* expl.show_filter_window && */ !path_is_empty(expl.cwd)) {
+            recount |= render_filter_polarity_button(expl);
             imgui::SameLine(0, 0);
-            render_filter_mode_toggle(expl);
+            recount |= render_filter_mode_toggle(expl);
             imgui::SameLine(0, 0);
-            render_filter_case_sensitivity_button(expl);
+            recount |= render_filter_case_sensitivity_button(expl);
 
             // imgui::SameLine(0, style.ItemSpacing.x / 2);
             imgui::SameLine();
 
-            expl.filter_text_input_focused = render_filter_text_input(expl, window_hovered, io.KeyCtrl, cnt);
+            auto [filter_focused, filter_edited] = render_filter_text_input(expl, window_hovered, io.KeyCtrl, cnt);
+            expl.filter_text_input_focused = filter_focused;
+
+            if (filter_edited || cwd_edited) {
+                cnt = do_counting(expl);
+            }
 
             imgui::SameLine();
-            render_filter_reset_button(expl);
+            recount |= render_filter_reset_button(expl);
 
             imgui::SameLineSpaced(1);
 
-            render_filter_type_toggler_buttons(expl);
-        }
+            recount |= render_filter_type_toggler_buttons(expl);
+        // }
 
         imgui::SameLineSpaced(1);
 
@@ -3247,81 +3302,25 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
         imgui::SameLineSpaced(1);
         render_help_icon(expl);
-        imgui::SameLineSpaced(2);
-
-        if (!path_is_empty(expl.cwd)) {
-            if (!cwd_exists_after_edit) {
-                imgui::TextColored(warning_color(), "Directory not found");
-                imgui::SameLine();
-
-                imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
-
-                if (imgui::Button(ICON_LC_FOLDER_TREE)) {
-                    char const *full_path_utf8 = expl.cwd.data();
-                    try {
-                        std::filesystem::path fs_path = full_path_utf8;
-                        std::filesystem::create_directories(fs_path);
-                        expl.update_cwd_entries(full_refresh, expl.cwd.data());
-                    }
-                    catch (std::exception const &except) {
-                        std::string action = make_str("std::filesystem::create_directories [%s].", full_path_utf8);
-                        char const *failed = except.what();
-                        swan_popup_modals::open_error(action.c_str(), failed);
-                    }
-                    catch (...) {
-                        std::string action = make_str("std::filesystem::create_directories [%s].", full_path_utf8);
-                        char const *failed = "Caught unexpected exception -> catch(...)";
-                        swan_popup_modals::open_error(action.c_str(), failed);
-                    }
-                }
-                if (imgui::IsItemHovered()) imgui::SetTooltip("Create directories");
-            }
-            else if (expl.cwd_entries.empty()) {
-                imgui::TextColored(warning_color(), "Empty directory");
-            }
-            else {
-                render_num_cwd_items(cnt);
-            }
-
-            if (cnt.selected_dirents > 0) {
-                imgui::SameLineSpaced(2);
-                (void) render_num_cwd_items_selected(expl, cnt);
-            }
-
-            if (expl.filter_error != "") {
-                imgui::SameLineSpaced(2);
-                // imgui::PushTextWrapPos(imgui::GetColumnWidth());
-                imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
-                // imgui::PopTextWrapPos();
-            }
-            else if (cwd_exists_after_edit && cnt.child_dirents > 0 && cnt.filtered_dirents == cnt.child_dirents) {
-                imgui::SameLineSpaced(2);
-                imgui::TextColored(warning_color(), "All items filtered");
-            }
-            else if (cnt.filtered_dirents > 0) {
-                imgui::SameLineSpaced(2);
-                (void) render_num_cwd_items_filtered(expl, cnt);
-            }
-
-            if (expl.refresh_message != "") {
-                imgui::SameLineSpaced(2);
-                imgui::TextColored(warning_color(), "%s", expl.refresh_message.c_str());
-                if (imgui::IsItemHovered()) {
-                    imgui::SetTooltip(expl.refresh_message_tooltip.c_str());
-                }
-                if (imgui::IsItemClicked(ImGuiMouseButton_Left)) {
-                    (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
-                }
-            }
-        }
+        // imgui::SameLineSpaced(2);
     }
 
-    if (!expl.filter_text_input_focused && !any_popups_open) {
+    if (recount) {
+        cnt = do_counting(expl);
+    }
+
+    bool b_render_drives_table = path_is_empty(expl.cwd);
+
+    if (window_hovered && !expl.filter_text_input_focused && !any_popups_open) {
         if (imgui::IsKeyPressed(ImGuiKey_Tab)) {
             if (expl.tabbing_focus_idx == -1) {
                 expl.tabbing_focus_idx = 0;
             } else {
-                s64 min = 0, max = std::distance(expl.cwd_entries.begin(), expl.first_filtered_cwd_dirent_iter) - 1;
+                s64 min = 0;
+                s64 max = b_render_drives_table
+                    ? (expl.drives.size() - 1)
+                    : std::distance(expl.cwd_entries.begin(), expl.first_filtered_cwd_dirent_iter) - 1
+                ;
                 if (imgui::GetIO().KeyShift) dec_or_wrap(expl.tabbing_focus_idx, min, max);
                 else inc_or_wrap(expl.tabbing_focus_idx, min, max);
             }
@@ -3329,12 +3328,9 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
     }
 
-    bool drives_table_rendered = false;
-
-    if (path_is_empty(expl.cwd)) {
+    if (b_render_drives_table) {
         imgui::NewLine();
         render_drives_table(expl, dir_sep_utf8, size_unit_multiplier);
-        drives_table_rendered = true;
     }
     else {
         for (auto &drive : expl.drives)
@@ -3388,10 +3384,13 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         ;
         imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
+        ImVec2 avail = imgui::GetContentRegionAvail();
+        ImVec2 size = ImVec2(avail.x, avail.y - imgui::CalcTextSize("X").y - imgui::GetStyle().ItemSpacing.y*1 - imgui::GetStyle().FramePadding.y*2);
+
         // bool show_cwd_entries_table = !expl.cwd_entries.empty() && cnt.filtered_dirents < expl.cwd_entries.size();
         bool show_cwd_entries_table = true;
 
-        if (show_cwd_entries_table && imgui::BeginTable("## explorer_window cwd_entries", explorer_window::cwd_entries_table_col_count, table_flags)) {
+        if (show_cwd_entries_table && imgui::BeginTable("## explorer_window cwd_entries", explorer_window::cwd_entries_table_col_count, table_flags, size)) {
             s32 const col_flags_sortable_prefer_asc = ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortAscending;
             s32 const col_flags_sortable_prefer_desc = ImGuiTableColumnFlags_DefaultSort|ImGuiTableColumnFlags_PreferSortDescending;
 
@@ -3470,6 +3469,76 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         }
         accept_move_dirents_drag_drop(expl);
     }
+
+    // footer
+    if (!path_is_empty(expl.cwd)) {
+        imgui::AlignTextToFramePadding();
+
+        if (!cwd_exists_after_edit) {
+            imgui::TextColored(warning_color(), "Directory not found");
+            imgui::SameLine();
+
+            imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
+
+            if (imgui::Button(ICON_LC_FOLDER_TREE)) {
+                char const *full_path_utf8 = expl.cwd.data();
+                try {
+                    std::filesystem::path fs_path = full_path_utf8;
+                    std::filesystem::create_directories(fs_path);
+                    expl.update_cwd_entries(full_refresh, expl.cwd.data());
+                }
+                catch (std::exception const &except) {
+                    std::string action = make_str("std::filesystem::create_directories [%s].", full_path_utf8);
+                    char const *failed = except.what();
+                    swan_popup_modals::open_error(action.c_str(), failed);
+                }
+                catch (...) {
+                    std::string action = make_str("std::filesystem::create_directories [%s].", full_path_utf8);
+                    char const *failed = "Caught unexpected exception -> catch(...)";
+                    swan_popup_modals::open_error(action.c_str(), failed);
+                }
+            }
+            if (imgui::IsItemHovered()) imgui::SetTooltip("Create directories");
+        }
+        else if (expl.cwd_entries.empty()) {
+            imgui::TextColored(warning_color(), "Empty directory");
+        }
+        else {
+            render_num_cwd_items(cnt);
+        }
+
+        if (cnt.selected_dirents > 0) {
+            imgui::SameLineSpaced(2);
+            (void) render_num_cwd_items_selected(expl, cnt);
+        }
+
+        if (expl.filter_error != "") {
+            imgui::SameLineSpaced(2);
+            // imgui::PushTextWrapPos(imgui::GetColumnWidth());
+            imgui::TextColored(error_color(), "%s", expl.filter_error.c_str());
+            // imgui::PopTextWrapPos();
+        }
+        else if (cwd_exists_after_edit && cnt.child_dirents > 0 && cnt.filtered_dirents == cnt.child_dirents) {
+            imgui::SameLineSpaced(2);
+            imgui::TextColored(warning_color(), "All items filtered");
+        }
+        else if (cnt.filtered_dirents > 0) {
+            imgui::SameLineSpaced(2);
+            (void) render_num_cwd_items_filtered(expl, cnt);
+        }
+
+        if (expl.refresh_message != "") {
+            imgui::SameLineSpaced(2);
+            imgui::TextColored(warning_color(), "%s", expl.refresh_message.c_str());
+            if (imgui::IsItemHovered()) {
+                imgui::SetTooltip(expl.refresh_message_tooltip.c_str());
+            }
+            if (imgui::IsItemClicked(ImGuiMouseButton_Left)) {
+                (void) expl.update_cwd_entries(full_refresh, expl.cwd.data());
+            }
+        }
+    }
+
     ImVec2 cwd_entries_child_size = imgui::GetItemRectSize();
     ImVec2 cwd_entries_child_min = imgui::GetItemRectMin();
     ImVec2 cwd_entries_child_max = imgui::GetItemRectMax();

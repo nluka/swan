@@ -138,8 +138,15 @@ struct drive_info
     char filesystem_name_utf8[512];
     char letter;
 };
+typedef static_vector<drive_info, ('Z' - 'A' + 1)> drive_info_array_t;
 
-typedef static_vector<drive_info, 26> drive_info_array_t;
+struct drive_entry
+{
+    s64 icon_GLtexID = 0; // -1 means load failed, 0 means no load attempted, > 0 means valid
+    ImVec2 icon_size = {};
+    drive_info info;
+};
+typedef static_vector<drive_entry, ('Z' - 'A' + 1)> drive_entry_array_t;
 
 struct recycle_bin_info
 {
@@ -273,15 +280,6 @@ struct explorer_window
         bool context_menu_active = false;
     };
 
-    struct drive
-    {
-        s64 icon_GLtexID = 0; // -1 means load failed, 0 means no load attempted, > 0 means valid
-        ImVec2 icon_size = {};
-        drive_info info;
-    };
-
-    u64 a = sizeof(drive);
-
     enum filter_mode : u64
     {
         contains = 0,
@@ -367,7 +365,7 @@ struct explorer_window
     std::vector<dirent> cwd_entries = {};                           // all direct children of the cwd
     std::vector<swan_path> select_cwd_entries_on_next_update = {};  // entries to select on the next update of cwd_entries
 
-    std::array<drive, ('Z' - 'A' + 1)> drives = {};
+    drive_entry_array_t drives = {};
 
     // 16 byte alignment members
 

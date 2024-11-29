@@ -461,7 +461,7 @@ winapi_error get_last_winapi_error() noexcept
 
 drive_info_array_t query_available_drives_info() noexcept
 {
-    drive_info_array_t drive_list;
+    drive_info_array_t drives;
 
     s32 drives_mask = GetLogicalDrives();
 
@@ -494,13 +494,13 @@ drive_info_array_t query_available_drives_info() noexcept
                     info.available_bytes = free_bytes.QuadPart;
                     (void) utf16_to_utf8(volume_name, info.name_utf8, lengthof(info.name_utf8));
                     (void) utf16_to_utf8(filesystem_name_utf8, info.filesystem_name_utf8, lengthof(info.filesystem_name_utf8));
-                    drive_list.push_back(info);
+                    drives.push_back(info);
                 }
             }
         }
     }
 
-    return drive_list;
+    return drives;
 }
 
 recycle_bin_info query_recycle_bin() noexcept
