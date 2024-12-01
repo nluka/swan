@@ -3,7 +3,9 @@
 #include "imgui_dependent_functions.hpp"
 #include "scoped_timer.hpp"
 
+#pragma warning(push, 1)
 #include "imgui/imspinner.h"
+#pragma warning(pop)
 
 static constexpr u64 num_obj_types = (u64)basic_dirent::kind::count;
 static constexpr u64 num_status_types = (u64)bulk_rename_transform::status::count;
@@ -222,7 +224,6 @@ std::pair<bool, u64> render_export_button(bool transact_active,
     imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
     if (imgui::Button(ICON_LC_CLIPBOARD " Export" "## bulk rename")) {
-        u64 num = 0;
         std::string content = {};
 
         for (auto iter = first_transform; iter != last_transform; ++iter) {
@@ -303,9 +304,7 @@ bool render_transaction_progress_indicator(transaction_counters const &counters)
     }
 
     f64 ratio_done = f64(num_completed + num_failed) / f64(num_total);
-    f64 percent_done = ratio_done * 100.f;
-
-    imgui::ProgressBar(ratio_done, ImVec2(100, 0));
+    imgui::ProgressBar((f32)ratio_done, ImVec2(100, 0));
 
     if (num_failed > 0) {
         imgui::SameLineSpaced(1);
