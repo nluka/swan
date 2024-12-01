@@ -152,10 +152,14 @@ try {
         (void) global_state::pinned_load_from_disk(global_state::settings().dir_separator_utf8);
         {
             auto result = global_state::recent_files_load_from_disk(global_state::settings().dir_separator_utf8);
-            if (!result.first) {
+            {
                 auto recent_files = global_state::recent_files_get();
                 std::scoped_lock recent_files_lock(*recent_files.mutex);
-                recent_files.container->clear();
+                if (bool success = result.first) {
+                    recent_files_reorder_and_dedupe(*recent_files.container);
+                } else {
+                    recent_files.container->clear();
+                }
             }
         }
         {

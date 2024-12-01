@@ -57,6 +57,8 @@
 
     s32 utf16_to_utf8(wchar_t const *utf16_text, char *utf8_text, u64 utf8_text_capacity, std::source_location sloc = std::source_location::current()) noexcept;
 
+    std::pair<bool, std::string> utf8_lowercase(char const *utf8_text) noexcept;
+
     struct build_mode
     {
         bool debug;

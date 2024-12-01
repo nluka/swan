@@ -3918,14 +3918,7 @@ render_table_rows_for_cwd_entries_result render_table_rows_for_cwd_entries(
                                         }
                                         else if (dirent.basic.is_symlink_to_file()) {
                                             char const *full_file_path = res.error_or_utf8_path.c_str();
-                                            u64 recent_file_idx = global_state::recent_files_find_idx(full_file_path);
-
-                                            if (recent_file_idx == u64(-1)) {
-                                                global_state::recent_files_add("Opened", full_file_path);
-                                            }
-                                            else { // already in recent
-                                                global_state::recent_files_move_to_front(recent_file_idx, "Opened");
-                                            }
+                                            global_state::recent_files_update("Opened", full_file_path);
                                             (void) global_state::recent_files_save_to_disk(nullptr);
                                         }
                                     } else {
@@ -3942,14 +3935,7 @@ render_table_rows_for_cwd_entries_result render_table_rows_for_cwd_entries(
 
                                     if (res.success) {
                                         char const *full_file_path = res.error_or_utf8_path.c_str();
-                                        u64 recent_file_idx = global_state::recent_files_find_idx(full_file_path);
-
-                                        if (recent_file_idx == u64(-1)) {
-                                            global_state::recent_files_add("Opened", full_file_path);
-                                        }
-                                        else { // already in recent
-                                            global_state::recent_files_move_to_front(recent_file_idx, "Opened");
-                                        }
+                                        global_state::recent_files_update("Opened", full_file_path);
                                         (void) global_state::recent_files_save_to_disk(nullptr);
                                     } else {
                                         std::string action = make_str("Open file [%s].", dirent.basic.path.data());
@@ -4302,14 +4288,7 @@ render_dirent_context_menu(explorer_window &expl, cwd_count_info const &cnt, swa
 
                 if (res.success) {
                     char const *full_file_path = res.error_or_utf8_path.c_str();
-                    u64 recent_file_idx = global_state::recent_files_find_idx(full_file_path);
-
-                    if (recent_file_idx == u64(-1)) {
-                        global_state::recent_files_add("Opened", full_file_path);
-                    }
-                    else { // already in recent
-                        global_state::recent_files_move_to_front(recent_file_idx, "Opened");
-                    }
+                    global_state::recent_files_update("Opened", full_file_path);
                     (void) global_state::recent_files_save_to_disk(nullptr);
                 } else {
                     std::string action = make_str("Open file as administrator [%s].", expl.context_menu_target->basic.path.data());

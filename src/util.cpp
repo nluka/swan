@@ -686,3 +686,35 @@ bool path_drive_like(char const *path, u64 len) noexcept
     return (len == 2 && IsCharAlphaA(path[0]) && path[1] == ':')
         || (len == 3 && IsCharAlphaA(path[0]) && path[1] == ':' && strchr("\\/", path[2]));
 }
+
+std::pair<bool, std::string> utf8_lowercase(char const *utf8_text) noexcept
+{
+    // Step 1: Convert UTF-8 to UTF-16
+    int wchar_cnt = MultiByteToWideChar(CP_UTF8, 0, utf8_text, -1, nullptr, 0);
+    if (wchar_cnt == 0) {
+        return { false, "Failed to convert UTF-8 to UTF-16." };
+    }
+
+    std::vector<wchar_t> utf16_chars(wchar_cnt);
+    MultiByteToWideChar(CP_UTF8, 0, utf8_text, -1, utf16_chars.data(), wchar_cnt);
+
+    // Step 2: Convert to lowercase using LCMapStringW
+    int lower_char_cnt = LCMapStringW(LOCALE_USER_DEFAULT, LCMAP_LOWERCASE, utf16_chars.data(), -1, nullptr, 0);
+    if (lower_char_cnt == 0) {
+        return { false, "Failed to map string to lowercase." };
+    }
+
+    std::vector<wchar_t> utf16_chars_lower(lower_char_cnt);
+    LCMapStringW(LOCALE_USER_DEFAULT, LCMAP_LOWERCASE, utf16_chars.data(), -1, utf16_chars_lower.data(), lower_char_cnt);
+
+    // Step 3: Convert UTF-16 back to UTF-8
+    int utf8_char_cnt = WideCharToMultiByte(CP_UTF8, 0, utf16_chars_lower.data(), -1, nullptr, 0, nullptr, nullptr);
+    if (utf8_char_cnt == 0) {
+        return { false, "Failed to convert UTF-16 to UTF-8." };
+    }
+
+    std::vector<char> utf8_chars_lower(utf8_char_cnt);
+    WideCharToMultiByte(CP_UTF8, 0, utf16_chars_lower.data(), -1, utf8_chars_lower.data(), utf8_char_cnt, nullptr, nullptr);
+
+    return { true, std::string(utf8_chars_lower.data()) };
+}

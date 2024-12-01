@@ -649,6 +649,7 @@ struct recent_file
     s64 icon_GLtexID = 0;
     ImVec2 icon_size = {};
     swan_path path = {};
+    std::string path2 = {}; // placed as temporary alternative to `path`, useful for some search/delete algorithms
     bool selected = false;
 };
 

@@ -96,7 +96,7 @@ void swan_popup_modals::render_new_file() noexcept
             swan_path create_path_utf8;
 
             if (utf16_to_utf8(create_path_utf16.c_str(), create_path_utf8.data(), create_path_utf8.max_size())) {
-                global_state::recent_files_add("Created", create_path_utf8.data());
+                global_state::recent_files_update("Created", create_path_utf8.data());
                 (void) global_state::recent_files_save_to_disk(nullptr);
             }
 

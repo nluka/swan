@@ -22,6 +22,25 @@ void erase(global_state::recent_files &obj,
     obj.container->erase(first, last);
 }
 
+void global_state::recent_files_update(char const *action, char const *full_path) noexcept
+{
+    // u64 recent_file_idx = global_state::recent_files_find_idx(full_path);
+
+    // if (recent_file_idx == u64(-1)) {
+    //     global_state::recent_files_add(action, full_path);
+    // }
+    // else { // already in recent
+    //     global_state::recent_files_move_to_front(recent_file_idx, action);
+    // }
+
+    global_state::recent_files_add(action, full_path);
+    auto [rf_container, rf_mutex] = global_state::recent_files_get();
+    {
+        std::scoped_lock rf_lock(*rf_mutex);
+        recent_files_reorder_and_dedupe(*rf_container);
+    }
+}
+
 u64 global_state::recent_files_find_idx(char const *search_path) noexcept
 {
     std::scoped_lock lock(g_recent_files_mutex);
@@ -64,7 +83,7 @@ void global_state::recent_files_add(char const *action, char const *full_file_pa
     if (recent_files.container->size() >= global_constants::MAX_RECENT_FILES) {
         erase(recent_files, recent_files.container->begin() + global_constants::MAX_RECENT_FILES, recent_files.container->end());
     }
-    g_recent_files.emplace_front(action, get_time_system(), 0, ImVec2(), path, false);
+    g_recent_files.emplace_front(action, get_time_system(), 0, ImVec2(), path, "", false);
 }
 
 void global_state::recent_files_remove(u64 recent_file_idx) noexcept
@@ -152,7 +171,7 @@ try {
 
         path_force_separator(stored_path, dir_separator);
 
-        g_recent_files.emplace_back(stored_action, stored_time, 0, ImVec2(), stored_path, false);
+        g_recent_files.emplace_back(stored_action, stored_time, 0, ImVec2(), stored_path, "", false);
 
         ++num_loaded_successfully;
 
@@ -610,4 +629,39 @@ bool swan_windows::render_recent_files(bool &open, bool any_popups_open) noexcep
     }
 
     return true;
+}
+
+u64 recent_files_reorder_and_dedupe(std::deque<recent_file> &elems) noexcept
+{
+    u64 failures = 0;
+
+    // Order by recency descending
+    std::sort(elems.begin(), elems.end(), [](recent_file const &a, recent_file const &b) noexcept {
+        return a.action_time > b.action_time;
+    });
+
+    // Standardize each element to avoid the need for path_loosely_same
+    for (auto &elem : elems) {
+        auto [success, utf8_lower] = utf8_lowercase(elem.path.data());
+        if (success) {
+            elem.path2 = utf8_lower.data();
+            std::replace(elem.path2.begin(), elem.path2.end(), '\\', '/');
+        } else {
+            elem.path2 = "";
+            ++failures;
+        }
+    }
+
+    std::unordered_set<std::string> paths_seen = {};
+
+    for (auto iter = elems.begin(); iter != elems.end(); ) {
+        if (paths_seen.contains(iter->path2)) {
+            iter = elems.erase(iter);
+        } else {
+            paths_seen.emplace(iter->path2);
+            ++iter;
+        }
+    }
+
+    return failures;
 }

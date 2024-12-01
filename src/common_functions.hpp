@@ -154,6 +154,7 @@ namespace global_state
         std::mutex              *mutex;
     };
     recent_files            recent_files_get() noexcept;
+    void                    recent_files_update(char const *action, char const *full_file_path) noexcept;
     u64                     recent_files_find_idx(char const *search_path) noexcept;
     void                    recent_files_move_to_front(u64 recent_file_idx, char const *new_action = nullptr) noexcept;
     void                    recent_files_add(char const *action, char const *full_file_path) noexcept;
@@ -287,3 +288,5 @@ void open_file_properties(char const *full_path_utf8) noexcept;
 bool window_render_order_save_to_disk(std::array<swan_windows::id, (u64)swan_windows::id::count - 1> data) noexcept;
 
 std::array<swan_windows::id, (u64)swan_windows::id::count - 1> window_render_order_load_from_disk() noexcept;
+
+u64 recent_files_reorder_and_dedupe(std::deque<recent_file> &elems) noexcept;
