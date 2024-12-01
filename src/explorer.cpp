@@ -2336,7 +2336,7 @@ render_filter_text_input_result render_filter_text_input(explorer_window &expl, 
         expl.tabbing_set_focus = true;
     }
 
-    if (window_hovered && ctrl_key_down && imgui::IsKeyPressed(ImGuiKey_F)) {
+    if (window_hovered && ctrl_key_down && !path_is_empty(expl.cwd) && imgui::IsKeyPressed(ImGuiKey_F)) {
         imgui::ActivateItemByID(imgui::GetID("## explorer_window filter"));
         expl.tabbing_focus_idx = -1;
     }
@@ -2947,8 +2947,14 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
                                                      [](explorer_window::dirent const &e) noexcept { return e.selected; });
 
             if (num_entries_selected == 0) {
-                // TODO notification
-                // swan_popup_modals::open_error("Keybind for rename was pressed.", "Nothing is selected.");
+                if (expl.tabbing_focus_idx >= 0) {
+                    open_single_rename_popup = true;
+                    s_dirent_to_be_renamed = &expl.cwd_entries[expl.tabbing_focus_idx];
+                }
+                else {
+                    // TODO notification
+                    // swan_popup_modals::open_error("Keybind for rename was pressed.", "Nothing is selected.");
+                }
             }
             else if (num_entries_selected == 1) {
                 auto selected_dirent = std::find_if(expl.cwd_entries.begin(), expl.cwd_entries.end(),
@@ -3468,6 +3474,12 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         accept_move_dirents_drag_drop(expl);
     }
 
+    ImVec2 cwd_entries_child_size = imgui::GetItemRectSize();
+    ImVec2 cwd_entries_child_min = imgui::GetItemRectMin();
+    ImVec2 cwd_entries_child_max = imgui::GetItemRectMax();
+
+    bool mouse_hovering_cwd_entries_child = imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max);
+
     // footer
     if (!path_is_empty(expl.cwd)) {
         imgui::AlignTextToFramePadding();
@@ -3536,12 +3548,6 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             }
         }
     }
-
-    ImVec2 cwd_entries_child_size = imgui::GetItemRectSize();
-    ImVec2 cwd_entries_child_min = imgui::GetItemRectMin();
-    ImVec2 cwd_entries_child_max = imgui::GetItemRectMax();
-
-    bool mouse_hovering_cwd_entries_child = imgui::IsMouseHoveringRect(cwd_entries_child_min, cwd_entries_child_max);
 
     if (!any_popups_open && mouse_hovering_cwd_entries_child) {
         auto handle_file_op_failure = [](char const *operation, generic_result const &result) noexcept {
