@@ -428,9 +428,7 @@ generic_result delete_selected_entries(explorer_window &expl, swan_settings cons
                 return set_init_error_and_notify(errors);
             }
 
-            bool compound_operation = i > 1;
             prog_sink.group_id = global_state::completed_file_operations_calc_next_group_id();
-            // prog_sink.group_id = compound_operation ? global_state::completed_file_operations_calc_next_group_id() : 0;
         }
 
         DWORD cookie = {};

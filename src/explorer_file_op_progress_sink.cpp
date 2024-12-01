@@ -73,6 +73,12 @@ HRESULT explorer_file_op_progress_sink::PostMoveItem(
 
     print_debug_msg("src=[%s] dst=[%s]", src_path_utf8.data(), dst_path_utf8.data());
 
+    if (path_is_empty(dst_path_utf8)) {
+        // item was locked or skipped, I think... let's leave this assert here to monitor this assumption
+        assert(result == 0x00270005 || result == 0x0027000b);
+        return S_OK;
+    }
+
     swan_path new_name_utf8;
 
     if (!utf16_to_utf8(new_name_utf16, new_name_utf8.data(), new_name_utf8.size())) {
@@ -149,6 +155,11 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
     }
     SCOPE_EXIT { if (free_recycle_bin_hardlink_path_utf16) CoTaskMemFree(recycle_bin_hardlink_path_utf16); };
 
+    if (one_of<HRESULT>(result, { 0x00270005, 0x0027000b }) && path_is_empty(recycle_bin_item_path_utf8)) {
+        // item was locked (0x0027000b) or skipped (0x00270005), I think...
+        return S_OK;
+    }
+
     SFGAOF attributes = {};
     if (FAILED(item->GetAttributes(SFGAO_FOLDER|SFGAO_LINK, &attributes))) {
         print_debug_msg("FAILED IShellItem::GetAttributes(SFGAO_FOLDER|SFGAO_LINK)");
@@ -157,9 +168,9 @@ HRESULT explorer_file_op_progress_sink::PostDeleteItem(DWORD, IShellItem *item, 
 
     // (https://learn.microsoft.com/en-us/windows/win32/shell/manage#connected-files)
     // IFileOperation does this really hideous thing where it implicitly deletes "connected files".
-    // Non issue if only one of file in the connected pair is being deleted in the IFileOperation.
-    // Issue if both files in the connected pair are being deleted in the IFileOperation, because PostDeleteItem is called twice
-    // for the same item if connected file/directory pair are queued for deletion in the same IFileOperation.
+    // Non issue if only one of the files in the connected pair is being deleted in the IFileOperation.
+    // Issue if both files in the connected pair are being deleted in the IFileOperation,
+    // because PostDeleteItem is called twice for the same item if connected file/directory pair are queued for deletion in the same IFileOperation.
     // We record any potential files/directories that could be affected by this behaviour into a std::set and
     // only record a completed_file_operation if we have not seen the file/directory previously in the set.
     {
@@ -286,6 +297,12 @@ HRESULT explorer_file_op_progress_sink::PostCopyItem(
     SCOPE_EXIT { if (dst_path_utf16_needs_free) CoTaskMemFree(dst_path_utf16); };
 
     print_debug_msg("src=[%s] dst=[%s]", src_path_utf8.data(), dst_path_utf8.data());
+
+    if (path_is_empty(dst_path_utf8)) {
+        // item was locked or skipped, I think... let's leave this assert here to monitor this assumption
+        assert(result == 0x00270005);
+        return S_OK;
+    }
 
     swan_path new_name_utf8;
 

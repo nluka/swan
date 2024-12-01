@@ -1302,8 +1302,7 @@ void perform_file_operations(
             return set_init_error_and_notify(errors);
         }
 
-        bool compound_operation = i > 1;
-        prog_sink.group_id = compound_operation ? global_state::completed_file_operations_calc_next_group_id() : 0;
+        prog_sink.group_id = global_state::completed_file_operations_calc_next_group_id();
     }
 
     DWORD cookie = {};
