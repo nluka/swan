@@ -2,14 +2,11 @@
 #include "common_functions.hpp"
 #include "imgui_dependent_functions.hpp"
 
-debug_log_record *              debug_log::g_last_record = nullptr;
+std::vector<debug_log_record>   debug_log::g_records = {};
+std::vector<u64>                debug_log::g_records_visible_indices;
 std::string                     debug_log::g_search_text = {};
-std::vector<debug_log_record>   debug_log::g_records_shown = {};
-std::vector<debug_log_record>   debug_log::g_records_hidden = {};
 std::mutex                      debug_log::g_mutex = {};
-u64                             debug_log::g_next_id = 1;
 bool                            debug_log::g_logging_enabled = true;
-
 
 static s32 g_debug_log_size_limit_megabytes = 5;
 
@@ -96,7 +93,6 @@ bool swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
 
     bool search_text_edited;
     {
-        // imgui::ScopedAvailWidth w = {};
         imgui::ScopedItemWidth w(imgui::CalcTextSize("123456789_123456789_123456789_").x);
         imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
 
@@ -107,36 +103,28 @@ bool swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
         std::scoped_lock lock(debug_log::g_mutex);
         imgui::TextUnformatted("Shown:");
         imgui::SameLine();
-        imgui::ProgressBar(f32(debug_log::g_records_shown.size()) / f32(debug_log::g_records_shown.size() + debug_log::g_records_hidden.size()), ImVec2(100, 0));
-        // imgui::TextDisabled("%zu shown  %zu hidden", debug_log::g_records_shown.size(), debug_log::g_records_hidden.size());
+        imgui::ProgressBar(f32(debug_log::g_records_visible_indices.size()) / f32(debug_log::g_records.size()), ImVec2(100, 0));
     }
-
-    // TODO: fix ugly 1 frame flicker when search_text_edited caused by scroll updating 1 frame after updated records rendered inside table
 
     static f32 s_scroll_y_target = -1.f;
 
     if (search_text_edited) {
         std::scoped_lock lock(debug_log::g_mutex);
 
-        u64 num_erased = 0;
-        auto &shown = debug_log::g_records_shown;
-        auto &hidden = debug_log::g_records_hidden;
-
-        std::copy(hidden.begin(), hidden.end(), std::back_inserter(shown));
-        hidden.clear();
-
-        if (!debug_log::g_search_text.empty()) {
-            auto partition_point_iter = std::partition(shown.begin(), shown.end(), [](debug_log_record const &elem) noexcept {
-                return elem.matches_search_text(debug_log::g_search_text.c_str()); // matches to the left partition
-            });
-            std::move(partition_point_iter, shown.end(), std::back_inserter(hidden));
-            num_erased = std::distance(partition_point_iter, shown.end());
-            shown.erase(partition_point_iter, shown.end());
+        debug_log::g_records_visible_indices.clear();
+        if (debug_log::g_search_text.empty()) {
+            debug_log::g_records_visible_indices.reserve(debug_log::g_records.size());
+            for (u64 i = 0; i < debug_log::g_records.size(); ++i) {
+                debug_log::g_records_visible_indices.push_back(i);
+            }
         }
-
-        std::sort(std::execution::parallel_unsequenced_policy(), shown.begin(), shown.end(), std::less<debug_log_record>());
-
-        s_scroll_y_target = imgui::GetTextLineHeightWithSpacing() * shown.size();
+        else {
+            for (u64 i = 0; i < debug_log::g_records.size(); ++i) {
+                if (debug_log::g_records[i].matches_search_text(debug_log::g_search_text.c_str())) {
+                    debug_log::g_records_visible_indices.push_back(i);
+                }
+            }
+        }
         s_scroll_y_target = 0;
     }
 
@@ -160,7 +148,7 @@ bool swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
 
         std::scoped_lock lock(debug_log::g_mutex);
 
-        u64 num_records_this_frame = debug_log::g_records_shown.size();
+        u64 num_records_this_frame = debug_log::g_records_visible_indices.size();
 
         if (jump_to_top) {
             imgui::SetNextWindowScroll(ImVec2(-1.0f, 0));
@@ -187,14 +175,15 @@ bool swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
 
             ImGuiListClipper clipper;
             {
-                u64 num_dirents_to_render = debug_log::g_records_shown.size();
+                u64 num_dirents_to_render = debug_log::g_records_visible_indices.size();
                 assert(num_dirents_to_render <= (u64)INT32_MAX);
                 clipper.Begin(s32(num_dirents_to_render));
             }
 
             while (clipper.Step()) {
                 for (u64 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-                    auto &record = debug_log::g_records_shown[i];
+                    u64 record_idx = debug_log::g_records_visible_indices[i];
+                    auto &record = debug_log::g_records[record_idx];
                     imgui::TableNextRow();
 
                     if (imgui::TableSetColumnIndex(debug_log_table_col_id_thread_id)) {
@@ -243,14 +232,10 @@ bool swan_windows::render_debug_log(bool &open, [[maybe_unused]] bool any_popups
                 }
             }
 
-            bool do_auto_scroll =
-                s_auto_scroll &&
+            bool do_auto_scroll = s_auto_scroll &&
                 (
-                    // search_text_edited ||
-                    (
-                        (num_records_this_frame > s_num_records_last_frame) // added records since last frame
-                        && (s_scroll_y_last_frame == s_scroll_y_max_last_frame) // were maximally scrolled last frame
-                    )
+                    (num_records_this_frame > s_num_records_last_frame) // added records since last frame
+                    && (s_scroll_y_last_frame == s_scroll_y_max_last_frame) // were maximally scrolled last frame
                 )
             ;
             if (do_auto_scroll) {

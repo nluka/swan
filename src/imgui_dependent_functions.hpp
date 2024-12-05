@@ -50,16 +50,13 @@ struct debug_log_record
     std::string message;                static_assert(sizeof(message) == 32);
     std::source_location loc;           static_assert(sizeof(loc) == 24);
     time_point_system_t system_time;    static_assert(sizeof(system_time) == 8);
-    u64 id;
     f64 imgui_time;
     s32 thread_id;
-    u32 num_repeats;
-
-    bool operator>(debug_log_record const &other) const noexcept { return this->id > other.id; }
-    bool operator<(debug_log_record const &other) const noexcept { return !(*this > other); }
+    u32 num_repeats; // when a duplicate message is printed, this counter is incremented instead of creating a new instance
 
     bool matches_search_text(char const *search_substr) const noexcept
     {
+        assert(!cstr_empty(search_substr));
         bool match =
             StrStrIA(this->loc.file_name(),                               search_substr) ||
             StrStrIA(this->loc.function_name(),                           search_substr) ||
@@ -76,12 +73,10 @@ struct debug_log
     char const *fmt;
     std::source_location loc;
 
-    static debug_log_record *g_last_record;
     static std::string g_search_text;
-    static std::vector<debug_log_record> g_records_shown;
-    static std::vector<debug_log_record> g_records_hidden;
+    static std::vector<debug_log_record> g_records;
+    static std::vector<u64> g_records_visible_indices;
     static std::mutex g_mutex;
-    static u64 g_next_id;
     static bool g_logging_enabled;
 
     debug_log(char const *f, std::source_location l = std::source_location::current()) noexcept
@@ -91,8 +86,8 @@ struct debug_log
 
     static void clear() noexcept
     {
-        g_records_shown.clear();
-        g_records_hidden.clear();
+        g_records.clear();
+        g_records_visible_indices.clear();
     }
 };
 
@@ -127,35 +122,39 @@ void print_debug_msg([[maybe_unused]] debug_log pack, [[maybe_unused]] Args&&...
         pack.loc.function_name(),
         formatted_message.data());
 
-    std::vector<debug_log_record> &dst_vec = debug_log::g_records_shown;
-
-    if (!debug_log::g_search_text.empty()) {
-        bool match = false;
-        auto markdown_line_copy = markdown_line;
-        char const *piece = strtok(markdown_line_copy.data(), "|");
-        while (piece != nullptr) {
-            if (StrStrIA(piece, debug_log::g_search_text.c_str())) {
-                match = true;
-                break;
-            }
-            piece = strtok(nullptr, "|");
-        }
-        dst_vec = match ? debug_log::g_records_shown : debug_log::g_records_hidden;
-    }
-
     {
         std::scoped_lock lock(debug_log::g_mutex);
 
-        if (debug_log::g_last_record && cstr_eq(debug_log::g_last_record->message.c_str(), formatted_message.data())) {
-            debug_log::g_last_record->num_repeats += 1;
+        bool record_matches_search_text = false;
+
+        if (debug_log::g_search_text.size()) {
+            auto markdown_line_copy = markdown_line;
+            char const *piece = strtok(markdown_line_copy.data(), "|");
+            while (piece != nullptr) {
+                if (StrStrIA(piece, debug_log::g_search_text.c_str())) {
+                    record_matches_search_text = true;
+                    break;
+                }
+                piece = strtok(nullptr, "|");
+            }
+        }
+
+        if (!debug_log::g_records.empty() && cstr_eq(formatted_message.data(), debug_log::g_records.back().message.c_str())) {
+            debug_log::g_records.back().num_repeats += 1;
         }
         else {
-            u64 used_size = sizeof(debug_log_record) * (debug_log::g_records_shown.size() + debug_log::g_records_hidden.size());
-            if (used_size > max_size) {
-                debug_log::clear();
+            u64 used_size = sizeof(debug_log_record) * debug_log::g_records.size();
+            if (used_size >= max_size) {
+                u64 halfway = debug_log::g_records.size() / 2;
+                debug_log::g_records.erase(debug_log::g_records.begin(), debug_log::g_records.begin() + halfway);
             }
-            dst_vec.reserve(max_size / sizeof(debug_log_record));
-            debug_log::g_last_record = &dst_vec.emplace_back(formatted_message.data(), pack.loc, system_time, debug_log::g_next_id++, imgui_time, thread_id, 0);
+            debug_log::g_records.reserve(max_size / sizeof(debug_log_record));
+
+            debug_log::g_records.emplace_back(formatted_message.data(), pack.loc, system_time, imgui_time, thread_id, 0);
+
+            if (debug_log::g_search_text.empty() || record_matches_search_text) {
+                debug_log::g_records_visible_indices.push_back(std::max<u64>(debug_log::g_records.size(), 1) - 1);
+            }
         }
     }
 
