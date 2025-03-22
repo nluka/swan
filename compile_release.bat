@@ -15,9 +15,9 @@ resource/swan.res ^
 /Fo:obj_release\ ^
 /Fe:dist/swan_release.exe ^
 /Fd:dist/vc140_release.pdb ^
-/I"C:/code/glfw" ^
-/I"C:/code/glew-2.1.0" ^
-/I"C:/code/boost_1_80_0" ^
+/I"glfw3" ^
+/I"glew" ^
+/I"E:/dev/boost_1_80_0" ^
 /std:c++20 ^
 /nologo ^
 /W4 ^
@@ -30,9 +30,9 @@ resource/swan.res ^
 /SUBSYSTEM:WINDOWS ^
 /NODEFAULTLIB:MSVCRTD ^
 /NODEFAULTLIB:LIBCMT ^
-/LIBPATH:"C:/code/glfw" ^
-/LIBPATH:"C:/code/glew-2.1.0" ^
-/LIBPATH:"C:/code/boost_1_80_0/stage/lib" ^
+/LIBPATH:"glfw3" ^
+/LIBPATH:"glew" ^
+/LIBPATH:"E:/dev/boost_1_80_0/stage/lib" ^
 glfw3.lib ^
 opengl32.lib ^
 glew32s.lib ^

@@ -59,10 +59,10 @@
 #include <d3d11.h>
 
 #define GLEW_STATIC
-#include <glew.h>
+#include "../glew/glew.h"
 
 #define GL_SILENCE_DEPRECATION
-#include <glfw3.h> // Will drag system OpenGL headers
+#include "../glfw3/glfw3.h" // Will drag system OpenGL headers
 
 #pragma warning(push)
 #pragma warning(disable: 4244)

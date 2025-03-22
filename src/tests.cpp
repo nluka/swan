@@ -257,45 +257,45 @@ try {
             ntest::assert_bool(true, path_loosely_same(p2, p1));
         }
         {
-            swan_path p1 = path_create("C:\\code\\");
-            swan_path p2 = path_create("C:\\code");
+            swan_path p1 = path_create("E:\\dev\\");
+            swan_path p2 = path_create("E:\\dev");
             ntest::assert_bool(true, path_loosely_same(p1, p2));
             ntest::assert_bool(true, path_loosely_same(p2, p1));
         }
         {
-            swan_path p1 = path_create("C:/code/");
-            swan_path p2 = path_create("C:/code/");
+            swan_path p1 = path_create("E:/dev/");
+            swan_path p2 = path_create("E:/dev/");
             ntest::assert_bool(true, path_loosely_same(p1, p2));
             ntest::assert_bool(true, path_loosely_same(p2, p1));
         }
         {
-            swan_path p1 = path_create("C:/code///");
-            swan_path p2 = path_create("C:/code/");
+            swan_path p1 = path_create("E:/dev///");
+            swan_path p2 = path_create("E:/dev/");
             ntest::assert_bool(true, path_loosely_same(p1, p2));
             ntest::assert_bool(true, path_loosely_same(p2, p1));
         }
         {
-            swan_path p1 = path_create("C:/code///");
-            swan_path p2 = path_create("C:/code//");
+            swan_path p1 = path_create("E:/dev///");
+            swan_path p2 = path_create("E:/dev//");
             ntest::assert_bool(true, path_loosely_same(p1, p2));
             ntest::assert_bool(true, path_loosely_same(p2, p1));
         }
         {
-            swan_path p1 = path_create("C:/code///");
-            swan_path p2 = path_create("C:/Code//");
+            swan_path p1 = path_create("E:/dev///");
+            swan_path p2 = path_create("E:/dev//");
             ntest::assert_bool(true, path_loosely_same(p1, p2));
             ntest::assert_bool(true, path_loosely_same(p2, p1));
         }
 
         {
-            swan_path p1 = path_create("C:/code///");
-            swan_path p2 = path_create("C:/cod");
+            swan_path p1 = path_create("E:/dev///");
+            swan_path p2 = path_create("E:/de");
             ntest::assert_bool(false, path_loosely_same(p1, p2));
             ntest::assert_bool(false, path_loosely_same(p2, p1));
         }
         {
-            swan_path p1 = path_create("C:\\code");
-            swan_path p2 = path_create("C:\\");
+            swan_path p1 = path_create("E:\\dev");
+            swan_path p2 = path_create("E:\\");
             ntest::assert_bool(false, path_loosely_same(p1, p2));
             ntest::assert_bool(false, path_loosely_same(p2, p1));
         }
@@ -324,7 +324,7 @@ try {
             ntest::assert_cstr("cpp", sut.ext);
         }
         {
-            char name[] = "C:/code/swan/src/explorer_window.cpp";
+            char name[] = "E:/dev/swan/src/explorer_window.cpp";
             temp_filename_extension_splitter sut(name);
             ntest::assert_cstr("explorer_window", sut.name);
             ntest::assert_cstr("cpp", sut.ext);

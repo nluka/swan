@@ -4,16 +4,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 option(CMAKE_BUILD_TYPE "Build type, Debug or Release")
-option(GLFW3_PATH "Path to directory containing <glfw3.h> and <glfw3.lib> files")
-option(GLEW_PATH "Path to directory containing <glew.h> and <glew32s.lib> files")
 option(BOOST_PATH "Path to standard Boost 1.80.0 directory")
 
-if(NOT GLFW3_PATH)
-    message(FATAL_ERROR "Please provide path to directory containing <glfw3.h> and <glfw3.lib> files with -DGLFW3_PATH=/path/to/dir")
-endif()
-if(NOT GLEW_PATH)
-    message(FATAL_ERROR "Please provide path to directory containing <glew.h> and <glew.lib> files with -DGLEW_PATH=/path/to/dir")
-endif()
+set(GLFW3_PATH "./glfw3/")
+set(GLEW_PATH "./glew/")
+
 if(NOT BOOST_PATH)
     message(FATAL_ERROR "Please provide path to Boost 1.80.0 directory with -DBOOST_PATH=/path/to/dir")
 endif()
@@ -42,10 +37,10 @@ set_property(TARGET imgui PROPERTY
     MSVC_RUNTIME_LIBRARY "MultiThreaded" # to eliminate MSVC warning D9025 `overriding '/MDd' with '/MT'`
 )
 target_include_directories(imgui PRIVATE
-    ${GLFW3_INCLUDE_PATH}
+    ${GLFW3_PATH}
 )
 target_link_directories(imgui PRIVATE
-    ${GLFW3_LIB_PATH}
+    ${GLFW3_PATH}
 )
 target_link_options(imgui PRIVATE
     /Z7 # embed debug info directly into .obj files, to enable stepping into imgui code during debug
@@ -113,7 +108,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         ${GLEW_PATH}
     )
     target_link_directories(swan_debug PRIVATE
-        ${BOOST_LIB_PATH}/stage/lib
+        ${BOOST_PATH}/stage/lib
+        ${GLFW3_PATH}
         ${GLEW_PATH}
     )
     target_link_libraries(swan_debug PRIVATE
@@ -155,11 +151,13 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     )
     target_include_directories(swan_release PRIVATE
         ${BOOST_PATH}
-        ${GLFW3_INCLUDE_PATH}
+        ${GLFW3_PATH}
+        ${GLEW_PATH}
     )
     target_link_directories(swan_release PRIVATE
-        ${BOOST_LIB_PATH}
-        ${GLFW3_LIB_PATH}
+        ${BOOST_PATH}
+        ${GLFW3_PATH}
+        ${GLEW_PATH}
     )
     target_link_libraries(swan_release PRIVATE
         imgui

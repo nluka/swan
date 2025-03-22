@@ -1,11 +1,13 @@
-cls && cd C:/code/swan/ && ptime.exe .\precompile_debug
-cls && cd C:/code/swan/ && ptime.exe .\compile_imgui_debug
+cls && cd E:/dev/swan/ && ptime.exe .\precompile_debug
+cls && cd E:/dev/swan/ && ptime.exe .\compile_imgui_debug
 
-cls && cd C:/code/swan/ && ptime.exe .\compile_debug && .\dist\swan_debug.exe
-cls && cd C:/code/swan/ && ptime.exe .\compile_tests_debug && .\dist\swan_tests_debug.exe
+cls && cd E:/dev/swan/ && ptime.exe .\compile_debug && .\dist\swan_debug.exe
+cls && cd E:/dev/swan/ && ptime.exe .\compile_tests_debug && .\dist\swan_tests_debug.exe
 
-cls && cd C:/code/swan/ && ptime.exe .\compile_release && .\dist\swan_release.exe
-cls && cd C:/code/swan/ && ptime.exe .\compile_tests_release && .\dist\swan_tests_release.exe
+cls && cd E:/dev/swan/ && ptime.exe .\compile_release && .\dist\swan_release.exe
+cls && cd E:/dev/swan/ && ptime.exe .\compile_tests_release && .\dist\swan_tests_release.exe
 
-cls && cd C:/code/swan/ && ptime.exe rc /r resource/swan.rc
-cls && cd C:/code/swan/ && ptime.exe windres resource/swan.rc -O coff -o resource/swan.res
+cls && cd E:/dev/swan/ && ptime.exe rc /r resource/swan.rc
+cls && cd E:/dev/swan/ && ptime.exe windres resource/swan.rc -O coff -o resource/swan.res
+
+cmake .. -DBOOST_PATH=E:/dev/boost_1_80_0 -G Ninja -DCMAKE_BUILD_TYPE=Debug
