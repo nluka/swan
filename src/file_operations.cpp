@@ -947,7 +947,7 @@ bool swan_windows::render_file_operations(bool &open, bool any_popups_open) noex
                     execute_forget_immediately = imgui::OpenConfirmationModal(
                         swan_id_confirm_completed_file_operations_forget,
                         make_str("Are you sure you want to forget %zu rows? This action cannot be undone.",
-                                s_num_selected_when_context_menu_opened).c_str(),
+                                 std::max(s_num_selected_when_context_menu_opened, u64(1))).c_str(),
                         &global_state::settings().confirm_completed_file_operations_forget
                     );
                 }
