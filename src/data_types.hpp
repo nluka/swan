@@ -452,7 +452,6 @@ struct explorer_window
     bool footer_filter_info_hovered = false;
     bool footer_selection_info_hovered = false;
     bool footer_clipboard_hovered = false;
-    bool highlight_footer = false;
     bool tabbing_set_focus = false;
 
     update_cwd_entries_actions update_request_from_outside = nil; /* how code from outside the Begin()/End() of the explorer window

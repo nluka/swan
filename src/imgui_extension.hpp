@@ -9,6 +9,8 @@
 
 namespace ImGui
 {
+    void RenderInputBlockingOverlay(ImVec2 pos, ImVec2 size) noexcept;
+
     void ClearNavFocus(bool clear_window = false) noexcept;
 
     ImVec4 RGBA_to_ImVec4(s32 r, s32 g, s32 b, s32 a) noexcept;

@@ -501,3 +501,20 @@ void imgui::ClearNavFocus(bool clear_window) noexcept
 
     g.NavWindow = clear_window ? NULL : g.NavWindow;
 }
+
+void imgui::RenderInputBlockingOverlay(ImVec2 pos, ImVec2 size) noexcept
+{
+    ImGui::SetNextWindowPos(pos);
+    ImGui::SetNextWindowSize(size);
+
+    ImGuiWindowFlags blocker_flags =
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_NoBackground |
+        ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoNav
+    ;
+
+    ImGui::Begin("TooltipBlocker", nullptr, blocker_flags);
+    ImGui::End();
+}

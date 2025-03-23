@@ -1,5 +1,5 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
-#include "glfw3native.h"
+#include "../glfw3/glfw3native.h"
 
 #include "stdafx.hpp"
 #include "common_functions.hpp"
@@ -205,10 +205,11 @@ try {
             }
 
             auto [starting_dir_exists, _] = expl.update_cwd_entries(query_filesystem, expl.cwd.data());
-            if (starting_dir_exists) {
+            // if (starting_dir_exists) {
+                // Perform filter even when !starting_dir_exists, so that if there is a malformed filter_text an error is generated and set
                 expl.set_latest_valid_cwd(expl.cwd, true); // prevent filter reset after load_from_disk
                 (void) expl.update_cwd_entries(filter, expl.cwd.data());
-            }
+            // }
         }
     }
 
@@ -343,7 +344,7 @@ try {
                     break;
                 }
                 case swan_windows::id::explorer_0_debug: {
-                    if (window_visib.explorer_0_debug && expl_rendered[0]) {
+                    if (window_visib.explorer_0_debug /* && expl_rendered[0] */) {
                         if (swan_windows::render_explorer_debug(explorers[0], window_visib.explorer_0_debug, any_popups_open)) {
                             if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
                                 window_render_order_move_to_back(swan_windows::id::explorer_0_debug);
@@ -354,7 +355,7 @@ try {
                     break;
                 }
                 case swan_windows::id::explorer_1_debug: {
-                    if (window_visib.explorer_1_debug && expl_rendered[1]) {
+                    if (window_visib.explorer_1_debug /* && expl_rendered[1] */) {
                         if (swan_windows::render_explorer_debug(explorers[1], window_visib.explorer_1_debug, any_popups_open)) {
                             if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
                                 window_render_order_move_to_back(swan_windows::id::explorer_1_debug);
@@ -365,7 +366,7 @@ try {
                     break;
                 }
                 case swan_windows::id::explorer_2_debug: {
-                    if (window_visib.explorer_2_debug && expl_rendered[2]) {
+                    if (window_visib.explorer_2_debug /* && expl_rendered[2] */) {
                         if (swan_windows::render_explorer_debug(explorers[2], window_visib.explorer_2_debug, any_popups_open)) {
                             if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
                                 window_render_order_move_to_back(swan_windows::id::explorer_2_debug);
@@ -376,7 +377,7 @@ try {
                     break;
                 }
                 case swan_windows::id::explorer_3_debug: {
-                    if (window_visib.explorer_3_debug && expl_rendered[3]) {
+                    if (window_visib.explorer_3_debug /* && expl_rendered[3] */) {
                         if (swan_windows::render_explorer_debug(explorers[3], window_visib.explorer_3_debug, any_popups_open)) {
                             if (imgui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && imgui::GetFrameCount() > 1) {
                                 window_render_order_move_to_back(swan_windows::id::explorer_3_debug);

@@ -144,7 +144,7 @@
         va_list args;
         va_start(args, fmt);
         [[maybe_unused]] s32 cnt = vsnprintf(retval.data(), retval.max_size(), fmt, args);
-        assert(cnt > 0);
+        // assert(cnt > 0);
         assert(cnt < retval.max_size());
         va_end(args);
 
