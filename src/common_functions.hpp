@@ -58,7 +58,7 @@ namespace swan_windows
             case id::explorer_2_debug: return " Explorer 3 Debug ";
             case id::explorer_3_debug: return " Explorer 4 Debug ";
             case id::finder: return " Finder ";
-            case id::pinned: return " Pinned ";
+            case id::pinned: return " Bookmarks ";
             case id::file_operations: return " File Operations ";
             case id::recent_files: return " Recent Files ";
             case id::analytics: return " Analytics ";
@@ -119,8 +119,8 @@ namespace swan_popup_modals
     constexpr char const *label_error = " Error ## popup_modal";
     constexpr char const *label_single_rename = " Rename ## popup_modal";
     constexpr char const *label_bulk_rename = " Bulk Rename ## popup_modal";
-    constexpr char const *label_new_pin = " New Pin ## popup_modal";
-    constexpr char const *label_edit_pin = " Edit Pin ## popup_modal";
+    constexpr char const *label_new_pin = " New Bookmark ## popup_modal";
+    constexpr char const *label_edit_pin = " Edit Bookmark ## popup_modal";
     constexpr char const *label_new_file = " New File ## popup_modal";
     constexpr char const *label_new_directory = " New Directory ## popup_modal";
 

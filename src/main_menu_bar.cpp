@@ -247,7 +247,7 @@ void render_main_menu_bar(GLFWwindow *window, std::array<explorer_window, global
                 setting_change |= imgui::MenuItem("[Recent Files]     Clear", nullptr, &global_state::settings().confirm_recent_files_clear);
                 setting_change |= imgui::MenuItem("[Recent Files]     Reveal selection in File Explorer", nullptr, &global_state::settings().confirm_recent_files_reveal_selected_in_win_file_expl);
                 setting_change |= imgui::MenuItem("[Recent Files]     Forget selection", nullptr, &global_state::settings().confirm_recent_files_forget_selected);
-                setting_change |= imgui::MenuItem("[Pinned]           Delete pin", nullptr, &global_state::settings().confirm_delete_pin);
+                setting_change |= imgui::MenuItem("[Bookmarks]        Delete bookmark", nullptr, &global_state::settings().confirm_delete_pin);
                 setting_change |= imgui::MenuItem("[Explorer]         Delete via context menu", nullptr, &global_state::settings().confirm_explorer_delete_via_context_menu);
                 setting_change |= imgui::MenuItem("[Explorer]         Delete via Del key", nullptr, &global_state::settings().confirm_explorer_delete_via_keybind);
                 setting_change |= imgui::MenuItem("[Explorer]         Unpin working directory", nullptr, &global_state::settings().confirm_explorer_unpin_directory);

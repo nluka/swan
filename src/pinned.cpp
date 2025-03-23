@@ -61,7 +61,7 @@ std::pair<pinned_path *, bool> swan_windows::render_pinned(pinned_path *s_contex
     if (search_text_edited) {
         s_focus_idx = -1;
         s_hidden_begin_iter = s_search_buf.empty() ? pins.end() : std::partition(pins.begin(), pins.end(), [](pinned_path const &elem) {
-            return strstr(elem.label.c_str(), s_search_buf.c_str());
+            return StrStrIA(elem.label.c_str(), s_search_buf.c_str()) || StrStrIA(elem.path.data(), s_search_buf.c_str());
         });
     }
 

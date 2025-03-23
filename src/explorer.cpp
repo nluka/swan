@@ -2218,7 +2218,7 @@ struct render_filter_text_input_result
     bool edited;
 };
 static
-render_filter_text_input_result render_filter_text_input(explorer_window &expl, bool window_hovered, bool ctrl_key_down, cwd_count_info const &cnt, bool cwd_exists_after_edit) noexcept
+render_filter_text_input_result render_filter_text_input(explorer_window &expl, bool window_hovered, bool ctrl_key_down, cwd_count_info const &cnt, bool cwd_exists_after_edit, bool any_popups_open) noexcept
 {
     render_filter_text_input_result retval = {};
 
@@ -2293,7 +2293,7 @@ render_filter_text_input_result render_filter_text_input(explorer_window &expl, 
         expl.tabbing_set_focus = true;
     }
 
-    if (window_hovered && ctrl_key_down && !path_is_empty(expl.cwd) && imgui::IsKeyPressed(ImGuiKey_F)) {
+    if (!any_popups_open && window_hovered && ctrl_key_down && !path_is_empty(expl.cwd) && imgui::IsKeyPressed(ImGuiKey_F)) {
         imgui::ActivateItemByID(imgui::GetID("## explorer_window filter"));
         expl.tabbing_focus_idx = -1;
     }
@@ -2477,7 +2477,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists) noexcept
     }
     bool already_pinned = pin_idx != std::string::npos;
 
-    auto label = make_str_static<8>("%s", already_pinned ? ICON_CI_STAR_FULL : ICON_CI_STAR_EMPTY);
+    auto label = make_str_static<8>("%s", already_pinned ? ICON_LC_BOOKMARK_CHECK : ICON_LC_BOOKMARK_PLUS);
 
     imgui::ScopedDisable disabled(!cwd_exists && !already_pinned);
     imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
@@ -2490,7 +2490,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists) noexcept
                 [pin_idx]() noexcept {
                     auto const &pin = global_state::pinned_get()[pin_idx];
 
-                    imgui::TextUnformatted("Are you sure you want to delete this pin?");
+                    imgui::TextUnformatted("Are you sure you want to delete this bookmark?");
                     imgui::Spacing(2);
 
                     imgui::SameLineSpaced(1); // indent
@@ -2514,7 +2514,7 @@ void render_button_pin_cwd(explorer_window &expl, bool cwd_exists) noexcept
         (void) global_state::pinned_save_to_disk();
     }
     if (imgui::IsItemHovered({}, 1)) {
-        imgui::SetTooltip("%s current working directory", already_pinned ? "Unpin" : "Pin");
+        imgui::SetTooltip("%s current working directory", already_pinned ? "Unbookmark" : "Bookmark");
     }
 }
 
@@ -2624,8 +2624,8 @@ void render_help_icon(explorer_window &expl) noexcept
                     { {"Ctrl N F"}, {"New file"}, {"Open modal for creating a new empty file."} },
                     { {"Ctrl N D"}, {"New directory"}, {"Open modal for creating a new empty directory."} },
                     { {"Ctrl H"}, {"Open history"}, {"Open history modal where you can view and navigate to previous working directories."} },
-                    { {"Ctrl P"}, {"Pin current working directory"}, {"Open modal to pin the current working directory, or modify the existing pin."} },
-                    { {"Ctrl O"}, {"Open pins"}, {"Open modal where pinned directories can be accessed."} },
+                    { {"Ctrl P"}, {"Bookmark current working directory"}, {"Open modal to bookmark the current working directory, or modify the existing bookmark."} },
+                    { {"Ctrl O"}, {"Open bookmarks"}, {"Open modal where bookmarked directories can be accessed."} },
                 };
 
                 imgui::TableSetupColumn("KEYBIND", {}, {}, 0);
@@ -3007,17 +3007,17 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             }
         }
         else if (window_focused_or_hovered && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_O)) {
-            imgui::OpenPopup("Pins");
+            imgui::OpenPopup("Bookmarks");
         }
     }
 
-    if (imgui::IsPopupOpen("Pins")) {
+    if (imgui::IsPopupOpen("Bookmarks")) {
         ImVec2 avail = imgui::GetContentRegionAvail();
         avail.y -= imgui::GetStyle().WindowPadding.y*10;
         imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Always);
         imgui::SetNextWindowSize(imgui::GetWindowContentRegionMax(), ImGuiCond_Always);
     }
-    if (imgui::BeginPopupModal("Pins", nullptr, ImGuiWindowFlags_NoResize)) {
+    if (imgui::BeginPopupModal("Bookmarks", nullptr, ImGuiWindowFlags_NoResize)) {
         static pinned_path *s_context_target = nullptr;
         auto [open_target_, close_btn] = render_pinned(s_context_target, true);
 
@@ -3028,8 +3028,8 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         if (open_target_) {
             if (!directory_exists(open_target_->path.data())) {
-                std::string action = make_str("Open pin [%s].", open_target_->label.c_str());
-                std::string failed = make_str("Pin path [%s] does not exit.", open_target_->path.data());
+                std::string action = make_str("Open bookmark [%s].", open_target_->label.c_str());
+                std::string failed = make_str("Bookmark path [%s] does not exit.", open_target_->path.data());
                 swan_popup_modals::open_error(action.c_str(), failed.c_str());
             }
             else {
@@ -3442,7 +3442,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
             cnt = do_counting(expl);
         }
 
-        auto [filter_focused, filter_edited] = render_filter_text_input(expl, window_hovered, io.KeyCtrl, cnt, cwd_exists_after_edit);
+        auto [filter_focused, filter_edited] = render_filter_text_input(expl, window_hovered, io.KeyCtrl, cnt, cwd_exists_after_edit, any_popups_open);
         expl.filter_text_input_focused = filter_focused;
 
         imgui::SameLine();
@@ -3496,8 +3496,8 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         imgui::SameLine(0, 0);
         {
             imgui::ScopedItemFlag no_nav(ImGuiItemFlags_NoNav, true);
-            if (imgui::Button(ICON_LC_BOOK_OPEN_TEXT)) imgui::OpenPopup("Pins");
-            if (imgui::IsItemHovered({}, 1)) imgui::SetTooltip("Open pins");
+            if (imgui::Button(ICON_LC_BOOK_OPEN_TEXT)) imgui::OpenPopup("Bookmarks");
+            if (imgui::IsItemHovered({}, 1)) imgui::SetTooltip("Open bookmarks");
         }
 
         imgui::SameLine(0, 0);
