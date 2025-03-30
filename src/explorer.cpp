@@ -3191,7 +3191,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         return cnt;
     };
 
-    cwd_count_info cnt = do_counting(expl);
+    cwd_count_info cnt;
 
     // header controls
     {
@@ -3210,9 +3210,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
 
         auto [_, cwd_edited] = render_cwd_text_input(expl, cwd_exists_after_edit, dir_sep_utf8, dir_sep_utf16, 0, cwd_exists_before_edit);
 
-        if (cwd_edited) { // recount
-            cnt = do_counting(expl);
-        }
+        cnt = do_counting(expl);
 
     #if 1
         bool show_dir_not_found_msg = !cwd_exists_after_edit;
