@@ -647,26 +647,30 @@ generic_result symlink_data::save(char const *lnk_file_path_utf8, char const *cw
     assert(lnk_file_path_utf8 != nullptr);
     assert(this->target_path_utf8.data() != nullptr);
 
-    swan_path lnk_file_full_path_utf8;
-    wchar_t lnk_file_path_utf16[MAX_PATH];
+    swan_path lnk_file_full_path_utf8, lnk_target_full_path_utf8;
+    wchar_t lnk_file_path_utf16[MAX_PATH], lnk_file_target_utf16[MAX_PATH];
     cstr_clear(lnk_file_path_utf16);
     HRESULT com_handle = {};
 
     if (cwd) {
         lnk_file_full_path_utf8 = path_create(cwd);
+        lnk_target_full_path_utf8 = path_create(cwd);
 
         if (!path_append(lnk_file_full_path_utf8, lnk_file_path_utf8, global_state::settings().dir_separator_utf8, true)) {
             return { false, "Max path length exceeded when appending symlink name to current working directory path." };
         }
+        if (!path_append(lnk_target_full_path_utf8, this->target_path_utf8.data(), global_state::settings().dir_separator_utf8, true)) {
+            return { false, "Max path length exceeded when appending symlink target path to current working directory path." };
+        }
     } else {
         lnk_file_full_path_utf8 = path_create(lnk_file_path_utf8);
+        lnk_target_full_path_utf8 = path_create(this->target_path_utf8.data());
     }
 
     if (!utf8_to_utf16(lnk_file_full_path_utf8.data(), lnk_file_path_utf16, lengthof(lnk_file_path_utf16))) {
         return { false, "Conversion of symlink path from UTF-8 to UTF-16 failed." };
     }
-
-    if (!utf8_to_utf16(this->target_path_utf8.data(), this->target_path_utf16, MAX_PATH)) {
+    if (!utf8_to_utf16(lnk_target_full_path_utf8.data(), this->target_path_utf16, MAX_PATH)) {
         return { false, "Conversion of symlink target path from UTF-8 to UTF-16 failed." };
     }
 

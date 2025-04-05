@@ -180,16 +180,16 @@ bool swan_windows::render_finder(finder_window &finder, bool &open, [[maybe_unus
                 imgui::EndDragDropTarget();
             }
 
-            if (imgui::IsItemFocused() && imgui::IsKeyPressed(ImGuiKey_O)) {
-                imgui::OpenPopup("Pins");
+            if (imgui::IsItemFocused() && io.KeyCtrl && imgui::IsKeyPressed(ImGuiKey_O)) {
+                imgui::OpenPopup("Bookmarks");
             }
-            if (imgui::IsPopupOpen("Pins")) {
+            if (imgui::IsPopupOpen("Bookmarks")) {
                 ImVec2 avail = imgui::GetContentRegionAvail();
                 avail.y -= imgui::GetStyle().WindowPadding.y*10;
                 imgui::SetNextWindowPos(base_window_pos, ImGuiCond_Always);
                 imgui::SetNextWindowSize(imgui::GetWindowContentRegionMax(), ImGuiCond_Always);
             }
-            if (imgui::BeginPopupModal("Pins", nullptr, ImGuiWindowFlags_NoResize)) {
+            if (imgui::BeginPopupModal("Bookmarks", nullptr, ImGuiWindowFlags_NoResize)) {
                 static pinned_path *s_context_target = nullptr;
                 auto [open_target, close_btn] = render_pinned(s_context_target, true);
 
