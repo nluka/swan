@@ -3217,7 +3217,7 @@ bool swan_windows::render_explorer(explorer_window &expl, bool &open, finder_win
         cnt = do_counting(expl);
 
     #if 1
-        bool show_dir_not_found_msg = !cwd_exists_after_edit;
+        bool show_dir_not_found_msg = !path_is_empty(expl.cwd) && !cwd_exists_after_edit;
         bool show_empty_dir_msg = (cwd_exists_after_edit && expl.cwd_entries.empty());
         bool show_tooltip = show_dir_not_found_msg || show_empty_dir_msg;
 
