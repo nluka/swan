@@ -665,9 +665,15 @@ LONG WINAPI custom_exception_handler(EXCEPTION_POINTERS *exception_info) noexcep
 {
     _tprintf(_T("Unhandled exception. Generating crash dump...\n"));
 
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+    std::stringstream ss = {};
+    ss << "swan_crash " << std::put_time(&tm, "%d-%m-%Y %H-%M-%S") << ".dmp";
+
     // Create a crash dump file
     HANDLE dump_file = CreateFile(
-        _T("swan_crash.dmp"),
+        // _T("swan_crash.dmp"),
+        ss.str().c_str(),
         GENERIC_WRITE,
         0,
         NULL,
